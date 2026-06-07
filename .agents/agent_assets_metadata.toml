@@ -1,0 +1,85 @@
+uploads = []
+
+[[generated]]
+id = "Qd1-ZuBSP8RJQlpuGS3UA"
+uri = "file://artifacts/debryansk-avto/src/assets/hero-bg.png"
+type = "image"
+title = "Premium auto showroom interior"
+
+[[generated]]
+id = "7ENtLK-wM9oCBj4AU4NMj"
+uri = "file://artifacts/debryansk-avto/src/assets/dealer-chery.png"
+type = "image"
+title = "CHERY showroom exterior"
+
+[[generated]]
+id = "RlQ_DYtGTY8jd8KNtTU9M"
+uri = "file://artifacts/debryansk-avto/src/assets/dealer-jaecoo.png"
+type = "image"
+title = "JAECOO showroom exterior"
+
+[[generated]]
+id = "RO4O5b949WEzk8AI4i8Zu"
+uri = "file://artifacts/debryansk-avto/src/assets/dealer-tenet.png"
+type = "image"
+title = "TENET showroom exterior"
+
+[[generated]]
+id = "gqcidLH2hlwYk5zyXn7qF"
+uri = "file://artifacts/debryansk-avto/src/assets/dealer-used.png"
+type = "image"
+title = "Premium used cars lot"
+
+[[outputs]]
+id = "YNtFUw3ER9ginfoEBVk3l"
+uri = "file://artifacts/debryansk-avto/src/assets/dealer-omoda.png"
+type = "image"
+title = "modern car dealership showroom exterior futuristic architecture"
+
+[[outputs]]
+id = "otl2AtWDJaIiD-WlpfaiI"
+uri = "file://artifacts/debryansk-avto/src/assets/dealer-haval.png"
+type = "image"
+title = "large modern suv dealership building exterior clean lines"
+
+[[outputs]]
+id = "sfZ1K2iZUJd6JUWlSJzpj"
+uri = "file://artifacts/debryansk-avto/src/assets/dealer-mb.png"
+type = "image"
+title = "ultra luxury german car dealership interior premium lighting"
+
+[[outputs]]
+id = "UgWv2j3MejkEUtcEmyc_3"
+uri = "file://artifacts/mockup-sandbox/public/images/hero-dynamic.jpg"
+type = "image"
+title = "modern car showroom"
+
+[[outputs]]
+id = "aleb8MVtT0z_1Y9DF9qXG"
+uri = "file://artifacts/mockup-sandbox/public/images/hero-luxury.jpg"
+type = "image"
+title = "dark luxury car showroom interior night cinematic"
+
+[[outputs]]
+id = "Gowsclks95bghWr3BScG8"
+uri = "file://attached_assets/image_search/hero_showroom_many.jpg"
+type = "image"
+title = "1 — Шоурум с множеством авто (цветное)"
+
+[[outputs]]
+id = "hLCp-bOI35W02z4psM5t1"
+uri = "file://attached_assets/image_search/hero_sports_row.jpg"
+type = "image"
+title = "2 — Ряд спортивных авто (яркое, цветное)"
+
+[[outputs]]
+id = "Z5Ikd8R_jYEiD5yrX7sOz"
+uri = "file://attached_assets/image_search/hero_showroom_bw.jpg"
+type = "image"
+title = "3 — Шоурум ч/б (драматичный, премиум)"
+
+[[outputs]]
+id = "UZw9H0MPkfYwudYtp-Uzd"
+uri = "file://attached_assets/image_search/hero_garage_bw.jpg"
+type = "image"
+title = "4 — Ряд авто в гараже ч/б"
