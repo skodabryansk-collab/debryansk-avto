@@ -28,6 +28,14 @@ interface NewCarRecord {
   maxDiscount: number;
   creditDiscount: number;
   tradeinDiscount: number;
+  extras: string;
+  description: string;
+  vin: string;
+  doorsCount: number;
+  wheel: string;
+  armored: string;
+  custom: string;
+  phone: string;
 }
 
 const DEALER_COLORS: Record<string, string> = {
@@ -362,6 +370,7 @@ export default function NewCarDetail() {
             id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
             run: 0, color: car.color, bodyType: car.bodyType, modification: car.modification,
             images: car.images, availability: car.availability, url: car.url, type: "new" as const,
+            extras: car.extras, complectation: car.complectation, vin: car.vin,
           })}
           className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all ${
             isInCompare(car.id)
@@ -467,6 +476,20 @@ export default function NewCarDetail() {
             </div>
           </div>
 
+          {/* Options */}
+          {car.extras && (
+            <div className="bg-white rounded-2xl border border-slate-100 p-4">
+              <h2 className="text-sm font-extrabold mb-3 text-slate-900">Опции и комплектация</h2>
+              <div className="flex flex-wrap gap-1.5">
+                {car.extras.split(", ").filter(Boolean).map((opt, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 bg-slate-50 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded-full border border-slate-100">
+                    <CheckCircle className="w-2.5 h-2.5 text-[#87b63c]" /> {opt.trim()}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Advantages */}
           <div className="grid grid-cols-3 gap-2">
             {[
@@ -507,6 +530,20 @@ export default function NewCarDetail() {
                 ))}
               </div>
             </div>
+
+            {/* Options */}
+            {car.extras && (
+              <div className="mt-5 bg-white rounded-2xl border border-slate-100 p-6">
+                <h2 className="text-base font-extrabold mb-4 text-slate-900">Опции и комплектация</h2>
+                <div className="flex flex-wrap gap-2">
+                  {car.extras.split(", ").filter(Boolean).map((opt, i) => (
+                    <span key={i} className="inline-flex items-center gap-1.5 bg-slate-50 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-full border border-slate-100">
+                      <CheckCircle className="w-3 h-3 text-[#87b63c]" /> {opt.trim()}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Advantages */}
             <div className="mt-4 grid grid-cols-3 gap-3">
