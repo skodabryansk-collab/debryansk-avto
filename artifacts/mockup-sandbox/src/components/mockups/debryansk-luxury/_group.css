@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600;700&display=swap');
+
+.luxury-theme {
+  --bg-color: #0d0f14;
+  --text-primary: #ffffff;
+  --text-secondary: #9ca3af;
+  --gold-accent: #d4af37;
+  --gold-gradient: linear-gradient(135deg, #d4af37 0%, #aa8420 100%);
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(212, 175, 55, 0.2);
+  --glass-hover-border: rgba(212, 175, 55, 0.8);
+  
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif; /* fallback body */
+}
+
+.font-serif-luxury {
+  font-family: 'Cormorant Garamond', serif;
+}
+
+.luxury-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  transition: all 0.4s ease;
+  backdrop-filter: blur(10px);
+}
+
+.luxury-card:hover {
+  border-color: var(--glass-hover-border);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.gold-text {
+  background: var(--gold-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
