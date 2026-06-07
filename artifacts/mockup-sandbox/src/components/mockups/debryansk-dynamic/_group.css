@@ -1,0 +1,30 @@
+:root {
+  --dynamic-blue: 209 100% 36%; /* #0070b8 */
+  --dynamic-green: 82 50% 47%; /* #87b63c */
+  --dynamic-dark: 222 47% 11%;
+  --dynamic-light: 210 40% 98%;
+  --dynamic-gray: 215 16% 47%;
+}
+
+.dynamic-gradient {
+  background: linear-gradient(135deg, #0070b8 0%, #87b63c 100%);
+}
+
+.dynamic-gradient-text {
+  background: linear-gradient(135deg, #0070b8 0%, #87b63c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.dynamic-clip-path {
+  clip-path: polygon(0 0, 100% 0, 100% 85%, 0 100%);
+}
+
+.hover-scale {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
