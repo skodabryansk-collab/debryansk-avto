@@ -1,0 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 220 10% 15%;
+  --border: 220 10% 90%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 10% 15%;
+  --card-border: 220 10% 90%;
+  --primary: 203 100% 36%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 15% 20%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 220 10% 96%;
+  --muted-foreground: 220 10% 40%;
+  --accent: 203 100% 36%;
+  --accent-foreground: 0 0% 100%;
+  --radius: 0.5rem;
+
+  --brand-blue: #0070b8;
+  --brand-green: #87b63c;
+  --brand-gradient: linear-gradient(135deg, #0070b8 0%, #87b63c 100%);
+
+  font-family: 'Manrope', 'Inter', sans-serif;
+}
