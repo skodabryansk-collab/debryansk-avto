@@ -8,6 +8,7 @@ import {
   Heart, Scale
 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
+import SEO from "@/components/SEO";
 import miniLogo from "@/assets/mini-logo.webp";
 
 interface CarRecord {
@@ -360,8 +361,44 @@ export default function UsedCarDetail() {
     </div>
   );
 
+  const carJsonLd = car ? {
+    "@type": "Vehicle",
+    "name": `${car.mark} ${car.model}`,
+    "brand": car.mark,
+    "model": car.model,
+    "vehicleTransmission": parseTransmission(car.modification),
+    "driveWheelConfiguration": parseDrive(car.modification),
+    "vehicleEngine": {
+      "@type": "EngineSpecification",
+      "name": parseEngine(car.modification)
+    },
+    "mileageFromOdometer": { "@type": "QuantitativeValue", "value": car.run, "unitCode": "KMT" },
+    "vehicleInteriorColor": car.color,
+    "bodyType": car.bodyType,
+    "offers": {
+      "@type": "Offer",
+      "price": car.price,
+      "priceCurrency": "RUB",
+      "availability": "https://schema.org/InStock",
+      "seller": { "@type": "AutoDealer", "name": "Дебрянск Авто" }
+    },
+    "image": car.images.filter(Boolean)[0],
+    "url": `https://debryansk-avto.ru/cars/${car.id}`,
+    "productionDate": car.year
+  } : undefined;
+
   return (
     <div className="min-h-screen bg-slate-50 font-[Manrope,sans-serif] pb-24 lg:pb-0">
+      {car && (
+        <SEO
+          title={`${car.mark} ${car.model} ${car.year} год за ${formatPrice(car.price)}`}
+          description={`Автомобиль ${car.mark} ${car.model}, ${car.year} год, пробег ${formatRun(car.run)}, кузов ${car.bodyType}, цвет ${car.color}, комплектация ${car.modification}. Дебрянск Авто.`}
+          canonical={`/cars/${car.id}`}
+          image={car.images.filter(Boolean)[0] || "/opengraph.jpg"}
+          type="product"
+          jsonLd={carJsonLd}
+        />
+      )}
       <AppHeader backHref="/cars" />
 
       {/* ── MOBILE layout (< lg) ── */}

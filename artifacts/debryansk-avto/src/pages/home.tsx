@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import { HomeActionBtn } from "@/components/HomeActionBtn";
+import SEO from "@/components/SEO";
 import { SiVk, SiTelegram } from "react-icons/si";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -586,6 +587,70 @@ export default function Home() {
   const [scrolled, setScrolled] = useState(false);
   const carouselRef = useRef<HTMLDivElement>(null);
   const { favorites, compare, isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
+
+  const organizationSchema = {
+    "@type": "Organization",
+    "name": "Дебрянск Авто",
+    "url": "https://debryansk-avto.ru",
+    "logo": "https://debryansk-avto.ru/favicon.svg",
+    "description": "Группа компаний по продаже, сервису и финансированию автомобилей в Брянске.",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Брянск",
+      "addressRegion": "Брянская область",
+      "addressCountry": "RU"
+    },
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "+7-4832-000-000",
+      "contactType": "sales"
+    },
+    "sameAs": [
+      "https://vk.com/debryanskavto",
+      "https://t.me/debryanskavto"
+    ]
+  };
+
+  const localBusinessSchema = {
+    "@type": "AutoDealer",
+    "name": "Дебрянск Авто",
+    "image": "https://debryansk-avto.ru/opengraph.jpg",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "ул. Курганская, 10",
+      "addressLocality": "Брянск",
+      "addressRegion": "Брянская область",
+      "postalCode": "241050",
+      "addressCountry": "RU"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": "53.243562",
+      "longitude": "34.363408"
+    },
+    "telephone": "+7-4832-000-000",
+    "openingHoursSpecification": [
+      {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        "opens": "09:00",
+        "closes": "21:00"
+      }
+    ],
+    "priceRange": "$$₽",
+    "paymentAccepted": "Наличные, кредит"
+  };
+
+  const webSiteSchema = {
+    "@type": "WebSite",
+    "url": "https://debryansk-avto.ru",
+    "name": "Дебрянск Авто",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://debryansk-avto.ru/cars?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  };
   const favCount = favorites.length;
   const compCount = compare.length;
 
@@ -628,6 +693,17 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white font-sans text-slate-900">
+
+      <SEO
+        title="Дебрянск Авто — Территория Автомобилей"
+        description="Группа компаний 9 брендов в Брянске. Продажа, сервис и финансирование с 2011 года. Новые автомобили и авто с пробегом."
+        canonical="/"
+        jsonLd={[
+          organizationSchema,
+          localBusinessSchema,
+          webSiteSchema
+        ]}
+      />
 
       {/* ── Modal ──────────────────────────────────────────── */}
       {modal && <Modal type={modal} onClose={closeModal} />}
@@ -690,6 +766,10 @@ export default function Home() {
               className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
               Вакансии
             </Link>
+            <Link href="/news"
+              className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+              Новости
+            </Link>
           </nav>
 
           <div className="flex-1" />
@@ -734,6 +814,10 @@ export default function Home() {
                 <Link href="/vacancies"
                   className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block">
                   Вакансии
+                </Link>
+                <Link href="/news"
+                  className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block">
+                  Новости
                 </Link>
                 <Link href="/favorites"
                   className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block flex items-center gap-2">
@@ -1574,6 +1658,9 @@ export default function Home() {
                 ))}
                 <li>
                   <a href="/vacancies" className="hover:text-[#0070b8] transition-colors">Вакансии</a>
+                </li>
+                <li>
+                  <a href="/news" className="hover:text-[#0070b8] transition-colors">Новости</a>
                 </li>
               </ul>
             </div>

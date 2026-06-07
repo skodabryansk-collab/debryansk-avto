@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, X, Heart, Car, Scale, Calendar, Gauge, Palette, Trash2, ChevronRight } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
+import SEO from "@/components/SEO";
 import miniLogo from "@/assets/mini-logo.webp";
 
 function formatPrice(p: number) { return p.toLocaleString("ru-RU") + " ₽"; }
@@ -44,6 +45,11 @@ export default function ComparePage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <SEO
+        title="Сравнение автомобилей"
+        description="Сравните автомобили по параметрам: цена, пробег, год, комплектация, коробка, привод. До 3 авто в сравнении."
+        canonical="/compare"
+      />
       {/* Header */}
       <div className="bg-white border-b border-slate-100 sticky top-0 z-30">
         <div className="container mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">

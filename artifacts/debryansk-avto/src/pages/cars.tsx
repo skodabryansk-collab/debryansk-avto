@@ -8,6 +8,7 @@ import {
   Heart, Scale
 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
+import SEO from "@/components/SEO";
 import miniLogo from "@/assets/mini-logo.webp";
 
 interface CarRecord {
@@ -476,6 +477,11 @@ export default function UsedCars() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-[Manrope,sans-serif]">
+      <SEO
+        title="Автомобили с пробегом в Брянске"
+        description="Купить автос пробегом в брендах Брянска. Выгодные цены, проверенные автомобили, кредит, трейд-ин. Дебрянск Авто — 9 брендов."
+        canonical="/cars"
+      />
       <header className="bg-[#0d0f14] text-white px-4 sm:px-6 py-4 flex items-center gap-4 sticky top-0 z-40">
         <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0">
           <img src={miniLogo} alt="Дебрянск Авто" className="h-8 w-8 object-contain" />

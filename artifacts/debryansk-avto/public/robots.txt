@@ -1,2 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /compare
+Disallow: /favorites
+Disallow: /api/
+
+Sitemap: https://debryansk-avto.ru/sitemap.xml

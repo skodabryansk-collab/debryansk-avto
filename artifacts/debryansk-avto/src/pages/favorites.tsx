@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Heart, Scale, Car, Trash2 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import { CarActionButtons } from "@/components/CarActionButtons";
+import SEO from "@/components/SEO";
 import miniLogo from "@/assets/mini-logo.webp";
 
 function formatPrice(p: number) { return p.toLocaleString("ru-RU") + " ₽"; }
@@ -67,6 +68,11 @@ export default function FavoritesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <SEO
+        title="Избранное"
+        description="Список избранных автомобилей Дебрянск Авто. Сохраненные автомобили с пробегом и новые."
+        canonical="/favorites"
+      />
       {/* Header */}
       <div className="bg-white border-b border-slate-100 sticky top-0 z-30">
         <div className="container mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">

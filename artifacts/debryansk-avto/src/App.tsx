@@ -11,6 +11,8 @@ import NewCarDetail from "@/pages/new-car-detail";
 import Vacancies from "@/pages/vacancies";
 import ComparePage from "@/pages/compare";
 import FavoritesPage from "@/pages/favorites";
+import NewsPage from "@/pages/news";
+import NewsDetailPage from "@/pages/news-detail";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +27,8 @@ function Router() {
       <Route path="/vacancies" component={Vacancies} />
       <Route path="/compare" component={ComparePage} />
       <Route path="/favorites" component={FavoritesPage} />
+      <Route path="/news" component={NewsPage} />
+      <Route path="/news/:slug" component={NewsDetailPage} />
       <Route component={NotFound} />
     </Switch>
   );

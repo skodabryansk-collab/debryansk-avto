@@ -6,6 +6,7 @@ import {
   Phone, User, CheckCircle, Star, GraduationCap, TrendingUp, Heart,
   Paperclip, FileText
 } from "lucide-react";
+import SEO from "@/components/SEO";
 import miniLogo from "@/assets/mini-logo.webp";
 
 /* ─── Types ──────────────────────────────────────────────────────────
@@ -666,6 +667,11 @@ export default function Vacancies() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <SEO
+        title="Вакансии — Дебрянск Авто"
+        description="Работа в автодилерском центре Брянска. Вакансии: менеджер, автоподборщик, автомеханик, автомойщик, директор."
+        canonical="/vacancies"
+      />
       {/* ── Header ── */}
       <header className="fixed top-0 left-0 right-0 z-40 bg-[#111317]/95 backdrop-blur-md border-b border-white/[0.06] h-14 flex items-center px-4 sm:px-6 gap-4">
         <button onClick={() => navigate("/")}
