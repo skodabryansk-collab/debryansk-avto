@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, X, Heart, Car, Scale, Calendar, Gauge, Palette, Trash2, ChevronRight } from "lucide-react";
+import { ArrowLeft, X, Heart, Car, Scale, Calendar, Gauge, Palette, Trash2, Check, Minus } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import SEO from "@/components/SEO";
 import miniLogo from "@/assets/mini-logo.webp";
@@ -37,17 +37,33 @@ const paramDefs = [
   { key: "transmission", label: "Коробка", icon: null as any, format: (c: any) => parseTransmission(c.modification) },
   { key: "drive", label: "Привод", icon: null as any, format: (c: any) => parseDrive(c.modification) },
   { key: "engine", label: "Двигатель", icon: null as any, format: (c: any) => parseEngine(c.modification) },
+  { key: "complectation", label: "Комплектация", icon: null as any, format: (c: any) => c.complectation || "—" },
+  { key: "vin", label: "VIN", icon: null as any, format: (c: any) => c.vin || "—" },
 ];
 
-export default function ComparePage() {
-  const { compare, removeFromCompare, clearCompare, toggleCompare } = useCarStorage();
+function extrasList(c: any): string[] {
+  if (!c.extras) return [];
+  return c.extras.split(", ").filter(Boolean).map((s: string) => s.trim());
+}
 
+function allExtras(cars: any[]): string[] {
+  const set = new Set<string>();
+  for (const c of cars) {
+    for (const e of extrasList(c)) set.add(e);
+  }
+  return Array.from(set).sort();
+}
+
+export default function ComparePage() {
+  const { compare, removeFromCompare, clearCompare } = useCarStorage();
+  const commonExtras = allExtras(compare);
+  const hasExtras = commonExtras.length > 0;
 
   return (
     <div className="min-h-screen bg-slate-50">
       <SEO
         title="Сравнение автомобилей"
-        description="Сравните автомобили по параметрам: цена, пробег, год, комплектация, коробка, привод. До 3 авто в сравнении."
+        description="Сравните автомобили по параметрам: цена, пробег, год, комплектация, коробка, привод, опции. До 3 авто в сравнении."
         canonical="/compare"
       />
       {/* Header */}
@@ -162,6 +178,28 @@ export default function ComparePage() {
                           </div>
                         ))}
                       </div>
+
+                      {/* Extras */}
+                      {hasExtras && (
+                        <div className="mt-4">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Опции</p>
+                          <div className="space-y-1">
+                            {commonExtras.map(extra => {
+                              const has = extrasList(car).includes(extra);
+                              return (
+                                <div key={extra} className="flex items-center justify-between py-1">
+                                  <span className="text-xs text-slate-500">{extra}</span>
+                                  {has ? (
+                                    <Check className="w-3.5 h-3.5 text-[#87b63c]" />
+                                  ) : (
+                                    <Minus className="w-3.5 h-3.5 text-slate-300" />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 ))}
@@ -234,6 +272,40 @@ export default function ComparePage() {
                       ))}
                     </React.Fragment>
                   ))}
+
+                  {/* Extras section */}
+                  {hasExtras && (
+                    <React.Fragment>
+                      <div className="col-span-full h-px bg-slate-200 my-1" />
+                      <div className="text-[10px] font-bold text-[#0070b8] uppercase tracking-wider py-2">Опции и комплектация</div>
+                      {compare.map(car => (
+                        <div key={car.id} className="py-2" />
+                      ))}
+                      {commonExtras.map(extra => (
+                        <React.Fragment key={extra}>
+                          <div className="text-xs font-bold text-slate-500 py-2 flex items-center gap-1">
+                            <span>{extra}</span>
+                          </div>
+                          {compare.map(car => {
+                            const has = extrasList(car).includes(extra);
+                            return (
+                              <div key={car.id} className="py-2 flex items-center">
+                                {has ? (
+                                  <span className="w-6 h-6 rounded-full bg-[#87b63c]/10 flex items-center justify-center">
+                                    <Check className="w-3.5 h-3.5 text-[#87b63c]" />
+                                  </span>
+                                ) : (
+                                  <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
+                                    <Minus className="w-3.5 h-3.5 text-slate-300" />
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </React.Fragment>
+                      ))}
+                    </React.Fragment>
+                  )}
                 </div>
               </div>
             </div>
