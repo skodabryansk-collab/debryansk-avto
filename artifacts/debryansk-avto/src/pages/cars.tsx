@@ -26,6 +26,10 @@ interface CarRecord {
   images: string[];
   ownersNumber: string;
   state: string;
+  extras: string;
+  description: string;
+  vin: string;
+  complectation: string;
 }
 
 function parseTransmission(mod: string): string {
@@ -187,6 +191,7 @@ function CarCard({ car, onLead }: { car: CarRecord; onLead: (car: CarRecord) => 
     id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
     run: car.run, color: car.color, bodyType: car.bodyType, modification: car.modification,
     images: car.images, availability: car.availability, url: car.url, type: "used" as const,
+    extras: car.extras, complectation: car.complectation, vin: car.vin,
   };
 
   return (
