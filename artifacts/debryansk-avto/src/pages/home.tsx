@@ -13,6 +13,7 @@ import {
 import { useCarStorage } from "@/hooks/useCarStorage";
 import { HomeActionBtn } from "@/components/HomeActionBtn";
 import SEO from "@/components/SEO";
+import { newsArticles } from "@/pages/news";
 import { SiVk, SiTelegram } from "react-icons/si";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -152,6 +153,9 @@ interface HomeCar {
   year: number; price: number; run: number; color: string;
   availability: string; url: string; images: string[];
   bodyType?: string;
+  extras?: string;
+  complectation?: string;
+  vin?: string;
 }
 async function fetchHomeCars(): Promise<HomeCar[]> {
   const r = await fetch("/api/cars/used");
@@ -168,6 +172,9 @@ interface FeaturedCar {
   id: string; mark: string; model: string; modification: string; year: number;
   price: number; color: string; bodyType: string; maxDiscount: number; creditDiscount: number;
   tradeinDiscount: number; availability: string; url: string; images: string[]; dealer: string;
+  extras?: string;
+  complectation?: string;
+  vin?: string;
 }
 async function fetchFeaturedCars(): Promise<FeaturedCar[]> {
   const r = await fetch("/api/cars/featured");
@@ -509,6 +516,7 @@ function UsedCarsSection() {
                   id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
                   run: car.run, color: car.color, bodyType: car.bodyType || "", modification: car.modification,
                   images: car.images, availability: car.availability, url: car.url, type: "used" as const,
+                  extras: car.extras, complectation: car.complectation, vin: car.vin,
                 };
                 return (
                   <div key={car.id}
@@ -757,10 +765,17 @@ export default function Home() {
 
           <nav className="hidden lg:flex items-center gap-0.5 ml-2">
             {[["О группе","about"],["Дилеры","dealers"],["Услуги","services"],["Контакты","contacts"]].map(([label, id]) => (
-              <button key={id} onClick={() => scrollTo(id)}
-                className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
-                {label}
-              </button>
+              id === "services" ? (
+                <Link key={id} href="/service"
+                  className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+                  {label}
+                </Link>
+              ) : (
+                <button key={id} onClick={() => scrollTo(id)}
+                  className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+                  {label}
+                </button>
+              )
             ))}
             <Link href="/vacancies"
               className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
@@ -806,10 +821,17 @@ export default function Home() {
               className="overflow-hidden border-t border-white/[0.07] bg-[#111317]">
               <div className="px-4 py-3 flex flex-col gap-0.5">
                 {[["О группе","about"],["Дилеры","dealers"],["Услуги","services"],["Контакты","contacts"]].map(([label, id]) => (
-                  <button key={id} onClick={() => scrollTo(id)}
-                    className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors">
-                    {label}
-                  </button>
+                  id === "services" ? (
+                    <Link key={id} href="/service"
+                      className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block">
+                      {label}
+                    </Link>
+                  ) : (
+                    <button key={id} onClick={() => scrollTo(id)}
+                      className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors">
+                      {label}
+                    </button>
+                  )
                 ))}
                 <Link href="/vacancies"
                   className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block">
@@ -913,7 +935,7 @@ export default function Home() {
               {[
                 { icon: Car,            label: "Новые авто",    sub: "В наличии и под заказ", type: null,                   href: "/new-cars" },
                 { icon: RotateCcw,      label: "С пробегом",   sub: "Проверенные авто",       type: null,                   href: "/cars" },
-                { icon: Wrench,         label: "Сервис",        sub: "Запись онлайн",          type: "service"  as ModalType, href: null },
+                { icon: Wrench,         label: "Сервис",        sub: "Запись онлайн",          type: null,                   href: "/service" },
                 { icon: ArrowLeftRight, label: "Trade-in",      sub: "Оценка за 30 мин",       type: "tradein"  as ModalType, href: null },
               ].map(({ icon: Icon, label, sub, type, href }) => {
                 const cls = "bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl px-4 py-3.5 sm:px-5 sm:py-4 text-left hover:bg-white/18 hover:border-white/28 transition-all group active:scale-[0.98]";
@@ -947,7 +969,7 @@ export default function Home() {
             {[
               { label: "Новые авто",    modal: null,                     href: "/new-cars" },
               { label: "С пробегом",   modal: null,                     href: "/cars" },
-              { label: "Сервис",       modal: "service" as ModalType,  href: null },
+              { label: "Сервис",       modal: null,                     href: "/service" },
               { label: "Фин. услуги",  modal: "credit" as ModalType,   href: null },
               { label: "Trade-in",     modal: "tradein" as ModalType,  href: null },
               { label: "Страхование",  modal: "callback" as ModalType, href: null },
@@ -1048,6 +1070,7 @@ export default function Home() {
                 id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
                 run: 0, color: car.color, bodyType: car.bodyType, modification: car.modification,
                 images: car.images, availability: car.availability, url: car.url, type: "new" as const,
+                extras: car.extras, complectation: car.complectation, vin: car.vin,
               };
               return (
                 <div key={car.id}
@@ -1563,28 +1586,24 @@ export default function Home() {
               <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Будьте в курсе</p>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Новости</h2>
             </div>
-            <button className="flex items-center gap-2 text-[#0070b8] font-bold hover:gap-3 transition-all text-sm whitespace-nowrap">
+            <Link href="/news" className="flex items-center gap-2 text-[#0070b8] font-bold hover:gap-3 transition-all text-sm whitespace-nowrap">
               Все новости <ArrowRight className="w-4 h-4" />
-            </button>
+            </Link>
           </FadeIn>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[
-              { date: "4 июня 2026 г.", tag: "Открытие", title: "Новый дилерский центр HAVAL открылся в Брянске", desc: "Современный шоурум площадью 2 500 м² с полным циклом обслуживания и тест-драйвом.", img: dealerHaval },
-              { date: "28 мая 2026 г.", tag: "Акция",    title: "Специальные условия на CHERY Tiggo в июне", desc: "Выгода до 250 000 ₽ при покупке в кредит. Ограниченное количество автомобилей в наличии.", img: dealerChery },
-              { date: "22 мая 2026 г.", tag: "Программа",title: "Дебрянск Авто запускает программу лояльности", desc: "Накапливайте бонусы с каждой покупки и обменивайте их на услуги сервиса и аксессуары.", img: dealerOmoda },
-            ].map((n, i) => (
+            {newsArticles.slice(0, 3).map((n, i) => (
               <FadeIn key={i} delay={i * 0.1}>
-                <article className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
+                <Link href={`/news/${n.slug}`} className="block bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
                   <div className="h-44 sm:h-48 overflow-hidden relative">
-                    <img src={n.img} alt={n.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
-                    <span className="absolute top-3 left-3 px-2.5 py-1 bg-[#0070b8] text-white text-[11px] font-bold rounded-full">{n.tag}</span>
+                    <img src={n.image} alt={n.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
+                    <span className="absolute top-3 left-3 px-2.5 py-1 bg-[#0070b8] text-white text-[11px] font-bold rounded-full">{n.category}</span>
                   </div>
                   <div className="p-5">
-                    <p className="text-xs font-semibold text-slate-400 mb-2">{n.date}</p>
+                    <p className="text-xs font-semibold text-slate-400 mb-2">{n.publishedAt}</p>
                     <h3 className="font-extrabold text-base leading-snug mb-2 group-hover:text-[#0070b8] transition-colors">{n.title}</h3>
-                    <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">{n.desc}</p>
+                    <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">{n.excerpt}</p>
                   </div>
-                </article>
+                </Link>
               </FadeIn>
             ))}
           </div>
@@ -1654,7 +1673,11 @@ export default function Home() {
               <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Навигация</h4>
               <ul className="space-y-2 text-sm">
                 {[["О группе","about"],["Услуги","services"],["Контакты","contacts"]].map(([l,id]) => (
-                  <li key={id}><button onClick={() => scrollTo(id)} className="hover:text-[#0070b8] transition-colors">{l}</button></li>
+                  id === "services" ? (
+                    <li key={id}><a href="/service" className="hover:text-[#0070b8] transition-colors">{l}</a></li>
+                  ) : (
+                    <li key={id}><button onClick={() => scrollTo(id)} className="hover:text-[#0070b8] transition-colors">{l}</button></li>
+                  )
                 ))}
                 <li>
                   <a href="/vacancies" className="hover:text-[#0070b8] transition-colors">Вакансии</a>
