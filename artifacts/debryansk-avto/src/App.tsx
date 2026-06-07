@@ -9,6 +9,8 @@ import NewCars from "@/pages/new-cars";
 import UsedCarDetail from "@/pages/car-detail";
 import NewCarDetail from "@/pages/new-car-detail";
 import Vacancies from "@/pages/vacancies";
+import ComparePage from "@/pages/compare";
+import FavoritesPage from "@/pages/favorites";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +23,8 @@ function Router() {
       <Route path="/new-cars" component={NewCars} />
       <Route path="/new-cars/:id" component={NewCarDetail} />
       <Route path="/vacancies" component={Vacancies} />
+      <Route path="/compare" component={ComparePage} />
+      <Route path="/favorites" component={FavoritesPage} />
       <Route component={NotFound} />
     </Switch>
   );

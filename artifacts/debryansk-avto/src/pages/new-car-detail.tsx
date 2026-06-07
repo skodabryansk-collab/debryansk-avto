@@ -4,8 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Car, ChevronLeft, ChevronRight, Phone, User,
-  CheckCircle, X, Calendar, Palette, Sparkles, Shield, CreditCard, ArrowLeftRight
+  CheckCircle, X, Calendar, Palette, Sparkles, Shield, CreditCard, ArrowLeftRight,
+  Heart, Scale
 } from "lucide-react";
+import { useCarStorage } from "@/hooks/useCarStorage";
 import miniLogo from "@/assets/mini-logo.webp";
 
 interface NewCarRecord {
@@ -222,16 +224,33 @@ export default function NewCarDetail() {
   const [imgIdx, setImgIdx] = useState(0);
   const [showLead, setShowLead] = useState(false);
   const imgs = car?.images.filter(Boolean) ?? [];
+  const { favorites, compare, isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
 
   const AppHeader = ({ backHref }: { backHref: string }) => (
-    <header className="bg-[#0d0f14] text-white px-4 py-4 flex items-center gap-3 sticky top-0 z-40">
+    <header className="bg-[#0d0f14] text-white px-4 sm:px-6 py-4 flex items-center gap-3 sticky top-0 z-40">
       <img src={miniLogo} alt="Дебрянск Авто" className="h-8 w-8 object-contain shrink-0" />
       <Link href={backHref} className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors text-sm font-semibold">
         <ArrowLeft className="w-4 h-4" /> Новые автомобили
       </Link>
       <div className="flex-1" />
+      <div className="flex items-center gap-1">
+        <Link href="/favorites" className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+          <Heart className="w-4 h-4" />
+          <span className="hidden sm:inline">Избранное</span>
+          {favorites.length > 0 && (
+            <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{favorites.length}</span>
+          )}
+        </Link>
+        <Link href="/compare" className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+          <Scale className="w-4 h-4" />
+          <span className="hidden sm:inline">Сравнить</span>
+          {compare.length > 0 && (
+            <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{compare.length}</span>
+          )}
+        </Link>
+      </div>
       {car && (
-        <span className="text-xs font-bold text-white/50 hidden sm:block truncate max-w-[260px]">
+        <span className="text-xs font-bold text-white/50 hidden sm:block truncate max-w-[260px] ml-2">
           {car.mark} {car.model}, {car.year}
         </span>
       )}
@@ -321,6 +340,38 @@ export default function NewCarDetail() {
       {car.availability && (
         <p className="text-xs font-bold text-[#87b63c] mb-4">● {car.availability}</p>
       )}
+      <div className="flex gap-2 mb-3">
+        <button
+          onClick={() => toggleFavorite({
+            id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
+            run: 0, color: car.color, bodyType: car.bodyType, modification: car.modification,
+            images: car.images, availability: car.availability, url: car.url, type: "new" as const,
+          })}
+          className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all ${
+            isFavorite(car.id)
+              ? "bg-red-50 text-red-600 border border-red-200"
+              : "bg-slate-50 text-slate-600 border border-slate-200 hover:border-red-200 hover:text-red-500"
+          }`}
+        >
+          <Heart className={`w-4 h-4 ${isFavorite(car.id) ? "fill-current" : ""}`} />
+          {isFavorite(car.id) ? "В избранном" : "В избранное"}
+        </button>
+        <button
+          onClick={() => toggleCompare({
+            id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
+            run: 0, color: car.color, bodyType: car.bodyType, modification: car.modification,
+            images: car.images, availability: car.availability, url: car.url, type: "new" as const,
+          })}
+          className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all ${
+            isInCompare(car.id)
+              ? "bg-[#0070b8]/10 text-[#0070b8] border border-[#0070b8]/20"
+              : "bg-slate-50 text-slate-600 border border-slate-200 hover:border-[#0070b8]/30 hover:text-[#0070b8]"
+          }`}
+        >
+          <Scale className="w-4 h-4" />
+          {isInCompare(car.id) ? "В сравнении" : "Сравнить"}
+        </button>
+      </div>
       <div className="space-y-2.5">
         <button
           onClick={() => setShowLead(true)}

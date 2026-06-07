@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Car, Filter, ChevronLeft, ChevronRight, ArrowLeft, X,
-  Calendar, Palette, Phone, User, CheckCircle, SlidersHorizontal, Sparkles
+  Calendar, Palette, Phone, User, CheckCircle, SlidersHorizontal, Sparkles,
+  Heart, Scale
 } from "lucide-react";
+import { useCarStorage } from "@/hooks/useCarStorage";
 import miniLogo from "@/assets/mini-logo.webp";
 
 interface NewCarRecord {
@@ -184,6 +186,15 @@ function NewCarCard({ car, onLead }: { car: NewCarRecord; onLead: (car: NewCarRe
   const img = imgs[imgIdx] ?? "";
   const transmission = parseTransmission(car.modification);
   const drive = parseDrive(car.modification);
+  const { favorites, compare, isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
+  const fav = isFavorite(car.id);
+  const comp = isInCompare(car.id);
+
+  const storedCar = {
+    id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
+    run: 0, color: car.color, bodyType: car.bodyType, modification: car.modification,
+    images: car.images, availability: car.availability, url: car.url, type: "new" as const,
+  };
 
   return (
     <motion.article
@@ -225,11 +236,36 @@ function NewCarCard({ car, onLead }: { car: NewCarRecord; onLead: (car: NewCarRe
             </span>
           </>
         )}
-        <span className="absolute top-2 left-2 bg-[#0070b8] text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
+        {/* Action buttons */}
+        <div className="absolute top-2 right-2 flex flex-col gap-1.5 z-10">
+          <button
+            onClick={e => { e.stopPropagation(); toggleFavorite(storedCar); }}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+              fav
+                ? "bg-red-500 text-white shadow-md shadow-red-500/20"
+                : "bg-black/30 text-white hover:bg-black/50 backdrop-blur-sm"
+            }`}
+            title={fav ? "\u0423\u0431\u0440\u0430\u0442\u044c \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0433\u043e" : "\u0412 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435"}
+          >
+            <Heart className={`w-4 h-4 ${fav ? "fill-current" : ""}`} />
+          </button>
+          <button
+            onClick={e => { e.stopPropagation(); toggleCompare(storedCar); }}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+              comp
+                ? "bg-[#0070b8] text-white shadow-md shadow-[#0070b8]/20"
+                : "bg-black/30 text-white hover:bg-black/50 backdrop-blur-sm"
+            }`}
+            title={comp ? "\u0423\u0431\u0440\u0430\u0442\u044c \u0438\u0437 \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f" : "\u0421\u0440\u0430\u0432\u043d\u0438\u0442\u044c"}
+          >
+            <Scale className="w-4 h-4" />
+          </button>
+        </div>
+        <span className="absolute top-2 left-2 bg-[#0070b8] text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 z-0">
           <Sparkles className="w-2.5 h-2.5" /> НОВЫЙ
         </span>
         <span
-          className="absolute top-2 right-2 text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-wide"
+          className="absolute top-2 left-14 text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-wide"
           style={{ background: DEALER_COLORS[car.dealer] ?? "#f0f4ff", color: "#334155" }}
         >
           {car.dealer}
@@ -336,6 +372,7 @@ const DRIVES = ["Любой", "Полный", "Передний"];
 const DEALERS = ["Все дилеры", "Jaecoo", "Omoda", "Tenet", "Haval City", "Haval Pro", "Jetour"];
 
 export default function NewCars() {
+  const { favorites, compare } = useCarStorage();
   const { data: cars = [], isLoading, isError } = useQuery<NewCarRecord[]>({
     queryKey: ["new-cars"],
     queryFn: fetchNewCars,
@@ -527,7 +564,22 @@ export default function NewCars() {
           <ArrowLeft className="w-4 h-4" /> Главная
         </a>
         <div className="flex-1" />
-        <h1 className="text-sm sm:text-base font-extrabold text-white/90">Новые автомобили</h1>
+        <div className="flex items-center gap-1">
+          <Link href="/favorites" className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+            <Heart className="w-4 h-4" />
+            <span className="hidden sm:inline">Избранное</span>
+            {favorites.length > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{favorites.length}</span>
+            )}
+          </Link>
+          <Link href="/compare" className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+            <Scale className="w-4 h-4" />
+            <span className="hidden sm:inline">Сравнить</span>
+            {compare.length > 0 && (
+              <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{compare.length}</span>
+            )}
+          </Link>
+        </div>
       </header>
 
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-10">

@@ -7,8 +7,11 @@ import {
   Car, RotateCcw, ArrowLeftRight, CreditCard, FileText, Shield,
   Wrench, Hammer, Building2, MapPin, Phone, Clock, Search,
   Menu, X, ArrowRight, ChevronRight, Sparkles, ChevronLeft,
-  Package, Users, Banknote, Navigation, MapPinned, ArrowUpRight
+  Package, Users, Banknote, Navigation, MapPinned, ArrowUpRight,
+  Heart, Scale
 } from "lucide-react";
+import { useCarStorage } from "@/hooks/useCarStorage";
+import { HomeActionBtn } from "@/components/HomeActionBtn";
 import { SiVk, SiTelegram } from "react-icons/si";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -147,6 +150,7 @@ interface HomeCar {
   id: string; mark: string; model: string; modification: string;
   year: number; price: number; run: number; color: string;
   availability: string; url: string; images: string[];
+  bodyType?: string;
 }
 async function fetchHomeCars(): Promise<HomeCar[]> {
   const r = await fetch("/api/cars/used");
@@ -160,9 +164,9 @@ function fmtRun(km: number) { return km < 1000 ? km + " км" : Math.round(km / 
 
 /* ── Featured Cars ───────────────────────────────────────── */
 interface FeaturedCar {
-  id: string; mark: string; model: string; year: number;
-  price: number; maxDiscount: number; creditDiscount: number;
-  tradeinDiscount: number; availability: string; images: string[]; dealer: string;
+  id: string; mark: string; model: string; modification: string; year: number;
+  price: number; color: string; bodyType: string; maxDiscount: number; creditDiscount: number;
+  tradeinDiscount: number; availability: string; url: string; images: string[]; dealer: string;
 }
 async function fetchFeaturedCars(): Promise<FeaturedCar[]> {
   const r = await fetch("/api/cars/featured");
@@ -436,6 +440,7 @@ function UsedCarsSection() {
     queryFn: fetchHomeCars,
     staleTime: 5 * 60 * 1000,
   });
+  const { isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const scroll = (dir: "left" | "right") => {
@@ -498,53 +503,65 @@ function UsedCarsSection() {
                   </div>
                 </div>
               ))
-            : cars.map((car) => (
-                <Link key={car.id} href={`/cars/${encodeURIComponent(car.id)}`}
-                  className="snap-start shrink-0 w-[240px] sm:w-[272px] bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg hover:border-[#0070b8]/20 transition-all group cursor-pointer block">
+            : cars.map((car) => {
+                const stored = {
+                  id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
+                  run: car.run, color: car.color, bodyType: car.bodyType || "", modification: car.modification,
+                  images: car.images, availability: car.availability, url: car.url, type: "used" as const,
+                };
+                return (
+                  <div key={car.id}
+                    className="snap-start shrink-0 w-[240px] sm:w-[272px] bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg hover:border-[#0070b8]/20 transition-all group cursor-pointer"
+                    onClick={() => window.location.href = `/cars/${encodeURIComponent(car.id)}`}>
 
-                  {/* Photo */}
-                  <div className="relative h-40 bg-slate-100 overflow-hidden">
-                    {car.images[0] ? (
-                      <img src={car.images[0]} alt={`${car.mark} ${car.model}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        loading="lazy" decoding="async" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-300">
-                        <Car className="w-12 h-12" />
+                    {/* Photo */}
+                    <div className="relative h-40 bg-slate-100 overflow-hidden">
+                      {car.images[0] ? (
+                        <img src={car.images[0]} alt={`${car.mark} ${car.model}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          loading="lazy" decoding="async" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-300">
+                          <Car className="w-12 h-12" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                      {car.availability && (
+                        <span className="absolute top-2.5 left-2.5 bg-[#87b63c] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                          {car.availability}
+                        </span>
+                      )}
+                      {car.images.length > 1 && (
+                        <span className="absolute bottom-2 right-2.5 text-white text-[10px] font-bold opacity-80">
+                          {car.images.length} фото
+                        </span>
+                      )}
+                      <div className="absolute top-2.5 right-2.5 flex flex-col gap-1.5 z-10">
+                        <HomeActionBtn icon={<Heart className="w-3.5 h-3.5" />} active={isFavorite(car.id)} activeClass="bg-red-500 text-white" onClick={() => toggleFavorite(stored)} />
+                        <HomeActionBtn icon={<Scale className="w-3.5 h-3.5" />} active={isInCompare(car.id)} activeClass="bg-[#0070b8] text-white" onClick={() => toggleCompare(stored)} />
                       </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                    {car.availability && (
-                      <span className="absolute top-2.5 left-2.5 bg-[#87b63c] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                        {car.availability}
-                      </span>
-                    )}
-                    {car.images.length > 1 && (
-                      <span className="absolute bottom-2 right-2.5 text-white text-[10px] font-bold opacity-80">
-                        {car.images.length} фото
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="p-4">
-                    <p className="font-extrabold text-sm leading-snug text-slate-900 mb-0.5 group-hover:text-[#0070b8] transition-colors">
-                      {car.mark} {car.model}
-                    </p>
-                    {car.modification && (
-                      <p className="text-[11px] text-slate-400 leading-snug mb-2 line-clamp-1">{car.modification}</p>
-                    )}
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500 font-semibold mb-3">
-                      <span>{car.year}</span>
-                      <span className="text-slate-300">·</span>
-                      <span>{fmtRun(car.run)}</span>
-                      <span className="text-slate-300">·</span>
-                      <span>{car.color}</span>
                     </div>
-                    <p className="text-base font-extrabold text-slate-900">{fmtPrice(car.price)}</p>
+
+                    {/* Info */}
+                    <div className="p-4">
+                      <p className="font-extrabold text-sm leading-snug text-slate-900 mb-0.5 group-hover:text-[#0070b8] transition-colors">
+                        {car.mark} {car.model}
+                      </p>
+                      {car.modification && (
+                        <p className="text-[11px] text-slate-400 leading-snug mb-2 line-clamp-1">{car.modification}</p>
+                      )}
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500 font-semibold mb-3">
+                        <span>{car.year}</span>
+                        <span className="text-slate-300">·</span>
+                        <span>{fmtRun(car.run)}</span>
+                        <span className="text-slate-300">·</span>
+                        <span>{car.color}</span>
+                      </div>
+                      <p className="text-base font-extrabold text-slate-900">{fmtPrice(car.price)}</p>
+                    </div>
                   </div>
-                </Link>
-              ))}
+                );
+              })}
         </div>
 
         {/* Mobile CTA */}
@@ -568,6 +585,9 @@ export default function Home() {
   const [modal, setModal] = useState<ModalType | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const carouselRef = useRef<HTMLDivElement>(null);
+  const { favorites, compare, isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
+  const favCount = favorites.length;
+  const compCount = compare.length;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 80);
@@ -674,6 +694,25 @@ export default function Home() {
 
           <div className="flex-1" />
 
+          <div className="hidden lg:flex items-center gap-2 mr-3">
+            <Link href="/favorites"
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+              <Heart className="w-4 h-4" />
+              <span>Избранное</span>
+              {favCount > 0 && (
+                <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{favCount}</span>
+              )}
+            </Link>
+            <Link href="/compare"
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+              <Scale className="w-4 h-4" />
+              <span>Сравнить</span>
+              {compCount > 0 && (
+                <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{compCount}</span>
+              )}
+            </Link>
+          </div>
+
           <button className="lg:hidden p-1.5 text-white/60 hover:text-white" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -695,6 +734,14 @@ export default function Home() {
                 <Link href="/vacancies"
                   className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block">
                   Вакансии
+                </Link>
+                <Link href="/favorites"
+                  className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block flex items-center gap-2">
+                  <Heart className="w-4 h-4" /> Избранное {favCount > 0 && <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{favCount}</span>}
+                </Link>
+                <Link href="/compare"
+                  className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block flex items-center gap-2">
+                  <Scale className="w-4 h-4" /> Сравнить {compCount > 0 && <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{compCount}</span>}
                 </Link>
                 <div className="pt-3 flex items-center justify-between">
                   <a href="tel:+74832000000" className="text-base font-bold text-[#0070b8]">+7 (4832) 000-000</a>
@@ -913,9 +960,15 @@ export default function Home() {
             {featuredCars.length > 0 ? featuredCars.map((car) => {
               const img = car.images.filter(Boolean)[0] ?? "";
               const salePrice = car.maxDiscount > 0 ? car.price - car.maxDiscount : car.price;
+              const stored = {
+                id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
+                run: 0, color: car.color, bodyType: car.bodyType, modification: car.modification,
+                images: car.images, availability: car.availability, url: car.url, type: "new" as const,
+              };
               return (
-                <Link key={car.id} href={`/new-cars/${encodeURIComponent(car.id)}`}
-                  className="snap-start shrink-0 w-[260px] sm:w-[300px] bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow group cursor-pointer block">
+                <div key={car.id}
+                  className="snap-start shrink-0 w-[260px] sm:w-[300px] bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow group cursor-pointer"
+                  onClick={() => window.location.href = `/new-cars/${encodeURIComponent(car.id)}`}>
                   <div className="relative h-40 sm:h-44 overflow-hidden bg-slate-100">
                     {img ? (
                       <img src={img} alt={`${car.mark} ${car.model}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
@@ -933,6 +986,10 @@ export default function Home() {
                     <span className="absolute top-3 right-3 px-2.5 py-1 bg-white/90 rounded-full text-[11px] font-bold text-slate-800">
                       {car.availability}
                     </span>
+                    <div className="absolute top-14 right-3 flex flex-col gap-1.5 z-10">
+                      <HomeActionBtn icon={<Heart className="w-3.5 h-3.5" />} active={isFavorite(car.id)} activeClass="bg-red-500 text-white" onClick={() => toggleFavorite(stored)} />
+                      <HomeActionBtn icon={<Scale className="w-3.5 h-3.5" />} active={isInCompare(car.id)} activeClass="bg-[#0070b8] text-white" onClick={() => toggleCompare(stored)} />
+                    </div>
                     <div className="absolute bottom-3 left-3 right-3">
                       <p className="text-white font-extrabold text-sm leading-tight drop-shadow">
                         {car.mark} {car.model}
@@ -953,12 +1010,12 @@ export default function Home() {
                       <p className="text-[#0070b8] font-extrabold text-lg mb-3">{fmtPrice(car.price)}</p>
                     )}
                     <button
-                      onClick={e => { e.preventDefault(); openModal("offer"); }}
+                      onClick={e => { e.stopPropagation(); openModal("offer"); }}
                       className="w-full py-2 sm:py-2.5 rounded-xl border-2 border-slate-200 text-xs sm:text-sm font-bold text-slate-600 hover:border-[#0070b8] hover:text-[#0070b8] transition-colors">
                       Оставить заявку
                     </button>
                   </div>
-                </Link>
+                </div>
               );
             }) : offers.map((o, i) => (
               <div key={i}

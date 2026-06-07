@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Car, Filter, ChevronLeft, ChevronRight, ArrowLeft, X,
-  Gauge, Calendar, Palette, Phone, User, CheckCircle, SlidersHorizontal
+  Gauge, Calendar, Palette, Phone, User, CheckCircle, SlidersHorizontal,
+  Heart, Scale
 } from "lucide-react";
+import { useCarStorage } from "@/hooks/useCarStorage";
 import miniLogo from "@/assets/mini-logo.webp";
 
 interface CarRecord {
@@ -176,6 +178,15 @@ function CarCard({ car, onLead }: { car: CarRecord; onLead: (car: CarRecord) => 
   const img = imgs[imgIdx] ?? "";
   const transmission = parseTransmission(car.modification);
   const drive = parseDrive(car.modification);
+  const { favorites, compare, isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
+  const fav = isFavorite(car.id);
+  const comp = isInCompare(car.id);
+
+  const storedCar = {
+    id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
+    run: car.run, color: car.color, bodyType: car.bodyType, modification: car.modification,
+    images: car.images, availability: car.availability, url: car.url, type: "used" as const,
+  };
 
   return (
     <motion.article
@@ -217,6 +228,31 @@ function CarCard({ car, onLead }: { car: CarRecord; onLead: (car: CarRecord) => 
             </span>
           </>
         )}
+        {/* Action buttons */}
+        <div className="absolute top-2 right-2 flex flex-col gap-1.5 z-10">
+          <button
+            onClick={e => { e.stopPropagation(); toggleFavorite(storedCar); }}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+              fav
+                ? "bg-red-500 text-white shadow-md shadow-red-500/20"
+                : "bg-black/30 text-white hover:bg-black/50 backdrop-blur-sm"
+            }`}
+            title={fav ? "\u0423\u0431\u0440\u0430\u0442\u044c \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0433\u043e" : "\u0412 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435"}
+          >
+            <Heart className={`w-4 h-4 ${fav ? "fill-current" : ""}`} />
+          </button>
+          <button
+            onClick={e => { e.stopPropagation(); toggleCompare(storedCar); }}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+              comp
+                ? "bg-[#0070b8] text-white shadow-md shadow-[#0070b8]/20"
+                : "bg-black/30 text-white hover:bg-black/50 backdrop-blur-sm"
+            }`}
+            title={comp ? "\u0423\u0431\u0440\u0430\u0442\u044c \u0438\u0437 \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f" : "\u0421\u0440\u0430\u0432\u043d\u0438\u0442\u044c"}
+          >
+            <Scale className="w-4 h-4" />
+          </button>
+        </div>
         {car.availability && (
           <span className="absolute top-2 left-2 bg-[#87b63c] text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
             {car.availability}
@@ -298,6 +334,7 @@ const TRANSMISSIONS = ["Любая", "Автомат", "Механика", "Ро
 const DRIVES = ["Любой", "Полный", "Передний/задний"];
 
 export default function UsedCars() {
+  const { favorites, compare } = useCarStorage();
   const { data: cars = [], isLoading, isError } = useQuery<CarRecord[]>({
     queryKey: ["used-cars"],
     queryFn: fetchCarsXml,
@@ -447,7 +484,22 @@ export default function UsedCars() {
           <ArrowLeft className="w-4 h-4" /> Главная
         </a>
         <div className="flex-1" />
-        <h1 className="text-sm sm:text-base font-extrabold text-white/90">Автомобили с пробегом</h1>
+        <div className="flex items-center gap-1">
+          <Link href="/favorites" className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+            <Heart className="w-4 h-4" />
+            <span className="hidden sm:inline">Избранное</span>
+            {favorites.length > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{favorites.length}</span>
+            )}
+          </Link>
+          <Link href="/compare" className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+            <Scale className="w-4 h-4" />
+            <span className="hidden sm:inline">Сравнить</span>
+            {compare.length > 0 && (
+              <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{compare.length}</span>
+            )}
+          </Link>
+        </div>
       </header>
 
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-10">
