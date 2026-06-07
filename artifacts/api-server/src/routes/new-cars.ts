@@ -28,6 +28,16 @@ export interface NewCarRecord {
   maxDiscount: number;
   creditDiscount: number;
   tradeinDiscount: number;
+  extras: string;
+  description: string;
+  vin: string;
+  doorsCount: number;
+  wheel: string;
+  armored: string;
+  custom: string;
+  phone: string;
+  notRegisteredInRussia: boolean;
+  acceptedAutoruExclusive: boolean;
 }
 
 let cache: { data: NewCarRecord[]; ts: number } | null = null;
@@ -65,6 +75,16 @@ function parseFeed(text: string, dealer: string): NewCarRecord[] {
       maxDiscount: parseInt(getField(block, "max_discount")) || 0,
       creditDiscount: parseInt(getField(block, "credit_discount")) || 0,
       tradeinDiscount: parseInt(getField(block, "tradein_discount")) || 0,
+      extras: getField(block, "extras"),
+      description: getField(block, "description"),
+      vin: getField(block, "vin"),
+      doorsCount: parseInt(getField(block, "doors_count")) || 0,
+      wheel: getField(block, "wheel"),
+      armored: getField(block, "armored"),
+      custom: getField(block, "custom"),
+      phone: getField(block, "phone"),
+      notRegisteredInRussia: getField(block, "not_registered_in_russia") === "true",
+      acceptedAutoruExclusive: getField(block, "accepted_autoru_exclusive") === "true",
     });
   }
   return cars;
