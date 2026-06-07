@@ -18,6 +18,9 @@ export interface StoredCar {
   availability?: string;
   url?: string;
   type: "used" | "new";
+  extras?: string;
+  complectation?: string;
+  vin?: string;
 }
 
 function load(key: string): StoredCar[] {
