@@ -28,6 +28,9 @@ interface NewCarRecord {
   maxDiscount: number;
   creditDiscount: number;
   tradeinDiscount: number;
+  extras: string;
+  description: string;
+  vin: string;
 }
 
 function parseTransmission(mod: string): string {
@@ -195,6 +198,7 @@ function NewCarCard({ car, onLead }: { car: NewCarRecord; onLead: (car: NewCarRe
     id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
     run: 0, color: car.color, bodyType: car.bodyType, modification: car.modification,
     images: car.images, availability: car.availability, url: car.url, type: "new" as const,
+    extras: car.extras, complectation: car.complectation, vin: car.vin,
   };
 
   return (
@@ -262,15 +266,17 @@ function NewCarCard({ car, onLead }: { car: NewCarRecord; onLead: (car: NewCarRe
             <Scale className="w-4 h-4" />
           </button>
         </div>
-        <span className="absolute top-2 left-2 bg-[#0070b8] text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 z-0">
-          <Sparkles className="w-2.5 h-2.5" /> НОВЫЙ
-        </span>
-        <span
-          className="absolute top-2 left-14 text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-wide"
-          style={{ background: DEALER_COLORS[car.dealer] ?? "#f0f4ff", color: "#334155" }}
-        >
-          {car.dealer}
-        </span>
+        <div className="absolute top-2 left-2 flex flex-wrap gap-1 z-0">
+          <span className="bg-[#0070b8] text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
+            <Sparkles className="w-2.5 h-2.5" /> НОВЫЙ
+          </span>
+          <span
+            className="text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-wide"
+            style={{ background: DEALER_COLORS[car.dealer] ?? "#f0f4ff", color: "#334155" }}
+          >
+            {car.dealer}
+          </span>
+        </div>
       </div>
 
       <div className="p-4 flex flex-col flex-1">
