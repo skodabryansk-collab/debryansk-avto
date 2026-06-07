@@ -13,6 +13,7 @@ import ComparePage from "@/pages/compare";
 import FavoritesPage from "@/pages/favorites";
 import NewsPage from "@/pages/news";
 import NewsDetailPage from "@/pages/news-detail";
+import ServicePage from "@/pages/service";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ function Router() {
       <Route path="/favorites" component={FavoritesPage} />
       <Route path="/news" component={NewsPage} />
       <Route path="/news/:slug" component={NewsDetailPage} />
+      <Route path="/service" component={ServicePage} />
       <Route component={NotFound} />
     </Switch>
   );
