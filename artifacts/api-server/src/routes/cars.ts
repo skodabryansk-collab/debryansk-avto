@@ -20,6 +20,18 @@ interface CarRecord {
   images: string[];
   ownersNumber: string;
   state: string;
+  extras: string;
+  description: string;
+  vin: string;
+  complectation: string;
+  custom: string;
+  doorsCount: number;
+  wheel: string;
+  armored: string;
+  phone: string;
+  maxDiscount: number;
+  creditDiscount: number;
+  tradeinDiscount: number;
 }
 
 let cache: { data: CarRecord[]; ts: number } | null = null;
@@ -55,6 +67,18 @@ function parseXml(text: string): CarRecord[] {
       images: getImages(block),
       ownersNumber: getField(block, "owners_number"),
       state: getField(block, "state"),
+      extras: getField(block, "extras"),
+      description: getField(block, "description"),
+      vin: getField(block, "vin"),
+      complectation: getField(block, "complectation_name"),
+      custom: getField(block, "custom"),
+      doorsCount: parseInt(getField(block, "doors_count")) || 0,
+      wheel: getField(block, "wheel"),
+      armored: getField(block, "armored"),
+      phone: getField(block, "phone"),
+      maxDiscount: parseInt(getField(block, "max_discount")) || 0,
+      creditDiscount: parseInt(getField(block, "credit_discount")) || 0,
+      tradeinDiscount: parseInt(getField(block, "tradein_discount")) || 0,
     });
   }
   return cars;
