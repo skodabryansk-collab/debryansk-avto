@@ -9,7 +9,10 @@ import {
 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import SEO from "@/components/SEO";
-import miniLogo from "@/assets/mini-logo.webp";
+import { TestDriveModal } from "@/components/modals/TestDriveModal";
+import { CreditModal } from "@/components/modals/CreditModal";
+import { TradeInModal } from "@/components/modals/TradeInModal";
+import Layout from "@/components/Layout";
 
 interface NewCarRecord {
   id: string;
@@ -183,7 +186,7 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
   );
 }
 
-function NewCarCard({ car, onLead }: { car: NewCarRecord; onLead: (car: NewCarRecord) => void }) {
+function NewCarCard({ car, onTestDrive }: { car: NewCarRecord; onTestDrive: (car: NewCarRecord) => void }) {
   const [, navigate] = useLocation();
   const [imgIdx, setImgIdx] = useState(0);
   const imgs = car.images.filter(Boolean);
@@ -350,10 +353,11 @@ function NewCarCard({ car, onLead }: { car: NewCarRecord; onLead: (car: NewCarRe
             <p className="text-xl font-extrabold text-slate-900 mb-3">{formatPrice(car.price)}</p>
           )}
           <button
-            onClick={e => { e.stopPropagation(); onLead(car); }}
-            className="w-full brand-gradient text-white font-bold rounded-xl py-2.5 text-sm hover:opacity-90 transition-opacity"
+            onClick={e => { e.stopPropagation(); onTestDrive(car); }}
+            className="w-full bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold rounded-xl py-2.5 text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
           >
-            Оставить заявку
+            <Car className="w-4 h-4" />
+            Запись на тест-драйв
           </button>
         </div>
       </div>
@@ -396,7 +400,9 @@ export default function NewCars() {
   const [priceMax, setPriceMax] = useState("");
   const [sortBy, setSortBy] = useState<"price_asc" | "price_desc" | "year_desc">("price_asc");
   const [page, setPage] = useState(1);
-  const [leadCar, setLeadCar] = useState<NewCarRecord | null>(null);
+  const [testDriveCar, setTestDriveCar] = useState<NewCarRecord | null>(null);
+  const [creditCar, setCreditCar] = useState<NewCarRecord | null>(null);
+  const [showTradeIn, setShowTradeIn] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const availableModels = useMemo(() => {
@@ -562,37 +568,12 @@ export default function NewCars() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 font-[Manrope,sans-serif]">
+    <Layout>
       <SEO
         title="Новые автомобили в Брянске"
         description="Новые автомобили 9 брендов в брендах Брянска. Выгодное кредитование, специальные программы, гарантия. Дебрянск Авто."
         canonical="/new-cars"
       />
-      <header className="bg-[#0d0f14] text-white px-4 sm:px-6 py-4 flex items-center gap-4 sticky top-0 z-40">
-        <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0">
-          <img src={miniLogo} alt="Дебрянск Авто" className="h-8 w-8 object-contain" />
-        </a>
-        <a href="/" className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors text-sm font-semibold">
-          <ArrowLeft className="w-4 h-4" /> Главная
-        </a>
-        <div className="flex-1" />
-        <div className="flex items-center gap-1">
-          <Link href="/favorites" className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
-            <Heart className="w-4 h-4" />
-            <span className="hidden sm:inline">Избранное</span>
-            {favorites.length > 0 && (
-              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{favorites.length}</span>
-            )}
-          </Link>
-          <Link href="/compare" className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
-            <Scale className="w-4 h-4" />
-            <span className="hidden sm:inline">Сравнить</span>
-            {compare.length > 0 && (
-              <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{compare.length}</span>
-            )}
-          </Link>
-        </div>
-      </header>
 
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <div className="flex items-start justify-between mb-5 sm:mb-8 gap-4">
@@ -758,7 +739,7 @@ export default function NewCars() {
                 ) : (
                   <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
                     {paginated.map(car => (
-                      <NewCarCard key={car.id} car={car} onLead={setLeadCar} />
+                      <NewCarCard key={car.id} car={car} onTestDrive={setTestDriveCar} />
                     ))}
                   </div>
                 )}
@@ -797,10 +778,16 @@ export default function NewCars() {
       </div>
 
       <AnimatePresence>
-        {leadCar && (
-          <LeadModal car={leadCar} onClose={() => setLeadCar(null)} />
+        {testDriveCar && (
+          <TestDriveModal car={testDriveCar} onClose={() => setTestDriveCar(null)} />
+        )}
+        {creditCar && (
+          <CreditModal car={creditCar} onClose={() => setCreditCar(null)} />
+        )}
+        {showTradeIn && (
+          <TradeInModal onClose={() => setShowTradeIn(false)} />
         )}
       </AnimatePresence>
-    </div>
+    </Layout>
   );
 }
