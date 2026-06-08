@@ -30,9 +30,23 @@ export function TestDriveModal({ car, onClose }: TestDriveModalProps) {
     comment: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.phone.trim()) return;
+    try {
+      const fd = new FormData();
+      fd.append("type", "testdrive");
+      fd.append("name", formData.name);
+      fd.append("phone", formData.phone);
+      fd.append("preferredDate", formData.date);
+      fd.append("preferredTime", formData.time);
+      fd.append("comment", formData.comment);
+      fd.append("carMark", car.mark);
+      fd.append("carModel", car.model);
+      fd.append("carYear", String(car.year));
+      fd.append("carPrice", String(car.price));
+      await fetch("/api/send-email", { method: "POST", body: fd });
+    } catch (_) {}
     setSubmitted(true);
   };
 
