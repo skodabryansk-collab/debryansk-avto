@@ -14,6 +14,8 @@ import FavoritesPage from "@/pages/favorites";
 import NewsPage from "@/pages/news";
 import NewsDetailPage from "@/pages/news-detail";
 import ServicePage from "@/pages/service";
+import ContactsPage from "@/pages/contacts";
+import AboutPage from "@/pages/about";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +33,8 @@ function Router() {
       <Route path="/news" component={NewsPage} />
       <Route path="/news/:slug" component={NewsDetailPage} />
       <Route path="/service" component={ServicePage} />
+      <Route path="/contacts" component={ContactsPage} />
+      <Route path="/about" component={AboutPage} />
       <Route component={NotFound} />
     </Switch>
   );
