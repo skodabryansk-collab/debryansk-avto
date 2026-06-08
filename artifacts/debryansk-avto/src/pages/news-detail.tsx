@@ -3,7 +3,7 @@ import { Link, useRoute } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, Clock, ArrowRight, Heart } from "lucide-react";
 import SEO from "@/components/SEO";
-import miniLogo from "@/assets/mini-logo.webp";
+import Layout from "@/components/Layout";
 import { newsArticles } from "./news";
 
 function formatDate(dateStr: string) {
@@ -18,16 +18,16 @@ export default function NewsDetailPage() {
 
   if (!article) {
     return (
-      <div className="min-h-screen bg-slate-50 font-[Manrope,sans-serif] flex items-center justify-center">
+      <Layout>
         <SEO title="Новость не найдена" description="Запрашиваемая новость не найдена." canonical="/news" />
-        <div className="text-center text-slate-400">
+        <div className="text-center text-slate-400 py-20">
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Новость не найдена</h1>
           <Link href="/news" className="text-[#0070b8] font-bold text-sm hover:underline">
             <ArrowLeft className="w-4 h-4 inline mr-1" />
             Вернуться к новостям
           </Link>
         </div>
-      </div>
+      </Layout>
     );
   }
 
@@ -45,16 +45,16 @@ export default function NewsDetailPage() {
     "publisher": {
       "@type": "Organization",
       "name": "Дебрянск Авто",
-      "logo": { "@type": "ImageObject", "url": "https://debryansk-avto.ru/favicon.svg" }
+      "logo": { "@type": "ImageObject", "url": "https://debryansk-auto.ru/favicon.svg" }
     },
     "mainEntityOfPage": {
       "@type": "WebPage",
-      "@id": `https://debryansk-avto.ru/news/${article.slug}`
+      "@id": `https://debryansk-auto.ru/news/${article.slug}`
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-[Manrope,sans-serif]">
+    <Layout>
       <SEO
         title={`${article.title}`}
         description={article.excerpt}
@@ -64,17 +64,7 @@ export default function NewsDetailPage() {
         jsonLd={articleJsonLd}
       />
 
-      {/* Header */}
-      <header className="bg-[#0d0f14] text-white px-4 sm:px-6 py-4 flex items-center gap-4 sticky top-0 z-40">
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0">
-          <img src={miniLogo} alt="Дебрянск Авто" className="h-8 w-8 object-contain" />
-        </Link>
-        <Link href="/news" className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors text-sm font-semibold">
-          <ArrowLeft className="w-4 h-4" /> Новости
-        </Link>
-      </header>
-
-      <main className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-3xl">
+      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-3xl">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-xs text-slate-400 mb-4">
           <Link href="/" className="hover:text-[#0070b8] transition-colors">Главная</Link>
@@ -118,17 +108,13 @@ export default function NewsDetailPage() {
             />
           </div>
 
-          {/* Content placeholder */}
+          {/* Content */}
           <div className="prose prose-slate max-w-none">
-            <p className="text-base sm:text-lg text-slate-600 leading-relaxed mb-4">
-              {article.excerpt}
-            </p>
-            <p className="text-slate-600 leading-relaxed mb-4">
-              В скором времени здесь появится полный текст новости. Следите за обновлениями на нашем сайте.
-            </p>
-            <p className="text-slate-600 leading-relaxed">
-              Если у вас есть вопросы о модели или условиях покупки, звоните в дилерские центры Дебрянск Авто или оставляйте заявку на сайте.
-            </p>
+            {article.content.split("\n\n").map((paragraph, i) => (
+              <p key={i} className={`text-slate-600 leading-relaxed mb-4 ${i === 0 ? "text-base sm:text-lg" : ""}`}>
+                {paragraph}
+              </p>
+            ))}
           </div>
 
           {/* CTA */}
@@ -174,7 +160,7 @@ export default function NewsDetailPage() {
             </div>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </Layout>
   );
 }
