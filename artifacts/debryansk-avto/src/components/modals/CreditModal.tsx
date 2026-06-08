@@ -33,9 +33,26 @@ export function CreditModal({ car, onClose }: CreditModalProps) {
   );
   const totalPayment = monthlyPayment * months + downPayment;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.phone.trim()) return;
+    try {
+      const fd = new FormData();
+      fd.append("type", "credit");
+      fd.append("name", formData.name);
+      fd.append("phone", formData.phone);
+      fd.append("carPrice", String(price));
+      fd.append("downPayment", String(downPayment) + " ₽");
+      fd.append("term", String(months));
+      fd.append("monthlyPayment", monthlyPayment.toLocaleString("ru-RU") + " ₽");
+      fd.append("totalAmount", totalPayment.toLocaleString("ru-RU") + " ₽");
+      if (car) {
+        fd.append("carMark", car.mark);
+        fd.append("carModel", car.model);
+        fd.append("carYear", String(car.year));
+      }
+      await fetch("/api/send-email", { method: "POST", body: fd });
+    } catch (_) {}
     setSubmitted(true);
   };
 
