@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, X, Heart, Car, Scale, Calendar, Gauge, Palette, Trash2, Check, Minus } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import SEO from "@/components/SEO";
-import miniLogo from "@/assets/mini-logo.webp";
+import Layout from "@/components/Layout";
 
 function formatPrice(p: number) { return p.toLocaleString("ru-RU") + " ₽"; }
 function formatRun(km: number) { return km < 1000 ? km + " км" : Math.round(km / 1000) + " тыс. км"; }
@@ -60,38 +60,12 @@ export default function ComparePage() {
   const hasExtras = commonExtras.length > 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <Layout>
       <SEO
         title="Сравнение автомобилей"
         description="Сравните автомобили по параметрам: цена, пробег, год, комплектация, коробка, привод, опции. До 3 авто в сравнении."
         canonical="/compare"
       />
-      {/* Header */}
-      <div className="bg-white border-b border-slate-100 sticky top-0 z-30">
-        <div className="container mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2">
-              <img src={miniLogo} alt="Дебрянск Авто" className="h-7 w-auto" />
-            </Link>
-            <span className="text-slate-300">|</span>
-            <h1 className="text-sm sm:text-base font-extrabold text-slate-900">
-              <Scale className="w-4 h-4 inline mr-1.5 text-[#0070b8]" />
-              Сравнение
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/favorites" className="hidden sm:flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-slate-500 hover:text-red-500 hover:bg-slate-50 rounded-lg transition-all">
-              <Heart className="w-4 h-4" />
-              <span>Избранное</span>
-            </Link>
-            <Link href="/cars" className="text-xs font-bold text-[#0070b8] hover:text-[#0058a0] transition-colors flex items-center gap-1">
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Каталог
-            </Link>
-          </div>
-        </div>
-      </div>
-
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {compare.length === 0 ? (
           <motion.div
@@ -312,6 +286,6 @@ export default function ComparePage() {
           </>
         )}
       </div>
-    </div>
+    </Layout>
   );
 }
