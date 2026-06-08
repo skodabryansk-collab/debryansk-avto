@@ -9,7 +9,10 @@ import {
 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import SEO from "@/components/SEO";
-import miniLogo from "@/assets/mini-logo.webp";
+import { TestDriveModal } from "@/components/modals/TestDriveModal";
+import { CreditModal } from "@/components/modals/CreditModal";
+import { TradeInModal } from "@/components/modals/TradeInModal";
+import Layout from "@/components/Layout";
 
 interface NewCarRecord {
   id: string;
@@ -232,58 +235,28 @@ export default function NewCarDetail() {
   const car = cars.find(c => c.id === id);
   const [imgIdx, setImgIdx] = useState(0);
   const [showLead, setShowLead] = useState(false);
+  const [showTestDrive, setShowTestDrive] = useState(false);
+  const [showCredit, setShowCredit] = useState(false);
+  const [showTradeIn, setShowTradeIn] = useState(false);
   const imgs = car?.images.filter(Boolean) ?? [];
   const { favorites, compare, isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
 
-  const AppHeader = ({ backHref }: { backHref: string }) => (
-    <header className="bg-[#0d0f14] text-white px-4 sm:px-6 py-4 flex items-center gap-3 sticky top-0 z-40">
-      <img src={miniLogo} alt="Дебрянск Авто" className="h-8 w-8 object-contain shrink-0" />
-      <Link href={backHref} className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors text-sm font-semibold">
-        <ArrowLeft className="w-4 h-4" /> Новые автомобили
-      </Link>
-      <div className="flex-1" />
-      <div className="flex items-center gap-1">
-        <Link href="/favorites" className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
-          <Heart className="w-4 h-4" />
-          <span className="hidden sm:inline">Избранное</span>
-          {favorites.length > 0 && (
-            <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{favorites.length}</span>
-          )}
-        </Link>
-        <Link href="/compare" className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
-          <Scale className="w-4 h-4" />
-          <span className="hidden sm:inline">Сравнить</span>
-          {compare.length > 0 && (
-            <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{compare.length}</span>
-          )}
-        </Link>
-      </div>
-      {car && (
-        <span className="text-xs font-bold text-white/50 hidden sm:block truncate max-w-[260px] ml-2">
-          {car.mark} {car.model}, {car.year}
-        </span>
-      )}
-    </header>
-  );
-
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 font-[Manrope,sans-serif]">
-        <AppHeader backHref="/new-cars" />
+      <Layout>
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center text-slate-400">
             <Car className="w-12 h-12 mx-auto mb-4 opacity-30 animate-pulse" />
             <p className="font-semibold">Загрузка...</p>
           </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   if (isError || !car) {
     return (
-      <div className="min-h-screen bg-slate-50 font-[Manrope,sans-serif]">
-        <AppHeader backHref="/new-cars" />
+      <Layout>
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center text-slate-400">
             <Car className="w-12 h-12 mx-auto mb-4 opacity-30" />
@@ -293,7 +266,7 @@ export default function NewCarDetail() {
             </Link>
           </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
@@ -384,11 +357,28 @@ export default function NewCarDetail() {
       </div>
       <div className="space-y-2.5">
         <button
-          onClick={() => setShowLead(true)}
-          className="w-full brand-gradient text-white font-bold rounded-xl py-3.5 text-sm hover:opacity-90 transition-opacity"
+          onClick={() => setShowTestDrive(true)}
+          className="w-full bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold rounded-xl py-3.5 text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
         >
-          Оставить заявку
+          <Car className="w-4 h-4" />
+          Запись на тест-драйв
         </button>
+        <div className="grid grid-cols-2 gap-2.5">
+          <button
+            onClick={() => setShowCredit(true)}
+            className="flex items-center justify-center gap-2 bg-gradient-to-r from-[#059669] to-[#047857] text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity"
+          >
+            <CreditCard className="w-4 h-4" />
+            Кредит
+          </button>
+          <button
+            onClick={() => setShowTradeIn(true)}
+            className="flex items-center justify-center gap-2 bg-gradient-to-r from-[#d97706] to-[#b45309] text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity"
+          >
+            <ArrowLeftRight className="w-4 h-4" />
+            Trade-in
+          </button>
+        </div>
         <a href="tel:+74832000000"
           className="w-full flex items-center justify-center gap-2 border-2 border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8] text-slate-700 font-bold rounded-xl py-3 text-sm transition-colors">
           <Phone className="w-4 h-4" />
@@ -433,12 +423,12 @@ export default function NewCarDetail() {
       "seller": { "@type": "AutoDealer", "name": "Дебрянск Авто" }
     },
     "image": car.images.filter(Boolean)[0],
-    "url": `https://debryansk-avto.ru/new-cars/${car.id}`,
+    "url": `https://debryansk-auto.ru/new-cars/${car.id}`,
     "productionDate": car.year
   } : undefined;
 
   return (
-    <div className="min-h-screen bg-slate-50 font-[Manrope,sans-serif] pb-24 lg:pb-0">
+    <Layout>
       {car && (
         <SEO
           title={`${car.mark} ${car.model} ${car.year} год от ${formatPrice(car.price)}`}
@@ -449,7 +439,6 @@ export default function NewCarDetail() {
           jsonLd={carJsonLd}
         />
       )}
-      <AppHeader backHref="/new-cars" />
 
       {/* ── MOBILE layout (< lg) ── */}
       <div className="lg:hidden">
@@ -586,16 +575,20 @@ export default function NewCarDetail() {
           <Phone className="w-4 h-4" />
         </a>
         <button
-          onClick={() => setShowLead(true)}
-          className="brand-gradient text-white font-bold rounded-xl px-5 py-3 text-sm shrink-0 hover:opacity-90 transition-opacity"
+          onClick={() => setShowTestDrive(true)}
+          className="bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold rounded-xl px-5 py-3 text-sm shrink-0 hover:opacity-90 transition-opacity flex items-center gap-1.5"
         >
-          Заявка
+          <Car className="w-4 h-4" />
+          Тест-драйв
         </button>
       </div>
 
       <AnimatePresence>
         {showLead && <LeadModal car={car} onClose={() => setShowLead(false)} />}
+        {showTestDrive && <TestDriveModal car={car} onClose={() => setShowTestDrive(false)} />}
+        {showCredit && <CreditModal car={car} onClose={() => setShowCredit(false)} />}
+        {showTradeIn && <TradeInModal onClose={() => setShowTradeIn(false)} />}
       </AnimatePresence>
-    </div>
+    </Layout>
   );
 }
