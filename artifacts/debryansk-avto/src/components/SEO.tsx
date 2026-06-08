@@ -18,7 +18,7 @@ export default function SEO({
   jsonLd,
 }: SEOProps) {
   const fullTitle = title.includes("Дебрянск") ? title : `${title} — Дебрянск Авто`;
-  const siteUrl = "https://debryansk-avto.ru";
+  const siteUrl = "https://debryansk-auto.ru";
   const fullUrl = canonical ? `${siteUrl}${canonical}` : siteUrl;
   const fullImage = image.startsWith("http") ? image : `${siteUrl}${image}`;
 
