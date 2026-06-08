@@ -40,6 +40,12 @@ externalPort = 3000
 
 [userenv.shared]
 VITE_YANDEX_MAPS_KEY = "56483475-6a94-4d85-9bb2-d43e6cd7c533"
+CM_EXPERT_TOKEN_URL = "https://lk.cm.expert/oauth/token"
+CM_EXPERT_API_URL = "https://appraisal.api.cm.expert/v1"
+SMTP_HOST = "smtp.timeweb.ru"
+SMTP_PORT = "465"
+SMTP_USER = "sales@debryansk-auto.ru"
+SMTP_TO = "sales@debryansk-auto.ru"
 
 [nix]
 channel = "stable-25_05"
