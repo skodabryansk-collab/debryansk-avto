@@ -9,7 +9,9 @@ import {
 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import SEO from "@/components/SEO";
-import miniLogo from "@/assets/mini-logo.webp";
+import { CreditModal } from "@/components/modals/CreditModal";
+import { TradeInModal } from "@/components/modals/TradeInModal";
+import Layout from "@/components/Layout";
 
 interface CarRecord {
   id: string;
@@ -176,7 +178,7 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
   );
 }
 
-function CarCard({ car, onLead }: { car: CarRecord; onLead: (car: CarRecord) => void }) {
+function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead: (car: CarRecord) => void; onCredit?: (car: CarRecord) => void; onTradeIn?: () => void }) {
   const [, navigate] = useLocation();
   const [imgIdx, setImgIdx] = useState(0);
   const imgs = car.images.filter(Boolean);
@@ -316,6 +318,24 @@ function CarCard({ car, onLead }: { car: CarRecord; onLead: (car: CarRecord) => 
           >
             Оставить заявку
           </button>
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            {onCredit && (
+              <button
+                onClick={e => { e.stopPropagation(); onCredit(car); }}
+                className="flex items-center justify-center gap-1 bg-blue-50 text-blue-700 font-bold rounded-xl py-2 text-[11px] border border-blue-100 hover:bg-blue-100 transition-colors"
+              >
+                Кредит
+              </button>
+            )}
+            {onTradeIn && (
+              <button
+                onClick={e => { e.stopPropagation(); onTradeIn(); }}
+                className="flex items-center justify-center gap-1 bg-green-50 text-green-700 font-bold rounded-xl py-2 text-[11px] border border-green-100 hover:bg-green-100 transition-colors"
+              >
+                Trade-In
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </motion.article>
@@ -356,6 +376,8 @@ export default function UsedCars() {
   const [sortBy, setSortBy] = useState<"price_asc" | "price_desc" | "year_desc" | "run_asc">("price_asc");
   const [page, setPage] = useState(1);
   const [leadCar, setLeadCar] = useState<CarRecord | null>(null);
+  const [creditCar, setCreditCar] = useState<CarRecord | null>(null);
+  const [showTradeIn, setShowTradeIn] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const availableMarks = useMemo(() => {
@@ -481,37 +503,12 @@ export default function UsedCars() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 font-[Manrope,sans-serif]">
+    <Layout>
       <SEO
         title="Автомобили с пробегом в Брянске"
         description="Купить автос пробегом в брендах Брянска. Выгодные цены, проверенные автомобили, кредит, трейд-ин. Дебрянск Авто — 9 брендов."
         canonical="/cars"
       />
-      <header className="bg-[#0d0f14] text-white px-4 sm:px-6 py-4 flex items-center gap-4 sticky top-0 z-40">
-        <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0">
-          <img src={miniLogo} alt="Дебрянск Авто" className="h-8 w-8 object-contain" />
-        </a>
-        <a href="/" className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors text-sm font-semibold">
-          <ArrowLeft className="w-4 h-4" /> Главная
-        </a>
-        <div className="flex-1" />
-        <div className="flex items-center gap-1">
-          <Link href="/favorites" className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
-            <Heart className="w-4 h-4" />
-            <span className="hidden sm:inline">Избранное</span>
-            {favorites.length > 0 && (
-              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{favorites.length}</span>
-            )}
-          </Link>
-          <Link href="/compare" className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
-            <Scale className="w-4 h-4" />
-            <span className="hidden sm:inline">Сравнить</span>
-            {compare.length > 0 && (
-              <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{compare.length}</span>
-            )}
-          </Link>
-        </div>
-      </header>
 
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <div className="flex items-start justify-between mb-5 sm:mb-8 gap-4">
@@ -647,7 +644,7 @@ export default function UsedCars() {
                 ) : (
                   <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
                     {paginated.map(car => (
-                      <CarCard key={car.id} car={car} onLead={setLeadCar} />
+                      <CarCard key={car.id} car={car} onLead={setLeadCar} onCredit={setCreditCar} onTradeIn={() => setShowTradeIn(true)} />
                     ))}
                   </div>
                 )}
@@ -686,7 +683,9 @@ export default function UsedCars() {
 
       <AnimatePresence>
         {leadCar && <LeadModal car={leadCar} onClose={() => setLeadCar(null)} />}
+        {creditCar && <CreditModal car={creditCar} onClose={() => setCreditCar(null)} />}
+        {showTradeIn && <TradeInModal onClose={() => setShowTradeIn(false)} />}
       </AnimatePresence>
-    </div>
+    </Layout>
   );
 }
