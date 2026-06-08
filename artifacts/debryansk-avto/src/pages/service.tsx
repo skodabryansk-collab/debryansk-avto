@@ -7,7 +7,7 @@ import {
   ChevronRight, Star, Settings, Gauge
 } from "lucide-react";
 import SEO from "@/components/SEO";
-import miniLogo from "@/assets/mini-logo.webp";
+import Layout from "@/components/Layout";
 import { useToast } from "@/hooks/use-toast";
 
 /* ─── Service centers data ───────────────────────────────────────── */
@@ -96,7 +96,7 @@ const serviceSchema = {
   "@type": "AutoRepair",
   name: "Дебрянск Авто — Официальный сервис",
   description: "Официальный сервисный центр Haval, Omoda, Jaecoo, Jetour, Tenet, Volkswagen, Skoda, Exeed, Mercedes-Benz в Брянске.",
-  url: "https://debryansk-avto.ru/service",
+  url: "https://debryansk-auto.ru/service",
   telephone: "+7 (4832) 000-000",
   areaServed: { "@type": "City", name: "Брянск" },
   hasOfferCatalog: {
@@ -289,7 +289,7 @@ export default function ServicePage() {
   const [, navigate] = useLocation();
 
   return (
-    <div className="min-h-screen bg-white">
+    <Layout>
       <SEO
         title="Официальный сервис — Дебрянск Авто"
         description="Официальный сервис Haval, Omoda, Jaecoo, Jetour, Tenet, Volkswagen, Skoda, Exeed, Mercedes-Benz в Брянске. ТО, ремонт, кузовной, детейлинг, диагностика. Онлайн-запись."
@@ -297,17 +297,7 @@ export default function ServicePage() {
         jsonLd={serviceSchema}
       />
 
-      {/* ── Header ── */}
-      <header className="fixed top-0 left-0 right-0 z-40 bg-[#111317]/95 backdrop-blur-md border-b border-white/[0.06] h-14 flex items-center px-4 sm:px-6 gap-4">
-        <button onClick={() => navigate("/")}
-          className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors text-sm font-semibold">
-          <ArrowLeft className="w-4 h-4" /> Главная
-        </button>
-        <div className="flex-1" />
-        <img src={miniLogo} alt="Дебрянск Авто" className="h-8 w-8 object-contain" />
-      </header>
-
-      <div className="pt-14">
+      <div>
         {/* ── Hero ── */}
         <div className="bg-[#0d0f14] text-white py-12 sm:py-16 md:py-20">
           <div className="container mx-auto px-4 sm:px-6">
@@ -452,6 +442,6 @@ export default function ServicePage() {
           </div>
         </section>
       </div>
-    </div>
+    </Layout>
   );
 }
