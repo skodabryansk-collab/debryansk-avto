@@ -6,5 +6,16 @@ export const modules: ModuleMap = {
   "./components/mockups/brand-cards/Hover3D.tsx": () => import("../components/mockups/brand-cards/Hover3D.tsx"),
   "./components/mockups/brand-cards/Minimalist.tsx": () => import("../components/mockups/brand-cards/Minimalist.tsx"),
   "./components/mockups/debryansk-dynamic/Dynamic.tsx": () => import("../components/mockups/debryansk-dynamic/Dynamic.tsx"),
-  "./components/mockups/debryansk-luxury/Luxury.tsx": () => import("../components/mockups/debryansk-luxury/Luxury.tsx")
+  "./components/mockups/debryansk-luxury/Luxury.tsx": () => import("../components/mockups/debryansk-luxury/Luxury.tsx"),
+  "./components/mockups/email-templates/EmailBase.tsx": () => import("../components/mockups/email-templates/EmailBase.tsx"),
+  "./components/mockups/email-templates/EmailCallback.tsx": () => import("../components/mockups/email-templates/EmailCallback.tsx"),
+  "./components/mockups/email-templates/EmailCredit.tsx": () => import("../components/mockups/email-templates/EmailCredit.tsx"),
+  "./components/mockups/email-templates/EmailFeedback.tsx": () => import("../components/mockups/email-templates/EmailFeedback.tsx"),
+  "./components/mockups/email-templates/EmailOpenResume.tsx": () => import("../components/mockups/email-templates/EmailOpenResume.tsx"),
+  "./components/mockups/email-templates/EmailTestDrive.tsx": () => import("../components/mockups/email-templates/EmailTestDrive.tsx"),
+  "./components/mockups/email-templates/EmailTradeIn.tsx": () => import("../components/mockups/email-templates/EmailTradeIn.tsx"),
+  "./components/mockups/email-templates/EmailVacancy.tsx": () => import("../components/mockups/email-templates/EmailVacancy.tsx"),
+  "./components/mockups/modals/CreditModal.tsx": () => import("../components/mockups/modals/CreditModal.tsx"),
+  "./components/mockups/modals/TestDriveModal.tsx": () => import("../components/mockups/modals/TestDriveModal.tsx"),
+  "./components/mockups/modals/TradeInModal.tsx": () => import("../components/mockups/modals/TradeInModal.tsx")
 };
