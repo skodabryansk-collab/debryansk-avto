@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import { HomeActionBtn } from "@/components/HomeActionBtn";
+import { TradeInModal } from "@/components/modals/TradeInModal";
 import SEO from "@/components/SEO";
 import { newsArticles } from "@/pages/news";
 import { SiVk, SiTelegram } from "react-icons/si";
@@ -599,8 +600,8 @@ export default function Home() {
   const organizationSchema = {
     "@type": "Organization",
     "name": "Дебрянск Авто",
-    "url": "https://debryansk-avto.ru",
-    "logo": "https://debryansk-avto.ru/favicon.svg",
+    "url": "https://debryansk-auto.ru",
+    "logo": "https://debryansk-auto.ru/favicon.svg",
     "description": "Группа компаний по продаже, сервису и финансированию автомобилей в Брянске.",
     "address": {
       "@type": "PostalAddress",
@@ -622,7 +623,7 @@ export default function Home() {
   const localBusinessSchema = {
     "@type": "AutoDealer",
     "name": "Дебрянск Авто",
-    "image": "https://debryansk-avto.ru/opengraph.jpg",
+    "image": "https://debryansk-auto.ru/opengraph.jpg",
     "address": {
       "@type": "PostalAddress",
       "streetAddress": "ул. Курганская, 10",
@@ -651,11 +652,11 @@ export default function Home() {
 
   const webSiteSchema = {
     "@type": "WebSite",
-    "url": "https://debryansk-avto.ru",
+    "url": "https://debryansk-auto.ru",
     "name": "Дебрянск Авто",
     "potentialAction": {
       "@type": "SearchAction",
-      "target": "https://debryansk-avto.ru/cars?q={search_term_string}",
+      "target": "https://debryansk-auto.ru/cars?q={search_term_string}",
       "query-input": "required name=search_term_string"
     }
   };
@@ -714,7 +715,8 @@ export default function Home() {
       />
 
       {/* ── Modal ──────────────────────────────────────────── */}
-      {modal && <Modal type={modal} onClose={closeModal} />}
+      {modal && modal !== "tradein" && <Modal type={modal} onClose={closeModal} />}
+      {modal === "tradein" && <TradeInModal onClose={closeModal} />}
 
       {/* ── Header ─────────────────────────────────────────── */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#111317] text-white">
@@ -764,9 +766,9 @@ export default function Home() {
           </motion.button>
 
           <nav className="hidden lg:flex items-center gap-0.5 ml-2">
-            {[["О группе","about"],["Дилеры","dealers"],["Услуги","services"],["Контакты","contacts"]].map(([label, id]) => (
-              id === "services" ? (
-                <Link key={id} href="/service"
+            {[["О группе","about","/about"],["Дилеры","dealers","#dealers"],["Услуги","services","/service"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
+              href.startsWith("/") ? (
+                <Link key={id} href={href}
                   className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
                   {label}
                 </Link>
@@ -820,9 +822,9 @@ export default function Home() {
               exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
               className="overflow-hidden border-t border-white/[0.07] bg-[#111317]">
               <div className="px-4 py-3 flex flex-col gap-0.5">
-                {[["О группе","about"],["Дилеры","dealers"],["Услуги","services"],["Контакты","contacts"]].map(([label, id]) => (
-                  id === "services" ? (
-                    <Link key={id} href="/service"
+                {[["О группе","about","/about"],["Дилеры","dealers","#dealers"],["Услуги","services","/service"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
+                  href.startsWith("/") ? (
+                    <Link key={id} href={href}
                       className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block">
                       {label}
                     </Link>
@@ -1672,12 +1674,8 @@ export default function Home() {
             <div>
               <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Навигация</h4>
               <ul className="space-y-2 text-sm">
-                {[["О группе","about"],["Услуги","services"],["Контакты","contacts"]].map(([l,id]) => (
-                  id === "services" ? (
-                    <li key={id}><a href="/service" className="hover:text-[#0070b8] transition-colors">{l}</a></li>
-                  ) : (
-                    <li key={id}><button onClick={() => scrollTo(id)} className="hover:text-[#0070b8] transition-colors">{l}</button></li>
-                  )
+                {[["О группе","about","/about"],["Услуги","services","/service"],["Контакты","contacts","/contacts"]].map(([l,_,href]) => (
+                  <li key={href}><a href={href} className="hover:text-[#0070b8] transition-colors">{l}</a></li>
                 ))}
                 <li>
                   <a href="/vacancies" className="hover:text-[#0070b8] transition-colors">Вакансии</a>
