@@ -4,10 +4,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, MapPin, Clock, Briefcase, ChevronRight, X,
   Phone, User, CheckCircle, Star, GraduationCap, TrendingUp, Heart,
-  Paperclip, FileText
+  Paperclip, FileText, Newspaper, Calendar, ArrowRight
 } from "lucide-react";
 import SEO from "@/components/SEO";
-import miniLogo from "@/assets/mini-logo.webp";
+import Layout from "@/components/Layout";
 
 /* ─── Types ──────────────────────────────────────────────────────────
    Designed for easy hh.ru API swap:
@@ -32,6 +32,117 @@ export interface Vacancy {
   hhUrl?: string;
   source?: "hh" | "internal";
 }
+
+/* ─── HR News ─────────────────────────────────────────────── */
+interface HrNewsItem {
+  id: string;
+  title: string;
+  excerpt: string;
+  content: string;
+  category: string;
+  image: string;
+  publishedAt: string;
+  readTime: number;
+}
+
+const hrNewsArticles: HrNewsItem[] = [
+  {
+    id: "hr1",
+    title: "Запуск программы «Дилерская академия»: обучение без опыта",
+    excerpt: "Набираем 15 молодых менеджеров по продажам с обучением с нуля. Оплата во время стажировки и гарантия трудоустройства.",
+    content: `Группа компаний «Дебрянск Авто» запускает уникальную программу «Дилерская академия» для молодых людей без опыта в автобизнесе.
+
+Программа длится 3 месяца и включает:
+• Теоретическое обучение по устройству автомобилей, салонной логике, подбору комплектаций
+• Практика на живых автомобилях под руководством наставников
+• Работа с клиентами по вопросам кредитования, трейд-ин, страхования
+• Обучение переговорам, возражению объекций, закрытию сделок
+
+Условия участия:
+• Возраст от 20 до 30 лет
+• Образование не имеет значения
+• Желание работать и обучаться
+• Оплата во время обучения — 40 000 рублей
+• После успешного окончания — гарантированное трудоустройство и оклад от 80 000 рублей
+
+Первый набор в стартует 1 июля. Подать заявку можно через форму отклика на сайте или по телефону.`,
+    category: "Набор",
+    image: "https://www.cyberleadinc.com/wp-content/uploads/2019/01/Auto-Salesman-Training.jpeg",
+    publishedAt: "2026-06-05",
+    readTime: 2,
+  },
+  {
+    id: "hr2",
+    title: "Автомеханикам дилера Haval — повышение квалификации",
+    excerpt: "Сертификационная программа для механиков и мастеров-консультантов. По окончании повышение зарплаты до 15%.",
+    content: `Дилерский центр Haval City в Брянске запускает сертификационную программу повышения квалификации для автомехаников и мастеров-консультантов.
+
+Что входит в программу:
+• Сертификационное обучение по диагностике автомобилей Haval на современном оборудовании
+• Практикум по гарантийному и постгарантийному ремонту
+• Изучение новейших систем безопасности, электроники, гибридных установок
+• Сдача внутреннего экзамена и получение сертификата официального дилера
+
+После успешного окончания программы:
+• Повышение квалификационного разряда и оклада до 15%
+• Доступ к работе с премиальными автомобилями и новейшими моделями
+• Возможность стать старшим механиком или мастером-консультантом
+• Сертификат повышает конкурентоспособность на рынке труда
+
+Первая группа отправится на обучение уже в июле.`,
+    category: "Обучение",
+    image: "https://apexlearning.org.uk/wp-content/uploads/2022/03/Car-Mechanic-and-Repair-Training-Diploma-1-1.webp",
+    publishedAt: "2026-05-28",
+    readTime: 3,
+  },
+  {
+    id: "hr3",
+    title: "Летний корпоратив для всей команды дилера",
+    excerpt: "Развлекаем команду на базе отдыха. Спорт, полевой кухня, барбекю и награды для всех участников.",
+    content: `Этой весной группа компаний организовала масштабный летний корпоратив на базе отдыха за городом.
+
+В программе было:
+• Турнир по волейболу и мини-футболу между отделениями
+• Мастер-класс по приготовлению шашлыка от шеф-кухни
+• Спортивный конкурс с призами для каждого участника
+• Вечернее барбекю под открытым небом
+• Церемония награждения лучших сотрудников по итогам полугодия
+
+В мероприятии приняли участие более 200 сотрудников из всех дилерских центров брендов Haval, Omoda, Chery, Jaecoo и других.
+
+«Это отличная возможность все вместе побыть, познакомиться и подкрепить командный дух,» — отмечает директор по персоналу.
+
+Ближайший корпоратив запланирован на конец лета.`,
+    category: "Корпоратив",
+    image: "https://www.jamesevents.com/wp-content/uploads/2025/02/Picnic-Games-Corporate-Team-Building-Activities-1024x576.jpg",
+    publishedAt: "2026-05-15",
+    readTime: 2,
+  },
+  {
+    id: "hr4",
+    title: "Из администратора в зав. отделом: истории карьерного роста",
+    excerpt: "Екатерина К. поделилась опытом: от администратора зоны приёма до заведующей отделом за 2 года.",
+    content: `Екатерина К. пришла в дилерский центр в весной в 2024 году на позицию администратора зоны приёма.
+
+«Я не имела опыта в автобизнесе, но знала, что хочу работать с людьми,» — вспоминает она.
+
+Свой путь она описывает так:
+• Администратор зоны приёма и клиентов на полном окладе (5 месяцев)
+• Старший администратор с дополнительной ответственностью за качество обслуживания (8 месяцев)
+• Помощник заведующего отдела клиентского опыта (1 год)
+• Заведующий отделом клиентского опыта в новом дилерском центре
+
+«Ключ к росту — обучаемость и готовность брать на себя больше ответственности,» — даёт совет екатерина.
+
+Она рекомендует всем новичкам: «Не бойтесь задавать вопросы, берите инициативу и не бойтесь ошибок.»
+
+Главное отдела по персоналу отмечает: «Екатерина — тот самый пример, когда амбиции и инициатива перерастаются в реальные результаты.»`,
+    category: "Карьера",
+    image: "https://media.istockphoto.com/id/1705503967/photo/confident-businesswoman-in-modern-office.jpg?s=612x612&w=0&k=20&c=_f2sAtCUkBBgKK8oxDnzGs2CLvYBTN5jfOLl1glQ8yw=",
+    publishedAt: "2026-05-08",
+    readTime: 4,
+  },
+];
 
 /* ─── hh.ru helpers ─────────────────────────────────────────────── */
 const HH_EMPLOYER_ID = "2421744";
@@ -354,9 +465,26 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
       .catch(() => setHhLoading(false));
   }, [vacancy.hhId]);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !phone.trim()) return;
+    try {
+      const fd = new FormData();
+      fd.append("type", "vacancy");
+      fd.append("name", name);
+      fd.append("phone", phone);
+      fd.append("vacancyTitle", vacancy.title);
+      fd.append("dept", vacancy.department);
+      fd.append("dealer", vacancy.location);
+      if (vacancy.salaryFrom) {
+        const sal = vacancy.salaryTo
+          ? `${vacancy.salaryFrom.toLocaleString("ru-RU")} – ${vacancy.salaryTo.toLocaleString("ru-RU")} ₽`
+          : `от ${vacancy.salaryFrom.toLocaleString("ru-RU")} ₽`;
+        fd.append("salary", sal);
+      }
+      if (resumeFile) fd.append("attachments", resumeFile);
+      await fetch("/api/send-email", { method: "POST", body: fd });
+    } catch (_) {}
     setSubmitted(true);
   }
 
@@ -636,10 +764,13 @@ export default function Vacancies() {
   const [, navigate] = useLocation();
   const [dept, setDept] = useState("Все отделы");
   const [activeVacancy, setActiveVacancy] = useState<Vacancy | null>(null);
+  const [activeHrNews, setActiveHrNews] = useState<HrNewsItem | null>(null);
   const [openApply, setOpenApply] = useState(false);
   const [openName, setOpenName] = useState("");
   const [openPhone, setOpenPhone] = useState("");
+  const [openFile, setOpenFile] = useState<File | null>(null);
   const [openSubmitted, setOpenSubmitted] = useState(false);
+  const openFileRef = React.useRef<HTMLInputElement>(null);
 
   // Fetch vacancies from hh.ru (browser-side, no CORS issues)
   const [hhVacancies, setHhVacancies] = useState<Vacancy[]>([]);
@@ -666,23 +797,14 @@ export default function Vacancies() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <Layout>
       <SEO
         title="Вакансии — Дебрянск Авто"
         description="Работа в автодилерском центре Брянска. Вакансии: менеджер, автоподборщик, автомеханик, автомойщик, директор."
         canonical="/vacancies"
       />
-      {/* ── Header ── */}
-      <header className="fixed top-0 left-0 right-0 z-40 bg-[#111317]/95 backdrop-blur-md border-b border-white/[0.06] h-14 flex items-center px-4 sm:px-6 gap-4">
-        <button onClick={() => navigate("/")}
-          className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors text-sm font-semibold">
-          <ArrowLeft className="w-4 h-4" /> Главная
-        </button>
-        <div className="flex-1" />
-        <img src={miniLogo} alt="Дебрянск Авто" className="h-8 w-8 object-contain" />
-      </header>
 
-      <div className="pt-14">
+      <div>
         {/* ── Hero strip ── */}
         <div className="bg-[#0d0f14] text-white py-10 sm:py-14">
           <div className="container mx-auto px-4 sm:px-6">
@@ -740,51 +862,108 @@ export default function Vacancies() {
             ))}
           </div>
 
-          {/* Count */}
-          {!isLoading && (
-            <p className="text-sm text-slate-500 mb-5">
-              {filtered.length} {filtered.length === 1 ? "вакансия" : filtered.length < 5 ? "вакансии" : "вакансий"}
-            </p>
-          )}
+          <div className="lg:grid lg:grid-cols-4 lg:gap-6">
+            {/* Left column: vacancies + CTA */}
+            <div className="lg:col-span-3">
+              {/* Count */}
+              {!isLoading && (
+                <p className="text-sm text-slate-500 mb-5">
+                  {filtered.length} {filtered.length === 1 ? "вакансия" : filtered.length < 5 ? "вакансии" : "вакансий"}
+                </p>
+              )}
 
-          {/* Cards grid */}
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-            {isLoading
-              ? Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 animate-pulse space-y-3">
-                    <div className="flex justify-between">
-                      <div className="h-5 w-20 bg-slate-100 rounded-full" />
-                      <div className="h-4 w-16 bg-slate-100 rounded-full" />
-                    </div>
-                    <div className="h-5 w-3/4 bg-slate-100 rounded" />
-                    <div className="h-4 w-full bg-slate-100 rounded" />
-                    <div className="h-4 w-2/3 bg-slate-100 rounded" />
-                    <div className="flex gap-1.5">
-                      <div className="h-5 w-28 bg-slate-100 rounded-full" />
-                      <div className="h-5 w-10 bg-slate-100 rounded-full" />
-                      <div className="h-5 w-20 bg-slate-100 rounded-full" />
-                    </div>
-                    <div className="h-6 w-32 bg-slate-100 rounded" />
-                    <div className="h-9 w-full bg-slate-100 rounded-xl" />
-                  </div>
-                ))
-              : filtered.map(v => (
-                  <VacancyCard key={v.id} vacancy={v} onOpen={() => setActiveVacancy(v)} />
-                ))
-            }
-          </div>
+              {/* Cards grid */}
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                {isLoading
+                  ? Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 animate-pulse space-y-3">
+                        <div className="flex justify-between">
+                          <div className="h-5 w-20 bg-slate-100 rounded-full" />
+                          <div className="h-4 w-16 bg-slate-100 rounded-full" />
+                        </div>
+                        <div className="h-5 w-3/4 bg-slate-100 rounded" />
+                        <div className="h-4 w-full bg-slate-100 rounded" />
+                        <div className="h-4 w-2/3 bg-slate-100 rounded" />
+                        <div className="flex gap-1.5">
+                          <div className="h-5 w-28 bg-slate-100 rounded-full" />
+                          <div className="h-5 w-10 bg-slate-100 rounded-full" />
+                          <div className="h-5 w-20 bg-slate-100 rounded-full" />
+                        </div>
+                        <div className="h-6 w-32 bg-slate-100 rounded" />
+                        <div className="h-9 w-full bg-slate-100 rounded-xl" />
+                      </div>
+                    ))
+                  : filtered.map(v => (
+                      <VacancyCard key={v.id} vacancy={v} onOpen={() => setActiveVacancy(v)} />
+                    ))
+                }
+              </div>
 
-          {/* Open application CTA */}
-          <div className="mt-12 sm:mt-16 bg-gradient-to-r from-[#0070b8] to-[#005fa0] rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-5">
-            <div>
-              <h3 className="text-white font-extrabold text-lg sm:text-xl mb-1">Не нашли подходящую вакансию?</h3>
-              <p className="text-blue-200 text-sm">Отправьте резюме — мы свяжемся при появлении подходящей позиции</p>
+              {/* Open application CTA */}
+              <div className="mt-12 sm:mt-16 bg-gradient-to-r from-[#0070b8] to-[#005fa0] rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-5">
+                <div>
+                  <h3 className="text-white font-extrabold text-lg sm:text-xl mb-1">Не нашли подходящую вакансию?</h3>
+                  <p className="text-blue-200 text-sm">Отправьте резюме — мы свяжемся при появлении подходящей позиции</p>
+                </div>
+                <button
+                  onClick={() => setOpenApply(true)}
+                  className="shrink-0 bg-white text-[#0070b8] font-bold rounded-xl px-6 py-3 text-sm hover:bg-blue-50 transition-colors">
+                  Отправить резюме
+                </button>
+              </div>
             </div>
-            <button
-              onClick={() => setOpenApply(true)}
-              className="shrink-0 bg-white text-[#0070b8] font-bold rounded-xl px-6 py-3 text-sm hover:bg-blue-50 transition-colors">
-              Отправить резюме
-            </button>
+
+            {/* Right column: HR News sidebar (desktop only) */}
+            <div className="mt-14 sm:mt-20 lg:mt-0 lg:col-span-1">
+              <div className="flex items-center gap-2 mb-4 lg:mb-6">
+                <Newspaper className="w-5 h-5 text-[#0070b8]" />
+                <h2 className="text-xl font-extrabold text-slate-900">Кадровые новости</h2>
+              </div>
+
+              <div className="grid sm:grid-cols-2 lg:grid-cols-1 gap-4 sm:gap-5">
+                {hrNewsArticles.map((article, i) => (
+                  <motion.article
+                    key={article.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: i * 0.08 }}
+                    className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                    onClick={() => setActiveHrNews(article)}
+                  >
+                    <div className="relative overflow-hidden h-32 lg:h-28">
+                      <img
+                        src={article.image}
+                        alt={article.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute top-2 left-2">
+                        <span className="inline-flex items-center bg-[#0070b8]/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          {article.category}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-4 lg:p-3">
+                      <div className="flex items-center gap-2 text-[11px] text-slate-400 mb-2">
+                        <Calendar className="w-3 h-3" />
+                        <span>{new Date(article.publishedAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}</span>
+                        <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
+                        <Clock className="w-3 h-3" />
+                        <span>{article.readTime} мин</span>
+                      </div>
+                      <h3 className="font-bold text-sm text-slate-900 leading-snug group-hover:text-[#0070b8] transition-colors mb-2">
+                        {article.title}
+                      </h3>
+                      <p className="text-slate-500 leading-relaxed text-xs hidden lg:block">
+                        {article.excerpt}
+                      </p>
+                      <span className="inline-flex items-center gap-1 text-[#0070b8] text-[11px] font-bold mt-2 group-hover:underline">
+                        Читать полностью <ArrowRight className="w-3 h-3" />
+                      </span>
+                    </div>
+                  </motion.article>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -825,7 +1004,18 @@ export default function Vacancies() {
                 <>
                   <h3 className="text-lg font-extrabold mb-1">Открытый отклик</h3>
                   <p className="text-slate-500 text-sm mb-5">Рассмотрим ваше резюме для будущих вакансий</p>
-                  <form onSubmit={e => { e.preventDefault(); setOpenSubmitted(true); }} className="space-y-3">
+                  <form onSubmit={async e => {
+                    e.preventDefault();
+                    try {
+                      const fd = new FormData();
+                      fd.append("type", "openresume");
+                      fd.append("name", openName);
+                      fd.append("phone", openPhone);
+                      if (openFile) fd.append("attachments", openFile);
+                      await fetch("/api/send-email", { method: "POST", body: fd });
+                    } catch (_) {}
+                    setOpenSubmitted(true);
+                  }} className="space-y-3">
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input value={openName} onChange={e => setOpenName(e.target.value)} placeholder="Ваше имя" required
@@ -836,6 +1026,24 @@ export default function Vacancies() {
                       <input value={openPhone} onChange={e => setOpenPhone(e.target.value)} placeholder="Телефон" required
                         className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8]" />
                     </div>
+                    <input ref={openFileRef} type="file" accept=".pdf,.doc,.docx" className="hidden"
+                      onChange={e => setOpenFile(e.target.files?.[0] ?? null)} />
+                    {openFile ? (
+                      <div className="flex items-center gap-2 px-3 py-2.5 border border-[#0070b8]/30 bg-[#0070b8]/5 rounded-xl">
+                        <FileText className="w-4 h-4 text-[#0070b8] shrink-0" />
+                        <span className="text-sm text-slate-700 truncate flex-1">{openFile.name}</span>
+                        <button type="button" onClick={() => { setOpenFile(null); if (openFileRef.current) openFileRef.current.value = ""; }}
+                          className="w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center shrink-0 transition-colors">
+                          <X className="w-3 h-3 text-slate-600" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => openFileRef.current?.click()}
+                        className="w-full flex items-center justify-center gap-2 border border-dashed border-slate-300 hover:border-[#0070b8] hover:bg-[#0070b8]/5 rounded-xl py-3 text-sm text-slate-500 hover:text-[#0070b8] transition-all">
+                        <Paperclip className="w-4 h-4" />
+                        Прикрепить резюме (PDF, DOC)
+                      </button>
+                    )}
                     <button type="submit"
                       className="w-full brand-gradient text-white font-bold rounded-xl py-3 text-sm">
                       Отправить
@@ -847,6 +1055,85 @@ export default function Vacancies() {
           </div>
         )}
       </AnimatePresence>
-    </div>
+
+      {/* ── HR News detail modal ── */}
+      <AnimatePresence>
+        {activeHrNews && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setActiveHrNews(null)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            >
+              {/* Hero image */}
+              <div className="relative h-48 sm:h-64 overflow-hidden rounded-t-2xl">
+                <img
+                  src={activeHrNews.image}
+                  alt={activeHrNews.title}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                <button
+                  onClick={() => setActiveHrNews(null)}
+                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors"
+                >
+                  <X className="w-4 h-4 text-slate-800" />
+                </button>
+                <div className="absolute bottom-4 left-4 right-4">
+                  <span className="inline-flex items-center bg-[#0070b8] text-white text-[10px] font-bold px-2.5 py-1 rounded-full mb-2">
+                    {activeHrNews.category}
+                  </span>
+                  <h2 className="text-white font-extrabold text-lg sm:text-xl leading-tight">
+                    {activeHrNews.title}
+                  </h2>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-5 sm:p-6">
+                <div className="flex items-center gap-2 text-xs text-slate-400 mb-5">
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>{new Date(activeHrNews.publishedAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}</span>
+                  <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>{activeHrNews.readTime} мин чтения</span>
+                </div>
+
+                <div className="prose prose-sm max-w-none text-slate-700 leading-relaxed">
+                  {activeHrNews.content.split("\n\n").map((paragraph, idx) => (
+                    <p key={idx} className="mb-3">
+                      {paragraph.split("\n").map((line, lineIdx) => (
+                        <React.Fragment key={lineIdx}>
+                          {line.startsWith("• ") ? (
+                            <span className="block pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-[#0070b8] before:font-bold">
+                              {line.slice(2)}
+                            </span>
+                          ) : (
+                            <span>{line}</span>
+                          )}
+                          {lineIdx < paragraph.split("\n").length - 1 && <br />}
+                        </React.Fragment>
+                      ))}
+                    </p>
+                  ))}
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-xs text-slate-400">Опубликовано на сайте Дебрянск Авто</span>
+                  <button
+                    onClick={() => setActiveHrNews(null)}
+                    className="bg-slate-100 text-slate-700 font-bold rounded-xl px-4 py-2 text-sm hover:bg-slate-200 transition-colors"
+                  >
+                    Закрыть
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </Layout>
   );
 }
