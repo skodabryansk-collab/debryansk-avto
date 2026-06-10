@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "wouter";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { DealerMap } from "@/components/DealerMap";
+import { YandexMap, type YandexMapHandle } from "@/components/YandexMap";
 import {
   Car, RotateCcw, ArrowLeftRight, CreditCard, FileText, Shield,
   Wrench, Hammer, Building2, MapPin, Phone, Clock, Search,
@@ -14,7 +14,6 @@ import { useCarStorage } from "@/hooks/useCarStorage";
 import { HomeActionBtn } from "@/components/HomeActionBtn";
 import { TradeInModal } from "@/components/modals/TradeInModal";
 import SEO from "@/components/SEO";
-import { newsArticles } from "@/pages/news";
 import { SiVk, SiTelegram } from "react-icons/si";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -49,97 +48,70 @@ import logoTenet from "../assets/logos/logo-tenet.webp";
 import logoMercedes from "../assets/logos/logo-mercedes-nobg.webp";
 import logoJetour from "../assets/logos/logo-jetour.svg";
 
-/* ── Dealer locations ────────────────────────────────────── */
-const dealerLocations: import("@/components/YandexMap").DealerLocation[] = [
-  {
-    id: 1,
-    address: "г. Брянск, ул. Советская, 77",
-    short: "Советская, 77",
-    brands: ["Volkswagen Сервис", "Tenet"],
-    lat: 53.25651,
-    lng: 34.345081,
-    color: "#0070b8",
-    phone: "+7 (4832) 000-000",
-    hours: "Пн–Пт 8:00–20:00, Сб 9:00–18:00",
-  },
-  {
-    id: 2,
-    address: "Брянская обл., с. Супонево, ул. Шоссейная, 12Г",
-    short: "Шоссейная, 12Г (Супонево)",
-    brands: ["Omoda", "Jaecoo", "Exeed Сервис", "Skoda Сервис", "Авто с пробегом"],
-    lat: 53.2130,
-    lng: 34.3180,
-    color: "#87b63c",
-    phone: "+7 (4832) 000-000",
-    hours: "Ежедневно 9:00–21:00",
-  },
-  {
-    id: 3,
-    address: "г. Брянск, пр. Московский, 2Г",
-    short: "Московский пр., 2Г",
-    brands: ["Mercedes-Benz Сервис", "Jetour", "Haval Pro"],
-    lat: 53.2158,
-    lng: 34.3620,
-    color: "#0070b8",
-    phone: "+7 (4832) 000-000",
-    hours: "Пн–Пт 8:00–20:00, Сб 9:00–18:00",
-  },
-  {
-    id: 4,
-    address: "г. Брянск, ул. Литейная, 3/2",
-    short: "Литейная, 3/2",
-    brands: ["Haval City"],
-    lat: 53.304566,
-    lng: 34.266973,
-    color: "#87b63c",
-    phone: "+7 (4832) 000-000",
-    hours: "Ежедневно 9:00–21:00",
-  },
-];
+/* ── Fallback photos for DealerMap (used when photoUrl not set in DB) ── */
+const DEALER_FALLBACK_PHOTOS = [dealerTenet, dealerOmoda, dealerMb, dealerHaval];
+const DEALER_COLORS = ["#0070b8", "#87b63c", "#0070b8", "#87b63c"];
 
-/* ── Dealer map locations (abstract coords) ────────────── */
-const dealerMapLocations: import("@/components/DealerMap").DealerMapLocation[] = [
-  {
-    id: 1,
-    address: "г. Брянск, ул. Советская, 77",
-    short: "Советская, 77",
-    phone: "+7 (4832) 000-000",
-    photo: dealerTenet,
-    x: 55,
-    y: 38,
-    brands: ["Volkswagen Сервис", "Tenet"],
-  },
-  {
-    id: 2,
-    address: "Брянская обл., с. Супонево, ул. Шоссейная, 12Г",
-    short: "Шоссейная, 12Г (Супонево)",
-    phone: "+7 (4832) 000-000",
-    photo: dealerOmoda,
-    x: 72,
-    y: 62,
-    brands: ["Omoda", "Jaecoo", "Exeed Сервис", "Skoda Сервис", "Авто с пробегом"],
-  },
-  {
-    id: 3,
-    address: "г. Брянск, пр. Московский, 2Г",
-    short: "Московский пр., 2Г",
-    phone: "+7 (4832) 000-000",
-    photo: dealerMb,
-    x: 40,
-    y: 65,
-    brands: ["Mercedes-Benz Сервис", "Jetour", "Haval Pro"],
-  },
-  {
-    id: 4,
-    address: "г. Брянск, ул. Литейная, 3/2",
-    short: "Литейная, 3/2",
-    phone: "+7 (4832) 000-000",
-    photo: dealerHaval,
-    x: 32,
-    y: 35,
-    brands: ["Haval City"],
-  },
-];
+interface LocationBrandItem {
+  id: number;
+  name: string;
+  logoUrl: string | null;
+  bgColor: string | null;
+  isService: boolean;
+  sortOrder: number;
+}
+
+interface ApiLocation {
+  id: number;
+  title: string;
+  address: string;
+  mapX: number | null;
+  mapY: number | null;
+  phone: string | null;
+  hours: string | null;
+  sortOrder: number;
+  brands: LocationBrandItem[];
+}
+
+async function fetchLocations(): Promise<ApiLocation[]> {
+  const r = await fetch("/api/locations");
+  if (!r.ok) throw new Error("API error");
+  const json = await r.json();
+  return json.ok ? json.data : [];
+}
+
+interface ApiNewsItem {
+  id: number;
+  title: string;
+  excerpt: string | null;
+  category: string | null;
+  image: string | null;
+  publishedAt: string | null;
+  slug: string;
+}
+
+async function fetchPublicNews(): Promise<ApiNewsItem[]> {
+  const r = await fetch("/api/news");
+  if (!r.ok) throw new Error("API error");
+  const json = await r.json();
+  return json.ok ? json.data : [];
+}
+
+interface ApiBrand {
+  id: number;
+  name: string;
+  logoUrl: string | null;
+  websiteUrl: string | null;
+  bgColor: string | null;
+  subName: string | null;
+}
+
+async function fetchBrands(): Promise<ApiBrand[]> {
+  const r = await fetch("/api/brands");
+  if (!r.ok) throw new Error("API error");
+  const json = await r.json();
+  return json.ok ? json.data : [];
+}
 
 /* ── Form schema ─────────────────────────────────────────── */
 const formSchema = z.object({
@@ -309,6 +281,46 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
 }
 
 /* ── Utility components ──────────────────────────────────── */
+const HomeNewsSection = () => {
+  const { data: articles = [] } = useQuery({
+    queryKey: ["home-news"],
+    queryFn: fetchPublicNews,
+    staleTime: 60 * 1000,
+  });
+  return (
+    <section id="news" className="py-16 sm:py-20 bg-white border-t border-slate-100">
+      <div className="container mx-auto px-4 sm:px-6">
+        <FadeIn className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 sm:mb-10 gap-3">
+          <div>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Будьте в курсе</p>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Новости</h2>
+          </div>
+          <Link href="/news" className="flex items-center gap-2 text-[#0070b8] font-bold hover:gap-3 transition-all text-sm whitespace-nowrap">
+            Все новости <ArrowRight className="w-4 h-4" />
+          </Link>
+        </FadeIn>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {articles.slice(0, 3).map((n, i) => (
+            <FadeIn key={n.id} delay={i * 0.1}>
+              <Link href={`/news/${n.slug}`} className="block bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
+                <div className="h-44 sm:h-48 overflow-hidden relative">
+                  {n.image && <img src={n.image} alt={n.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />}
+                  {n.category && <span className="absolute top-3 left-3 px-2.5 py-1 bg-[#0070b8] text-white text-[11px] font-bold rounded-full">{n.category}</span>}
+                </div>
+                <div className="p-5">
+                  {n.publishedAt && <p className="text-xs font-semibold text-slate-400 mb-2">{new Date(n.publishedAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}</p>}
+                  <h3 className="font-extrabold text-base leading-snug mb-2 group-hover:text-[#0070b8] transition-colors">{n.title}</h3>
+                  <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">{n.excerpt ?? ""}</p>
+                </div>
+              </Link>
+            </FadeIn>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const FadeIn = ({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-60px" });
@@ -371,18 +383,6 @@ const AboutStat = ({ value, suffix = "", label, sub, color, className = "" }: { 
     </div>
   );
 };
-
-/* ── Brand data ──────────────────────────────────────────── */
-const brands = [
-  { name: "OMODA",      bg: "#fff5ee", logo: logoOmoda,         sub: null,    href: "https://omoda-debryansk.ru",    external: true  },
-  { name: "JAECOO",     bg: "#f2f2f6", logo: logoJaecoo,        sub: null,    href: "https://jaecoo-debryansk.ru",   external: true  },
-  { name: "HAVAL",      bg: "#eef2ff", logo: logoHavalOfficial, sub: "CITY",  href: "https://debryansk-haval.ru",    external: true  },
-  { name: "HAVAL",      bg: "#e8f4ff", logo: logoHavalOfficial, sub: "PRO",   href: "https://debryansk-haval.pro",   external: true  },
-  { name: "TENET",      bg: "#edfbf3", logo: logoTenet,         sub: null,    href: "https://tenet-debryansk.ru",    external: true  },
-  { name: "JETOUR",     bg: "#f0f4ff", logo: logoJetour,        sub: null,    href: "https://jetour-mbbryansky.ru",  external: true  },
-  { name: "МБ-Брянск",  bg: "#f6f6f6", logo: logoMercedes,      sub: null,    href: "https://mb-debryansk.ru",       external: true  },
-  { name: "С пробегом", bg: "#eef6ff", logo: null,              sub: null,    href: "/cars",                         external: false },
-];
 
 /* ── Offers data ─────────────────────────────────────────── */
 const offers = [
@@ -594,8 +594,60 @@ export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [modal, setModal] = useState<ModalType | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [activeCardId, setActiveCardId] = useState<number | null>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
+  const yandexMapRef = useRef<YandexMapHandle>(null);
+  const mapSectionRef = useRef<HTMLDivElement>(null);
   const { favorites, compare, isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
+
+  const { data: apiLocations = [] } = useQuery({
+    queryKey: ["public-locations"],
+    queryFn: fetchLocations,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: apiNews = [] } = useQuery({
+    queryKey: ["public-news"],
+    queryFn: fetchPublicNews,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: apiBrands = [] } = useQuery({
+    queryKey: ["public-brands"],
+    queryFn: fetchBrands,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  /* ── 4 unique locations on Yandex map ── */
+  const dealerMapLocations = React.useMemo(() => {
+    if (apiLocations.length === 0) return [];
+    return apiLocations
+      .filter(loc => loc.mapX != null && loc.mapY != null)
+      .map((loc, idx) => ({
+        id: loc.id,
+        address: loc.address,
+        short: loc.title,
+        brands: loc.brands.filter(b => !b.isService).map(b => b.name),
+        serviceBrands: loc.brands.filter(b => b.isService).map(b => b.name),
+        lat: loc.mapX as number,
+        lng: loc.mapY as number,
+        color: DEALER_COLORS[idx % DEALER_COLORS.length],
+        phone: loc.phone ?? undefined,
+        hours: loc.hours ?? undefined,
+      }));
+  }, [apiLocations]);
+
+  const dealerLocations = React.useMemo(() =>
+    apiLocations.map((loc, i) => ({
+      id: loc.id,
+      address: loc.address,
+      short: loc.title,
+      brands: loc.brands.filter(b => !b.isService).map(b => b.name),
+      serviceBrands: loc.brands.filter(b => b.isService).map(b => b.name),
+      color: DEALER_COLORS[i % DEALER_COLORS.length],
+      phone: loc.phone,
+      hours: loc.hours,
+    })), [apiLocations]);
 
   const organizationSchema = {
     "@type": "Organization",
@@ -746,7 +798,7 @@ export default function Home() {
           <motion.button
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             className="shrink-0 relative h-8 flex items-center overflow-hidden"
-            animate={{ width: scrolled ? 40 : 200 }}
+            animate={{ width: scrolled ? 40 : 140 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
           >
             <motion.img
@@ -766,7 +818,7 @@ export default function Home() {
           </motion.button>
 
           <nav className="hidden lg:flex items-center gap-0.5 ml-2">
-            {[["О группе","about","/about"],["Дилеры","dealers","#dealers"],["Услуги","services","/service"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
+            {[["О группе","about","/about"],["Дилеры","dealers","#dealers"],["Услуги","services","/service"],["Выкуп","buyout","/buyout"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
               href.startsWith("/") ? (
                 <Link key={id} href={href}
                   className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
@@ -822,7 +874,7 @@ export default function Home() {
               exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
               className="overflow-hidden border-t border-white/[0.07] bg-[#111317]">
               <div className="px-4 py-3 flex flex-col gap-0.5">
-                {[["О группе","about","/about"],["Дилеры","dealers","#dealers"],["Услуги","services","/service"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
+                {[["О группе","about","/about"],["Дилеры","dealers","#dealers"],["Услуги","services","/service"],["Выкуп","buyout","/buyout"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
                   href.startsWith("/") ? (
                     <Link key={id} href={href}
                       className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block">
@@ -935,10 +987,10 @@ export default function Home() {
               className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 w-full max-w-2xl"
             >
               {[
-                { icon: Car,            label: "Новые авто",    sub: "В наличии и под заказ", type: null,                   href: "/new-cars" },
-                { icon: RotateCcw,      label: "С пробегом",   sub: "Проверенные авто",       type: null,                   href: "/cars" },
-                { icon: Wrench,         label: "Сервис",        sub: "Запись онлайн",          type: null,                   href: "/service" },
-                { icon: ArrowLeftRight, label: "Trade-in",      sub: "Оценка за 30 мин",       type: "tradein"  as ModalType, href: null },
+                { icon: Car,            label: "Новые авто",    sub: "В наличии и под заказ", type: null, href: "/new-cars" },
+                { icon: RotateCcw,      label: "С пробегом",   sub: "Проверенные авто",       type: null, href: "/cars" },
+                { icon: Wrench,         label: "Сервис",        sub: "Запись онлайн",          type: null, href: "/service" },
+                { icon: Banknote,       label: "Выкуп авто",   sub: "Честная цена",           type: null, href: "/buyout" },
               ].map(({ icon: Icon, label, sub, type, href }) => {
                 const cls = "bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl px-4 py-3.5 sm:px-5 sm:py-4 text-left hover:bg-white/18 hover:border-white/28 transition-all group active:scale-[0.98]";
                 const inner = (
@@ -972,9 +1024,6 @@ export default function Home() {
               { label: "Новые авто",    modal: null,                     href: "/new-cars" },
               { label: "С пробегом",   modal: null,                     href: "/cars" },
               { label: "Сервис",       modal: null,                     href: "/service" },
-              { label: "Фин. услуги",  modal: "credit" as ModalType,   href: null },
-              { label: "Trade-in",     modal: "tradein" as ModalType,  href: null },
-              { label: "Страхование",  modal: "callback" as ModalType, href: null },
             ].map(({ label, modal, href }) => {
               const cls = "shrink-0 px-4 sm:px-6 py-3.5 sm:py-4 text-xs sm:text-sm font-bold text-slate-500 hover:text-[#0070b8] hover:border-b-2 hover:border-[#0070b8] border-b-2 border-transparent transition-all whitespace-nowrap";
               return href
@@ -989,55 +1038,58 @@ export default function Home() {
       <section id="brands" className="py-12 sm:py-16 md:py-20 bg-white border-b border-slate-100">
         <div className="container mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 sm:gap-6">
-            {brands.map((b, i) => (
-              <FadeIn key={`${b.name}-${b.sub ?? i}`} delay={i * 0.05}>
-                <a
-                  href={b.href}
-                  {...(b.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                  className="group relative w-full block rounded-2xl overflow-hidden transition-all duration-500 hover:scale-[1.04] hover:-translate-y-1"
-                  style={{ aspectRatio: "5/3" }}
-                >
-                  {/* Card base */}
-                  <div className="absolute inset-0 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] border border-slate-200/60 group-hover:shadow-[0_12px_40px_rgba(0,112,184,0.18),inset_0_1px_0_rgba(255,255,255,0.9)] group-hover:border-[#0070b8]/20 transition-all duration-500" />
-                  {/* Gradient sheen */}
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30" />
-                  {/* Hover glow */}
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#0070b8]/5 via-transparent to-emerald-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                  {/* Top accent line */}
-                  <div className="absolute top-0 left-4 right-4 h-[2px] bg-gradient-to-r from-transparent via-[#0070b8]/30 to-transparent rounded-full opacity-60 group-hover:opacity-100 group-hover:via-[#0070b8]/50 transition-all duration-500" />
-                  {/* Content */}
-                  <div className="relative z-10 w-full h-full flex flex-col items-center justify-center p-4 sm:p-5">
-                    {b.logo ? (
-                      <>
-                        <img
-                          src={b.logo}
-                          alt={b.name}
-                          className="w-full object-contain transition-all duration-500 group-hover:scale-110 flex-1 min-h-0 drop-shadow-[0_2px_4px_rgba(0,0,0,0.08)]"
-                          style={{ maxWidth: "85%", padding: "4% 8%" }}
-                          loading="lazy"
-                          decoding="async"
-                          onError={e => { e.currentTarget.style.display = "none"; }}
-                        />
-                        {b.sub && (
-                          <span className="mt-1 text-[10px] sm:text-xs font-black tracking-widest uppercase text-slate-500 group-hover:text-[#0070b8] transition-colors duration-300">
-                            {b.sub}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full">
-                        <Car className="w-8 h-8 sm:w-10 sm:h-10 text-[#0070b8]/70 mb-1.5 group-hover:text-[#0070b8] group-hover:scale-110 transition-all duration-300" />
-                        <span className="text-xs sm:text-sm font-bold text-slate-600 group-hover:text-[#0070b8] text-center leading-tight transition-colors duration-300">{b.name}</span>
+            {apiBrands.map((b, i) => {
+              const external = b.websiteUrl ? b.websiteUrl.startsWith("http") : false;
+              return (
+                <FadeIn key={`${b.name}-${b.subName ?? i}`} delay={i * 0.05}>
+                  <a
+                    href={b.websiteUrl ?? "#"}
+                    {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                    className="group relative w-full block rounded-2xl overflow-hidden transition-all duration-500 hover:scale-[1.04] hover:-translate-y-1"
+                    style={{ aspectRatio: "5/3" }}
+                  >
+                    {/* Card base */}
+                    <div className="absolute inset-0 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] border border-slate-200/60 group-hover:shadow-[0_12px_40px_rgba(0,112,184,0.18),inset_0_1px_0_rgba(255,255,255,0.9)] group-hover:border-[#0070b8]/20 transition-all duration-500" />
+                    {/* Gradient sheen */}
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30" />
+                    {/* Hover glow */}
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#0070b8]/5 via-transparent to-emerald-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    {/* Top accent line */}
+                    <div className="absolute top-0 left-4 right-4 h-[2px] bg-gradient-to-r from-transparent via-[#0070b8]/30 to-transparent rounded-full opacity-60 group-hover:opacity-100 group-hover:via-[#0070b8]/50 transition-all duration-500" />
+                    {/* Content */}
+                    <div className="relative z-10 w-full h-full flex flex-col items-center justify-center p-4 sm:p-5">
+                      {b.logoUrl ? (
+                        <>
+                          <img
+                            src={b.logoUrl}
+                            alt={b.name}
+                            className="w-full object-contain transition-all duration-500 group-hover:scale-110 drop-shadow-[0_2px_4px_rgba(0,0,0,0.08)]"
+                            style={{ maxWidth: "85%", maxHeight: "70%" }}
+                            loading="lazy"
+                            decoding="async"
+                            onError={e => { e.currentTarget.style.display = "none"; }}
+                          />
+                          {b.subName && (
+                            <span className="mt-1 text-[10px] sm:text-xs font-black tracking-widest uppercase text-slate-500 group-hover:text-[#0070b8] transition-colors duration-300">
+                              {b.subName}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full">
+                          <Car className="w-8 h-8 sm:w-10 sm:h-10 text-[#0070b8]/70 mb-1.5 group-hover:text-[#0070b8] group-hover:scale-110 transition-all duration-300" />
+                          <span className="text-xs sm:text-sm font-bold text-slate-600 group-hover:text-[#0070b8] text-center leading-tight transition-colors duration-300">{b.name}</span>
+                        </div>
+                      )}
+                      {/* Arrow */}
+                      <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-[#0070b8]/0 group-hover:bg-[#0070b8]/10 flex items-center justify-center transition-all duration-300">
+                        <ArrowUpRight className="w-4 h-4 text-[#0070b8] opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0" />
                       </div>
-                    )}
-                    {/* Arrow */}
-                    <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-[#0070b8]/0 group-hover:bg-[#0070b8]/10 flex items-center justify-center transition-all duration-300">
-                      <ArrowUpRight className="w-4 h-4 text-[#0070b8] opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0" />
                     </div>
-                  </div>
-                </a>
-              </FadeIn>
-            ))}
+                  </a>
+                </FadeIn>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -1388,45 +1440,68 @@ export default function Home() {
             <p className="text-slate-500 mt-2 text-sm sm:text-base">4 локации в Брянске — более 11 торгово-сервисных точек</p>
           </FadeIn>
 
-          <FadeIn delay={0.1}>
-            <DealerMap locations={dealerMapLocations} />
-          </FadeIn>
+          <div ref={mapSectionRef} className="w-full h-[400px] sm:h-[500px] md:h-[600px] rounded-2xl overflow-hidden border border-slate-200 shadow-lg">
+            <YandexMap ref={yandexMapRef} locations={dealerMapLocations} />
+          </div>
 
           {/* Dealer list below map */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8 sm:mt-10">
-            {dealerLocations.map((loc) => (
-              <FadeIn key={loc.id} delay={loc.id * 0.08}>
-                <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5 hover:shadow-md transition-shadow">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-bold text-white text-sm"
-                      style={{ background: loc.color }}>
-                      {loc.id}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-slate-900 leading-snug">{loc.address}</p>
-                      {loc.hours && (
-                        <div className="flex items-center gap-1 mt-1 text-[11px] text-slate-500">
-                          <Clock className="w-3 h-3" />
-                          {loc.hours}
-                        </div>
-                      )}
-                      <div className="flex flex-wrap gap-1.5 mt-2.5">
-                        {loc.brands.map(b => (
-                          <span key={b} className="inline-block px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-slate-100 text-slate-600">
-                            {b}
-                          </span>
-                        ))}
+            {dealerLocations.map((loc) => {
+              const isActive = activeCardId === loc.id;
+              return (
+                <FadeIn key={loc.id} delay={loc.id * 0.08}>
+                  <button
+                    onClick={() => {
+                      setActiveCardId(loc.id);
+                      yandexMapRef.current?.openLocation(loc.id);
+                      mapSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }}
+                    className={`w-full text-left bg-white rounded-2xl border p-4 sm:p-5 transition-all ${
+                      isActive
+                        ? "border-[#0070b8] shadow-[0_0_0_2px_rgba(0,112,184,0.18)] shadow-md"
+                        : "border-slate-100 hover:shadow-md hover:border-slate-200"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-bold text-white text-sm transition-transform ${isActive ? "scale-110" : ""}`}
+                        style={{ background: loc.color }}>
+                        {loc.id}
                       </div>
-                      <a href={`tel:${loc.phone}`}
-                        className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0070b8] hover:text-[#0058a0] transition-colors mt-3">
-                        <Phone className="w-3.5 h-3.5" />
-                        {loc.phone}
-                      </a>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-900 leading-snug">{loc.short}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">{loc.address}</p>
+                        {loc.hours && (
+                          <div className="flex items-center gap-1 mt-1 text-[11px] text-slate-500">
+                            <Clock className="w-3 h-3" />
+                            {loc.hours}
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-1.5 mt-2.5">
+                          {loc.brands.map(b => (
+                            <span key={b} className="inline-block px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-blue-100 text-blue-700">
+                              {b}
+                            </span>
+                          ))}
+                          {(loc.serviceBrands ?? []).map(b => (
+                            <span key={`svc-${b}`} className="inline-block px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-orange-100 text-orange-700">
+                              {b} Сервис
+                            </span>
+                          ))}
+                        </div>
+                        {loc.phone && (
+                          <a href={`tel:${loc.phone}`}
+                            onClick={e => e.stopPropagation()}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0070b8] hover:text-[#0058a0] transition-colors mt-3">
+                            <Phone className="w-3.5 h-3.5" />
+                            {loc.phone}
+                          </a>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </FadeIn>
-            ))}
+                  </button>
+                </FadeIn>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -1581,36 +1656,7 @@ export default function Home() {
       </section>
 
       {/* ── News ───────────────────────────────────────────── */}
-      <section id="news" className="py-16 sm:py-20 bg-white border-t border-slate-100">
-        <div className="container mx-auto px-4 sm:px-6">
-          <FadeIn className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 sm:mb-10 gap-3">
-            <div>
-              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Будьте в курсе</p>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Новости</h2>
-            </div>
-            <Link href="/news" className="flex items-center gap-2 text-[#0070b8] font-bold hover:gap-3 transition-all text-sm whitespace-nowrap">
-              Все новости <ArrowRight className="w-4 h-4" />
-            </Link>
-          </FadeIn>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {newsArticles.slice(0, 3).map((n, i) => (
-              <FadeIn key={i} delay={i * 0.1}>
-                <Link href={`/news/${n.slug}`} className="block bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
-                  <div className="h-44 sm:h-48 overflow-hidden relative">
-                    <img src={n.image} alt={n.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
-                    <span className="absolute top-3 left-3 px-2.5 py-1 bg-[#0070b8] text-white text-[11px] font-bold rounded-full">{n.category}</span>
-                  </div>
-                  <div className="p-5">
-                    <p className="text-xs font-semibold text-slate-400 mb-2">{n.publishedAt}</p>
-                    <h3 className="font-extrabold text-base leading-snug mb-2 group-hover:text-[#0070b8] transition-colors">{n.title}</h3>
-                    <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">{n.excerpt}</p>
-                  </div>
-                </Link>
-              </FadeIn>
-            ))}
-          </div>
-        </div>
-      </section>
+      <HomeNewsSection />
 
       {/* ── Newsletter ─────────────────────────────────────── */}
       <section className="py-12 sm:py-16 bg-slate-50 border-t border-slate-100">
