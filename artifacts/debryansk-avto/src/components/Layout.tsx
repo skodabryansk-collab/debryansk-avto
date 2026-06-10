@@ -15,6 +15,7 @@ const NAV_LINKS: [string, string, string][] = [
   ["О группе", "about", "/about"],
   ["Дилеры", "dealers", "/#dealers"],
   ["Услуги", "services", "/service"],
+  ["Выкуп", "buyout", "/buyout"],
   ["Контакты", "contacts", "/contacts"],
 ];
 
@@ -151,7 +152,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <motion.button
             onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); window.location.href = "/"; }}
             className="shrink-0 relative h-8 flex items-center overflow-hidden"
-            animate={{ width: scrolled ? 40 : 200 }}
+            animate={{ width: scrolled ? 40 : 140 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
           >
             <motion.img
@@ -332,6 +333,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <ul className="space-y-2 text-sm">
                 <li><Link href="/about" className="hover:text-[#0070b8] transition-colors">О группе</Link></li>
                 <li><Link href="/service" className="hover:text-[#0070b8] transition-colors">Услуги</Link></li>
+                <li><Link href="/buyout" className="hover:text-[#0070b8] transition-colors">Выкуп и комиссия</Link></li>
                 <li><Link href="/contacts" className="hover:text-[#0070b8] transition-colors">Контакты</Link></li>
                 <li><Link href="/vacancies" className="hover:text-[#0070b8] transition-colors">Вакансии</Link></li>
                 <li><Link href="/news" className="hover:text-[#0070b8] transition-colors">Новости</Link></li>
