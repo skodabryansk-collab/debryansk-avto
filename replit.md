@@ -1,45 +1,64 @@
-# [Project name]
+# Дебрянск Авто
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Сайт автодилерской группы компаний «Дебрянск Авто» в Брянске — витрина бренда, каталог автомобилей, выкуп авто и страницы дилеров.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `pnpm --filter @workspace/debryansk-avto run dev` — сайт (порт из $PORT)
+- `pnpm --filter @workspace/api-server run dev` — API сервер (порт 8080)
+- `pnpm --filter @workspace/admin-panel run dev` — панель администратора
+- `pnpm run typecheck` — проверка типов по всем пакетам
+- `pnpm run build` — typecheck + сборка всех пакетов
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
+- Frontend: React + Vite, Tailwind CSS v4, Framer Motion, shadcn/ui
+- API: Express 5, esbuild (CJS bundle)
 - DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Icons: Lucide React, react-icons (si-иконки брендов)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/debryansk-avto/` — основной сайт (React + Vite)
+  - `src/pages/home.tsx` — главная страница со своим хедером
+  - `src/pages/buyout.tsx` — страница выкупа авто (двухшаговая форма)
+  - `src/components/Layout.tsx` — общий лэйаут для всех страниц кроме главной
+- `artifacts/api-server/` — бэкенд API
+  - `src/routes/car-catalog.ts` — прайсы авто (Auto.ru API + fallback-таблица)
+  - `src/routes/email.ts` — отправка email через nodemailer
+- `artifacts/admin-panel/` — панель администратора
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- **Главная страница имеет собственный хедер** — `home.tsx` содержит встроенный `<header>` с анимацией логотипа (Framer Motion), не использует `Layout.tsx`. Изменения навигации нужно вносить в оба места.
+- **Логотип в хедере анимируется при скролле** — ширина меняется с 140px (полный логотип) до 40px (иконка). Уменьшение нужно для того, чтобы все ссылки навигации помещались на экране 1024px.
+- **Auto.ru price-stats API** — используется dealer-токен (`AUTORU_API_KEY`), который не имеет доступа к price-stats. Реализован fallback с базовыми ценами 40+ марок + формула амортизации (5%/год, 1%/10k км).
+- **Email** через SMTP (`SMTP_PASS`). Маршрут `/api/send-email` — пути в роутере без префикса `/api` (он добавлен в `app.use`).
+- **Object Storage** (Replit GCS) для загружаемых файлов из админки — бакет через `DEFAULT_OBJECT_STORAGE_BUCKET_ID`.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Главная страница: hero с слайдером брендов, плитки быстрого доступа (Новые авто, С пробегом, Сервис, Выкуп авто), блок дилеров
+- Страница выкупа `/buyout`: описание услуги, двухшаговая форма оценки (марка → пробег → расчёт цены)
+- Каталог `/cars`: список автомобилей с фильтрами
+- Страница сервиса `/service`, вакансии `/vacancies`, новости `/news`
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Тональность текстов — «Территория автомобилей», без маркетинговых клише
+- Брендовый цвет: #0070b8 (синий), градиент `brand-gradient`
+- Языки: интерфейс на русском
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- **Два хедера**: главная `/` использует встроенный хедер в `home.tsx`, остальные страницы — `Layout.tsx`. При добавлении навигационных ссылок нужно обновить оба файла.
+- **Роутер Express**: пути в `router.get(...)` пишутся БЕЗ префикса `/api` — он добавлен через `app.use("/api", router)`.
+- **multer и nodemailer** должны быть в списке `external` в конфиге esbuild, иначе бандл ломается.
 
 ## Pointers
 
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- Репозиторий GitHub: `skodabryansk-collab/debryansk-avto`
+- См. skill `auto-track-and-sync` для синхронизации изменений с GitHub
+- См. skill `object-storage-debryansk` для работы с Object Storage
