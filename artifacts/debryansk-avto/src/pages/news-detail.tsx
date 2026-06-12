@@ -4,7 +4,26 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, Clock, ArrowRight, Heart } from "lucide-react";
 import SEO from "@/components/SEO";
 import Layout from "@/components/Layout";
-import { newsArticles } from "./news";
+import { useQuery } from "@tanstack/react-query";
+
+interface NewsArticle {
+  id: number;
+  title: string;
+  excerpt: string | null;
+  content: string | null;
+  category: string | null;
+  image: string | null;
+  publishedAt: string | null;
+  readTime: number | null;
+  slug: string;
+}
+
+async function fetchAllNews(): Promise<NewsArticle[]> {
+  const r = await fetch("/api/news");
+  if (!r.ok) throw new Error("API error");
+  const json = await r.json();
+  return json.ok ? json.data : [];
+}
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
@@ -14,7 +33,34 @@ function formatDate(dateStr: string) {
 export default function NewsDetailPage() {
   const [, params] = useRoute("/news/:slug");
   const slug = params?.slug ?? "";
-  const article = newsArticles.find(a => a.slug === slug);
+
+  const { data: allNews = [], isLoading } = useQuery({
+    queryKey: ["public-news"],
+    queryFn: fetchAllNews,
+    staleTime: 60 * 1000,
+  });
+
+  const article = allNews.find(a => a.slug === slug);
+  const related = article
+    ? allNews.filter(a => a.id !== article.id && a.category === article.category).slice(0, 3)
+    : [];
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 sm:px-6 py-8 max-w-3xl animate-pulse space-y-4">
+          <div className="h-4 bg-slate-100 rounded w-2/3" />
+          <div className="h-8 bg-slate-100 rounded w-full" />
+          <div className="h-64 bg-slate-100 rounded-2xl" />
+          <div className="space-y-3">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-4 bg-slate-100 rounded" />
+            ))}
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!article) {
     return (
@@ -30,10 +76,6 @@ export default function NewsDetailPage() {
       </Layout>
     );
   }
-
-  const related = newsArticles
-    .filter(a => a.id !== article.id && a.category === article.category)
-    .slice(0, 3);
 
   const articleJsonLd = {
     "@type": "NewsArticle",
@@ -57,11 +99,16 @@ export default function NewsDetailPage() {
     <Layout>
       <SEO
         title={`${article.title}`}
-        description={article.excerpt}
+        description={article.excerpt ?? ""}
         canonical={`/news/${article.slug}`}
-        image={article.image}
+        image={article.image ?? undefined}
         type="article"
         jsonLd={articleJsonLd}
+        breadcrumbs={[
+          { name: "Главная", url: "/" },
+          { name: "Новости", url: "/news" },
+          { name: article.title ?? "", url: `/news/${article.slug}` },
+        ]}
       />
 
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-3xl">
@@ -84,14 +131,18 @@ export default function NewsDetailPage() {
             <span className="inline-flex items-center bg-[#0070b8]/10 text-[#0070b8] text-[11px] font-bold px-2.5 py-1 rounded-full">
               {article.category}
             </span>
-            <div className="flex items-center gap-1 text-[11px] text-slate-400">
-              <Calendar className="w-3 h-3" />
-              <span>{formatDate(article.publishedAt)}</span>
-            </div>
-            <div className="flex items-center gap-1 text-[11px] text-slate-400">
-              <Clock className="w-3 h-3" />
-              <span>{article.readTime} мин чтения</span>
-            </div>
+            {article.publishedAt && (
+              <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                <Calendar className="w-3 h-3" />
+                <span>{formatDate(article.publishedAt)}</span>
+              </div>
+            )}
+            {article.readTime && (
+              <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                <Clock className="w-3 h-3" />
+                <span>{article.readTime} мин чтения</span>
+              </div>
+            )}
           </div>
 
           {/* Title */}
@@ -100,17 +151,19 @@ export default function NewsDetailPage() {
           </h1>
 
           {/* Cover image */}
-          <div className="relative rounded-2xl overflow-hidden mb-6">
-            <img
-              src={article.image}
-              alt={article.title}
-              className="w-full h-48 sm:h-80 object-cover"
-            />
-          </div>
+          {article.image && (
+            <div className="relative rounded-2xl overflow-hidden mb-6">
+              <img
+                src={article.image}
+                alt={article.title}
+                className="w-full h-48 sm:h-80 object-cover"
+              />
+            </div>
+          )}
 
           {/* Content */}
           <div className="prose prose-slate max-w-none">
-            {article.content.split("\n\n").map((paragraph, i) => (
+            {(article.content ?? article.excerpt ?? "").split("\n\n").map((paragraph, i) => (
               <p key={i} className={`text-slate-600 leading-relaxed mb-4 ${i === 0 ? "text-base sm:text-lg" : ""}`}>
                 {paragraph}
               </p>
@@ -147,9 +200,11 @@ export default function NewsDetailPage() {
               {related.map(a => (
                 <Link key={a.id} href={`/news/${a.slug}`}>
                   <div className="bg-white rounded-xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow group">
-                    <div className="h-32 overflow-hidden">
-                      <img src={a.image} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    </div>
+                    {a.image && (
+                      <div className="h-32 overflow-hidden">
+                        <img src={a.image} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      </div>
+                    )}
                     <div className="p-4">
                       <div className="text-[10px] text-[#0070b8] font-bold mb-1">{a.category}</div>
                       <h3 className="text-sm font-bold text-slate-900 leading-snug group-hover:text-[#0070b8] transition-colors">{a.title}</h3>
