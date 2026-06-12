@@ -209,3 +209,36 @@ html {
   transform: scale(1.02);
   box-shadow: 0 20px 40px -12px rgba(0,0,0,0.15);
 }
+
+.hh-description p {
+  margin-bottom: 0.5rem;
+}
+.hh-description ul,
+.hh-description ol {
+  padding-left: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+.hh-description ul {
+  list-style-type: disc;
+}
+.hh-description ol {
+  list-style-type: decimal;
+}
+.hh-description li {
+  margin-bottom: 0.25rem;
+}
+.hh-description strong,
+.hh-description b {
+  font-weight: 700;
+}
+.hh-description em,
+.hh-description i {
+  font-style: italic;
+}
+.hh-description h2,
+.hh-description h3,
+.hh-description h4 {
+  font-weight: 700;
+  margin-bottom: 0.375rem;
+  margin-top: 0.75rem;
+}
