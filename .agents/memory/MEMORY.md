@@ -4,4 +4,5 @@
 - [SVG optimization](svg-optimization.md) — Manual SVG cleanup: remove unused namespaces, redundant attributes, use `<g>` with `fill` instead of per-path fills, short gradient IDs. Jetour/VW/Haval-official SVGs remain as-is since they have unique source-embedded features.
 - [GitHub API upload](github-api-upload.md) — When git push is blocked in main agent, use GitHub Contents API via Replit connector: split source/binary files, base64 encode, PUT with 100ms rate limit, skip >1MB files. Repo: skodabryansk-collab/debryansk-avto.
 - [Auto track & sync skill](auto-track-and-sync.md) — Reusable skill for tracking changed files per session and syncing only those to GitHub via Contents API. Skip unchanged files, sequential upload, 409 auto-retry. Saved as `.agents/skills/auto-track-and-sync/SKILL.md`.
+- [GitHub auto-sync policy](github-auto-sync-policy.md) — ALWAYS sync to GitHub after completing any task that modifies files. User expects this to happen automatically without being asked.
 - [Auto.ru Dealer API](autoru-api.md) — catalog proxy: host apiauto.ru, auth header x-authorization (no Bearer/Vertis prefix), brands+models via /1.0/search/cars/breadcrumbs.
