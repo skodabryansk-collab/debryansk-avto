@@ -9,31 +9,42 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+interface TargetCar {
+  mark: string;
+  model: string;
+  year?: number | string;
+  price?: number;
+  isNew?: boolean;
+}
+
 interface TradeInModalProps {
   onClose: () => void;
+  targetCar?: TargetCar;
 }
+
+interface CmItem { id: string; name: string }
 
 interface EstimateResult {
   ok: boolean;
-  estimate: number | null;
-  range?: { min: number; max: number };
-  similarCount?: number;
-  marketAverage?: number;
+  buyoutMin?: number;
+  buyoutMax?: number;
   message?: string;
 }
 
-export function TradeInModal({ onClose }: TradeInModalProps) {
+export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
   const [submitted, setSubmitted] = useState(false);
   const [estimateResult, setEstimateResult] = useState<EstimateResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [estimating, setEstimating] = useState(false);
 
-  const [brands, setBrands] = useState<string[]>([]);
-  const [models, setModels] = useState<string[]>([]);
+  const [brands, setBrands] = useState<CmItem[]>([]);
+  const [models, setModels] = useState<CmItem[]>([]);
+  const [years, setYears] = useState<number[]>([]);
   const [brandOpen, setBrandOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [brandsLoading, setBrandsLoading] = useState(true);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [yearsLoading, setYearsLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     brand: "",
@@ -47,13 +58,11 @@ export function TradeInModal({ onClose }: TradeInModalProps) {
     comment: "",
   });
 
-  const years = Array.from({ length: 30 }, (_, i) => (new Date().getFullYear() - i).toString());
-
   useEffect(() => {
-    fetch("/api/cars/brands")
+    fetch("/api/car-catalog/cm-brands")
       .then(r => r.json())
       .then(data => {
-        if (data.ok) setBrands(data.brands);
+        if (data.ok) setBrands(data.data ?? []);
       })
       .catch(() => setBrands([]))
       .finally(() => setBrandsLoading(false));
@@ -65,20 +74,40 @@ export function TradeInModal({ onClose }: TradeInModalProps) {
       return;
     }
     setModelsLoading(true);
-    fetch(`/api/cars/models?brand=${encodeURIComponent(formData.brand)}`)
+    fetch(`/api/car-catalog/cm-models?brand=${encodeURIComponent(formData.brand)}`)
       .then(r => r.json())
       .then(data => {
-        if (data.ok) setModels(data.models);
+        if (data.ok) setModels(data.data ?? []);
       })
       .catch(() => setModels([]))
       .finally(() => setModelsLoading(false));
   }, [formData.brand]);
+
+  useEffect(() => {
+    if (!formData.brand || !formData.model) {
+      setYears([]);
+      return;
+    }
+    setYearsLoading(true);
+    const qs = new URLSearchParams({ brand: formData.brand, model: formData.model });
+    fetch(`/api/car-catalog/cm-years?${qs}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) setYears(data.data ?? []);
+      })
+      .catch(() => setYears([]))
+      .finally(() => setYearsLoading(false));
+  }, [formData.brand, formData.model]);
 
   const handleChange = useCallback((field: string, value: string) => {
     setFormData(prev => {
       const next = { ...prev, [field]: value };
       if (field === "brand") {
         next.model = "";
+        next.year = "";
+      }
+      if (field === "model") {
+        next.year = "";
       }
       return next;
     });
@@ -90,17 +119,16 @@ export function TradeInModal({ onClose }: TradeInModalProps) {
     setEstimating(true);
     try {
       const params = new URLSearchParams({
-        brand: formData.brand,
-        model: formData.model,
+        brandId: formData.brand,
+        modelId: formData.model,
         year: formData.year,
         mileage: formData.mileage,
-        condition: formData.condition || "good",
       });
-      const resp = await fetch(`/api/cars/estimate?${params}`);
+      const resp = await fetch(`/api/car-catalog/cm-expert-predict?${params}`);
       const data = await resp.json();
       setEstimateResult(data);
-    } catch (e) {
-      setEstimateResult({ ok: false, estimate: null, message: "Ошибка при расчете" });
+    } catch {
+      setEstimateResult({ ok: false, message: "Ошибка при расчете" });
     } finally {
       setEstimating(false);
     }
@@ -115,26 +143,36 @@ export function TradeInModal({ onClose }: TradeInModalProps) {
       fd.append("type", "tradein");
       fd.append("name", formData.name);
       fd.append("phone", formData.phone);
-      fd.append("brand", formData.brand);
-      fd.append("model", formData.model);
+      const brandName = brands.find(b => b.id === formData.brand)?.name ?? formData.brand;
+      const modelName = models.find(m => m.id === formData.model)?.name ?? formData.model;
+      fd.append("brand", brandName);
+      fd.append("model", modelName);
       fd.append("year", formData.year);
       fd.append("mileage", formData.mileage);
       fd.append("condition", formData.condition);
       fd.append("owners", formData.owners);
       fd.append("comment", formData.comment);
-      if (estimateResult?.ok && estimateResult.range) {
-        fd.append("estimateMin", String(estimateResult.range.min));
-        fd.append("estimateMax", String(estimateResult.range.max));
-      } else if (estimateResult?.ok && estimateResult.estimate) {
-        fd.append("estimate", String(estimateResult.estimate) + " ₽");
+      if (estimateResult?.ok && estimateResult.buyoutMin && estimateResult.buyoutMax) {
+        fd.append("estimateMin", String(estimateResult.buyoutMin));
+        fd.append("estimateMax", String(estimateResult.buyoutMax));
+      }
+      if (targetCar) {
+        fd.append("targetMark", targetCar.mark);
+        fd.append("targetModel", targetCar.model);
+        if (targetCar.year) fd.append("targetYear", String(targetCar.year));
+        if (targetCar.price) fd.append("targetPrice", String(targetCar.price));
+        fd.append("targetIsNew", targetCar.isNew ? "да" : "нет");
       }
       await fetch("/api/send-email", { method: "POST", body: fd });
     } catch (_) {}
     setSubmitted(true);
     setLoading(false);
-  }, [formData, estimateResult]);
+  }, [formData, estimateResult, brands, models]);
 
   const canEstimate = formData.brand && formData.model && formData.year && formData.mileage;
+
+  const selectedBrandName = brands.find(b => b.id === formData.brand)?.name ?? "";
+  const selectedModelName = models.find(m => m.id === formData.model)?.name ?? "";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -209,8 +247,8 @@ export function TradeInModal({ onClose }: TradeInModalProps) {
                         onClick={() => setBrandOpen(!brandOpen)}
                         className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between text-sm hover:border-[#d97706] transition-colors"
                       >
-                        <span className={formData.brand ? "text-slate-900" : "text-slate-400"}>
-                          {formData.brand || "Выберите марку"}
+                        <span className={selectedBrandName ? "text-slate-900" : "text-slate-400"}>
+                          {selectedBrandName || "Выберите марку"}
                         </span>
                         {brandsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                       </button>
@@ -224,12 +262,12 @@ export function TradeInModal({ onClose }: TradeInModalProps) {
                           >
                             {brands.map(b => (
                               <button
-                                key={b}
+                                key={b.id}
                                 type="button"
-                                onClick={() => { handleChange("brand", b); setBrandOpen(false); }}
+                                onClick={() => { handleChange("brand", b.id); setBrandOpen(false); }}
                                 className="w-full px-3 py-2 text-sm text-left hover:bg-slate-50 transition-colors"
                               >
-                                {b}
+                                {b.name}
                               </button>
                             ))}
                           </motion.div>
@@ -248,8 +286,8 @@ export function TradeInModal({ onClose }: TradeInModalProps) {
                           onClick={() => setModelOpen(!modelOpen)}
                           className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between text-sm hover:border-[#d97706] transition-colors"
                         >
-                          <span className={formData.model ? "text-slate-900" : "text-slate-400"}>
-                            {formData.model || "Выберите модель"}
+                          <span className={selectedModelName ? "text-slate-900" : "text-slate-400"}>
+                            {selectedModelName || "Выберите модель"}
                           </span>
                           {modelsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                         </button>
@@ -266,12 +304,12 @@ export function TradeInModal({ onClose }: TradeInModalProps) {
                               )}
                               {models.map(m => (
                                 <button
-                                  key={m}
+                                  key={m.id}
                                   type="button"
-                                  onClick={() => { handleChange("model", m); setModelOpen(false); }}
+                                  onClick={() => { handleChange("model", m.id); setModelOpen(false); }}
                                   className="w-full px-3 py-2 text-sm text-left hover:bg-slate-50 transition-colors"
                                 >
-                                  {m}
+                                  {m.name}
                                 </button>
                               ))}
                             </motion.div>
@@ -291,12 +329,18 @@ export function TradeInModal({ onClose }: TradeInModalProps) {
                         <select
                           value={formData.year}
                           onChange={(e) => handleChange("year", e.target.value)}
-                          className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm appearance-none focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none"
+                          disabled={!formData.model || yearsLoading}
+                          className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm appearance-none focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
                         >
-                          <option value="">Год</option>
+                          <option value="">
+                            {yearsLoading ? "Загрузка..." : !formData.model ? "Сначала модель" : "Год"}
+                          </option>
                           {years.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
-                        <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        {yearsLoading
+                          ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        }
                       </div>
                     </div>
 
@@ -380,24 +424,14 @@ export function TradeInModal({ onClose }: TradeInModalProps) {
                         animate={{ opacity: 1, y: 0 }}
                         className="bg-[#d97706]/10 rounded-lg p-3 border border-[#d97706]/20"
                       >
-                        {estimateResult.ok && estimateResult.estimate ? (
+                        {estimateResult.ok && estimateResult.buyoutMin && estimateResult.buyoutMax ? (
                           <div>
                             <div className="flex items-center justify-between">
                               <span className="text-sm text-[#b45309] font-medium">Предварительная оценка</span>
-                              <span className="text-lg font-bold text-[#d97706]">
-                                {estimateResult.estimate.toLocaleString("ru-RU")} ₽
-                              </span>
                             </div>
-                            {estimateResult.range && (
-                              <div className="text-xs text-[#d97706]/70 mt-1">
-                                Диапазон: {estimateResult.range.min.toLocaleString("ru-RU")} ₽ — {estimateResult.range.max.toLocaleString("ru-RU")} ₽
-                              </div>
-                            )}
-                            {estimateResult.similarCount && (
-                              <div className="text-xs text-[#d97706]/60 mt-0.5">
-                                На основе {estimateResult.similarCount} похожих авто в каталоге
-                              </div>
-                            )}
+                            <div className="text-base font-bold text-[#d97706] mt-1">
+                              {estimateResult.buyoutMin.toLocaleString("ru-RU")} ₽ — {estimateResult.buyoutMax.toLocaleString("ru-RU")} ₽
+                            </div>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2 text-sm text-[#b45309]">
