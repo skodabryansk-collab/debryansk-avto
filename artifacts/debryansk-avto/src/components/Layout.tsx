@@ -1,14 +1,40 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Heart, Scale, ArrowLeft, Phone, User, CheckCircle } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import { SiVk, SiTelegram } from "react-icons/si";
+import { Helmet } from "react-helmet-async";
 import miniLogo from "@/assets/mini-logo.webp";
 import logoWhiteSvg from "@/assets/logo-white.svg";
 import logoPng from "@/assets/logo-optimized.webp";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+
+const GLOBAL_DEALER_LD = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "AutoDealer",
+  "name": "Дебрянск Авто",
+  "alternateName": "Территория Автомобилей",
+  "url": "https://debryansk-auto.ru",
+  "telephone": "+74832777770",
+  "description": "Группа автодилеров в Брянске. 9 брендов: CHERY, OMODA, JAECOO, HAVAL, TENET, Jetour, МБ-Брянск и другие.",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Брянск",
+    "addressRegion": "Брянская область",
+    "addressCountry": "RU"
+  },
+  "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": 53.2434,
+    "longitude": 34.3647
+  },
+  "openingHours": "Mo-Su 09:00-21:00",
+  "sameAs": ["https://vk.com/debryansk_avto"],
+  "foundingDate": "2011"
+});
 
 /* ── Nav links ──────────────────────────────────────────── */
 const NAV_LINKS: [string, string, string][] = [
@@ -109,6 +135,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const compCount = compare.length;
   const { toast } = useToast();
 
+  const { data: siteSettings } = useQuery({
+    queryKey: ["site-settings"],
+    queryFn: () => fetch("/api/settings").then(r => r.json()).then(j => j.data as Record<string, string>),
+    staleTime: 5 * 60 * 1000,
+  });
+  const headerPhone = siteSettings?.header_phone ?? "+7 (4832) 77 77 70";
+  const headerPhoneTel = "tel:+" + (siteSettings?.header_phone ?? "+7 (4832) 77 77 70").replace(/\D/g, "");
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 80);
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -124,6 +158,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50 font-[Manrope,sans-serif] flex flex-col">
+      <Helmet>
+        <script type="application/ld+json">{GLOBAL_DEALER_LD}</script>
+      </Helmet>
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#111317] text-white">
         {/* Top info bar */}
@@ -131,12 +168,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="container mx-auto px-4 sm:px-6 flex items-center justify-between h-10">
             <div className="flex items-center gap-4 text-[11px] font-medium text-white/40">
               <span>г. Брянск</span>
-              <span className="hidden sm:block">Ежедневно 9:00–21:00</span>
             </div>
             <div className="flex items-center gap-3">
-              <a href="tel:+74832000000"
+              <a href={headerPhoneTel}
                 className="text-xs sm:text-sm font-bold text-white/70 hover:text-white transition-colors">
-                +7 (4832) 000-000
+                {headerPhone}
               </a>
               <Button size="sm"
                 className="h-7 sm:h-8 px-3 sm:px-4 brand-gradient border-0 text-white font-bold rounded-lg text-[11px] sm:text-xs hover:opacity-90"
@@ -270,7 +306,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <Scale className="w-4 h-4" /> Сравнить {compCount > 0 && <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{compCount}</span>}
                 </Link>
                 <div className="pt-3 flex items-center justify-between">
-                  <a href="tel:+74832000000" className="text-base font-bold text-[#0070b8]">+7 (4832) 000-000</a>
+                  <a href={headerPhoneTel} className="text-base font-bold text-[#0070b8]">{headerPhone}</a>
                   <div className="flex gap-2">
                     <a href="#" className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center hover:bg-[#0070b8] transition-colors">
                       <SiVk size={14} />
@@ -304,36 +340,38 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 Территория Автомобилей. Группа компаний с 9 брендами в Брянске с 2011 года.
               </p>
               <div className="flex gap-2.5">
-                <a href="#" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#0070b8] transition-colors group">
+                <a href="#" aria-label="ВКонтакте" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#0070b8] transition-colors group">
                   <SiVk className="text-white/40 group-hover:text-white" size={15} />
                 </a>
-                <a href="#" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#0070b8] transition-colors group">
+                <a href="#" aria-label="Telegram" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#0070b8] transition-colors group">
                   <SiTelegram className="text-white/40 group-hover:text-white" size={15} />
                 </a>
               </div>
             </div>
             <div>
-              <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Бренды</h4>
+              <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Каталог</h4>
               <ul className="space-y-2 text-sm">
-                {["CHERY","OMODA","JAECOO","HAVAL"].map(b => (
-                  <li key={b}><span className="hover:text-[#0070b8] transition-colors cursor-pointer">{b}</span></li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Ещё бренды</h4>
-              <ul className="space-y-2 text-sm">
-                {["TENET","МБ-Брянск","С пробегом"].map(b => (
-                  <li key={b}><span className="hover:text-[#0070b8] transition-colors cursor-pointer">{b}</span></li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Навигация</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link href="/about" className="hover:text-[#0070b8] transition-colors">О группе</Link></li>
-                <li><Link href="/service" className="hover:text-[#0070b8] transition-colors">Услуги</Link></li>
+                <li><Link href="/new-cars" className="hover:text-[#0070b8] transition-colors">Новые автомобили</Link></li>
+                <li><Link href="/cars" className="hover:text-[#0070b8] transition-colors">Автомобили с пробегом</Link></li>
                 <li><Link href="/buyout" className="hover:text-[#0070b8] transition-colors">Выкуп и комиссия</Link></li>
+                <li><Link href="/compare" className="hover:text-[#0070b8] transition-colors">Сравнение авто</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Услуги</h4>
+              <ul className="space-y-2 text-sm">
+                <li><Link href="/service" className="hover:text-[#0070b8] transition-colors">Сервис и ТО</Link></li>
+                <li><Link href="/about" className="hover:text-[#0070b8] transition-colors">О группе</Link></li>
+                {["CHERY", "OMODA", "JAECOO", "HAVAL"].map(b => (
+                  <li key={b}>
+                    <Link href={`/new-cars?brand=${encodeURIComponent(b)}`} className="hover:text-[#0070b8] transition-colors">{b}</Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Компания</h4>
+              <ul className="space-y-2 text-sm">
                 <li><Link href="/contacts" className="hover:text-[#0070b8] transition-colors">Контакты</Link></li>
                 <li><Link href="/vacancies" className="hover:text-[#0070b8] transition-colors">Вакансии</Link></li>
                 <li><Link href="/news" className="hover:text-[#0070b8] transition-colors">Новости</Link></li>
@@ -342,7 +380,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="pt-6 sm:pt-8 border-t border-white/[0.07] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
             <p>© {new Date().getFullYear()} Дебрянск Авто — Территория Автомобилей</p>
-            <Link href="#" className="hover:text-white transition-colors">Политика конфиденциальности</Link>
+            <Link href="/privacy" className="hover:text-white transition-colors">Политика конфиденциальности</Link>
           </div>
         </div>
       </footer>
