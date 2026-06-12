@@ -390,6 +390,10 @@ export default function NewCars() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const [filterMark, setFilterMark] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("brand") ?? "";
+  });
   const [filterDealer, setFilterDealer] = useState("Все дилеры");
   const [filterModel, setFilterModel] = useState("Все модели");
   const [filterAvailability, setFilterAvailability] = useState("Все");
@@ -413,6 +417,7 @@ export default function NewCars() {
 
   const filtered = useMemo(() => {
     let list = cars;
+    if (filterMark) list = list.filter(c => c.mark.toLowerCase() === filterMark.toLowerCase());
     if (filterDealer !== "Все дилеры") list = list.filter(c => c.dealer === filterDealer);
     if (filterModel !== "Все модели") list = list.filter(c => c.model === filterModel);
     if (filterAvailability !== "Все") list = list.filter(c => c.availability === filterAvailability);
@@ -427,7 +432,7 @@ export default function NewCars() {
     if (sortBy === "price_desc") list = [...list].sort((a, b) => b.price - a.price);
     if (sortBy === "year_desc") list = [...list].sort((a, b) => b.year - a.year);
     return list;
-  }, [cars, filterDealer, filterModel, filterAvailability, filterBodyType, filterTransmission, filterDrive, priceMin, priceMax, sortBy]);
+  }, [cars, filterMark, filterDealer, filterModel, filterAvailability, filterBodyType, filterTransmission, filterDrive, priceMin, priceMax, sortBy]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -435,6 +440,7 @@ export default function NewCars() {
   function go(fn: () => void) { fn(); setPage(1); }
 
   function resetFilters() {
+    setFilterMark("");
     setFilterDealer("Все дилеры");
     setFilterModel("Все модели");
     setFilterAvailability("Все");
@@ -453,6 +459,7 @@ export default function NewCars() {
   }, [cars]);
 
   const activeCount = [
+    !!filterMark,
     filterDealer !== "Все дилеры",
     filterModel !== "Все модели",
     filterAvailability !== "Все",
@@ -567,12 +574,41 @@ export default function NewCars() {
     </div>
   );
 
+  const itemListJsonLd = !isLoading && filtered.length > 0 ? {
+    "@type": "ItemList",
+    "name": "Новые автомобили — Дебрянск Авто",
+    "url": "https://debryansk-auto.ru/new-cars",
+    "numberOfItems": filtered.length,
+    "itemListElement": filtered.slice(0, 50).map((car, idx) => ({
+      "@type": "ListItem",
+      "position": idx + 1,
+      "name": `${car.mark} ${car.model} ${car.year}`,
+      "url": `https://debryansk-auto.ru/new-cars/${encodeURIComponent(car.id)}`,
+      "image": car.images.filter(Boolean)[0] ?? "",
+      "item": {
+        "@type": "Car",
+        "name": `${car.mark} ${car.model} ${car.year}`,
+        "offers": {
+          "@type": "Offer",
+          "price": car.maxDiscount > 0 ? car.price - car.maxDiscount : car.price,
+          "priceCurrency": "RUB",
+          "availability": car.availability === "В наличии" ? "https://schema.org/InStock" : "https://schema.org/PreOrder",
+        },
+      },
+    })),
+  } : undefined;
+
   return (
     <Layout>
       <SEO
         title="Новые автомобили в Брянске"
         description="Новые автомобили 9 брендов в брендах Брянска. Выгодное кредитование, специальные программы, гарантия. Дебрянск Авто."
         canonical="/new-cars"
+        jsonLd={itemListJsonLd}
+        breadcrumbs={[
+          { name: "Главная", url: "/" },
+          { name: "Новые автомобили", url: "/new-cars" },
+        ]}
       />
 
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-10">
