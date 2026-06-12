@@ -71,6 +71,14 @@ export default defineConfig({
         target: "http://localhost:8080",
         changeOrigin: true,
       },
+      "/uploads": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
+      "/storage": {
+        target: "http://localhost:8080/api",
+        changeOrigin: true,
+      },
     },
   },
   preview: {
