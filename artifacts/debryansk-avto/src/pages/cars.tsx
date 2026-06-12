@@ -502,12 +502,41 @@ export default function UsedCars() {
     </div>
   );
 
+  const itemListJsonLd = !isLoading && filtered.length > 0 ? {
+    "@type": "ItemList",
+    "name": "Автомобили с пробегом — Дебрянск Авто",
+    "url": "https://debryansk-auto.ru/cars",
+    "numberOfItems": filtered.length,
+    "itemListElement": filtered.slice(0, 50).map((car, idx) => ({
+      "@type": "ListItem",
+      "position": idx + 1,
+      "name": `${car.mark} ${car.model} ${car.year}`,
+      "url": `https://debryansk-auto.ru/cars/${car.id}`,
+      "image": car.images.filter(Boolean)[0] ?? "",
+      "item": {
+        "@type": "Car",
+        "name": `${car.mark} ${car.model} ${car.year}`,
+        "offers": {
+          "@type": "Offer",
+          "price": car.price,
+          "priceCurrency": "RUB",
+          "availability": "https://schema.org/InStock",
+        },
+      },
+    })),
+  } : undefined;
+
   return (
     <Layout>
       <SEO
         title="Автомобили с пробегом в Брянске"
         description="Купить автос пробегом в брендах Брянска. Выгодные цены, проверенные автомобили, кредит, трейд-ин. Дебрянск Авто — 9 брендов."
         canonical="/cars"
+        jsonLd={itemListJsonLd}
+        breadcrumbs={[
+          { name: "Главная", url: "/" },
+          { name: "Автомобили с пробегом", url: "/cars" },
+        ]}
       />
 
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-10">
