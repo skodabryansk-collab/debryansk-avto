@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Car, ChevronLeft, ChevronRight, Phone, User,
   CheckCircle, X, Calendar, Gauge, Palette, MapPin, Shield,
-  Heart, Scale, CreditCard, ArrowLeftRight
+  Heart, Scale, CreditCard, ArrowLeftRight, Sparkles
 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import SEO from "@/components/SEO";
@@ -61,6 +61,14 @@ function parseEngine(mod: string): string {
   if (hp) return `${hp[1]} л.с.`;
   return "";
 }
+function parseFuelType(mod: string): string {
+  if (!mod) return "";
+  const l = mod.toLowerCase();
+  if (l.includes("электр") || l.includes("ev") || l.includes("electric")) return "Electric";
+  if (l.includes("гибрид") || l.includes("hybrid") || l.includes("phev") || l.includes("hev")) return "Hybrid";
+  if (l.includes("дизель") || l.includes("diesel")) return "Diesel";
+  return "Gasoline";
+}
 function formatPrice(p: number) {
   return p.toLocaleString("ru-RU") + " ₽";
 }
@@ -68,12 +76,39 @@ function formatRun(km: number) {
   return km < 1000 ? km + " км" : Math.round(km / 1000) + " тыс. км";
 }
 
+interface NewCarRecord {
+  id: string;
+  mark: string;
+  model: string;
+  year: number;
+  price: number;
+  maxDiscount: number;
+  images: string[];
+}
+
+const DEALER_BRANDS = ["Jaecoo", "OMODA", "Tenet", "Haval", "Jetour"];
+
 async function fetchCars(): Promise<CarRecord[]> {
   const r = await fetch("/api/cars/used");
   if (!r.ok) throw new Error(`API error: ${r.status}`);
   const json = await r.json();
   if (!json.ok) throw new Error(json.error ?? "Unknown error");
   return json.data as CarRecord[];
+}
+
+async function fetchNewCars(): Promise<NewCarRecord[]> {
+  const r = await fetch("/api/cars/new");
+  if (!r.ok) throw new Error(`API error: ${r.status}`);
+  const json = await r.json();
+  if (!json.ok) throw new Error(json.error ?? "Unknown error");
+  return json.data as NewCarRecord[];
+}
+
+async function fetchBrandLocations(): Promise<Record<string, { phone: string; locationTitle: string }>> {
+  const r = await fetch("/api/brand-locations");
+  if (!r.ok) return {};
+  const json = await r.json();
+  return json.ok ? json.data : {};
 }
 
 function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
@@ -217,7 +252,56 @@ export default function UsedCarDetail() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: newCars = [] } = useQuery<NewCarRecord[]>({
+    queryKey: ["new-cars"],
+    queryFn: fetchNewCars,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: brandLocations = {} } = useQuery<Record<string, { phone: string; locationTitle: string }>>({
+    queryKey: ["brand-locations"],
+    queryFn: fetchBrandLocations,
+    staleTime: 10 * 60 * 1000,
+  });
+
   const car = cars.find(c => c.id === id);
+
+  const similarUsed = useMemo(() => {
+    if (!car) return [];
+
+    const sameBrand = cars
+      .filter(c => c.id !== car.id && c.mark === car.mark && Math.abs(c.price - car.price) / car.price <= 0.40)
+      .sort((a, b) => Math.abs(a.price - car.price) - Math.abs(b.price - car.price))
+      .slice(0, 4);
+
+    if (sameBrand.length >= 4) return sameBrand;
+
+    const usedIds = new Set([car.id, ...sameBrand.map(c => c.id)]);
+    const crossBrand = cars
+      .filter(c => !usedIds.has(c.id) && Math.abs(c.price - car.price) / car.price <= 0.25)
+      .sort((a, b) => Math.abs(a.price - car.price) - Math.abs(b.price - car.price))
+      .slice(0, 4 - sameBrand.length);
+
+    return [...sameBrand, ...crossBrand];
+  }, [cars, car]);
+
+  const sameNew = useMemo(() => {
+    if (!car || !DEALER_BRANDS.some(b => b.toLowerCase() === car.mark.toLowerCase())) return [];
+    const baseModel = (m: string) => m.split(",")[0].trim().toLowerCase();
+    return newCars
+      .filter(c =>
+        c.mark.toLowerCase() === car.mark.toLowerCase() &&
+        baseModel(c.model) === baseModel(car.model)
+      )
+      .sort((a, b) => (a.price - (a.maxDiscount || 0)) - (b.price - (b.maxDiscount || 0)))
+      .slice(0, 3);
+  }, [newCars, car]);
+  const carMark = car?.mark?.toLowerCase() ?? "";
+  const locationEntry = brandLocations[carMark]
+    ?? Object.entries(brandLocations).find(([k]) => k.startsWith(carMark) || carMark.startsWith(k))?.[1];
+  const locationPhone = locationEntry?.phone ?? "+7 (4832) 77 77 70";
+  const locationPhoneTel = "tel:+" + locationPhone.replace(/\D/g, "");
+
   const [imgIdx, setImgIdx] = useState(0);
   const [showLead, setShowLead] = useState(false);
   const [showCredit, setShowCredit] = useState(false);
@@ -336,10 +420,10 @@ export default function UsedCarDetail() {
             <ArrowLeftRight className="w-4 h-4" /> Trade-In
           </button>
         </div>
-        <a href="tel:+74832000000"
+        <a href={locationPhoneTel}
           className="w-full flex items-center justify-center gap-2 border-2 border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8] text-slate-700 font-bold rounded-xl py-3 text-sm transition-colors">
           <Phone className="w-4 h-4" />
-          +7 (4832) 000-000
+          {locationPhone}
         </a>
       </div>
       <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
@@ -360,9 +444,9 @@ export default function UsedCarDetail() {
   );
 
   const carJsonLd = car ? {
-    "@type": "Vehicle",
-    "name": `${car.mark} ${car.model}`,
-    "brand": car.mark,
+    "@type": "Car",
+    "name": `${car.mark} ${car.model} ${car.year}`,
+    "brand": { "@type": "Brand", "name": car.mark },
     "model": car.model,
     "vehicleTransmission": parseTransmission(car.modification),
     "driveWheelConfiguration": parseDrive(car.modification),
@@ -371,18 +455,22 @@ export default function UsedCarDetail() {
       "name": parseEngine(car.modification)
     },
     "mileageFromOdometer": { "@type": "QuantitativeValue", "value": car.run, "unitCode": "KMT" },
+    "fuelType": parseFuelType(car.modification),
+    "color": car.color,
     "vehicleInteriorColor": car.color,
     "bodyType": car.bodyType,
+    ...(car.vin ? { "vehicleIdentificationNumber": car.vin } : {}),
     "offers": {
       "@type": "Offer",
       "price": car.price,
       "priceCurrency": "RUB",
       "availability": "https://schema.org/InStock",
-      "seller": { "@type": "AutoDealer", "name": "Дебрянск Авто" }
+      "itemCondition": "https://schema.org/UsedCondition",
+      "seller": { "@type": "AutoDealer", "name": "Дебрянск Авто", "url": "https://debryansk-auto.ru" }
     },
     "image": car.images.filter(Boolean)[0],
     "url": `https://debryansk-auto.ru/cars/${car.id}`,
-    "productionDate": car.year
+    "productionDate": String(car.year)
   } : undefined;
 
   return (
@@ -395,6 +483,11 @@ export default function UsedCarDetail() {
           image={car.images.filter(Boolean)[0] || "/opengraph.jpg"}
           type="product"
           jsonLd={carJsonLd}
+          breadcrumbs={[
+            { name: "Главная", url: "/" },
+            { name: "Автомобили с пробегом", url: "/cars" },
+            { name: `${car.mark} ${car.model} ${car.year}`, url: `/cars/${car.id}` },
+          ]}
         />
       )}
 
@@ -450,6 +543,64 @@ export default function UsedCarDetail() {
               </div>
             ))}
           </div>
+
+          {/* Similar used */}
+          {similarUsed.length > 0 && (
+            <div>
+              <h2 className="text-sm font-extrabold mb-3 text-slate-900">Похожие с пробегом</h2>
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory" style={{ scrollbarWidth: "none" }}>
+                {similarUsed.map(c => (
+                  <Link key={c.id} href={`/cars/${c.id}`}>
+                    <div className="snap-start shrink-0 w-44 rounded-2xl overflow-hidden border border-slate-100 bg-white hover:shadow-md transition-shadow cursor-pointer">
+                      <div className="h-28 bg-slate-50 overflow-hidden">
+                        {c.images[0]
+                          ? <img src={c.images[0]} className="w-full h-full object-cover" loading="lazy" decoding="async" alt={`${c.mark} ${c.model}`} />
+                          : <div className="w-full h-full flex items-center justify-center text-slate-200"><Car className="w-8 h-8" /></div>
+                        }
+                      </div>
+                      <div className="p-2.5">
+                        <p className="text-xs font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
+                        <p className="text-[10px] text-slate-400">{c.year} · {formatRun(c.run)}</p>
+                        <p className="text-sm font-extrabold text-[#0070b8] mt-0.5">{formatPrice(c.price)}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Same new */}
+          {sameNew.length > 0 && (
+            <div className="pb-20">
+              <h2 className="text-sm font-extrabold mb-3 text-slate-900">Такой же новый</h2>
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory" style={{ scrollbarWidth: "none" }}>
+                {sameNew.map(c => (
+                  <Link key={c.id} href={`/new-cars/${encodeURIComponent(c.id)}`}>
+                    <div className="snap-start shrink-0 w-44 rounded-2xl overflow-hidden border border-slate-100 bg-white hover:shadow-md transition-shadow cursor-pointer">
+                      <div className="relative h-28 bg-slate-50 overflow-hidden">
+                        {c.images[0]
+                          ? <img src={c.images[0]} className="w-full h-full object-cover" loading="lazy" decoding="async" alt={`${c.mark} ${c.model}`} />
+                          : <div className="w-full h-full flex items-center justify-center text-slate-200"><Car className="w-8 h-8" /></div>
+                        }
+                        <span className="absolute top-2 left-2 bg-[#0070b8] text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                          <Sparkles className="w-2.5 h-2.5" /> Новый
+                        </span>
+                      </div>
+                      <div className="p-2.5">
+                        <p className="text-xs font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
+                        <p className="text-[10px] text-slate-400">{c.year}</p>
+                        <p className="text-sm font-extrabold text-[#0070b8] mt-0.5">{formatPrice(c.price - (c.maxDiscount || 0))}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Spacer for sticky bottom bar when no "same new" block */}
+          {sameNew.length === 0 && <div className="pb-20" />}
         </div>
       </div>
 
@@ -506,6 +657,61 @@ export default function UsedCarDetail() {
                 </div>
               ))}
             </div>
+
+            {/* Similar used — desktop */}
+            {similarUsed.length > 0 && (
+              <div className="mt-6">
+                <h2 className="text-base font-extrabold mb-4 text-slate-900">Похожие с пробегом</h2>
+                <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory" style={{ scrollbarWidth: "none" }}>
+                  {similarUsed.map(c => (
+                    <Link key={c.id} href={`/cars/${c.id}`}>
+                      <div className="snap-start shrink-0 w-52 rounded-2xl overflow-hidden border border-slate-100 bg-white hover:shadow-md transition-shadow cursor-pointer">
+                        <div className="h-32 bg-slate-50 overflow-hidden">
+                          {c.images[0]
+                            ? <img src={c.images[0]} className="w-full h-full object-cover" loading="lazy" decoding="async" alt={`${c.mark} ${c.model}`} />
+                            : <div className="w-full h-full flex items-center justify-center text-slate-200"><Car className="w-10 h-10" /></div>
+                          }
+                        </div>
+                        <div className="p-3">
+                          <p className="text-sm font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">{c.year} · {formatRun(c.run)}</p>
+                          <p className="text-base font-extrabold text-[#0070b8] mt-1">{formatPrice(c.price)}</p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Same new — desktop */}
+            {sameNew.length > 0 && (
+              <div className="mt-6">
+                <h2 className="text-base font-extrabold mb-4 text-slate-900">Такой же новый</h2>
+                <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory" style={{ scrollbarWidth: "none" }}>
+                  {sameNew.map(c => (
+                    <Link key={c.id} href={`/new-cars/${encodeURIComponent(c.id)}`}>
+                      <div className="snap-start shrink-0 w-52 rounded-2xl overflow-hidden border border-slate-100 bg-white hover:shadow-md transition-shadow cursor-pointer">
+                        <div className="relative h-32 bg-slate-50 overflow-hidden">
+                          {c.images[0]
+                            ? <img src={c.images[0]} className="w-full h-full object-cover" loading="lazy" decoding="async" alt={`${c.mark} ${c.model}`} />
+                            : <div className="w-full h-full flex items-center justify-center text-slate-200"><Car className="w-10 h-10" /></div>
+                          }
+                          <span className="absolute top-2 left-2 bg-[#0070b8] text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                            <Sparkles className="w-2.5 h-2.5" /> Новый
+                          </span>
+                        </div>
+                        <div className="p-3">
+                          <p className="text-sm font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">{c.year}</p>
+                          <p className="text-base font-extrabold text-[#0070b8] mt-1">{formatPrice(c.price - (c.maxDiscount || 0))}</p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right — sticky price card */}
@@ -521,7 +727,7 @@ export default function UsedCarDetail() {
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide truncate">{car.mark} {car.model}</p>
           <p className="text-base font-extrabold text-slate-900 leading-tight">{formatPrice(car.price)}</p>
         </div>
-        <a href="tel:+74832000000"
+        <a href={locationPhoneTel}
           className="flex items-center justify-center w-11 h-11 rounded-xl border-2 border-slate-200 text-slate-600 shrink-0">
           <Phone className="w-4 h-4" />
         </a>
@@ -536,7 +742,7 @@ export default function UsedCarDetail() {
       <AnimatePresence>
         {showLead && <LeadModal car={car} onClose={() => setShowLead(false)} />}
         {showCredit && <CreditModal car={car} onClose={() => setShowCredit(false)} />}
-        {showTradeIn && <TradeInModal onClose={() => setShowTradeIn(false)} />}
+        {showTradeIn && <TradeInModal onClose={() => setShowTradeIn(false)} targetCar={{ mark: car.mark, model: car.model, year: car.year, price: car.price }} />}
       </AnimatePresence>
     </Layout>
   );
