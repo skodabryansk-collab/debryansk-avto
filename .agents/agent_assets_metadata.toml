@@ -83,3 +83,9 @@ id = "UZw9H0MPkfYwudYtp-Uzd"
 uri = "file://attached_assets/image_search/hero_garage_bw.jpg"
 type = "image"
 title = "4 — Ряд авто в гараже ч/б"
+
+[[outputs]]
+id = "0rRw8kMOACZKxZLCf11lf"
+uri = "file://icons-debryansk-avto.zip"
+type = "unspecified"
+title = "Иконки Дебрянск Авто — 34 SVG файла"
