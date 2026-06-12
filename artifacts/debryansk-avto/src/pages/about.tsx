@@ -51,6 +51,31 @@ const brands = [
 ];
 
 /* ─── Page ────────────────────────────────────────────────────────────────────────────────────── */
+const organizationSchema = {
+  "@type": "Organization",
+  "name": "Дебрянск Авто",
+  "alternateName": "Debryansk Auto",
+  "url": "https://debryansk-auto.ru",
+  "logo": "https://debryansk-auto.ru/favicon.svg",
+  "foundingDate": "2011",
+  "description": "Крупнейшая автомобильная группа компаний в Брянской области. 9 брендов, 6 дилерских центров.",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Брянск",
+    "addressRegion": "Брянская область",
+    "addressCountry": "RU"
+  },
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "telephone": "+7-4832-63-10-00",
+    "contactType": "customer service",
+    "availableLanguage": "Russian"
+  },
+  "sameAs": [
+    "https://debryansk-auto.ru"
+  ]
+};
+
 export default function AboutPage() {
   return (
     <Layout>
@@ -58,6 +83,11 @@ export default function AboutPage() {
         title="О группе компаний Дебрянск Авто — территория автомобилей"
         description="Дебрянск Авто — крупнейший автодилер Брянска. 9 брендов, 6 дилерских центров, 15 лет на рынке. Продажа, сервис, финансирование."
         canonical="/about"
+        jsonLd={organizationSchema}
+        breadcrumbs={[
+          { name: "Главная", url: "/" },
+          { name: "О группе", url: "/about" },
+        ]}
       />
 
       <div>
