@@ -8,52 +8,33 @@ import {
 import SEO from "@/components/SEO";
 import { useToast } from "@/hooks/use-toast";
 import Layout from "@/components/Layout";
+import { useQuery } from "@tanstack/react-query";
+import { YandexMap, type YandexMapHandle } from "@/components/YandexMap";
 
-/* ─── Contact data ────────────────────────────────────────────────────────────────────────────────────── */
-const dealers = [
-  {
-    name: "Haval City",
-    address: "г. Брянск, ул. Советская, 77",
-    phone: "+7 (4832) 63-10-00",
-    hours: "Ежедневно 9:00–21:00",
-    brands: ["Haval City"],
-  },
-  {
-    name: "Haval Pro",
-    address: "бр. Брянск, с. Супонево, ул. Шоссейная, 12Г",
-    phone: "+7 (4832) 63-10-00",
-    hours: "Ежедневно 9:00–21:00",
-    brands: ["Haval Pro"],
-  },
-  {
-    name: "OMODA \u2022 JAECOO",
-    address: "бр. Брянск, с. Супонево, ул. Шоссейная, 12Г",
-    phone: "+7 (4832) 63-10-00",
-    hours: "Ежедневно 9:00–21:00",
-    brands: ["OMODA", "JAECOO"],
-  },
-  {
-    name: "Tenet",
-    address: "г. Брянск, ул. Советская, 77",
-    phone: "+7 (4832) 63-10-00",
-    hours: "Ежедневно 9:00–21:00",
-    brands: ["Tenet"],
-  },
-  {
-    name: "JETOUR",
-    address: "г. Брянск, пр. Московский, 2Г",
-    phone: "+7 (4832) 63-10-00",
-    hours: "Ежедневно 9:00–21:00",
-    brands: ["JETOUR"],
-  },
-  {
-    name: "МБ-Брянск",
-    address: "г. Брянск, пр. Московский, 2Г",
-    phone: "+7 (4832) 63-10-00",
-    hours: "Пн–Пт 9:00–18:00, Сб 9:00–16:00",
-    brands: ["Mercedes-Benz"],
-  },
-];
+const DEALER_COLORS = ["#0070b8", "#87b63c", "#0070b8", "#87b63c"];
+
+interface LocationBrandItem {
+  id: number; name: string; logoUrl: string | null;
+  bgColor: string | null; isService: boolean; sortOrder: number;
+}
+
+interface Location {
+  id: number;
+  title: string;
+  address: string;
+  phone: string | null;
+  hours: string | null;
+  mapX: number | null;
+  mapY: number | null;
+  brands: LocationBrandItem[];
+}
+
+async function fetchLocations(): Promise<Location[]> {
+  const r = await fetch("/api/locations");
+  if (!r.ok) throw new Error("API error");
+  const json = await r.json();
+  return json.ok ? json.data : [];
+}
 
 /* ─── Form state ────────────────────────────────────────────────────────────────────────────────────── */
 function FeedbackForm() {
@@ -172,12 +153,58 @@ function FeedbackForm() {
 
 /* ─── Page ────────────────────────────────────────────────────────────────────────────────────── */
 export default function ContactsPage() {
+  const yandexMapRef = React.useRef<YandexMapHandle>(null);
+
+  const { data: locations = [], isLoading } = useQuery({
+    queryKey: ["contacts-locations"],
+    queryFn: fetchLocations,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const dealerMapLocations = React.useMemo(() => {
+    if (locations.length === 0) return [];
+    return locations
+      .filter(loc => loc.mapX != null && loc.mapY != null)
+      .map((loc, idx) => ({
+        id: loc.id,
+        address: loc.address,
+        short: loc.title,
+        brands: loc.brands.filter(b => !b.isService).map(b => b.name),
+        serviceBrands: loc.brands.filter(b => b.isService).map(b => b.name),
+        lat: loc.mapX as number,
+        lng: loc.mapY as number,
+        color: DEALER_COLORS[idx % DEALER_COLORS.length],
+        phone: loc.phone ?? undefined,
+        hours: loc.hours ?? undefined,
+      }));
+  }, [locations]);
+
+  const dealersSchema = locations.map((loc) => ({
+    "@type": "AutoDealer",
+    "name": `Дебрянск Авто — ${loc.title}`,
+    "url": "https://debryansk-auto.ru/contacts",
+    "telephone": loc.phone ?? "+7-4832-63-10-00",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": loc.address,
+      "addressLocality": "Брянск",
+      "addressRegion": "Брянская область",
+      "addressCountry": "RU"
+    },
+    ...(loc.hours ? { "openingHours": loc.hours } : {}),
+  }));
+
   return (
     <Layout>
       <SEO
-        title="Контакты Дебрянск Авто — 6 дилерских центров в Брянске"
-        description="Адреса, телефоны, часы работы 6 автосалонов Дебрянск Авто в Брянске. Оставьте заявку онлайн."
+        title="Контакты Дебрянск Авто — дилерские центры в Брянске"
+        description="Адреса, телефоны, часы работы автосалонов Дебрянск Авто в Брянске. Оставьте заявку онлайн."
         canonical="/contacts"
+        jsonLd={dealersSchema.length > 0 ? dealersSchema : undefined}
+        breadcrumbs={[
+          { name: "Главная", url: "/" },
+          { name: "Контакты", url: "/contacts" },
+        ]}
       />
 
       <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
@@ -235,48 +262,67 @@ export default function ContactsPage() {
           </div>
         </motion.div>
 
+        {/* Map */}
+        {dealerMapLocations.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="mb-8 sm:mb-10 rounded-2xl overflow-hidden border border-slate-200 shadow-sm"
+            style={{ height: 420 }}
+          >
+            <YandexMap ref={yandexMapRef} locations={dealerMapLocations} />
+          </motion.div>
+        )}
+
         {/* Dealers grid + Form */}
         <div className="grid lg:grid-cols-3 gap-6 sm:gap-8">
           {/* Left: dealers */}
           <div className="lg:col-span-2 space-y-4">
             <h2 className="text-lg font-bold text-slate-900 mb-4">Наши салоны</h2>
-            {dealers.map((d, i) => (
+            {locations.map((loc, i) => (
               <motion.div
-                key={d.name}
+                key={loc.id}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 + i * 0.06 }}
-                className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6"
+                className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 cursor-pointer hover:border-[#0070b8]/30 transition-colors"
+                onClick={() => yandexMapRef.current?.openLocation(loc.id)}
               >
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
                   <div>
-                    <h3 className="font-bold text-slate-900">{d.name}</h3>
+                    <h3 className="font-bold text-slate-900">{loc.title}</h3>
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
-                      {d.brands.map(b => (
-                        <span key={b} className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                          {b}
+                      {loc.brands.filter(b => !b.isService).map(b => (
+                        <span key={b.id} className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                          {b.name}
+                        </span>
+                      ))}
+                      {loc.brands.filter(b => b.isService).map(b => (
+                        <span key={b.id} className="text-[10px] font-bold bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">
+                          {b.name} Сервис
                         </span>
                       ))}
                     </div>
                   </div>
                   <a
-                    href={`tel:${d.phone.replace(/\D/g, "")}`}
+                    href={`tel:${(loc.phone || "").replace(/\D/g, "")}`}
                     className="text-[#0070b8] font-bold text-sm hover:underline shrink-0"
                   >
-                    {d.phone}
+                    {loc.phone || "—"}
                   </a>
                 </div>
                 <div className="flex items-start gap-2 text-sm text-slate-500">
                   <MapPin className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                  <span>{d.address}</span>
+                  <span>{loc.address}</span>
                 </div>
                 <div className="flex items-start gap-2 text-sm text-slate-500 mt-1">
                   <Clock className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                  <span>{d.hours}</span>
+                  <span>{loc.hours || "—"}</span>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <a
-                    href={`https://yandex.ru/maps/?text=${encodeURIComponent(d.address)}`}
+                    href={`https://yandex.ru/maps/?text=${encodeURIComponent(loc.address)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-bold bg-slate-100 text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-200 transition-colors"
