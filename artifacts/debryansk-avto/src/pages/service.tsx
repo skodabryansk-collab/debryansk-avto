@@ -1,45 +1,43 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
-  ArrowLeft, Wrench, Hammer, Sparkles, Package, Car, Shield,
-  MapPin, Phone, Clock, CheckCircle, Calendar, User, ClipboardList,
-  ChevronRight, Star, Settings, Gauge
+  Wrench, Hammer, Sparkles, Package, Car, Shield,
+  MapPin, Phone, Clock, CheckCircle, Star, Settings, Gauge
 } from "lucide-react";
 import SEO from "@/components/SEO";
 import Layout from "@/components/Layout";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
-/* ─── Service centers data ───────────────────────────────────────── */
-const serviceCenters = [
-  {
-    id: 1,
-    name: "Сервисный центр Советская",
-    address: "г. Брянск, ул. Советская, 77",
-    phone: "+7 (4832) 000-000",
-    hours: "Пн–Пт 8:00–20:00, Сб 9:00–18:00",
-    brands: ["Volkswagen", "Tenet"],
-    services: ["ТО", "Ремонт", "Кузовной", "Диагностика"],
-  },
-  {
-    id: 2,
-    name: "Сервисный центр Супонево",
-    address: "Брянская обл., с. Супонево, ул. Шоссейная, 12Г",
-    phone: "+7 (4832) 000-000",
-    hours: "Ежедневно 9:00–21:00",
-    brands: ["Omoda", "Jaecoo", "Exeed", "Skoda"],
-    services: ["ТО", "Ремонт", "Детейлинг", "Шиномонтаж"],
-  },
-  {
-    id: 3,
-    name: "Сервисный центр Московский",
-    address: "г. Брянск, пр. Московский, 2Г",
-    phone: "+7 (4832) 000-000",
-    hours: "Пн–Пт 8:00–20:00, Сб 9:00–18:00",
-    brands: ["Mercedes-Benz", "Jetour", "Haval"],
-    services: ["ТО", "Ремонт", "Кузовной", "Диагностика", "Запчасти"],
-  },
-];
+/* ─── Types ──────────────────────────────────────────────────────── */
+interface LocationBrandItem {
+  id: number;
+  name: string;
+  logoUrl: string | null;
+  bgColor: string | null;
+  isService: boolean;
+  sortOrder: number;
+}
+
+interface ApiLocation {
+  id: number;
+  title: string;
+  address: string;
+  mapX: number | null;
+  mapY: number | null;
+  phone: string | null;
+  hours: string | null;
+  sortOrder: number;
+  brands: LocationBrandItem[];
+}
+
+async function fetchLocations(): Promise<ApiLocation[]> {
+  const r = await fetch("/api/locations");
+  if (!r.ok) throw new Error("API error");
+  const json = await r.json();
+  return json.ok ? json.data : [];
+}
 
 /* ─── Services list ─────────────────────────────────────────────── */
 const servicesList = [
@@ -83,12 +81,12 @@ const servicesList = [
 
 /* ─── Advantages ────────────────────────────────────────────────── */
 const advantages = [
-  { icon: Shield,    title: "Гарантия производителя", desc: "Все работы выполняются по стандартам производителя с сохранением гарантии" },
-  { icon: Star,      title: "Сертифицированные мастера", desc: "Технические специалисты проходят регулярное обучение у производителей" },
-  { icon: CheckCircle, title: "Оригинальные запчасти",  desc: "Только сертифицированные детали от официальных поставщиков" },
-  { icon: Clock,     title: "Быстрая запись",          desc: "Запись на сервис в тот же день или на удобное время" },
-  { icon: Car,       title: "Запасной автомобиль",     desc: "Предоставляем подменный автомобиль на время длительного ремонта" },
-  { icon: MapPin,    title: "3 сервисных центра",      desc: "Удобное расположение по всему городу Брянск и области" },
+  { icon: Shield,      title: "Гарантия производителя",  desc: "Все работы выполняются по стандартам производителя с сохранением гарантии" },
+  { icon: Star,        title: "Сертифицированные мастера", desc: "Технические специалисты проходят регулярное обучение у производителей" },
+  { icon: CheckCircle, title: "Оригинальные запчасти",    desc: "Только сертифицированные детали от официальных поставщиков" },
+  { icon: Clock,       title: "Быстрая запись",           desc: "Запись на сервис в тот же день или на удобное время" },
+  { icon: Car,         title: "Запасной автомобиль",      desc: "Предоставляем подменный автомобиль на время длительного ремонта" },
+  { icon: MapPin,      title: "4 сервисных центра",       desc: "Удобное расположение по всему городу Брянск и области" },
 ];
 
 /* ─── JSON-LD schema ────────────────────────────────────────────── */
@@ -97,7 +95,7 @@ const serviceSchema = {
   name: "Дебрянск Авто — Официальный сервис",
   description: "Официальный сервисный центр Haval, Omoda, Jaecoo, Jetour, Tenet, Volkswagen, Skoda, Exeed, Mercedes-Benz в Брянске.",
   url: "https://debryansk-auto.ru/service",
-  telephone: "+7 (4832) 000-000",
+  telephone: "+7 (4832) 77 77 70",
   areaServed: { "@type": "City", name: "Брянск" },
   hasOfferCatalog: {
     "@type": "OfferCatalog",
@@ -126,20 +124,19 @@ function FadeIn({ children, delay = 0, className = "" }: { children: React.React
 }
 
 /* ─── Booking Form ──────────────────────────────────────────────── */
-function BookingForm() {
+function BookingForm({ locations }: { locations: ApiLocation[] }) {
   const { toast } = useToast();
   const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    brand: "",
-    model: "",
-    mileage: "",
-    service: "",
-    center: "",
-    date: "",
-    comment: "",
+    name: "", phone: "", brand: "", model: "",
+    mileage: "", service: "", center: "", date: "", comment: "",
   });
   const [submitted, setSubmitted] = useState(false);
+
+  const allBrands = useMemo(() => {
+    const names = new Set<string>();
+    locations.forEach(loc => loc.brands.forEach(b => names.add(b.name)));
+    return Array.from(names).sort();
+  }, [locations]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,10 +158,7 @@ function BookingForm() {
         <p className="text-slate-500 mb-4">
           Мы перезвоним вам в течение 15 минут для уточнения деталей.
         </p>
-        <button
-          onClick={() => setSubmitted(false)}
-          className="text-[#0070b8] font-bold hover:underline"
-        >
+        <button onClick={() => setSubmitted(false)} className="text-[#0070b8] font-bold hover:underline">
           Отправить ещё одну
         </button>
       </div>
@@ -195,12 +189,16 @@ function BookingForm() {
         </div>
         <div>
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Марка авто</label>
-          <input
+          <select
             value={form.brand}
             onChange={e => setForm(f => ({ ...f, brand: e.target.value }))}
-            placeholder="Например, Haval"
-            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#0070b8] focus:ring-1 focus:ring-[#0070b8] outline-none text-sm"
-          />
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#0070b8] focus:ring-1 focus:ring-[#0070b8] outline-none text-sm bg-white"
+          >
+            <option value="">Выберите марку</option>
+            {allBrands.map(b => (
+              <option key={b} value={b}>{b}</option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Модель</label>
@@ -246,8 +244,8 @@ function BookingForm() {
             className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#0070b8] focus:ring-1 focus:ring-[#0070b8] outline-none text-sm bg-white"
           >
             <option value="">Любой удобный</option>
-            {serviceCenters.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+            {locations.map(loc => (
+              <option key={loc.id} value={String(loc.id)}>{loc.title}</option>
             ))}
           </select>
         </div>
@@ -287,6 +285,17 @@ function BookingForm() {
 /* ─── Main Page ─────────────────────────────────────────────────── */
 export default function ServicePage() {
   const [, navigate] = useLocation();
+  const { data: locations = [], isLoading } = useQuery({
+    queryKey: ["service-locations"],
+    queryFn: fetchLocations,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const totalBrands = useMemo(() => {
+    const names = new Set<string>();
+    locations.forEach(loc => loc.brands.forEach(b => names.add(b.name)));
+    return names.size;
+  }, [locations]);
 
   return (
     <Layout>
@@ -295,6 +304,10 @@ export default function ServicePage() {
         description="Официальный сервис Haval, Omoda, Jaecoo, Jetour, Tenet, Volkswagen, Skoda, Exeed, Mercedes-Benz в Брянске. ТО, ремонт, кузовной, детейлинг, диагностика. Онлайн-запись."
         canonical="/service"
         jsonLd={serviceSchema}
+        breadcrumbs={[
+          { name: "Главная", url: "/" },
+          { name: "Сервис", url: "/service" },
+        ]}
       />
 
       <div>
@@ -308,7 +321,7 @@ export default function ServicePage() {
                 Техническое обслуживание и ремонт в Брянске
               </h1>
               <p className="text-slate-400 text-sm sm:text-base max-w-xl mb-8">
-                6 брендов, 3 сервисных центра, гарантия производителя.
+                {totalBrands > 0 ? `${totalBrands} брендов` : "9 брендов"}, 4 сервисных центра, гарантия производителя.
                 Сертифицированные мастера, оригинальные запчасти, современное оборудование.
               </p>
               <div className="flex flex-wrap gap-2 sm:gap-3">
@@ -316,7 +329,7 @@ export default function ServicePage() {
                   { icon: Wrench, text: "ТО и ремонт" },
                   { icon: Shield, text: "Гарантия производителя" },
                   { icon: Clock, text: "Быстрая запись" },
-                  { icon: MapPin, text: "3 центра в Брянске" },
+                  { icon: MapPin, text: "4 центра в Брянске" },
                 ].map(({ icon: Icon, text }) => (
                   <div key={text} className="flex items-center gap-1.5 bg-white/[0.07] border border-white/[0.1] rounded-full px-3 py-1.5 text-xs font-semibold text-white/80">
                     <Icon className="w-3.5 h-3.5 text-[#87b63c]" /> {text}
@@ -385,46 +398,75 @@ export default function ServicePage() {
         {/* ── Service Centers + Booking ── */}
         <section className="py-12 sm:py-16 bg-[#f8f9fb] border-t border-slate-100">
           <div className="container mx-auto px-4 sm:px-6">
-            <div className="grid lg:grid-cols-5 gap-6 sm:gap-8">
+            <div className="grid lg:grid-cols-5 gap-6 sm:gap-8 items-start">
               {/* Left: centers */}
               <div className="lg:col-span-3">
-                <FadeIn className="mb-6">
+                <FadeIn className="mb-5">
                   <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Центры</p>
                   <h2 className="text-2xl sm:text-3xl font-extrabold">Сервисные центры в Брянске</h2>
                 </FadeIn>
+
+                {/* Legend */}
+                <FadeIn className="flex items-center gap-4 mb-5">
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-blue-700">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
+                    Дилер (продажи + сервис)
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-orange-600">
+                    <span className="w-2.5 h-2.5 rounded-full bg-orange-400 inline-block" />
+                    Только сервис
+                  </span>
+                </FadeIn>
+
                 <div className="space-y-4">
-                  {serviceCenters.map((c, i) => (
-                    <FadeIn key={c.id} delay={i * 0.08}>
+                  {isLoading && (
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-100 animate-pulse h-32" />
+                    ))
+                  )}
+                  {locations.map((loc, i) => (
+                    <FadeIn key={loc.id} delay={i * 0.08}>
                       <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-100">
                         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                          <div className="w-12 h-12 rounded-xl bg-[#0070b8]/10 flex items-center justify-center shrink-0">
-                            <MapPin className="w-6 h-6 text-[#0070b8]" />
+                          <div className="w-12 h-12 rounded-xl bg-[#0070b8]/10 flex items-center justify-center shrink-0 font-extrabold text-[#0070b8] text-lg">
+                            {i + 1}
                           </div>
-                          <div className="flex-1">
-                            <h3 className="font-extrabold text-base mb-1">{c.name}</h3>
-                            <p className="text-sm text-slate-500 mb-2">{c.address}</p>
-                            <div className="flex flex-wrap gap-2 mb-3">
-                              {c.brands.map(b => (
-                                <span key={b} className="text-[10px] font-semibold bg-slate-50 text-slate-600 px-2 py-0.5 rounded-full">
-                                  {b}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-extrabold text-base mb-0.5">{loc.title}</h3>
+                            <p className="text-sm text-slate-500 mb-3">{loc.address}</p>
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                              {loc.brands.filter(b => !b.isService).map(b => (
+                                <span key={b.id} className="text-[10px] font-semibold bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full">
+                                  {b.name}
+                                </span>
+                              ))}
+                              {loc.brands.filter(b => b.isService).map(b => (
+                                <span key={b.id} className="text-[10px] font-semibold bg-orange-100 text-orange-700 px-2.5 py-0.5 rounded-full">
+                                  {b.name} Сервис
                                 </span>
                               ))}
                             </div>
                             <div className="flex flex-wrap gap-3 text-xs text-slate-500">
-                              <span className="flex items-center gap-1">
-                                <Phone className="w-3 h-3" /> {c.phone}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" /> {c.hours}
-                              </span>
+                              {loc.phone && (
+                                <span className="flex items-center gap-1">
+                                  <Phone className="w-3 h-3" /> {loc.phone}
+                                </span>
+                              )}
+                              {loc.hours && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" /> {loc.hours}
+                                </span>
+                              )}
                             </div>
                           </div>
-                          <div className="flex gap-2 shrink-0">
-                            <a href={`tel:${c.phone}`}
-                              className="px-4 py-2 bg-[#0070b8] text-white font-bold rounded-xl text-sm hover:bg-[#005a94] transition-colors">
-                              Позвонить
-                            </a>
-                          </div>
+                          {loc.phone && (
+                            <div className="flex gap-2 shrink-0">
+                              <a href={`tel:${loc.phone}`}
+                                className="px-4 py-2 bg-[#0070b8] text-white font-bold rounded-xl text-sm hover:bg-[#005a94] transition-colors">
+                                Позвонить
+                              </a>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </FadeIn>
@@ -435,7 +477,7 @@ export default function ServicePage() {
               {/* Right: booking form */}
               <div className="lg:col-span-2">
                 <FadeIn>
-                  <BookingForm />
+                  <BookingForm locations={locations} />
                 </FadeIn>
               </div>
             </div>
