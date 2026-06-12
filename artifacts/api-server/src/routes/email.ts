@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import nodemailer from "nodemailer";
 import multer from "multer";
+import { db, leadsTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -40,7 +41,7 @@ function logoHtml(accent = BLUE) {
           <img src="${LOGO_SRC}" alt="Дебрянск Авто" width="200" height="33"
                style="display:block;border:0;outline:none;max-width:200px;height:auto" />
           <div style="color:#546e8a;font-size:10px;margin-top:5px;font-family:Arial,sans-serif">
-            debryansk-auto.ru &nbsp;·&nbsp; sales@debryansk-auto.ru &nbsp;·&nbsp; +7 (4832) 63-10-00
+            debryansk-auto.ru &nbsp;·&nbsp; sales@debryansk-auto.ru &nbsp;·&nbsp; +7 (4832) 77 77 70
           </div>
         </td>
         <td style="text-align:right;vertical-align:top">
@@ -77,7 +78,7 @@ function wrapEmail(body: string, accent = BLUE) {
         <td style="background:#f2f5f8;border-top:1px solid #dde3ea;padding:14px 28px">
           <table cellpadding="0" cellspacing="0" style="width:100%"><tr>
             <td style="color:#8fa8c0;font-size:11px;font-family:Arial,sans-serif">
-              Дебрянск Авто &nbsp;·&nbsp; ул. Советская 77, Брянск &nbsp;·&nbsp; +7 (4832) 000-000
+              Дебрянск Авто &nbsp;·&nbsp; г. Брянск &nbsp;·&nbsp; +7 (4832) 77 77 70
             </td>
             <td style="color:#8fa8c0;font-size:11px;text-align:right;font-family:Arial,sans-serif">${now}</td>
           </tr></table>
@@ -227,6 +228,17 @@ function buildCreditHtml(d: Record<string, string>) {
 
 function buildTradeInHtml(d: Record<string, string>) {
   const accent = "#d97706";
+  const targetSection = d.targetMark
+    ? `<div style="padding:14px 28px 4px;font-family:Arial,sans-serif">
+        <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.6px">Планирует купить взамен</div>
+      </div>` +
+      carCard(
+        d.targetMark,
+        d.targetModel || "",
+        d.targetIsNew === "да" ? "Новый автомобиль" : (d.targetYear || ""),
+        d.targetPrice ? Number(d.targetPrice) : "уточнить цену"
+      )
+    : "";
   return wrapEmail(
     banner("🔄", "Заявка на Trade-in", accent) +
     heading("Trade-in: клиент хочет обменять автомобиль", "Клиент оставил данные своего авто для оценки") +
@@ -241,6 +253,7 @@ function buildTradeInHtml(d: Record<string, string>) {
       ["Онлайн-оценка",  d.estimateMin && d.estimateMax ? `${Number(d.estimateMin).toLocaleString("ru-RU")} — ${Number(d.estimateMax).toLocaleString("ru-RU")} ₽` : d.estimate],
       ["Комментарий",    d.comment],
     ]) +
+    targetSection +
     hr() +
     actionBlock(d.phone, undefined, "Связаться и уточнить оценку", accent),
     accent
@@ -284,6 +297,30 @@ function buildOpenResumeHtml(d: Record<string, string>) {
   );
 }
 
+function buildBuyoutHtml(d: Record<string, string>) {
+  const GREEN = "#87b63c";
+  return wrapEmail(
+    banner("💰", "Заявка на выкуп автомобиля", GREEN) +
+    heading("Клиент хочет продать автомобиль", "Заявка оставлена через форму выкупа на сайте") +
+    dataTable([
+      ["Имя клиента",    d.name],
+      ["Телефон",        d.phone],
+      ["Марка / Модель", d.brand && d.model ? `${d.brand} ${d.model}` : (d.brand || d.model)],
+      ["Год выпуска",    d.year],
+      ["Пробег",         d.mileage ? Number(d.mileage).toLocaleString("ru-RU") + " км" : undefined],
+      ["Поколение",      d.generation],
+      ["Тип кузова",     d.body],
+      ["Оценка выкупа",  d.estimateMin && d.estimateMax
+        ? `${Number(d.estimateMin).toLocaleString("ru-RU")} — ${Number(d.estimateMax).toLocaleString("ru-RU")} ₽`
+        : (d.estimateMin ? `от ${Number(d.estimateMin).toLocaleString("ru-RU")} ₽` : undefined)],
+      ["Комментарий",    d.comment],
+    ]) +
+    hr() +
+    actionBlock(d.phone, undefined, "Перезвонить и подтвердить цену", GREEN),
+    GREEN
+  );
+}
+
 function buildFeedbackHtml(d: Record<string, string>) {
   return wrapEmail(
     banner("✉️", "Обращение через форму контактов", BLUE) +
@@ -306,6 +343,7 @@ const SUBJECTS: Record<string, string> = {
   testdrive:  "🏁 Тест-драйв",
   credit:     "💳 Автокредит",
   tradein:    "🔄 Trade-in",
+  buyout:     "💰 Выкуп автомобиля",
   vacancy:    "💼 Отклик на вакансию",
   openresume: "📋 Открытый отклик",
   feedback:   "✉️ Форма контактов",
@@ -331,6 +369,7 @@ router.post(
         case "testdrive":  html = buildTestDriveHtml(body); break;
         case "credit":     html = buildCreditHtml(body); break;
         case "tradein":    html = buildTradeInHtml(body); break;
+        case "buyout":     html = buildBuyoutHtml(body); break;
         case "vacancy":    html = buildVacancyHtml(body); break;
         case "openresume": html = buildOpenResumeHtml(body); break;
         case "feedback":   html = buildFeedbackHtml(body); break;
@@ -355,6 +394,27 @@ router.post(
         html,
         attachments,
       });
+
+      // Save lead to database
+      try {
+        const carParts = [body.carMark, body.carModel, body.carYear].filter(Boolean).join(" ");
+        const extraData: Record<string, string> = {};
+        const knownKeys = ["type","name","phone","email","message","carMark","carModel","carYear","carPrice","car","budget","downPayment","term","carMileage","position","surname","brand","model","vehicle"];
+        for (const [k, v] of Object.entries(body)) {
+          if (!knownKeys.includes(k) && v) extraData[k] = v;
+        }
+        await db.insert(leadsTable).values({
+          type,
+          name: body.name || null,
+          phone: body.phone || null,
+          email: body.email || null,
+          message: body.message || body.comment || null,
+          car: carParts || body.car || body.brand || body.model || body.vehicle || null,
+          extraJson: Object.keys(extraData).length ? extraData : null,
+        });
+      } catch (dbErr) {
+        console.error("[email] lead save error:", dbErr);
+      }
 
       return res.json({ ok: true });
     } catch (err) {
