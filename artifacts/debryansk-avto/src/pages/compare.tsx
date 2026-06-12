@@ -65,6 +65,10 @@ export default function ComparePage() {
         title="Сравнение автомобилей"
         description="Сравните автомобили по параметрам: цена, пробег, год, комплектация, коробка, привод, опции. До 3 авто в сравнении."
         canonical="/compare"
+        breadcrumbs={[
+          { name: "Главная", url: "/" },
+          { name: "Сравнение", url: "/compare" },
+        ]}
       />
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {compare.length === 0 ? (
