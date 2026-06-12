@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -69,6 +69,14 @@ function parseEngine(mod: string): string {
   if (hp) return `${hp[1]} л.с.`;
   return "";
 }
+function parseFuelType(mod: string): string {
+  if (!mod) return "";
+  const l = mod.toLowerCase();
+  if (l.includes("электр") || l.includes("ev") || l.includes("electric")) return "Electric";
+  if (l.includes("гибрид") || l.includes("hybrid") || l.includes("phev") || l.includes("hev")) return "Hybrid";
+  if (l.includes("дизель") || l.includes("diesel")) return "Diesel";
+  return "Gasoline";
+}
 function formatPrice(p: number) {
   return p.toLocaleString("ru-RU") + " ₽";
 }
@@ -79,6 +87,13 @@ async function fetchNewCars(): Promise<NewCarRecord[]> {
   const json = await r.json();
   if (!json.ok) throw new Error(json.error ?? "Unknown error");
   return json.data as NewCarRecord[];
+}
+
+async function fetchBrandLocations(): Promise<Record<string, { phone: string; locationTitle: string }>> {
+  const r = await fetch("/api/brand-locations");
+  if (!r.ok) return {};
+  const json = await r.json();
+  return json.ok ? json.data : {};
 }
 
 function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void }) {
@@ -232,7 +247,28 @@ export default function NewCarDetail() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: brandLocations = {} } = useQuery<Record<string, { phone: string; locationTitle: string }>>({
+    queryKey: ["brand-locations"],
+    queryFn: fetchBrandLocations,
+    staleTime: 10 * 60 * 1000,
+  });
+
   const car = cars.find(c => c.id === id);
+
+  const similarNew = useMemo(() => {
+    if (!car) return [];
+    return cars
+      .filter(c => c.id !== car.id && Math.abs(c.price - car.price) / car.price <= 0.25)
+      .sort((a, b) => Math.abs(a.price - car.price) - Math.abs(b.price - car.price))
+      .slice(0, 6);
+  }, [cars, car]);
+
+  const carMark = car?.mark?.toLowerCase() ?? "";
+  const locationEntry = brandLocations[carMark]
+    ?? Object.entries(brandLocations).find(([k]) => k.startsWith(carMark) || carMark.startsWith(k))?.[1];
+  const locationPhone = locationEntry?.phone ?? "+7 (4832) 77 77 70";
+  const locationPhoneTel = "tel:+" + locationPhone.replace(/\D/g, "");
+
   const [imgIdx, setImgIdx] = useState(0);
   const [showLead, setShowLead] = useState(false);
   const [showTestDrive, setShowTestDrive] = useState(false);
@@ -379,10 +415,10 @@ export default function NewCarDetail() {
             Trade-in
           </button>
         </div>
-        <a href="tel:+74832000000"
+        <a href={locationPhoneTel}
           className="w-full flex items-center justify-center gap-2 border-2 border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8] text-slate-700 font-bold rounded-xl py-3 text-sm transition-colors">
           <Phone className="w-4 h-4" />
-          +7 (4832) 000-000
+          {locationPhone}
         </a>
       </div>
       <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
@@ -403,9 +439,9 @@ export default function NewCarDetail() {
   );
 
   const carJsonLd = car ? {
-    "@type": "Vehicle",
-    "name": `${car.mark} ${car.model}`,
-    "brand": car.mark,
+    "@type": "Car",
+    "name": `${car.mark} ${car.model} ${car.year}`,
+    "brand": { "@type": "Brand", "name": car.mark },
     "model": car.model,
     "vehicleTransmission": parseTransmission(car.modification),
     "driveWheelConfiguration": parseDrive(car.modification),
@@ -413,18 +449,23 @@ export default function NewCarDetail() {
       "@type": "EngineSpecification",
       "name": parseEngine(car.modification)
     },
+    "fuelType": parseFuelType(car.modification),
+    "color": car.color,
     "vehicleInteriorColor": car.color,
     "bodyType": car.bodyType,
+    "mileageFromOdometer": { "@type": "QuantitativeValue", "value": 0, "unitCode": "KMT" },
+    ...(car.vin ? { "vehicleIdentificationNumber": car.vin } : {}),
     "offers": {
       "@type": "Offer",
       "price": car.maxDiscount > 0 ? car.price - car.maxDiscount : car.price,
       "priceCurrency": "RUB",
       "availability": car.availability === "В наличии" ? "https://schema.org/InStock" : "https://schema.org/PreOrder",
-      "seller": { "@type": "AutoDealer", "name": "Дебрянск Авто" }
+      "itemCondition": "https://schema.org/NewCondition",
+      "seller": { "@type": "AutoDealer", "name": "Дебрянск Авто", "url": "https://debryansk-auto.ru" }
     },
     "image": car.images.filter(Boolean)[0],
-    "url": `https://debryansk-auto.ru/new-cars/${car.id}`,
-    "productionDate": car.year
+    "url": `https://debryansk-auto.ru/new-cars/${encodeURIComponent(car.id)}`,
+    "productionDate": String(car.year)
   } : undefined;
 
   return (
@@ -433,10 +474,15 @@ export default function NewCarDetail() {
         <SEO
           title={`${car.mark} ${car.model} ${car.year} год от ${formatPrice(car.price)}`}
           description={`Новый ${car.mark} ${car.model}, ${car.year} год, кузов ${car.bodyType}, цвет ${car.color}, комплектация ${car.complectation || car.modification}, дилер ${car.dealer}. Дебрянск Авто.`}
-          canonical={`/new-cars/${car.id}`}
+          canonical={`/new-cars/${encodeURIComponent(car.id)}`}
           image={car.images.filter(Boolean)[0] || "/opengraph.jpg"}
           type="product"
           jsonLd={carJsonLd}
+          breadcrumbs={[
+            { name: "Главная", url: "/" },
+            { name: "Новые автомобили", url: "/new-cars" },
+            { name: `${car.mark} ${car.model} ${car.year}`, url: `/new-cars/${encodeURIComponent(car.id)}` },
+          ]}
         />
       )}
 
@@ -492,6 +538,38 @@ export default function NewCarDetail() {
               </div>
             ))}
           </div>
+
+          {/* Similar new — mobile */}
+          {similarNew.length > 0 && (
+            <div className="pb-20">
+              <h2 className="text-sm font-extrabold mb-3 text-slate-900">В похожем бюджете</h2>
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory" style={{ scrollbarWidth: "none" }}>
+                {similarNew.map(c => (
+                  <Link key={c.id} href={`/new-cars/${encodeURIComponent(c.id)}`}>
+                    <div className="snap-start shrink-0 w-44 rounded-2xl overflow-hidden border border-slate-100 bg-white hover:shadow-md transition-shadow cursor-pointer">
+                      <div className="relative h-28 bg-slate-50 overflow-hidden">
+                        {c.images[0]
+                          ? <img src={c.images[0]} className="w-full h-full object-cover" loading="lazy" decoding="async" alt={`${c.mark} ${c.model}`} />
+                          : <div className="w-full h-full flex items-center justify-center text-slate-200"><Car className="w-8 h-8" /></div>
+                        }
+                        <span className="absolute top-2 left-2 bg-[#0070b8] text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                          <Sparkles className="w-2.5 h-2.5" /> Новый
+                        </span>
+                      </div>
+                      <div className="p-2.5">
+                        <p className="text-xs font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
+                        <p className="text-[10px] text-slate-400">{c.year}</p>
+                        <p className="text-sm font-extrabold text-[#0070b8] mt-0.5">{formatPrice(c.maxDiscount > 0 ? c.price - c.maxDiscount : c.price)}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Spacer for sticky bar when no similar */}
+          {similarNew.length === 0 && <div className="pb-20" />}
         </div>
       </div>
 
@@ -548,6 +626,35 @@ export default function NewCarDetail() {
                 </div>
               ))}
             </div>
+
+            {/* Similar new — desktop */}
+            {similarNew.length > 0 && (
+              <div className="mt-6">
+                <h2 className="text-base font-extrabold mb-4 text-slate-900">В похожем бюджете</h2>
+                <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory" style={{ scrollbarWidth: "none" }}>
+                  {similarNew.map(c => (
+                    <Link key={c.id} href={`/new-cars/${encodeURIComponent(c.id)}`}>
+                      <div className="snap-start shrink-0 w-52 rounded-2xl overflow-hidden border border-slate-100 bg-white hover:shadow-md transition-shadow cursor-pointer">
+                        <div className="relative h-32 bg-slate-50 overflow-hidden">
+                          {c.images[0]
+                            ? <img src={c.images[0]} className="w-full h-full object-cover" loading="lazy" decoding="async" alt={`${c.mark} ${c.model}`} />
+                            : <div className="w-full h-full flex items-center justify-center text-slate-200"><Car className="w-10 h-10" /></div>
+                          }
+                          <span className="absolute top-2 left-2 bg-[#0070b8] text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                            <Sparkles className="w-2.5 h-2.5" /> Новый
+                          </span>
+                        </div>
+                        <div className="p-3">
+                          <p className="text-sm font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">{c.year}</p>
+                          <p className="text-base font-extrabold text-[#0070b8] mt-1">{formatPrice(c.maxDiscount > 0 ? c.price - c.maxDiscount : c.price)}</p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right — sticky price card */}
@@ -570,7 +677,7 @@ export default function NewCarDetail() {
             <p className="text-base font-extrabold text-slate-900 leading-tight">{formatPrice(car.price)}</p>
           )}
         </div>
-        <a href="tel:+74832000000"
+        <a href={locationPhoneTel}
           className="flex items-center justify-center w-11 h-11 rounded-xl border-2 border-slate-200 text-slate-600 shrink-0">
           <Phone className="w-4 h-4" />
         </a>
@@ -587,7 +694,7 @@ export default function NewCarDetail() {
         {showLead && <LeadModal car={car} onClose={() => setShowLead(false)} />}
         {showTestDrive && <TestDriveModal car={car} onClose={() => setShowTestDrive(false)} />}
         {showCredit && <CreditModal car={car} onClose={() => setShowCredit(false)} />}
-        {showTradeIn && <TradeInModal onClose={() => setShowTradeIn(false)} />}
+        {showTradeIn && <TradeInModal onClose={() => setShowTradeIn(false)} targetCar={{ mark: car.mark, model: car.model, price: car.price, isNew: true }} />}
       </AnimatePresence>
     </Layout>
   );
