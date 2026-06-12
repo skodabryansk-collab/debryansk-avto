@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp, Clock, Shield, BadgeCheck,
-  Phone, User, MessageSquare, Car, Gauge, CheckCircle,
-  ArrowRight, Banknote, Tag,
+  Phone, MessageSquare, Car, Gauge, CheckCircle,
+  ArrowRight, Banknote, Tag, AlertCircle,
 } from "lucide-react";
 import SEO from "@/components/SEO";
 import Layout from "@/components/Layout";
@@ -12,23 +12,64 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 
 /* ── Types ─────────────────────────────────────────────────── */
-interface Brand { id: string; name: string; cyrillicName: string; isPopular: boolean }
-interface CarModel { id: string; name: string }
+interface CmItem { id: string; name: string; [key: string]: any }
 
 /* ── API helpers ────────────────────────────────────────────── */
-async function fetchBrands(): Promise<Brand[]> {
-  const r = await fetch("/api/car-catalog/brands");
+async function fetchCmBrands(): Promise<CmItem[]> {
+  const r = await fetch("/api/car-catalog/cm-brands");
   if (!r.ok) throw new Error("Ошибка загрузки марок");
   const j = await r.json();
-  return j.ok ? j.data : [];
+  return j.ok ? (j.data ?? []) : [];
 }
 
-async function fetchModels(brandId: string): Promise<CarModel[]> {
-  if (!brandId) return [];
-  const r = await fetch(`/api/car-catalog/models?brandId=${encodeURIComponent(brandId)}`);
+async function fetchCmModels(brand: string): Promise<CmItem[]> {
+  if (!brand) return [];
+  const r = await fetch(`/api/car-catalog/cm-models?brand=${encodeURIComponent(brand)}`);
   if (!r.ok) throw new Error("Ошибка загрузки моделей");
   const j = await r.json();
-  return j.ok ? j.data : [];
+  return j.ok ? (j.data ?? []) : [];
+}
+
+async function fetchCmGenerations(brand: string, model: string, creationYear: string): Promise<CmItem[]> {
+  if (!brand || !model) return [];
+  const qs = new URLSearchParams({ brand, model });
+  if (creationYear) qs.append("creationYear", creationYear);
+  const r = await fetch(`/api/car-catalog/cm-generations?${qs}`);
+  if (!r.ok) throw new Error("Ошибка загрузки поколений");
+  const j = await r.json();
+  return j.ok ? (j.data ?? []) : [];
+}
+
+async function fetchCmBodies(brand: string, model: string): Promise<CmItem[]> {
+  if (!brand || !model) return [];
+  const qs = new URLSearchParams({ brand, model });
+  const r = await fetch(`/api/car-catalog/cm-bodies?${qs}`);
+  if (!r.ok) throw new Error("Ошибка загрузки кузовов");
+  const j = await r.json();
+  return j.ok ? (j.data ?? []) : [];
+}
+
+interface PredictResult {
+  ok: true;
+  buyoutMin: number;
+  buyoutMax: number;
+}
+
+async function fetchCmExpertPredict(params: {
+  brandId: string; modelId: string; year: string; mileage: string;
+  bodyId?: string; generationId?: string;
+}): Promise<PredictResult | { ok: false }> {
+  const qs = new URLSearchParams({
+    brandId: params.brandId,
+    modelId: params.modelId,
+    year: params.year,
+    mileage: params.mileage,
+  });
+  if (params.bodyId)       qs.append("bodyId", params.bodyId);
+  if (params.generationId) qs.append("generationId", params.generationId);
+  const r = await fetch(`/api/car-catalog/cm-expert-predict?${qs}`);
+  if (!r.ok) return { ok: false };
+  return r.json();
 }
 
 /* ── FadeIn helper ──────────────────────────────────────────── */
@@ -50,31 +91,17 @@ function FadeIn({ children, delay = 0, className = "" }: { children: React.React
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: currentYear - 1999 }, (_, i) => currentYear - i);
 
-const bodyTypes = [
-  "Седан", "Хэтчбек", "Универсал", "Кроссовер / SUV",
-  "Внедорожник", "Минивэн", "Купе", "Кабриолет",
-  "Пикап", "Фургон", "Другой",
-];
-
 /* ── Price helpers ───────────────────────────────────────────── */
 function formatPriceRUB(n: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n) + " ₽";
 }
 
-interface PriceStats {
-  marketMin: number; marketMedian: number; marketMax: number;
-  buyoutMin: number; buyoutMax: number; sampleCount: number;
+/* ── Helpers to extract id/name from CM Expert items ─────────── */
+function itemId(item: CmItem): string {
+  return String(item.id ?? item.code ?? item.value ?? item.name ?? "");
 }
-
-async function fetchPriceStats(params: { brandId: string; modelId?: string; year: string; mileage?: string }): Promise<PriceStats | null> {
-  const qs = new URLSearchParams({ brandId: params.brandId, year: params.year });
-  if (params.modelId) qs.append("modelId", params.modelId);
-  if (params.mileage) qs.append("mileage", params.mileage);
-  const r = await fetch(`/api/car-catalog/price-stats?${qs}`);
-  if (!r.ok) throw new Error("Ошибка оценки");
-  const j = await r.json();
-  if (!j.ok || !j.data) return null;
-  return j.data as PriceStats;
+function itemName(item: CmItem): string {
+  return String(item.name ?? item.title ?? item.label ?? item.id ?? "");
 }
 
 /* ── Buyout form ────────────────────────────────────────────── */
@@ -83,35 +110,67 @@ function BuyoutForm() {
   const [step, setStep] = useState<1 | 2>(1);
   const [form, setForm] = useState({
     brand: "", model: "", year: "", mileage: "",
-    body: "", name: "", phone: "", comment: "",
+    generation: "", body: "",
+    name: "", phone: "", comment: "",
   });
-  const [priceStats, setPriceStats] = useState<PriceStats | null>(null);
+  const [priceResult, setPriceResult] = useState<PredictResult | { ok: false } | null>(null);
   const [priceLoading, setPriceLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  /* CM Expert brands */
   const { data: brands = [], isLoading: brandsLoading } = useQuery({
-    queryKey: ["car-catalog-brands"],
-    queryFn: fetchBrands,
+    queryKey: ["cm-brands"],
+    queryFn: fetchCmBrands,
     staleTime: 24 * 60 * 60 * 1000,
   });
 
+  /* CM Expert models — depends on brand */
   const { data: models = [], isLoading: modelsLoading } = useQuery({
-    queryKey: ["car-catalog-models", form.brand],
-    queryFn: () => fetchModels(form.brand),
+    queryKey: ["cm-models", form.brand],
+    queryFn: () => fetchCmModels(form.brand),
     enabled: !!form.brand,
-    staleTime: 60 * 60 * 1000,
+    staleTime: 24 * 60 * 60 * 1000,
   });
 
+  /* CM Expert generations — depends on brand + model + year */
+  const { data: generations = [], isLoading: generationsLoading } = useQuery({
+    queryKey: ["cm-generations", form.brand, form.model, form.year],
+    queryFn: () => fetchCmGenerations(form.brand, form.model, form.year),
+    enabled: !!form.brand && !!form.model,
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+
+  /* CM Expert bodies — depends on brand + model */
+  const { data: bodies = [], isLoading: bodiesLoading } = useQuery({
+    queryKey: ["cm-bodies", form.brand, form.model],
+    queryFn: () => fetchCmBodies(form.brand, form.model),
+    enabled: !!form.brand && !!form.model,
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+
+  /* Reset dependent fields on parent change */
   useEffect(() => {
-    setForm(f => ({ ...f, model: "" }));
+    setForm(f => ({ ...f, model: "", generation: "", body: "" }));
   }, [form.brand]);
+
+  useEffect(() => {
+    setForm(f => ({ ...f, generation: "", body: "" }));
+  }, [form.model]);
+
+  useEffect(() => {
+    setForm(f => ({ ...f, generation: "" }));
+  }, [form.year]);
 
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [key]: e.target.value }));
 
   const handleCalculate = async () => {
-    if (!form.brand || !form.year) {
-      toast({ title: "Выберите марку и год", variant: "destructive" });
+    if (!form.brand || !form.model) {
+      toast({ title: "Выберите марку и модель", variant: "destructive" });
+      return;
+    }
+    if (!form.year) {
+      toast({ title: "Выберите год выпуска", variant: "destructive" });
       return;
     }
     if (!form.mileage) {
@@ -120,20 +179,19 @@ function BuyoutForm() {
     }
     setPriceLoading(true);
     try {
-      const stats = await fetchPriceStats({
-        brandId: form.brand,
-        modelId: form.model || undefined,
-        year: form.year,
-        mileage: form.mileage || undefined,
+      const result = await fetchCmExpertPredict({
+        brandId:      form.brand,
+        modelId:      form.model,
+        year:         form.year,
+        mileage:      form.mileage,
+        bodyId:       form.body       || undefined,
+        generationId: form.generation || undefined,
       });
-      if (!stats) {
-        toast({ title: "Недостаточно данных", description: "Попробуйте другую модель или год", variant: "destructive" });
-        return;
-      }
-      setPriceStats(stats);
+      setPriceResult(result);
       setStep(2);
-    } catch (err: any) {
-      toast({ title: "Ошибка расчёта", description: err.message, variant: "destructive" });
+    } catch {
+      setPriceResult({ ok: false });
+      setStep(2);
     } finally {
       setPriceLoading(false);
     }
@@ -148,10 +206,16 @@ function BuyoutForm() {
     try {
       const fd = new FormData();
       fd.append("type", "buyout");
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
-      if (priceStats) {
-        fd.append("estimatedBuyoutMin", String(priceStats.buyoutMin));
-        fd.append("estimatedBuyoutMax", String(priceStats.buyoutMax));
+      const brandName = brands.find(b => itemId(b) === form.brand)?.name ?? form.brand;
+      const modelName = models.find(m => itemId(m) === form.model)?.name ?? form.model;
+      Object.entries(form).forEach(([k, v]) => {
+        if (k !== "brand" && k !== "model") fd.append(k, v);
+      });
+      fd.append("brand", brandName);
+      fd.append("model", modelName);
+      if (priceResult?.ok) {
+        fd.append("estimateMin", String(priceResult.buyoutMin));
+        fd.append("estimateMax", String(priceResult.buyoutMax));
       }
       await fetch("/api/send-email", { method: "POST", body: fd });
     } catch (_) {}
@@ -159,12 +223,16 @@ function BuyoutForm() {
     toast({ title: "Заявка принята!", description: "Перезвоним в течение 15 минут" });
   };
 
-  const inputCls = "w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#0070b8] focus:ring-1 focus:ring-[#0070b8] outline-none text-sm";
-  const selectCls = `${inputCls} bg-white`;
-  const labelCls = "text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5";
+  const inputCls   = "w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#0070b8] focus:ring-1 focus:ring-[#0070b8] outline-none text-sm";
+  const selectCls  = `${inputCls} bg-white`;
+  const labelCls   = "text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5";
 
-  const popularBrands = brands.filter(b => b.isPopular);
-  const otherBrands = brands.filter(b => !b.isPopular);
+  const resetForm = () => {
+    setSubmitted(false);
+    setStep(1);
+    setPriceResult(null);
+    setForm({ brand: "", model: "", year: "", mileage: "", generation: "", body: "", name: "", phone: "", comment: "" });
+  };
 
   if (submitted) {
     return (
@@ -174,7 +242,7 @@ function BuyoutForm() {
         </div>
         <h3 className="text-xl font-extrabold mb-2">Заявка принята!</h3>
         <p className="text-slate-500 mb-4 text-sm">Наш менеджер перезвонит вам в течение 15 минут для обсуждения условий.</p>
-        <button onClick={() => { setSubmitted(false); setStep(1); setPriceStats(null); setForm({ brand: "", model: "", year: "", mileage: "", body: "", name: "", phone: "", comment: "" }); }} className="text-[#0070b8] font-bold hover:underline text-sm">
+        <button onClick={resetForm} className="text-[#0070b8] font-bold hover:underline text-sm">
           Отправить ещё одну заявку
         </button>
       </div>
@@ -208,30 +276,22 @@ function BuyoutForm() {
       {step === 1 && (
         <div className="space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
+
             {/* Марка */}
             <div>
               <label className={labelCls}>Марка *</label>
               <select value={form.brand} onChange={set("brand")} className={selectCls} disabled={brandsLoading}>
                 <option value="">{brandsLoading ? "Загрузка…" : "Выберите марку"}</option>
-                {popularBrands.length > 0 && (
-                  <optgroup label="Популярные">
-                    {popularBrands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </optgroup>
-                )}
-                {otherBrands.length > 0 && (
-                  <optgroup label="Все марки">
-                    {otherBrands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </optgroup>
-                )}
+                {brands.map(b => <option key={itemId(b)} value={itemId(b)}>{itemName(b)}</option>)}
               </select>
             </div>
 
             {/* Модель */}
             <div>
-              <label className={labelCls}>Модель</label>
+              <label className={labelCls}>Модель *</label>
               <select value={form.model} onChange={set("model")} className={selectCls} disabled={!form.brand || modelsLoading}>
                 <option value="">{!form.brand ? "Сначала марку" : modelsLoading ? "Загрузка…" : "Выберите модель"}</option>
-                {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                {models.map(m => <option key={itemId(m)} value={itemId(m)}>{itemName(m)}</option>)}
               </select>
             </div>
 
@@ -247,17 +307,31 @@ function BuyoutForm() {
             {/* Пробег */}
             <div>
               <label className={labelCls}>Пробег, км *</label>
-              <input type="number" min="0" value={form.mileage} onChange={set("mileage")} placeholder="Например, 75 000" className={inputCls} />
+              <input type="number" min="0" value={form.mileage} onChange={set("mileage")} placeholder="Например, 75 000" className={inputCls} />
+            </div>
+
+            {/* Поколение */}
+            <div>
+              <label className={labelCls}>Поколение</label>
+              <select value={form.generation} onChange={set("generation")} className={selectCls} disabled={!form.brand || !form.model || generationsLoading}>
+                <option value="">
+                  {!form.model ? "Сначала модель" : generationsLoading ? "Загрузка…" : generations.length ? "Выберите поколение" : "Не указано"}
+                </option>
+                {generations.map(g => <option key={itemId(g)} value={itemId(g)}>{itemName(g)}</option>)}
+              </select>
             </div>
 
             {/* Тип кузова */}
-            <div className="sm:col-span-2">
+            <div>
               <label className={labelCls}>Тип кузова</label>
-              <select value={form.body} onChange={set("body")} className={selectCls}>
-                <option value="">Выберите тип</option>
-                {bodyTypes.map(t => <option key={t} value={t}>{t}</option>)}
+              <select value={form.body} onChange={set("body")} className={selectCls} disabled={!form.brand || !form.model || bodiesLoading}>
+                <option value="">
+                  {!form.model ? "Сначала модель" : bodiesLoading ? "Загрузка…" : bodies.length ? "Выберите кузов" : "Не указано"}
+                </option>
+                {bodies.map(b => <option key={itemId(b)} value={itemId(b)}>{itemName(b)}</option>)}
               </select>
             </div>
+
           </div>
 
           <button
@@ -271,38 +345,50 @@ function BuyoutForm() {
         </div>
       )}
 
-      {/* ── Price result + Step 2: Contacts ── */}
-      {step === 2 && priceStats && (
+      {/* ── Step 2: Price result + Contacts ── */}
+      {step === 2 && (
         <div className="space-y-4">
-          {/* Price card */}
-          <div className="bg-[#0d0f14] rounded-2xl p-5 sm:p-6 border border-white/[0.07] mb-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#87b63c] mb-2">Предварительная оценка</p>
-            <div className="flex items-baseline gap-2 mb-2">
-              <span className="text-2xl sm:text-3xl font-extrabold text-white">{formatPriceRUB(priceStats.buyoutMin)}</span>
-              <span className="text-sm text-white/40"> — </span>
-              <span className="text-2xl sm:text-3xl font-extrabold text-white">{formatPriceRUB(priceStats.buyoutMax)}</span>
+          {/* Price card — shown when predict succeeded */}
+          {priceResult?.ok && (
+            <div className="bg-[#0d0f14] rounded-2xl p-5 sm:p-6 border border-white/[0.07] mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[#87b63c] mb-2">Предварительная оценка</p>
+              <div className="flex items-baseline gap-2 mb-2">
+                <span className="text-2xl sm:text-3xl font-extrabold text-white">{formatPriceRUB(priceResult.buyoutMin)}</span>
+                <span className="text-sm text-white/40"> — </span>
+                <span className="text-2xl sm:text-3xl font-extrabold text-white">{formatPriceRUB(priceResult.buyoutMax)}</span>
+              </div>
+              <div className="bg-[#87b63c]/10 border border-[#87b63c]/20 rounded-xl px-3 py-2.5">
+                <p className="text-[11px] font-semibold text-[#87b63c] leading-snug">
+                  ⚠ Расчёт предварительный. Точная цена определяется после осмотра автомобиля.
+                </p>
+              </div>
             </div>
-            <div className="bg-[#87b63c]/10 border border-[#87b63c]/20 rounded-xl px-3 py-2.5 mb-3">
-              <p className="text-[11px] font-semibold text-[#87b63c] leading-snug">
-                ⚠ Расчёт предварительный. Точная цена определяется после осмотра автомобиля.
-              </p>
+          )}
+
+          {/* Error card — shown when predict failed */}
+          {priceResult && !priceResult.ok && (
+            <div className="bg-slate-50 rounded-2xl p-5 sm:p-6 border border-slate-200 mb-2 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-slate-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-slate-700 mb-1">Не удалось получить оценку</p>
+                <p className="text-sm text-slate-500 leading-snug">
+                  Менеджер перезвонит и назовёт цену — оставьте контакты, и мы свяжемся в течение 15 минут.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="grid sm:grid-cols-2 gap-4">
-            {/* Имя */}
             <div>
               <label className={labelCls}>Ваше имя *</label>
               <input type="text" value={form.name} onChange={set("name")} placeholder="Как вас зовут?" className={inputCls} />
             </div>
-            {/* Телефон */}
             <div>
               <label className={labelCls}>Телефон *</label>
               <input type="tel" value={form.phone} onChange={set("phone")} placeholder="+7 (___) ___-__-__" className={inputCls} />
             </div>
           </div>
 
-          {/* Комментарий */}
           <div>
             <label className={labelCls}>Комментарий</label>
             <textarea
@@ -315,7 +401,7 @@ function BuyoutForm() {
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => { setStep(1); setPriceStats(null); }}
+              onClick={() => { setStep(1); setPriceResult(null); }}
               className="px-4 py-3 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-100 transition-colors"
             >
               Изменить
@@ -378,27 +464,44 @@ const services = [
 
 /* ── Why us ─────────────────────────────────────────────────── */
 const whyUs = [
-  { icon: BadgeCheck, title: "Официальный дилер", desc: "Договор, юридическая чистота и гарантия оплаты" },
-  { icon: Clock,      title: "Ответ за 15 минут",   desc: "Перезваниваем сами — вам не надо ждать" },
-  { icon: Shield,     title: "Чистая сделка", desc: "Проверяем историю, оформляем все документы" },
-  { icon: Gauge,      title: "Честная оценка", desc: "Без искусственного занижения — только реальная цена" },
+  { icon: BadgeCheck, title: "Официальный дилер",   desc: "Договор, юридическая чистота и гарантия оплаты" },
+  { icon: Clock,      title: "Ответ за 15 минут",    desc: "Перезваниваем сами — вам не надо ждать" },
+  { icon: Shield,     title: "Чистая сделка",        desc: "Проверяем историю, оформляем все документы" },
+  { icon: Gauge,      title: "Честная оценка",       desc: "Без искусственного занижения — только реальная цена" },
 ];
 
 /* ── JSON-LD ─────────────────────────────────────────────────── */
 const schema = {
-  "@type": "AutoDealer",
-  name: "Дебрянск Авто — Выкуп и комиссия",
-  description: "Срочный выкуп автомобилей и комиссионная продажа в Брянске. Оценка бесплатно, деньги в день сделки.",
-  url: "https://debryansk-auto.ru/buyout",
-  telephone: "+7 (4832) 000-000",
-  areaServed: { "@type": "City", name: "Брянск" },
+  "@type": "Service",
+  "name": "Выкуп и комиссионная продажа автомобилей",
+  "alternateName": "Срочный выкуп авто",
+  "description": "Срочный выкуп автомобилей и комиссионная продажа в Брянске. Оценка бесплатно, деньги в день сделки. Официальный дилер.",
+  "url": "https://debryansk-auto.ru/buyout",
+  "serviceType": "Выкуп и продажа автомобилей",
+  "provider": {
+    "@type": "AutoDealer",
+    "name": "Дебрянск Авто",
+    "url": "https://debryansk-auto.ru",
+    "telephone": "+74832777770",
+  },
+  "areaServed": {
+    "@type": "City",
+    "name": "Брянск",
+    "containedInPlace": { "@type": "State", "name": "Брянская область" },
+  },
+  "offers": {
+    "@type": "Offer",
+    "description": "Бесплатная оценка автомобиля. Деньги в день сделки.",
+    "price": "0",
+    "priceCurrency": "RUB",
+  },
 };
 
 /* ── Sticky nav ─────────────────────────────────────────────── */
 const navItems = [
   { id: "services", label: "Услуги" },
-  { id: "process", label: "Процесс" },
-  { id: "form", label: "Оценка" },
+  { id: "process",  label: "Процесс" },
+  { id: "form",     label: "Оценка" },
 ];
 
 function BuyoutNav() {
@@ -409,9 +512,7 @@ function BuyoutNav() {
     const observer = new IntersectionObserver(
       entries => {
         const visible = entries.filter(e => e.isIntersecting);
-        if (visible.length > 0) {
-          setActive(visible[0].target.id);
-        }
+        if (visible.length > 0) setActive(visible[0].target.id);
       },
       { rootMargin: "-40% 0px -55% 0px", threshold: 0 }
     );
@@ -430,15 +531,10 @@ function BuyoutNav() {
               onClick={e => {
                 e.preventDefault();
                 const el = document.getElementById(item.id);
-                if (el) {
-                  el.scrollIntoView({ behavior: "smooth", block: "start" });
-                  setActive(item.id);
-                }
+                if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); setActive(item.id); }
               }}
               className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all ${
-                active === item.id
-                  ? "bg-[#0070b8] text-white shadow-sm"
-                  : "text-slate-600 hover:bg-slate-100"
+                active === item.id ? "bg-[#0070b8] text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
               }`}
             >
               {item.label}
@@ -455,6 +551,14 @@ function BuyoutNav() {
 
 /* ── Main page ──────────────────────────────────────────────── */
 export default function BuyoutPage() {
+  const { data: siteSettings } = useQuery({
+    queryKey: ["site-settings"],
+    queryFn: () => fetch("/api/settings").then(r => r.json()).then(j => j.data as Record<string, string>),
+    staleTime: 5 * 60 * 1000,
+  });
+  const headerPhone    = siteSettings?.header_phone ?? "+7 (4832) 77 77 70";
+  const headerPhoneTel = "tel:+" + headerPhone.replace(/\D/g, "");
+
   return (
     <Layout>
       <SEO
@@ -462,6 +566,10 @@ export default function BuyoutPage() {
         description="Срочный выкуп автомобилей за наличные и комиссионная продажа в Брянске. Оценка бесплатно, деньги в день сделки. Официальный дилер."
         canonical="/buyout"
         jsonLd={schema}
+        breadcrumbs={[
+          { name: "Главная", url: "/" },
+          { name: "Выкуп и комиссия", url: "/buyout" },
+        ]}
       />
 
       <BuyoutNav />
@@ -481,13 +589,14 @@ export default function BuyoutPage() {
             </p>
             <div className="flex flex-wrap gap-2 sm:gap-3">
               {[
-                { icon: Banknote, text: "Деньги в день сделки" },
+                { icon: Banknote,   text: "Деньги в день сделки" },
                 { icon: BadgeCheck, text: "Официальный договор" },
-                { icon: Clock, text: "Оценка за 15 минут" },
-                { icon: Car, text: "Любая марка и год" },
+                { icon: Clock,      text: "Оценка за 15 минут" },
+                { icon: Car,        text: "Любая марка и год" },
               ].map(({ icon: Icon, text }) => (
-                <div key={text} className="flex items-center gap-1.5 bg-white/[0.07] border border-white/[0.1] rounded-full px-3 py-1.5 text-xs font-semibold text-white/80">
-                  <Icon className="w-3.5 h-3.5 text-[#87b63c]" /> {text}
+                <div key={text} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1.5">
+                  <Icon className="w-3.5 h-3.5 text-[#87b63c]" />
+                  <span className="text-xs font-semibold text-white/80">{text}</span>
                 </div>
               ))}
             </div>
@@ -502,7 +611,6 @@ export default function BuyoutPage() {
             <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Услуги</p>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Два пути. Одна цель — ваша выгода.</h2>
           </FadeIn>
-
           <div className="grid sm:grid-cols-2 gap-5 sm:gap-6">
             {services.map((s, i) => (
               <FadeIn key={s.title} delay={i * 0.1}>
@@ -568,10 +676,10 @@ export default function BuyoutPage() {
           </FadeIn>
           <div className="grid sm:grid-cols-4 gap-4">
             {[
-              { n: "01", title: "Расскажите об авто", desc: "Заполните форму или позвоните — нам достаточно марки, года и пробега" },
-              { n: "02", title: "Называем цену", desc: "Перезвоним в течение 15 минут с конкретной суммой — без расплывчатых ответов" },
-              { n: "03", title: "Осмотр на месте", desc: "Выедем к вам или примем на нашей площадке — осмотр всегда бесплатный" },
-              { n: "04", title: "Деньги в день сделки", desc: "Подписываем договор и переводим средства — в тот же день" },
+              { n: "01", title: "Расскажите об авто",    desc: "Заполните форму или позвоните — нам достаточно марки, года и пробега" },
+              { n: "02", title: "Называем цену",         desc: "Перезвоним в течение 15 минут с конкретной суммой — без расплывчатых ответов" },
+              { n: "03", title: "Осмотр на месте",       desc: "Выедем к вам или примем на нашей площадке — осмотр всегда бесплатный" },
+              { n: "04", title: "Деньги в день сделки",  desc: "Подписываем договор и переводим средства — в тот же день" },
             ].map((step, i) => (
               <FadeIn key={step.n} delay={i * 0.1} className="relative">
                 <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-100 h-full">
@@ -602,11 +710,11 @@ export default function BuyoutPage() {
                   Заполните данные — система покажет диапазон цен, а наш специалист перезвонит и подтвердит предложение. Оценка бесплатно, без обязательств.
                 </p>
                 <div className="space-y-4">
-                  <a href="tel:+74832000000" className="flex items-center gap-3 text-sm font-bold text-slate-700 hover:text-[#0070b8] transition-colors">
+                  <a href={headerPhoneTel} className="flex items-center gap-3 text-sm font-bold text-slate-700 hover:text-[#0070b8] transition-colors">
                     <div className="w-9 h-9 rounded-xl bg-[#0070b8]/10 flex items-center justify-center">
                       <Phone className="w-4 h-4 text-[#0070b8]" />
                     </div>
-                    +7 (4832) 000-000
+                    {headerPhone}
                   </a>
                   <p className="text-xs text-slate-400 pl-12">Ежедневно с 9:00 до 21:00</p>
                 </div>
