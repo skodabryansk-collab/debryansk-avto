@@ -128,8 +128,27 @@ function getPreviewPath(): string | null {
   return match ? match[1] : null;
 }
 
+function isIconsRoute(): boolean {
+  const basePath = getBasePath();
+  const { pathname } = window.location;
+  const local =
+    basePath && pathname.startsWith(basePath)
+      ? pathname.slice(basePath.length) || "/"
+      : pathname;
+  return local === "/icons" || local === "/icons/";
+}
+
 function App() {
   const previewPath = getPreviewPath();
+
+  if (isIconsRoute()) {
+    return (
+      <PreviewRenderer
+        componentPath="icons/IconSet"
+        modules={discoveredModules}
+      />
+    );
+  }
 
   if (previewPath) {
     return (
