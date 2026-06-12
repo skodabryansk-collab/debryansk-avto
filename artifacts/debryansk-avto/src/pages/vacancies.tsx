@@ -146,7 +146,6 @@ const hrNewsArticles: HrNewsItem[] = [
 
 /* ─── hh.ru helpers ─────────────────────────────────────────────── */
 const HH_EMPLOYER_ID = "2421744";
-const HH_API = "https://api.hh.ru";
 
 function guessDepartment(title: string): string {
   const t = title.toLowerCase();
@@ -451,19 +450,6 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
   const [tab, setTab] = useState<"info" | "apply">("info");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Fetch full hh.ru vacancy details when modal opens
-  const [hhDetails, setHhDetails] = useState<any>(null);
-  const [hhLoading, setHhLoading] = useState(false);
-  useEffect(() => {
-    if (!vacancy.hhId) return;
-    setHhLoading(true);
-    fetch(`${HH_API}/vacancies/${vacancy.hhId}`, {
-      headers: { "Accept": "application/json" }
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { setHhDetails(d); setHhLoading(false); })
-      .catch(() => setHhLoading(false));
-  }, [vacancy.hhId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -498,7 +484,7 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 40 }}
         transition={{ duration: 0.25 }}
-        className="relative bg-white w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
+        className="relative bg-white w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl shadow-2xl h-[90vh] sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden"
       >
         {/* Header */}
         <div className="p-5 sm:p-6 border-b border-slate-100 shrink-0">
@@ -536,7 +522,7 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
         </div>
 
         {/* Body */}
-        <div className="overflow-y-auto flex-1">
+        <div className="overflow-y-auto flex-1 min-h-0">
           {submitted ? (
             <div className="p-10 text-center">
               <CheckCircle className="w-14 h-14 text-[#87b63c] mx-auto mb-4" />
@@ -579,18 +565,12 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
 
               {/* hh.ru full description */}
               {vacancy.source === "hh" ? (
-                hhLoading ? (
-                  <div className="space-y-2 animate-pulse">
-                    {[80, 60, 90, 50, 70].map(w => (
-                      <div key={w} className="h-3 bg-slate-100 rounded" style={{ width: `${w}%` }} />
-                    ))}
-                  </div>
-                ) : hhDetails?.description ? (
+                vacancy.description ? (
                   <div>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Описание вакансии</p>
                     <div
                       className="text-sm text-slate-700 leading-relaxed hh-description"
-                      dangerouslySetInnerHTML={{ __html: hhDetails.description }}
+                      dangerouslySetInnerHTML={{ __html: vacancy.description }}
                     />
                   </div>
                 ) : (
@@ -722,7 +702,9 @@ function VacancyCard({ vacancy, onOpen }: { vacancy: Vacancy; onOpen: () => void
           {vacancy.title}
         </h3>
         {vacancy.description && (
-          <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">{vacancy.description}</p>
+          <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">
+            {vacancy.description.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}
+          </p>
         )}
       </div>
 
@@ -802,6 +784,10 @@ export default function Vacancies() {
         title="Вакансии — Дебрянск Авто"
         description="Работа в автодилерском центре Брянска. Вакансии: менеджер, автоподборщик, автомеханик, автомойщик, директор."
         canonical="/vacancies"
+        breadcrumbs={[
+          { name: "Главная", url: "/" },
+          { name: "Вакансии", url: "/vacancies" },
+        ]}
       />
 
       <div>
