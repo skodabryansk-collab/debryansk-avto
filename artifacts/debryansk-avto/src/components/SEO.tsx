@@ -1,5 +1,10 @@
 import { Helmet } from "react-helmet-async";
 
+interface BreadcrumbItem {
+  name: string;
+  url: string;
+}
+
 interface SEOProps {
   title: string;
   description: string;
@@ -7,6 +12,7 @@ interface SEOProps {
   image?: string;
   type?: string;
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+  breadcrumbs?: BreadcrumbItem[];
 }
 
 export default function SEO({
@@ -16,11 +22,33 @@ export default function SEO({
   image = "/opengraph.jpg",
   type = "website",
   jsonLd,
+  breadcrumbs,
 }: SEOProps) {
   const fullTitle = title.includes("Дебрянск") ? title : `${title} — Дебрянск Авто`;
   const siteUrl = "https://debryansk-auto.ru";
   const fullUrl = canonical ? `${siteUrl}${canonical}` : siteUrl;
   const fullImage = image.startsWith("http") ? image : `${siteUrl}${image}`;
+
+  const jsonLdString = jsonLd
+    ? JSON.stringify(
+        Array.isArray(jsonLd)
+          ? { "@context": "https://schema.org", "@graph": jsonLd }
+          : { "@context": "https://schema.org", ...jsonLd }
+      )
+    : null;
+
+  const breadcrumbJsonLd = breadcrumbs && breadcrumbs.length > 0
+    ? JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": breadcrumbs.map((item, index) => ({
+          "@type": "ListItem",
+          "position": index + 1,
+          "name": item.name,
+          "item": item.url.startsWith("http") ? item.url : `${siteUrl}${item.url}`,
+        })),
+      })
+    : null;
 
   return (
     <Helmet>
@@ -39,16 +67,11 @@ export default function SEO({
       <meta name="twitter:title" content={fullTitle} />
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={fullImage} />
-      <meta name="twitter:site" content="@debryanskavto" />
-      <meta name="yandex-verification" content="" />
-      <meta name="google-site-verification" content="" />
-      {jsonLd && (
-        <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            ...jsonLd,
-          })}
-        </script>
+      {jsonLdString && (
+        <script type="application/ld+json">{jsonLdString}</script>
+      )}
+      {breadcrumbJsonLd && (
+        <script type="application/ld+json">{breadcrumbJsonLd}</script>
       )}
     </Helmet>
   );
