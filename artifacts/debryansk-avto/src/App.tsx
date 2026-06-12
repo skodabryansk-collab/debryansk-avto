@@ -1,4 +1,5 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,10 +15,19 @@ import FavoritesPage from "@/pages/favorites";
 import NewsPage from "@/pages/news";
 import NewsDetailPage from "@/pages/news-detail";
 import ServicePage from "@/pages/service";
+import BuyoutPage from "@/pages/buyout";
 import ContactsPage from "@/pages/contacts";
 import AboutPage from "@/pages/about";
 
 const queryClient = new QueryClient();
+
+function ScrollToTop() {
+  const [location] = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+  return null;
+}
 
 function Router() {
   return (
@@ -33,6 +43,7 @@ function Router() {
       <Route path="/news" component={NewsPage} />
       <Route path="/news/:slug" component={NewsDetailPage} />
       <Route path="/service" component={ServicePage} />
+      <Route path="/buyout" component={BuyoutPage} />
       <Route path="/contacts" component={ContactsPage} />
       <Route path="/about" component={AboutPage} />
       <Route component={NotFound} />
@@ -45,6 +56,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
+          <ScrollToTop />
           <Router />
         </WouterRouter>
         <Toaster />
