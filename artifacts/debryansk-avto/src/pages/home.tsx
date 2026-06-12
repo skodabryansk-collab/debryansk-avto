@@ -104,6 +104,7 @@ interface ApiBrand {
   websiteUrl: string | null;
   bgColor: string | null;
   subName: string | null;
+  isServiceOnly?: boolean;
 }
 
 async function fetchBrands(): Promise<ApiBrand[]> {
@@ -600,6 +601,14 @@ export default function Home() {
   const mapSectionRef = useRef<HTMLDivElement>(null);
   const { favorites, compare, isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
 
+  const { data: siteSettings } = useQuery({
+    queryKey: ["site-settings"],
+    queryFn: () => fetch("/api/settings").then(r => r.json()).then(j => j.data as Record<string, string>),
+    staleTime: 5 * 60 * 1000,
+  });
+  const headerPhone = siteSettings?.header_phone ?? "+7 (4832) 77 77 70";
+  const headerPhoneTel = "tel:+" + (siteSettings?.header_phone ?? "+7 (4832) 77 77 70").replace(/\D/g, "");
+
   const { data: apiLocations = [] } = useQuery({
     queryKey: ["public-locations"],
     queryFn: fetchLocations,
@@ -764,6 +773,9 @@ export default function Home() {
           localBusinessSchema,
           webSiteSchema
         ]}
+        breadcrumbs={[
+          { name: "Главная", url: "/" },
+        ]}
       />
 
       {/* ── Modal ──────────────────────────────────────────── */}
@@ -777,12 +789,11 @@ export default function Home() {
           <div className="container mx-auto px-4 sm:px-6 flex items-center justify-between h-10">
             <div className="flex items-center gap-4 text-[11px] font-medium text-white/40">
               <span>г. Брянск</span>
-              <span className="hidden sm:block">Ежедневно 9:00–21:00</span>
             </div>
             <div className="flex items-center gap-3">
-              <a href="tel:+74832000000"
+              <a href={headerPhoneTel}
                 className="text-xs sm:text-sm font-bold text-white/70 hover:text-white transition-colors">
-                +7 (4832) 000-000
+                {headerPhone}
               </a>
               <Button size="sm"
                 className="h-7 sm:h-8 px-3 sm:px-4 brand-gradient border-0 text-white font-bold rounded-lg text-[11px] sm:text-xs hover:opacity-90"
@@ -904,7 +915,7 @@ export default function Home() {
                   <Scale className="w-4 h-4" /> Сравнить {compCount > 0 && <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{compCount}</span>}
                 </Link>
                 <div className="pt-3 flex items-center justify-between">
-                  <a href="tel:+74832000000" className="text-base font-bold text-[#0070b8]">+7 (4832) 000-000</a>
+                  <a href={headerPhoneTel} className="text-base font-bold text-[#0070b8]">{headerPhone}</a>
                   <div className="flex gap-2">
                     <a href="#" className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center hover:bg-[#0070b8] transition-colors">
                       <SiVk size={14} />
@@ -1085,6 +1096,12 @@ export default function Home() {
                       <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-[#0070b8]/0 group-hover:bg-[#0070b8]/10 flex items-center justify-center transition-all duration-300">
                         <ArrowUpRight className="w-4 h-4 text-[#0070b8] opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0" />
                       </div>
+                      {/* Service badge */}
+                      {b.isServiceOnly && (
+                        <span className="absolute bottom-2.5 left-3 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-[#0070b8] bg-[#0070b8]/10 border border-[#0070b8]/20 rounded-md px-1.5 py-0.5 leading-none">
+                          Сервис
+                        </span>
+                      )}
                     </div>
                   </a>
                 </FadeIn>
@@ -1555,7 +1572,7 @@ export default function Home() {
                     </div>
                     <div>
                       <div className="text-xs font-bold text-slate-400 uppercase mb-1">Телефон</div>
-                      <a href="tel:+74832000000" className="text-xl sm:text-2xl font-extrabold text-white hover:text-[#0070b8] transition-colors">+7 (4832) 000-000</a>
+                      <a href={headerPhoneTel} className="text-xl sm:text-2xl font-extrabold text-white hover:text-[#0070b8] transition-colors">{headerPhone}</a>
                     </div>
                   </div>
                 </div>
@@ -1577,22 +1594,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Address card */}
-                <div className="relative group overflow-hidden rounded-3xl border border-white/[0.12]
-                  bg-gradient-to-br from-white/[0.08] via-white/[0.03] to-transparent
-                  backdrop-blur-xl hover:border-white/[0.18] transition-all duration-500">
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
-                    style={{ background: `radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,112,184,0.12) 0%, transparent 60%)` }} />
-                  <div className="relative p-6 sm:p-8 flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-[#0070b8]/20 flex items-center justify-center shrink-0">
-                      <MapPin className="w-5 h-5 text-[#0070b8]" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-400 uppercase mb-1">Адрес</div>
-                      <div className="text-lg sm:text-xl font-extrabold text-white">г. Брянск, пр. Московский, 65</div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </motion.div>
 
@@ -1693,48 +1694,47 @@ export default function Home() {
                 Территория Автомобилей. Группа компаний с 9 брендами в Брянске с 2011 года.
               </p>
               <div className="flex gap-2.5">
-                <a href="#" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#0070b8] transition-colors group">
+                <a href="#" aria-label="ВКонтакте" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#0070b8] transition-colors group">
                   <SiVk className="text-white/40 group-hover:text-white" size={15} />
                 </a>
-                <a href="#" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#0070b8] transition-colors group">
+                <a href="#" aria-label="Telegram" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#0070b8] transition-colors group">
                   <SiTelegram className="text-white/40 group-hover:text-white" size={15} />
                 </a>
               </div>
             </div>
             <div>
-              <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Бренды</h4>
+              <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Каталог</h4>
               <ul className="space-y-2 text-sm">
-                {["CHERY","OMODA","JAECOO","HAVAL"].map(b => (
-                  <li key={b}><button onClick={() => openModal("buy")} className="hover:text-[#0070b8] transition-colors">{b}</button></li>
+                <li><a href="/new-cars" className="hover:text-[#0070b8] transition-colors">Новые автомобили</a></li>
+                <li><a href="/cars" className="hover:text-[#0070b8] transition-colors">Автомобили с пробегом</a></li>
+                <li><a href="/buyout" className="hover:text-[#0070b8] transition-colors">Выкуп и комиссия</a></li>
+                <li><a href="/compare" className="hover:text-[#0070b8] transition-colors">Сравнение авто</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Услуги</h4>
+              <ul className="space-y-2 text-sm">
+                <li><a href="/service" className="hover:text-[#0070b8] transition-colors">Сервис и ТО</a></li>
+                <li><a href="/about" className="hover:text-[#0070b8] transition-colors">О группе</a></li>
+                {["CHERY", "OMODA", "JAECOO", "HAVAL"].map(b => (
+                  <li key={b}>
+                    <a href={`/new-cars?brand=${encodeURIComponent(b)}`} className="hover:text-[#0070b8] transition-colors">{b}</a>
+                  </li>
                 ))}
               </ul>
             </div>
             <div>
-              <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Ещё бренды</h4>
+              <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Компания</h4>
               <ul className="space-y-2 text-sm">
-                {["TENET","МБ-Брянск","С пробегом"].map(b => (
-                  <li key={b}><button onClick={() => openModal("buy")} className="hover:text-[#0070b8] transition-colors">{b}</button></li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Навигация</h4>
-              <ul className="space-y-2 text-sm">
-                {[["О группе","about","/about"],["Услуги","services","/service"],["Контакты","contacts","/contacts"]].map(([l,_,href]) => (
-                  <li key={href}><a href={href} className="hover:text-[#0070b8] transition-colors">{l}</a></li>
-                ))}
-                <li>
-                  <a href="/vacancies" className="hover:text-[#0070b8] transition-colors">Вакансии</a>
-                </li>
-                <li>
-                  <a href="/news" className="hover:text-[#0070b8] transition-colors">Новости</a>
-                </li>
+                <li><a href="/contacts" className="hover:text-[#0070b8] transition-colors">Контакты</a></li>
+                <li><a href="/vacancies" className="hover:text-[#0070b8] transition-colors">Вакансии</a></li>
+                <li><a href="/news" className="hover:text-[#0070b8] transition-colors">Новости</a></li>
               </ul>
             </div>
           </div>
           <div className="pt-6 sm:pt-8 border-t border-white/[0.07] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
             <p>© {new Date().getFullYear()} Дебрянск Авто — Территория Автомобилей</p>
-            <a href="#" className="hover:text-white transition-colors">Политика конфиденциальности</a>
+            <a href="/privacy" className="hover:text-white transition-colors">Политика конфиденциальности</a>
           </div>
         </div>
       </footer>
