@@ -297,6 +297,7 @@ function buildOpenResumeHtml(d: Record<string, string>) {
   );
 }
 
+
 function buildBuyoutHtml(d: Record<string, string>) {
   const GREEN = "#87b63c";
   return wrapEmail(
@@ -337,10 +338,29 @@ function buildFeedbackHtml(d: Record<string, string>) {
   );
 }
 
+function buildServiceHtml(d: Record<string, string>) {
+  const accent = "#0070b8";
+  return wrapEmail(
+    banner("🔧", "Запись на сервис", accent) +
+    heading("Новая запись на сервис", "Клиент хочет записаться на техническое обслуживание или ремонт") +
+    dataTable([
+      ["Имя клиента",      d.name],
+      ["Телефон",          d.phone],
+      ["Что нужно сделать", d.comment],
+      ["Источник",         d.source || "Навигатор (чат)"],
+    ]) +
+    hr() +
+    actionBlock(d.phone, undefined, "Записать клиента на сервис", accent),
+    accent
+  );
+}
+
+
 /* ── Subject lines ── */
 const SUBJECTS: Record<string, string> = {
   callback:   "📞 Заказать звонок",
   testdrive:  "🏁 Тест-драйв",
+  service:    "🔧 Запись на сервис",
   credit:     "💳 Автокредит",
   tradein:    "🔄 Trade-in",
   buyout:     "💰 Выкуп автомобиля",
@@ -362,11 +382,18 @@ router.post(
         return res.status(400).json({ ok: false, error: "Unknown form type: " + type });
       }
 
+      // For buyout: use pre-computed estimate from frontend (CM Expert), or leave empty
+      let buyoutEstimate: { estimateMin: number; estimateMax: number } | null = null;
+      if (type === "buyout" && body.estimateMin && body.estimateMax) {
+        buyoutEstimate = { estimateMin: Number(body.estimateMin), estimateMax: Number(body.estimateMax) };
+      }
+
       // Build HTML
       let html = "";
       switch (type) {
         case "callback":   html = buildCallbackHtml(body); break;
         case "testdrive":  html = buildTestDriveHtml(body); break;
+        case "service":    html = buildServiceHtml(body); break;
         case "credit":     html = buildCreditHtml(body); break;
         case "tradein":    html = buildTradeInHtml(body); break;
         case "buyout":     html = buildBuyoutHtml(body); break;
@@ -416,7 +443,10 @@ router.post(
         console.error("[email] lead save error:", dbErr);
       }
 
-      return res.json({ ok: true });
+      return res.json({
+        ok: true,
+        ...(buyoutEstimate ?? {}),
+      });
     } catch (err) {
       console.error("[email] send error:", err);
       return res.status(500).json({ ok: false, error: String(err) });
