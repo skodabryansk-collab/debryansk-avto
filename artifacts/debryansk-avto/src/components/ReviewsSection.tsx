@@ -70,7 +70,7 @@ function StarRating({ rating }: { rating: number }) {
 
 const FadeIn = ({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) => {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-60px" });
+  const isInView = useInView(ref, { once: true, margin: "-60px 0px" });
   return (
     <motion.div
       ref={ref}
