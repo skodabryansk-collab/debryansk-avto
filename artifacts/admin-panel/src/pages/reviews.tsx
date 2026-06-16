@@ -38,8 +38,9 @@ export default function ReviewsPage() {
   });
 
   const syncMut = useMutation({
-    mutationFn: (type: "full" | "recent") => syncReviews(type),
-    onSuccess: (res, type) => {
+    mutationFn: ({ type, days }: { type: "full" | "recent" | "custom"; days?: number }) =>
+      syncReviews(type, days),
+    onSuccess: (res) => {
       toast({
         title: "Синхронизация завершена",
         description: `Загружено: ${res.upserted}, пропущено: ${res.skipped} (${(res.durationMs / 1000).toFixed(1)} с)`,
@@ -83,19 +84,28 @@ export default function ReviewsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => syncMut.mutate("recent")}
+            onClick={() => syncMut.mutate({ type: "recent" })}
             disabled={syncMut.isPending}
           >
             <RefreshCw className={`w-4 h-4 mr-1.5 ${syncMut.isPending ? "animate-spin" : ""}`} />
-            Новые (1 день)
+            1 день
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => syncMut.mutate({ type: "custom", days: 15 })}
+            disabled={syncMut.isPending}
+          >
+            <RefreshCw className={`w-4 h-4 mr-1.5 ${syncMut.isPending ? "animate-spin" : ""}`} />
+            15 дней
           </Button>
           <Button
             size="sm"
-            onClick={() => syncMut.mutate("full")}
+            onClick={() => syncMut.mutate({ type: "full" })}
             disabled={syncMut.isPending}
           >
             <RefreshCw className={`w-4 h-4 mr-1.5 ${syncMut.isPending ? "animate-spin" : ""}`} />
-            Полная (90 дней)
+            90 дней
           </Button>
         </div>
       </div>
