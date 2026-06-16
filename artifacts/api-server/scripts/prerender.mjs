@@ -1,0 +1,195 @@
+/**
+ * Pre-rendering script for Дебрянск Авто
+ * Usage:
+ *   node scripts/prerender.mjs              — full crawl of all routes
+ *   node scripts/prerender.mjs --cars-only  — only car detail pages
+ *
+ * Env vars (inherited from running process or .env):
+ *   PRERENDER_SITE_URL                — base URL of the running Express server (default: http://localhost:8080)
+ *   DEFAULT_OBJECT_STORAGE_BUCKET_ID  — GCS bucket where HTML is stored
+ */
+
+import { Storage } from "@google-cloud/storage";
+import puppeteer from "puppeteer";
+
+const SIDECAR = "http://127.0.0.1:1106";
+const SITE_URL = (process.env.PRERENDER_SITE_URL || "http://localhost:8080").replace(/\/$/, "");
+const BUCKET_ID = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+const POOL_SIZE = 5;
+const PAGE_TIMEOUT_MS = 14_000;
+const NETWORK_IDLE_MS = 800;
+
+const carsOnly = process.argv.includes("--cars-only");
+
+if (!BUCKET_ID) {
+  console.error("[prerender] FATAL: DEFAULT_OBJECT_STORAGE_BUCKET_ID not set");
+  process.exit(1);
+}
+
+const gcs = new Storage({
+  credentials: {
+    audience: "replit",
+    subject_token_type: "access_token",
+    token_url: `${SIDECAR}/token`,
+    type: "external_account",
+    credential_source: {
+      url: `${SIDECAR}/credential`,
+      format: { type: "json", subject_token_field_name: "access_token" },
+    },
+    universe_domain: "googleapis.com",
+  },
+  projectId: "",
+});
+
+function routeToObjectName(route) {
+  const clean = route === "/" ? "" : route.replace(/^\//, "").replace(/\/$/, "");
+  return clean ? `prerendered/${clean}/index.html` : "prerendered/index.html";
+}
+
+async function saveToGCS(route, html) {
+  const file = gcs.bucket(BUCKET_ID).file(routeToObjectName(route));
+  await file.save(Buffer.from(html, "utf-8"), {
+    contentType: "text/html; charset=utf-8",
+    resumable: false,
+  });
+}
+
+async function getRoutes() {
+  const staticRoutes = carsOnly
+    ? []
+    : ["/", "/new-cars", "/cars", "/service", "/about", "/contacts", "/news"];
+
+  const [newCarsRes, usedCarsRes, newsRes] = await Promise.all([
+    fetch(`${SITE_URL}/api/cars/new`)
+      .then((r) => r.json())
+      .catch(() => ({ data: [] })),
+    fetch(`${SITE_URL}/api/cars/used`)
+      .then((r) => r.json())
+      .catch(() => ({ data: [] })),
+    carsOnly
+      ? Promise.resolve({ data: [] })
+      : fetch(`${SITE_URL}/api/news`)
+          .then((r) => r.json())
+          .catch(() => ({ data: [] })),
+  ]);
+
+  const newCarRoutes = (newCarsRes.data || []).map(
+    (c) => `/new-cars/${encodeURIComponent(c.id)}`,
+  );
+  const usedCarRoutes = (usedCarsRes.data || []).map(
+    (c) => `/cars/${encodeURIComponent(c.id)}`,
+  );
+  const newsRoutes = (newsRes.data || []).map(
+    (n) => `/news/${encodeURIComponent(n.slug)}`,
+  );
+
+  return [...staticRoutes, ...newCarRoutes, ...usedCarRoutes, ...newsRoutes];
+}
+
+async function processRoute(page, route) {
+  const url = `${SITE_URL}${route}`;
+  try {
+    await page.goto(url, {
+      waitUntil: "domcontentloaded",
+      timeout: PAGE_TIMEOUT_MS,
+    });
+
+    await page
+      .waitForNetworkIdle({ idleTime: NETWORK_IDLE_MS, timeout: PAGE_TIMEOUT_MS })
+      .catch(() => {});
+
+    await page.waitForSelector("main", { timeout: 3_000 }).catch(() => {});
+
+    const html = await page.content();
+
+    const hasContent =
+      html.length > 5_000 &&
+      !html.includes("data-loading") &&
+      html.includes("<main");
+
+    if (!hasContent) {
+      console.warn(`[prerender] WARN: possibly empty content at ${route} (len=${html.length})`);
+    }
+
+    await saveToGCS(route, html);
+    console.log(`[prerender] OK   ${route} (${Math.round(html.length / 1024)}KB)`);
+  } catch (err) {
+    console.error(`[prerender] FAIL ${route}: ${err.message}`);
+  }
+}
+
+async function main() {
+  const startedAt = Date.now();
+  console.log(`[prerender] Starting — carsOnly=${carsOnly}, site=${SITE_URL}`);
+
+  const routes = await getRoutes();
+  console.log(`[prerender] ${routes.length} routes to process`);
+
+  if (routes.length === 0) {
+    console.log("[prerender] Nothing to do, exiting");
+    return;
+  }
+
+  let executablePath;
+  const { execSync } = await import("child_process");
+  try {
+    executablePath = execSync(
+      "which chromium 2>/dev/null || which chromium-browser 2>/dev/null || which google-chrome-stable 2>/dev/null || which google-chrome 2>/dev/null",
+      { encoding: "utf8" }
+    ).trim().split("\n")[0].trim();
+  } catch {
+    console.error("[prerender] FATAL: no Chromium found; install system chromium package");
+    process.exit(1);
+  }
+  if (!executablePath) {
+    console.error("[prerender] FATAL: no Chromium found; install system chromium package");
+    process.exit(1);
+  }
+
+  console.log(`[prerender] Using Chromium: ${executablePath}`);
+
+  const browser = await puppeteer.launch({
+    headless: true,
+    executablePath,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+    ],
+  });
+
+  try {
+    const poolSize = Math.min(POOL_SIZE, routes.length);
+    const pages = await Promise.all(
+      Array.from({ length: poolSize }, () => browser.newPage()),
+    );
+
+    for (const page of pages) {
+      await page.setExtraHTTPHeaders({ "X-Prerender-Bot": "1" });
+      await page.setViewport({ width: 1280, height: 900 });
+    }
+
+    let idx = 0;
+
+    async function worker(page) {
+      while (true) {
+        const route = routes[idx++];
+        if (!route) break;
+        await processRoute(page, route);
+      }
+    }
+
+    await Promise.all(pages.map((page) => worker(page)));
+  } finally {
+    await browser.close();
+  }
+
+  const elapsed = Math.round((Date.now() - startedAt) / 1000);
+  console.log(`[prerender] Done — ${routes.length} routes in ${elapsed}s`);
+}
+
+main().catch((err) => {
+  console.error("[prerender] Fatal error:", err);
+  process.exit(1);
+});
