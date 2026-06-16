@@ -113,9 +113,9 @@ export interface ReviewsMeta {
 export function getAdminReviews(page = 1) {
   return api<ReviewsMeta>("GET", `/admin/reviews?page=${page}`);
 }
-export function syncReviews(type: "full" | "recent" = "full") {
+export function syncReviews(type: "full" | "recent" | "custom" = "full", days?: number) {
   return api<{ ok: boolean; upserted: number; skipped: number; overallCount: number; durationMs: number }>(
-    "POST", "/admin/reviews/sync", { type }
+    "POST", "/admin/reviews/sync", { type, ...(days !== undefined && { days }) }
   );
 }
 
