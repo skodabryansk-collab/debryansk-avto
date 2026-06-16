@@ -1,9 +1,8 @@
 import React, { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, useInView } from "framer-motion";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
-/* ── Types ────────────────────────────────────────────────── */
+/* ── Types ────────────────────────────────────────────── */
 export interface ApiReview {
   id: string | number;
   author: string;
@@ -14,7 +13,7 @@ export interface ApiReview {
   sourceUrl?: string;
 }
 
-/* ── Fetch ────────────────────────────────────────────────── */
+/* ── Fetch ────────────────────────────────────────────── */
 export async function fetchReviews(): Promise<{ data: ApiReview[]; avg: number; total: number; overallCount: number }> {
   const r = await fetch("/api/reviews");
   if (!r.ok) return { data: [], avg: 5, total: 0, overallCount: 0 };
@@ -24,7 +23,7 @@ export async function fetchReviews(): Promise<{ data: ApiReview[]; avg: number; 
     : { data: [], avg: 5, total: 0, overallCount: 0 };
 }
 
-/* ── Helpers ──────────────────────────────────────────────── */
+/* ── Helpers ──────────────────────────────────────────── */
 function SourceIcon({ source }: { source: string }) {
   const s = source.toLowerCase();
   if (s === "яндекс" || s === "yandex") {
@@ -70,13 +69,13 @@ function StarRating({ rating }: { rating: number }) {
 
 const FadeIn = ({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) => {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-60px 0px" });
+  const isInView = useInView(ref, { once: true, margin: "-40px 0px" });
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 20 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-      transition={{ duration: 0.5, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
+      initial={{ opacity: 0, y: 16 }}
+      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
+      transition={{ duration: 0.45, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
       className={className}
     >
       {children}
@@ -84,7 +83,7 @@ const FadeIn = ({ children, delay = 0, className = "" }: { children: React.React
   );
 };
 
-/* ── Main component ───────────────────────────────────────── */
+/* ── Main component ───────────────────────────────────── */
 export const ReviewsSection = () => {
   const { data: reviewsData, isLoading } = useQuery({
     queryKey: ["reviews"],
@@ -95,51 +94,43 @@ export const ReviewsSection = () => {
 
   const reviews = reviewsData?.data ?? [];
   const avg = reviewsData?.avg ?? 5;
-  const total = reviewsData?.total ?? 0;
   const overallCount = reviewsData?.overallCount ?? 0;
 
   const [expanded, setExpanded] = React.useState<Record<string | number, boolean>>({});
-  const [visibleCount, setVisibleCount] = React.useState(9);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const scroll = (dir: "left" | "right") => {
-    scrollRef.current?.scrollBy({ left: dir === "left" ? -320 : 320, behavior: "smooth" });
-  };
+  const [visibleCount, setVisibleCount] = React.useState(6);
 
   if (!isLoading && reviews.length === 0) return null;
 
   const skeletons = Array.from({ length: 3 });
+  const visible = reviews.slice(0, visibleCount);
+  const hasMore = visibleCount < reviews.length;
 
   return (
-    <section className="py-16 sm:py-20 bg-slate-50 border-t border-slate-100">
+    <section className="py-12 sm:py-20 bg-slate-50 border-t border-slate-100">
       <div className="container mx-auto px-4 sm:px-6">
-        <FadeIn className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 sm:mb-10 gap-4">
-          <div>
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Нам доверяют</p>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Отзывы покупателей</h2>
-            {!isLoading && overallCount > 0 && (
-              <div className="flex items-center gap-2 mt-2">
-                <StarRating rating={Math.round(avg)} />
-                <span className="text-sm font-bold text-slate-700">{avg.toFixed(1)}</span>
-                <span className="text-xs text-slate-400">·</span>
-                <span className="text-xs text-slate-500">{overallCount.toLocaleString("ru-RU")} отзыв{overallCount % 10 === 1 && overallCount % 100 !== 11 ? "" : overallCount % 10 >= 2 && overallCount % 10 <= 4 && (overallCount % 100 < 10 || overallCount % 100 >= 20) ? "а" : "ов"} за всё время</span>
-              </div>
-            )}
-          </div>
-          {reviews.length > 3 && (
-            <div className="hidden sm:flex gap-2">
-              <button onClick={() => scroll("left")} className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:border-[#0070b8]/30 transition-colors">
-                <ChevronLeft className="w-4 h-4 text-slate-500" />
-              </button>
-              <button onClick={() => scroll("right")} className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:border-[#0070b8]/30 transition-colors">
-                <ChevronRight className="w-4 h-4 text-slate-500" />
-              </button>
+
+        {/* Header */}
+        <FadeIn className="mb-6 sm:mb-10">
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Нам доверяют</p>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Отзывы покупателей</h2>
+          {!isLoading && overallCount > 0 && (
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <StarRating rating={Math.round(avg)} />
+              <span className="text-sm font-bold text-slate-700">{avg.toFixed(1)}</span>
+              <span className="text-xs text-slate-400">·</span>
+              <span className="text-xs text-slate-500">
+                {overallCount.toLocaleString("ru-RU")}&nbsp;отзыв
+                {overallCount % 10 === 1 && overallCount % 100 !== 11 ? "" :
+                  overallCount % 10 >= 2 && overallCount % 10 <= 4 && (overallCount % 100 < 10 || overallCount % 100 >= 20) ? "а" : "ов"}
+                &nbsp;за всё время
+              </span>
             </div>
           )}
         </FadeIn>
 
+        {/* Grid */}
         {isLoading ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {skeletons.map((_, i) => (
               <div key={i} className="bg-white rounded-2xl border border-slate-100 p-5 animate-pulse">
                 <div className="flex items-center gap-3 mb-4">
@@ -159,72 +150,68 @@ export const ReviewsSection = () => {
           </div>
         ) : (
           <>
-          <div
-            ref={scrollRef}
-            className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden"
-          >
-            {reviews.slice(0, visibleCount).map((review, i) => {
-              const isExp = expanded[review.id];
-              const longText = review.text.length > 200;
-              const displayText = isExp || !longText ? review.text : review.text.slice(0, 200) + "…";
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              {visible.map((review, i) => {
+                const isExp = expanded[review.id];
+                const LIMIT = 160;
+                const longText = review.text.length > LIMIT;
+                const displayText = isExp || !longText ? review.text : review.text.slice(0, LIMIT) + "…";
 
-              return (
-                <FadeIn
-                  key={review.id}
-                  delay={Math.min(i * 0.07, 0.35)}
-                  className="min-w-[280px] sm:min-w-0 snap-start shrink-0 sm:shrink sm:snap-none"
-                >
-                  <div className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 h-full flex flex-col hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0070b8]/20 to-[#87b63c]/20 flex items-center justify-center text-sm font-bold text-[#0070b8] shrink-0">
-                          {review.author.charAt(0).toUpperCase()}
+                return (
+                  <FadeIn
+                    key={review.id}
+                    delay={Math.min(i * 0.06, 0.25)}
+                  >
+                    <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5 h-full flex flex-col hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-[#0070b8]/20 to-[#87b63c]/20 flex items-center justify-center text-sm font-bold text-[#0070b8] shrink-0">
+                            {review.author.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm text-slate-900 truncate">{review.author}</p>
+                            {review.date && (
+                              <p className="text-[11px] text-slate-400">
+                                {new Date(review.date).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-sm text-slate-900 truncate">{review.author}</p>
-                          {review.date && (
-                            <p className="text-[11px] text-slate-400">
-                              {new Date(review.date).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
                         <SourceIcon source={review.source} />
                       </div>
+
+                      <StarRating rating={review.rating} />
+
+                      <p className="text-sm text-slate-600 leading-relaxed mt-2.5 flex-1">
+                        {displayText}
+                      </p>
+                      {longText && (
+                        <button
+                          className="text-[11px] font-semibold text-[#0070b8] hover:underline mt-2 text-left"
+                          onClick={() => setExpanded(e => ({ ...e, [review.id]: !isExp }))}
+                        >
+                          {isExp ? "Свернуть" : "Читать полностью"}
+                        </button>
+                      )}
                     </div>
-
-                    <StarRating rating={review.rating} />
-
-                    <p className="text-sm text-slate-600 leading-relaxed mt-3 flex-1">
-                      {displayText}
-                    </p>
-                    {longText && (
-                      <button
-                        className="text-[11px] font-semibold text-[#0070b8] hover:underline mt-2 text-left"
-                        onClick={() => setExpanded(e => ({ ...e, [review.id]: !isExp }))}
-                      >
-                        {isExp ? "Свернуть" : "Читать полностью"}
-                      </button>
-                    )}
-                  </div>
-                </FadeIn>
-              );
-            })}
-          </div>
-
-          {!isLoading && visibleCount < reviews.length && (
-            <div className="mt-8 flex justify-center">
-              <button
-                onClick={() => setVisibleCount(c => c + 9)}
-                className="px-6 py-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:border-[#0070b8]/40 hover:text-[#0070b8] transition-colors"
-              >
-                Показать ещё · {Math.min(9, reviews.length - visibleCount)} отзывов
-              </button>
+                  </FadeIn>
+                );
+              })}
             </div>
-          )}
+
+            {hasMore && (
+              <div className="mt-8 flex justify-center">
+                <button
+                  onClick={() => setVisibleCount(c => c + 6)}
+                  className="px-6 py-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:border-[#0070b8]/40 hover:text-[#0070b8] transition-colors"
+                >
+                  Показать ещё · {Math.min(6, reviews.length - visibleCount)} отзывов
+                </button>
+              </div>
+            )}
           </>
         )}
+
       </div>
     </section>
   );
