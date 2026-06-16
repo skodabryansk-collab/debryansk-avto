@@ -4,6 +4,8 @@ import { logger } from "../lib/logger";
 
 const EXCLUDED_PLATFORMS = ["plasopro", "flamp", "yell", "zoon"];
 const API_URL = "https://remake.getloyalty.io/api/v2/reviews";
+const BATCH_LIMIT = 100;
+const TIMEOUT_MS = 15_000;
 
 function normalizeSource(raw: string | undefined): string {
   if (!raw) return "Отзыв";
@@ -15,15 +17,23 @@ function normalizeSource(raw: string | undefined): string {
   return raw;
 }
 
-async function fetchPage(
-  apiKey: string,
-  page: number,
-): Promise<{
-  sourcesMap: Record<string, { platform?: string; link?: string; reviews?: number }> | null;
+function toDateStr(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
+
+type SourcesMap = Record<string, { platform?: string; link?: string; reviews?: number }>;
+
+interface BatchResult {
   items: Record<string, unknown>[];
-}> {
+  sources: SourcesMap | null;
+}
+
+async function fetchBatch(
+  apiKey: string,
+  body: Record<string, unknown>,
+): Promise<BatchResult> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let resp: Response;
   try {
     resp = await fetch(API_URL, {
@@ -33,7 +43,7 @@ async function fetchPage(
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ page }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
   } finally {
@@ -41,21 +51,16 @@ async function fetchPage(
   }
   if (!resp.ok) throw new Error(`GetLoyalty API error: ${resp.status}`);
   const json = (await resp.json()) as Record<string, unknown>;
-  const items = Array.isArray(json.reviews)
+
+  const items: Record<string, unknown>[] = Array.isArray(json.reviews)
     ? (json.reviews as Record<string, unknown>[])
-    : Array.isArray(json)
-      ? (json as Record<string, unknown>[])
-      : Array.isArray((json as Record<string, unknown[]>).data)
-        ? ((json as Record<string, unknown[]>).data as Record<string, unknown>[])
-        : [];
-  const sm =
-    page === 1
-      ? ((json.sources ?? {}) as Record<
-          string,
-          { platform?: string; link?: string; reviews?: number }
-        >)
-      : null;
-  return { sourcesMap: sm, items };
+    : [];
+
+  const sources = json.sources
+    ? (json.sources as SourcesMap)
+    : null;
+
+  return { items, sources };
 }
 
 export interface SyncResult {
@@ -70,57 +75,70 @@ async function syncReviews(cutoffDays: number): Promise<SyncResult> {
   const apiKey = process.env.GETLOYALTY_API_KEY;
   if (!apiKey) throw new Error("GETLOYALTY_API_KEY not set");
 
-  const cutoffTs = Math.floor(Date.now() / 1000) - cutoffDays * 24 * 3600;
+  const dateFrom = toDateStr(new Date(Date.now() - cutoffDays * 24 * 3600 * 1000));
+  const dateTo = toDateStr(new Date());
 
-  let sourcesMap: Record<string, { platform?: string; link?: string; reviews?: number }> = {};
-  const rawList: Record<string, unknown>[] = [];
-  const seenIds = new Set<string>();
-  const MAX_PAGES = 50;
+  logger.info({ dateFrom, dateTo, cutoffDays }, "[reviews-sync] fetching with server-side filters");
 
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const { sourcesMap: sm, items } = await fetchPage(apiKey, page);
-    if (sm) sourcesMap = sm;
-    if (items.length === 0) break;
-
-    /* Detect wrap-around: stop if first item of this page was already seen */
-    if (page > 1 && items.length > 0) {
-      const firstId = String((items[0] as any)?.id ?? "");
-      if (firstId && seenIds.has(firstId)) break;
-    }
-
-    for (const item of items) {
-      const rid = String((item as any)?.id ?? "");
-      if (rid) seenIds.add(rid);
-    }
-
-    rawList.push(...items);
-    const oldestTs = Math.min(
-      ...items.map((r) => (typeof r.date === "number" ? (r.date as number) : 0)),
-    );
-    if (oldestTs > 0 && oldestTs < cutoffTs) break;
+  /* ── 1. Get overall count (no date filter, just sources meta) ─────────── */
+  let sourcesMap: SourcesMap = {};
+  try {
+    const { sources } = await fetchBatch(apiKey, { offset: 0, limit: 1 });
+    if (sources) sourcesMap = sources;
+  } catch (err) {
+    logger.warn({ err }, "[reviews-sync] could not fetch sources meta");
   }
 
-  /* Deduplicate rawList by id (GetLoyalty may repeat entries across pages) */
-  const dedupeMap = new Map<string, Record<string, unknown>>();
-  for (const r of rawList) {
-    const key = String((r.id as string | number) ?? "");
-    if (key && !dedupeMap.has(key)) dedupeMap.set(key, r);
-    else if (!key) dedupeMap.set(`nokey-${dedupeMap.size}`, r);
-  }
-  const deduped = Array.from(dedupeMap.values());
-
-  /* Overall count — all non-excluded platforms (all time, from API meta) */
   const overallCount = Object.values(sourcesMap).reduce((sum, s) => {
     const p = (s.platform ?? "").toLowerCase();
     if (EXCLUDED_PLATFORMS.some((ex) => p.includes(ex))) return sum;
     return sum + (s.reviews ?? 0);
   }, 0);
 
+  /* ── 2. Paginate filtered reviews ─────────────────────────────────────── */
+  const allItems: Record<string, unknown>[] = [];
+  let offset = 0;
+  const MAX_BATCHES = 20; // safety cap: 20 × 100 = 2000 reviews max
+
+  for (let batch = 0; batch < MAX_BATCHES; batch++) {
+    const { items, sources } = await fetchBatch(apiKey, {
+      date_from: dateFrom,
+      date_to: dateTo,
+      rate_from: 4,
+      has_text: 1,
+      offset,
+      limit: BATCH_LIMIT,
+    });
+
+    /* Capture sources from first batch if meta call failed */
+    if (batch === 0 && sources && overallCount === 0) {
+      sourcesMap = sources;
+    }
+
+    logger.info({ batch, offset, returned: items.length }, "[reviews-sync] batch received");
+
+    if (items.length === 0) break;
+    allItems.push(...items);
+    if (items.length < BATCH_LIMIT) break; // last page
+    offset += BATCH_LIMIT;
+  }
+
+  logger.info({ total: allItems.length }, "[reviews-sync] all batches fetched");
+
+  /* ── 3. Deduplicate by external ID ────────────────────────────────────── */
+  const dedupeMap = new Map<string, Record<string, unknown>>();
+  for (const r of allItems) {
+    const key = String((r.id as string | number) ?? "");
+    if (!dedupeMap.has(key)) dedupeMap.set(key, r);
+  }
+  const deduped = Array.from(dedupeMap.values());
+
+  /* ── 4. Upsert into DB ────────────────────────────────────────────────── */
   let upserted = 0;
   let skipped = 0;
 
   for (const r of deduped) {
-    const sourceKey = r.source as string;
+    const sourceKey = r.sources as string; // note: field name is "sources" (hash)
     const sourceInfo = sourcesMap[sourceKey];
     const platform = sourceInfo?.platform ?? sourceKey ?? "";
     const normalizedSource = normalizeSource(platform);
@@ -137,38 +155,19 @@ async function syncReviews(cutoffDays: number): Promise<SyncResult> {
       (r.author as string) ||
       (r.name as string) ||
       "Покупатель";
-    const rating = Number(
-      (r.rate as number) ?? (r.rating as number) ?? (r.score as number) ?? 5,
-    );
-    const text = (
-      (r.text as string) ||
-      (r.content as string) ||
-      (r.body as string) ||
-      ""
-    ).trim();
+
+    const rating = Number((r.rate as number) ?? (r.rating as number) ?? 5);
+
+    const text = ((r.text as string) || "").trim();
+
     const dateRaw = r.date as number | string;
     const dateStr =
       typeof dateRaw === "number"
         ? new Date(dateRaw * 1000).toISOString().split("T")[0]
         : (dateRaw as string) || "";
-    const externalId = String(
-      (r.id as string | number) ?? `${author}-${dateStr}`,
-    );
-    const sourceUrl =
-      sourceInfo?.link || (r.link as string) || null;
 
-    /* Filter: 4–5 ★, non-empty text, within cutoff window */
-    if (rating < 4 || !text) {
-      skipped++;
-      continue;
-    }
-    if (dateStr) {
-      const ts = Math.floor(new Date(dateStr).getTime() / 1000);
-      if (ts < cutoffTs) {
-        skipped++;
-        continue;
-      }
-    }
+    const externalId = String((r.id as string | number) ?? `${author}-${dateStr}`);
+    const sourceUrl = sourceInfo?.link || (r.link as string) || null;
 
     await db.execute(sql`
       INSERT INTO reviews (external_id, author, rating, text, date, source, source_url, synced_at)
@@ -194,7 +193,7 @@ async function syncReviews(cutoffDays: number): Promise<SyncResult> {
     upserted++;
   }
 
-  /* Persist meta (overall count from API, sync timestamp) */
+  /* ── 5. Persist meta ──────────────────────────────────────────────────── */
   await db.execute(sql`
     INSERT INTO reviews_meta (id, overall_count, last_sync_at)
     VALUES (1, ${overallCount}, NOW())
