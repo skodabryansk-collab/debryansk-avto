@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import chatRouter from "./chat";
 import carsRouter from "./cars";
 import newCarsRouter from "./new-cars";
 import featuredRouter from "./featured";
@@ -20,13 +21,16 @@ import adminStatsRouter from "./admin-stats";
 import adminLocationsRouter from "./admin-locations";
 import adminSettingsRouter from "./admin-settings";
 import publicSettingsRouter from "./public-settings";
+import publicReviewsRouter from "./public-reviews";
 import storageRouter from "./storage";
 import carCatalogRouter from "./car-catalog";
 import brandLocationsRouter from "./brand-locations";
+import adminNavigatorRouter from "./admin-navigator";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(chatRouter);
 router.use(carsRouter);
 router.use(newCarsRouter);
 router.use(featuredRouter);
@@ -57,8 +61,12 @@ router.use("/admin/users", adminUsersRouter);
 router.use("/admin/upload", adminUploadRouter);
 router.use("/admin/locations", adminLocationsRouter);
 router.use("/admin/settings", adminSettingsRouter);
+router.use("/admin/navigator", adminNavigatorRouter);
 
 // Public settings
 router.use("/settings", publicSettingsRouter);
+
+// GetLoyalty reviews proxy
+router.use("/reviews", publicReviewsRouter);
 
 export default router;
