@@ -8,6 +8,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import SEO from "@/components/SEO";
 import Layout from "@/components/Layout";
+import { ReviewsSection } from "@/components/ReviewsSection";
 
 /* ─── Types ────────────────────────────────────────────────────────────────── */
 interface ApiBrand {
@@ -171,6 +172,9 @@ export default function AboutPage() {
             </div>
           </div>
         </section>
+
+        {/* Reviews */}
+        <ReviewsSection />
 
         {/* Brands */}
         <section className="py-16 sm:py-24 bg-slate-50 border-t border-slate-100">
