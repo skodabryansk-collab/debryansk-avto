@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/requireAdmin";
-import { syncAllReviews, syncRecentReviews } from "../services/reviews-sync";
+import { syncAllReviews, syncRecentReviews, syncCustomDays } from "../services/reviews-sync";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -57,10 +57,15 @@ router.get("/", async (req, res) => {
 
 /* ── POST /api/admin/reviews/sync ── trigger manual sync ─────────────── */
 router.post("/sync", async (req, res) => {
-  const type: "full" | "recent" = req.body?.type === "recent" ? "recent" : "full";
+  const type: "full" | "recent" | "custom" =
+    req.body?.type === "recent" ? "recent" :
+    req.body?.type === "custom" ? "custom" : "full";
+  const days = Number(req.body?.days ?? 90);
   try {
     const result =
-      type === "full" ? await syncAllReviews() : await syncRecentReviews();
+      type === "recent" ? await syncRecentReviews() :
+      type === "custom" ? await syncCustomDays(days) :
+      await syncAllReviews();
     return res.json({ ok: true, ...result });
   } catch (err) {
     logger.error({ err }, `[admin-reviews] manual ${type} sync failed`);
