@@ -1,8 +1,12 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import path from "path";
+import { existsSync } from "fs";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { registerSitemapRoute } from "./routes/sitemap";
+import { prerenderMiddleware } from "./middleware/prerender";
 
 const app: Express = express();
 
@@ -30,7 +34,29 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
-import path from "path";
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
+registerSitemapRoute(app);
+
+const frontendDist =
+  process.env.FRONTEND_DIST_PATH ||
+  path.resolve(__dirname, "../../debryansk-avto/dist/public");
+
+if (existsSync(frontendDist)) {
+  logger.info({ frontendDist }, "Serving frontend static files");
+
+  app.use(prerenderMiddleware);
+
+  app.use(express.static(frontendDist, { index: false }));
+
+  app.use((_req, res) => {
+    res.sendFile(path.join(frontendDist, "index.html"));
+  });
+} else {
+  logger.info(
+    { frontendDist },
+    "Frontend dist not found — skipping static serving (dev mode)",
+  );
+}
 
 export default app;
