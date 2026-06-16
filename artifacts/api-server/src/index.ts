@@ -4,6 +4,8 @@ import { db, newsTable, brandsTable, usersTable, locationsTable } from "@workspa
 import { sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { runMigration } from "./migration";
+import path from "path";
+import { spawn } from "child_process";
 
 const rawPort = process.env["PORT"];
 
@@ -160,18 +162,108 @@ async function seedDatabase() {
   }
 }
 
+function spawnPrerender(args: string[]): void {
+  if (process.env.PRERENDER_ENABLED !== "true") return;
+  const scriptPath = path.resolve(__dirname, "../scripts/prerender.mjs");
+  const child = spawn(process.execPath, [scriptPath, ...args], {
+    env: { ...process.env },
+    stdio: ["ignore", "pipe", "pipe"],
+    detached: false,
+  });
+  child.stdout?.on("data", (d: Buffer) =>
+    logger.info({ src: "prerender" }, d.toString().trim()),
+  );
+  child.stderr?.on("data", (d: Buffer) =>
+    logger.warn({ src: "prerender" }, d.toString().trim()),
+  );
+  child.on("exit", (code: number | null) => {
+    logger.info({ code, args }, "prerender: script exited");
+    if (code === 0 && process.env.PRERENDER_ENABLED === "true") {
+      import("./middleware/prerender")
+        .then(({ loadPrerenderCacheFromGCS }) => loadPrerenderCacheFromGCS())
+        .catch(err => logger.warn({ err }, "prerender: cache reload after script failed"));
+    }
+  });
+}
+
+async function handlePrerenderAfterSync(
+  stats: import("./services/car-sync").SyncStats,
+): Promise<void> {
+  if (process.env.PRERENDER_ENABLED !== "true") return;
+  try {
+    const { deletePrerendered } = await import("./lib/prerenderStorage");
+    const { deletePrerenderCache } = await import("./middleware/prerender");
+
+    for (const car of stats.removedCars) {
+      const route =
+        car.type === "new"
+          ? `/new-cars/${encodeURIComponent(car.externalId)}`
+          : `/cars/${encodeURIComponent(car.externalId)}`;
+      await deletePrerendered(route);
+      deletePrerenderCache(route);
+      logger.info({ route }, "prerender: marked removed car as gone");
+    }
+
+    if (stats.added > 0 || stats.updated > 0) {
+      spawnPrerender(["--cars-only"]);
+    }
+  } catch (err) {
+    logger.warn({ err }, "prerender: post-sync handler failed");
+  }
+}
+
 async function main() {
   // Run migration first to fix schema mismatches
   await runMigration();
   // Then seed data
   await seedDatabase();
+
+  // Initial car sync (non-blocking)
+  import("./services/car-sync").then(({ syncCars }) => {
+    syncCars()
+      .then(stats => {
+        logger.info(stats, "Startup car sync complete");
+        handlePrerenderAfterSync(stats);
+      })
+      .catch(err => logger.warn({ err }, "Startup car sync failed"));
+
+    // Sync every 30 minutes
+    setInterval(() => {
+      syncCars()
+        .then(stats => {
+          logger.info(stats, "Scheduled car sync complete");
+          handlePrerenderAfterSync(stats);
+        })
+        .catch(err => logger.warn({ err }, "Scheduled car sync failed"));
+    }, 30 * 60 * 1000);
+  }).catch(err => logger.warn({ err }, "Car sync module load failed"));
+
+  // Warm Navigator context cache on startup so the first user doesn't hit a cold cache
+  import("./routes/chat").then(({ warmContext }) => {
+    warmContext()
+      .then(() => logger.info("Navigator context cache warmed"))
+      .catch(err => logger.warn({ err }, "Navigator context cache warmup failed"));
+  }).catch(err => logger.warn({ err }, "Chat module load failed"));
+
   // Start server
-  app.listen(port, (err) => {
-    if (err) {
-      logger.error({ err }, "Error listening on port");
-      process.exit(1);
-    }
+  app.listen(port, () => {
     logger.info({ port }, "Server listening");
+
+    if (process.env.PRERENDER_ENABLED === "true") {
+      import("./middleware/prerender")
+        .then(async ({ loadPrerenderCacheFromGCS }) => {
+          const { countPrerendered } = await import("./lib/prerenderStorage");
+          const count = await countPrerendered();
+          if (count === 0) {
+            logger.info("prerender: GCS cache is empty — triggering full prerender");
+            spawnPrerender([]);
+          } else {
+            logger.info({ count }, "prerender: loading existing cache from GCS");
+            await loadPrerenderCacheFromGCS();
+          }
+        })
+        .catch(err => logger.warn({ err }, "prerender: startup init failed"));
+    }
   });
 }
 
