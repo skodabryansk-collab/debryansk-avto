@@ -1,8 +1,13 @@
-import { db, carsTable } from "@workspace/db";
+import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { getUsedCars } from "../routes/cars";
 import { getNewCars } from "../routes/new-cars";
+
+export interface RemovedCar {
+  externalId: string;
+  type: "new" | "used";
+}
 
 export interface SyncStats {
   added: number;
@@ -10,6 +15,8 @@ export interface SyncStats {
   removed: number;
   total: number;
   durationMs: number;
+  addedOrUpdatedExternalIds: string[];
+  removedCars: RemovedCar[];
 }
 
 export async function syncCars(): Promise<SyncStats> {
@@ -21,7 +28,7 @@ export async function syncCars(): Promise<SyncStats> {
   ]);
 
   if (!usedCars.length && !newCars.length) {
-    return { added: 0, updated: 0, removed: 0, total: 0, durationMs: Date.now() - startedAt };
+    return { added: 0, updated: 0, removed: 0, total: 0, durationMs: Date.now() - startedAt, addedOrUpdatedExternalIds: [], removedCars: [] };
   }
 
   const countBefore = await db.execute(sql`SELECT COUNT(*)::int AS cnt FROM cars`)
@@ -79,6 +86,11 @@ export async function syncCars(): Promise<SyncStats> {
 
   for (const c of newCars) {
     allExternalIds.push(c.id);
+    // image_url policy: use first image from feed when available; on conflict keep
+    // the existing non-NULL image_url rather than overwriting it with NULL — this
+    // prevents transient feed gaps (supplier forgot to upload a photo) from
+    // permanently erasing a photo we already have.
+    const imageUrl = c.images[0] ?? null;
     await db.execute(sql`
       INSERT INTO cars (external_id, type, brand, model, year, color, price, mileage,
                         body_type, modification, complectation, extras, description,
@@ -87,7 +99,7 @@ export async function syncCars(): Promise<SyncStats> {
       VALUES (
         ${c.id}, 'new', ${c.mark}, ${c.model}, ${c.year}, ${c.color}, ${c.price},
         0, ${c.bodyType}, ${c.modification}, ${c.complectation},
-        ${c.extras || null}, ${c.description || null}, ${c.images[0] ?? null},
+        ${c.extras || null}, ${c.description || null}, ${imageUrl},
         ${c.vin || null}, ${c.dealer},
         ${c.maxDiscount}, ${c.creditDiscount}, ${c.tradeinDiscount}, NOW()
       )
@@ -101,7 +113,7 @@ export async function syncCars(): Promise<SyncStats> {
         complectation = EXCLUDED.complectation,
         extras = EXCLUDED.extras,
         description = EXCLUDED.description,
-        image_url = EXCLUDED.image_url,
+        image_url = COALESCE(EXCLUDED.image_url, cars.image_url),
         vin = EXCLUDED.vin,
         dealer = EXCLUDED.dealer,
         max_discount = EXCLUDED.max_discount,
@@ -112,12 +124,16 @@ export async function syncCars(): Promise<SyncStats> {
   }
 
   let removed = 0;
+  const removedCars: RemovedCar[] = [];
   if (allExternalIds.length > 0) {
     const idList = allExternalIds.map(id => `'${id.replace(/'/g, "''")}'`).join(",");
     const removeResult = await db.execute(
-      sql.raw(`DELETE FROM cars WHERE external_id NOT IN (${idList}) RETURNING id`)
+      sql.raw(`DELETE FROM cars WHERE external_id NOT IN (${idList}) RETURNING external_id, type`)
     ).catch(() => ({ rows: [] }));
     removed = removeResult.rows.length;
+    for (const row of removeResult.rows as { external_id: string; type: "new" | "used" }[]) {
+      if (row.external_id) removedCars.push({ externalId: row.external_id, type: row.type ?? "used" });
+    }
   }
 
   const countAfter = await db.execute(sql`SELECT COUNT(*)::int AS cnt FROM cars`)
@@ -133,6 +149,8 @@ export async function syncCars(): Promise<SyncStats> {
     removed,
     total: countAfter,
     durationMs: Date.now() - startedAt,
+    addedOrUpdatedExternalIds: allExternalIds,
+    removedCars,
   };
 
   logger.info(stats, "car-sync: completed");
