@@ -37,10 +37,12 @@ router.get("/", async (_req, res) => {
         return { ...brand, carCount: usedCount };
       }
 
-      const firstWord = nameLower.split(/[\s-]+/)[0];
+      // Bidirectional contains check (ILIKE equivalent):
+      // either the car mark contains the brand name, or the brand name contains the mark.
+      // This correctly handles e.g. "Haval City"↔"haval" and "JAECOO"↔"jaecoo".
       let count = 0;
       for (const [markKey, cnt] of Object.entries(newCounts)) {
-        if (markKey.includes(firstWord) || firstWord.includes(markKey)) {
+        if (nameLower.includes(markKey) || markKey.includes(nameLower)) {
           count += cnt;
         }
       }
