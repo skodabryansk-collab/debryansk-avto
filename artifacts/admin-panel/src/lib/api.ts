@@ -100,6 +100,25 @@ export function createUser(data: Omit<User, "id" | "createdAt" | "updatedAt">) {
 export function updateUser(id: number, data: Partial<User>) { return api<User>("PUT", `/admin/users/${id}`, data); }
 export function deleteUser(id: number) { return api<{ ok: true }>("DELETE", `/admin/users/${id}`); }
 
+/* Reviews */
+export interface AdminReview {
+  id: number; external_id: string; author: string; rating: number;
+  text: string; date: string | null; source: string | null; source_url: string | null;
+  synced_at: string;
+}
+export interface ReviewsMeta {
+  data: AdminReview[]; total: number; avg: number; overallCount: number;
+  lastSyncAt: string | null; page: number; pages: number;
+}
+export function getAdminReviews(page = 1) {
+  return api<ReviewsMeta>("GET", `/admin/reviews?page=${page}`);
+}
+export function syncReviews(type: "full" | "recent" = "full") {
+  return api<{ ok: boolean; upserted: number; skipped: number; overallCount: number; durationMs: number }>(
+    "POST", "/admin/reviews/sync", { type }
+  );
+}
+
 /* Locations */
 export interface LocationBrandItem {
   id: number; name: string; logoUrl: string | null; bgColor: string | null;
@@ -129,6 +148,52 @@ export function removeBrandFromLocation(locationId: number, brandId: number) {
 export interface SiteSettings { header_phone?: string; [key: string]: string | undefined; }
 export function getSettings() { return api<{ ok: true; data: SiteSettings }>("GET", "/admin/settings").then(r => r.data); }
 export function updateSetting(key: string, value: string) { return api<{ ok: true }>("PUT", `/admin/settings/${key}`, { value }); }
+
+/* Navigator — chat history (Task #94) */
+export interface ChatListItem {
+  id: number;
+  session_id: string | null;
+  created_at: string;
+  consented_at: string | null;
+  msg_count: number;
+  rated_count: number;
+  avg_rating: number | null;
+}
+export interface ChatDetail {
+  conversation: Record<string, unknown>;
+  messages: {
+    id: number; role: string; content: string;
+    car_ids: string | null; rating: number | null; created_at: string;
+  }[];
+}
+export function getChats() {
+  return api<{ ok: true; data: ChatListItem[] }>("GET", "/admin/navigator/chats").then(r => r.data);
+}
+export function getChatDetail(id: number) {
+  return api<{ ok: true; data: ChatDetail }>("GET", `/admin/navigator/chats/${id}`).then(r => r.data);
+}
+export async function exportChatsJsonl() {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/admin/navigator/chats/export-jsonl`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Export failed");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "navigator-finetune.jsonl";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+export function syncCars() {
+  return api<{ ok: true; added: number; updated: number; removed: number; total: number; durationMs: number }>(
+    "POST", "/admin/navigator/sync-cars"
+  );
+}
+export function getSyncStatus() {
+  return api<{ ok: true; total: number; lastSynced: string | null }>("GET", "/admin/navigator/sync-status");
+}
 
 /* Upload - Object Storage (GCS) */
 export async function uploadFile(file: File): Promise<string> {
