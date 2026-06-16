@@ -1,4 +1,7 @@
 import { Router, type IRouter } from "express";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -27,6 +30,50 @@ function normalizeSource(raw: string | undefined): string {
   if (s.includes("2gis") || s.includes("2gis") || s.includes("2гис")) return "2ГИС";
   return raw;
 }
+
+/* ── DB persistence ─────────────────────────────────────────────────────────── */
+async function loadCacheFromDB(): Promise<void> {
+  try {
+    const result = await db.execute(sql`
+      SELECT data, avg, total, overall_count, EXTRACT(EPOCH FROM fetched_at) * 1000 AS fetched_ms
+      FROM reviews_cache WHERE id = 1
+    `);
+    if (result.rows.length > 0) {
+      const row = result.rows[0] as { data: Review[]; avg: string; total: string; overall_count: string; fetched_ms: string };
+      cache = {
+        data: row.data as Review[],
+        avg: Number(row.avg),
+        total: Number(row.total),
+        overallCount: Number(row.overall_count),
+        fetchedAt: Number(row.fetched_ms),
+      };
+      logger.info(`[reviews] Loaded ${cache.data.length} reviews from DB cache (fetched ${new Date(cache.fetchedAt).toISOString()})`);
+    }
+  } catch (err) {
+    logger.warn({ err }, "[reviews] Failed to load cache from DB");
+  }
+}
+
+async function saveCacheToDB(entry: CacheEntry): Promise<void> {
+  try {
+    await db.execute(sql`
+      INSERT INTO reviews_cache (id, data, avg, total, overall_count, fetched_at)
+      VALUES (1, ${JSON.stringify(entry.data)}::jsonb, ${entry.avg}, ${entry.total}, ${entry.overallCount}, to_timestamp(${entry.fetchedAt / 1000}))
+      ON CONFLICT (id) DO UPDATE SET
+        data = EXCLUDED.data,
+        avg = EXCLUDED.avg,
+        total = EXCLUDED.total,
+        overall_count = EXCLUDED.overall_count,
+        fetched_at = EXCLUDED.fetched_at
+    `);
+    logger.info(`[reviews] Saved ${entry.data.length} reviews to DB cache`);
+  } catch (err) {
+    logger.warn({ err }, "[reviews] Failed to save cache to DB");
+  }
+}
+
+/* Load on startup (non-blocking) */
+loadCacheFromDB();
 
 /* ── Fetch from GetLoyalty ─────────────────────────────────────────────────── */
 async function fetchFromGetLoyalty(): Promise<CacheEntry> {
@@ -132,9 +179,10 @@ router.get("/", async (_req, res) => {
 
     const entry = await fetchFromGetLoyalty();
     cache = entry;
+    saveCacheToDB(entry); /* fire-and-forget */
     return res.json({ ok: true, data: entry.data, avg: entry.avg, total: entry.total, overallCount: entry.overallCount, cached: false });
   } catch (err) {
-    console.error("[reviews]", String(err));
+    logger.error({ err }, "[reviews]");
     /* Stale cache fallback — serve last known data when GetLoyalty is down */
     if (cache) {
       return res.json({ ok: true, data: cache.data, avg: cache.avg, total: cache.total, overallCount: cache.overallCount, cached: true, stale: true });
