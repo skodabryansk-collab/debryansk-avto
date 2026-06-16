@@ -15,13 +15,13 @@ export interface ApiReview {
 }
 
 /* ── Fetch ────────────────────────────────────────────────── */
-export async function fetchReviews(): Promise<{ data: ApiReview[]; avg: number; total: number }> {
+export async function fetchReviews(): Promise<{ data: ApiReview[]; avg: number; total: number; overallCount: number }> {
   const r = await fetch("/api/reviews");
-  if (!r.ok) return { data: [], avg: 5, total: 0 };
+  if (!r.ok) return { data: [], avg: 5, total: 0, overallCount: 0 };
   const json = await r.json();
   return json.ok
-    ? { data: json.data ?? [], avg: json.avg ?? 5, total: json.total ?? 0 }
-    : { data: [], avg: 5, total: 0 };
+    ? { data: json.data ?? [], avg: json.avg ?? 5, total: json.total ?? 0, overallCount: json.overallCount ?? 0 }
+    : { data: [], avg: 5, total: 0, overallCount: 0 };
 }
 
 /* ── Helpers ──────────────────────────────────────────────── */
@@ -96,6 +96,7 @@ export const ReviewsSection = () => {
   const reviews = reviewsData?.data ?? [];
   const avg = reviewsData?.avg ?? 5;
   const total = reviewsData?.total ?? 0;
+  const overallCount = reviewsData?.overallCount ?? 0;
 
   const [expanded, setExpanded] = React.useState<Record<string | number, boolean>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -115,12 +116,12 @@ export const ReviewsSection = () => {
           <div>
             <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Нам доверяют</p>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Отзывы покупателей</h2>
-            {!isLoading && total > 0 && (
+            {!isLoading && overallCount > 0 && (
               <div className="flex items-center gap-2 mt-2">
                 <StarRating rating={Math.round(avg)} />
                 <span className="text-sm font-bold text-slate-700">{avg.toFixed(1)}</span>
                 <span className="text-xs text-slate-400">·</span>
-                <span className="text-xs text-slate-500">{total} отзыв{total === 1 ? "" : total < 5 ? "а" : "ов"}</span>
+                <span className="text-xs text-slate-500">{overallCount.toLocaleString("ru-RU")} отзыв{overallCount % 10 === 1 && overallCount % 100 !== 11 ? "" : overallCount % 10 >= 2 && overallCount % 10 <= 4 && (overallCount % 100 < 10 || overallCount % 100 >= 20) ? "а" : "ов"} за всё время</span>
               </div>
             )}
           </div>
