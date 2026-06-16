@@ -125,16 +125,29 @@ export async function syncCars(): Promise<SyncStats> {
 
   let removed = 0;
   const removedCars: RemovedCar[] = [];
-  if (allExternalIds.length > 0) {
-    const idList = allExternalIds.map(id => `'${id.replace(/'/g, "''")}'`).join(",");
-    const removeResult = await db.execute(
-      sql.raw(`DELETE FROM cars WHERE external_id NOT IN (${idList}) RETURNING external_id, type`)
-    ).catch(() => ({ rows: [] }));
-    removed = removeResult.rows.length;
-    for (const row of removeResult.rows as { external_id: string; type: "new" | "used" }[]) {
-      if (row.external_id) removedCars.push({ externalId: row.external_id, type: row.type ?? "used" });
+
+  /* Delete stale cars PER TYPE so that a feed outage (0 cars returned) for one
+     type never wipes out cars of that type from the database.
+     Only delete within a type when we actually received at least 1 car from that feed. */
+  const deleteByType = async (type: "new" | "used", ids: string[]) => {
+    if (ids.length === 0) {
+      logger.warn({ type }, "car-sync: skipping delete — feed returned 0 cars, likely a transient outage");
+      return;
     }
-  }
+    const idList = ids.map(id => `'${id.replace(/'/g, "''")}'`).join(",");
+    const result = await db.execute(
+      sql.raw(`DELETE FROM cars WHERE type = '${type}' AND external_id NOT IN (${idList}) RETURNING external_id, type`)
+    ).catch(() => ({ rows: [] }));
+    removed += result.rows.length;
+    for (const row of result.rows as { external_id: string; type: "new" | "used" }[]) {
+      if (row.external_id) removedCars.push({ externalId: row.external_id, type: row.type ?? type });
+    }
+  };
+
+  const usedIds = usedCars.map(c => c.id);
+  const newIds  = newCars.map(c => c.id);
+  await deleteByType("used", usedIds);
+  await deleteByType("new",  newIds);
 
   const countAfter = await db.execute(sql`SELECT COUNT(*)::int AS cnt FROM cars`)
     .then(r => Number((r.rows[0] as any)?.cnt ?? 0))
