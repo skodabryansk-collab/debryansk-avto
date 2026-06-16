@@ -44,6 +44,8 @@ export interface NewCarRecord {
 let cache: { data: NewCarRecord[]; ts: number } | null = null;
 const CACHE_TTL = 30 * 60 * 1000;
 
+export function clearNewCarsCache() { cache = null; }
+
 function getField(xml: string, field: string): string {
   const m = xml.match(new RegExp(`<${field}[^>]*>([\\s\\S]*?)<\\/${field}>`));
   return m ? m[1].trim() : "";
