@@ -33,6 +33,10 @@ localPort = 8082
 externalPort = 3001
 
 [[ports]]
+localPort = 18099
+externalPort = 5000
+
+[[ports]]
 localPort = 19052
 externalPort = 3000
 
@@ -54,6 +58,8 @@ SMTP_HOST = "smtp.timeweb.ru"
 SMTP_PORT = "465"
 SMTP_USER = "sales@debryansk-auto.ru"
 SMTP_TO = "sales@debryansk-auto.ru"
+PRERENDER_ENABLED = "true"
+PRERENDER_SITE_URL = "http://localhost:8080"
 
 [nix]
 channel = "stable-25_05"
