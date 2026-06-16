@@ -157,6 +157,86 @@ export async function runMigration() {
     `);
     logger.info("site_settings schema ready (idempotent)");
 
+    // Conversations + messages tables for Navigator chat history (Task #94)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS conversations (
+        id SERIAL PRIMARY KEY,
+        session_id TEXT UNIQUE,
+        title TEXT NOT NULL DEFAULT 'Чат',
+        consented_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        car_ids TEXT,
+        rating INTEGER,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      )
+    `);
+
+    // Cars table for XML sync + richer chat context (Task #96)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cars (
+        id SERIAL PRIMARY KEY,
+        external_id TEXT NOT NULL UNIQUE,
+        type TEXT NOT NULL,
+        brand TEXT,
+        model TEXT,
+        year INTEGER,
+        color TEXT,
+        price INTEGER,
+        mileage INTEGER DEFAULT 0,
+        body_type TEXT,
+        modification TEXT,
+        complectation TEXT,
+        extras TEXT,
+        description TEXT,
+        image_url TEXT,
+        vin TEXT,
+        dealer TEXT,
+        synced_at TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS owners_number integer`);
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS max_discount integer NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS credit_discount integer NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS tradein_discount integer NOT NULL DEFAULT 0`);
+
+    // Normalize brand names — CM.Expert feeds sometimes export marks in UPPERCASE.
+    // Running these UPDATEs on every boot is safe (idempotent once rows are fixed).
+    await db.execute(sql`UPDATE cars SET brand = 'Chery'      WHERE brand = 'CHERY'`);
+    await db.execute(sql`UPDATE cars SET brand = 'Tenet'      WHERE brand = 'TENET'`);
+    await db.execute(sql`UPDATE cars SET brand = 'Great Wall' WHERE brand = 'GREAT WALL'`);
+    await db.execute(sql`UPDATE cars SET brand = 'Haval'      WHERE brand = 'HAVAL'`);
+    await db.execute(sql`UPDATE cars SET brand = 'Jaecoo'     WHERE brand = 'JAECOO'`);
+    await db.execute(sql`UPDATE cars SET brand = 'Jetour'     WHERE brand = 'JETOUR'`);
+    await db.execute(sql`UPDATE cars SET brand = 'Omoda'      WHERE brand = 'OMODA'`);
+    await db.execute(sql`UPDATE cars SET brand = 'Exeed'      WHERE brand = 'EXEED'`);
+    await db.execute(sql`UPDATE cars SET brand = 'Tank'       WHERE brand = 'TANK'`);
+
+    logger.info("Navigator schema ready (conversations, messages, cars — idempotent)");
+
+    // Reviews persistent cache — survives server restarts / redeploys
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS reviews_cache (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        data JSONB NOT NULL DEFAULT '[]',
+        avg FLOAT NOT NULL DEFAULT 5,
+        total INTEGER NOT NULL DEFAULT 0,
+        overall_count INTEGER NOT NULL DEFAULT 0,
+        fetched_at TIMESTAMPTZ DEFAULT NOW(),
+        CONSTRAINT reviews_cache_single_row CHECK (id = 1)
+      )
+    `);
+    logger.info("reviews_cache schema ready (idempotent)");
+
   } catch (err) {
     logger.error({ err }, "Migration error");
   }
