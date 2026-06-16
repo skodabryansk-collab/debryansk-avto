@@ -237,6 +237,30 @@ export async function runMigration() {
     `);
     logger.info("reviews_cache schema ready (idempotent)");
 
+    // Individual reviews rows (replaces single-blob reviews_cache)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS reviews (
+        id SERIAL PRIMARY KEY,
+        external_id TEXT NOT NULL UNIQUE,
+        author TEXT NOT NULL,
+        rating INTEGER NOT NULL DEFAULT 5,
+        text TEXT NOT NULL DEFAULT '',
+        date DATE,
+        source TEXT,
+        source_url TEXT,
+        synced_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS reviews_meta (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        overall_count INTEGER NOT NULL DEFAULT 0,
+        last_sync_at TIMESTAMPTZ DEFAULT NOW(),
+        CONSTRAINT reviews_meta_single_row CHECK (id = 1)
+      )
+    `);
+    logger.info("reviews + reviews_meta schema ready (idempotent)");
+
   } catch (err) {
     logger.error({ err }, "Migration error");
   }
