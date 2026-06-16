@@ -33,42 +33,54 @@ async function fetchFromGetLoyalty(): Promise<CacheEntry> {
   const apiKey = process.env.GETLOYALTY_API_KEY;
   if (!apiKey) throw new Error("GETLOYALTY_API_KEY not set");
 
-  const url = "https://remake.getloyalty.io/platform/reviews?per_page=50&sort=date&order=desc";
+  const url = "https://remake.getloyalty.io/api/v2/reviews";
   const resp = await fetch(url, {
+    method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
       "Accept": "application/json",
       "Content-Type": "application/json",
     },
+    body: JSON.stringify({}),
   });
 
   if (!resp.ok) throw new Error(`GetLoyalty API error: ${resp.status}`);
   const json = await resp.json() as Record<string, unknown>;
 
-  /* Flatten response — try common shapes: {data:[...]}, {reviews:[...]}, [...] */
+  /* GetLoyalty v2 response: { sources: { [key]: {platform, link, filials} }, reviews: [...] } */
+  const sourcesMap = (json.sources ?? {}) as Record<string, { platform?: string; link?: string; filials?: string[] }>;
+
   let rawList: Record<string, unknown>[] = [];
-  if (Array.isArray(json)) {
+  if (Array.isArray(json.reviews)) {
+    rawList = json.reviews as Record<string, unknown>[];
+  } else if (Array.isArray(json)) {
     rawList = json as Record<string, unknown>[];
   } else if (Array.isArray((json as Record<string, unknown[]>).data)) {
     rawList = (json as Record<string, unknown[]>).data as Record<string, unknown>[];
-  } else if (Array.isArray((json as Record<string, unknown[]>).reviews)) {
-    rawList = (json as Record<string, unknown[]>).reviews as Record<string, unknown>[];
-  } else if (json.data && typeof json.data === "object" && !Array.isArray(json.data)) {
-    /* paginated: {data:{data:[...]}} */
-    const inner = (json.data as Record<string, unknown>).data;
-    if (Array.isArray(inner)) rawList = inner as Record<string, unknown>[];
   }
 
   /* Normalize each review */
-  const all: Review[] = rawList.map((r, i) => ({
-    id: (r.id as string | number) ?? i,
-    author: (r.author as string) || (r.name as string) || (r.reviewer as string) || "Покупатель",
-    rating: Number((r.rating as number) ?? (r.rate as number) ?? (r.score as number) ?? 5),
-    text: (r.text as string) || (r.content as string) || (r.body as string) || (r.comment as string) || "",
-    date: (r.date as string) || (r.created_at as string) || (r.published_at as string) || "",
-    source: normalizeSource((r.source as string) || (r.platform as string) || (r.source_name as string)),
-    sourceUrl: (r.url as string) || (r.link as string) || undefined,
-  }));
+  const all: Review[] = rawList.map((r, i) => {
+    const sourceKey = r.source as string;
+    const sourceInfo = sourcesMap[sourceKey];
+    const platform = sourceInfo?.platform ?? sourceKey ?? "";
+    const user = r.user as Record<string, unknown> | undefined;
+    const authorName = (user?.name as string) || (r.author as string) || (r.name as string) || "Покупатель";
+    const ratingRaw = (r.rate as number) ?? (r.rating as number) ?? (r.score as number) ?? 5;
+    const dateRaw = r.date as number | string;
+    const dateStr = typeof dateRaw === "number"
+      ? new Date(dateRaw * 1000).toISOString().split("T")[0]
+      : (dateRaw as string) || "";
+    return {
+      id: (r.id as string | number) ?? i,
+      author: authorName,
+      rating: Number(ratingRaw),
+      text: (r.text as string) || (r.content as string) || (r.body as string) || "",
+      date: dateStr,
+      source: normalizeSource(platform),
+      sourceUrl: sourceInfo?.link || (r.link as string) || undefined,
+    };
+  });
 
   /* Keep only positive reviews (4–5 stars), non-empty text */
   const positive = all.filter(r => r.rating >= 4 && r.text.trim().length > 0);
