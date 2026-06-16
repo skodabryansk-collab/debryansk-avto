@@ -80,11 +80,11 @@ async function syncReviews(cutoffDays: number): Promise<SyncResult> {
 
   logger.info({ dateFrom, dateTo, cutoffDays }, "[reviews-sync] fetching with server-side filters");
 
-  /* ── 1. Get overall count (no date filter, just sources meta) ─────────── */
+  /* ── 1. Get overall count via unfiltered meta request ────────────────── */
   let sourcesMap: SourcesMap = {};
   try {
     const { sources } = await fetchBatch(apiKey, { offset: 0, limit: 1 });
-    if (sources) sourcesMap = sources;
+    if (sources) sourcesMap = { ...sourcesMap, ...sources };
   } catch (err) {
     logger.warn({ err }, "[reviews-sync] could not fetch sources meta");
   }
@@ -110,10 +110,8 @@ async function syncReviews(cutoffDays: number): Promise<SyncResult> {
       limit: BATCH_LIMIT,
     });
 
-    /* Capture sources from first batch if meta call failed */
-    if (batch === 0 && sources && overallCount === 0) {
-      sourcesMap = sources;
-    }
+    /* Merge sources from every batch to build complete hash→platform map */
+    if (sources) sourcesMap = { ...sourcesMap, ...sources };
 
     logger.info({ batch, offset, returned: items.length }, "[reviews-sync] batch received");
 
@@ -138,7 +136,7 @@ async function syncReviews(cutoffDays: number): Promise<SyncResult> {
   let skipped = 0;
 
   for (const r of deduped) {
-    const sourceKey = r.sources as string; // note: field name is "sources" (hash)
+    const sourceKey = r.source as string; // hash key into sourcesMap
     const sourceInfo = sourcesMap[sourceKey];
     const platform = sourceInfo?.platform ?? sourceKey ?? "";
     const normalizedSource = normalizeSource(platform);
