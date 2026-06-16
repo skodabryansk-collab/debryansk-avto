@@ -90,7 +90,7 @@ export const ReviewsSection = () => {
     queryKey: ["reviews"],
     queryFn: fetchReviews,
     staleTime: 30 * 60 * 1000,
-    retry: 1,
+    retry: 0,
   });
 
   const reviews = reviewsData?.data ?? [];
