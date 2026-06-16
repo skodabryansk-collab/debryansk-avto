@@ -82,8 +82,13 @@ async function fetchFromGetLoyalty(): Promise<CacheEntry> {
     };
   });
 
-  /* Keep only positive reviews (4–5 stars), non-empty text */
-  const positive = all.filter(r => r.rating >= 4 && r.text.trim().length > 0);
+  /* Keep only positive reviews (4–5 stars), non-empty text, exclude plasopro */
+  const EXCLUDED_PLATFORMS = ["plasopro", "flamp", "yell", "zoon"];
+  const positive = all.filter(r =>
+    r.rating >= 4 &&
+    r.text.trim().length > 0 &&
+    !EXCLUDED_PLATFORMS.some(p => (r.source ?? "").toLowerCase().includes(p))
+  );
 
   const avg = positive.length > 0
     ? Math.round((positive.reduce((s, r) => s + r.rating, 0) / positive.length) * 10) / 10
