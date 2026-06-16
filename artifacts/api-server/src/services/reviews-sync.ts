@@ -221,3 +221,11 @@ export async function syncRecentReviews(): Promise<SyncResult> {
   logger.info(result, "[reviews-sync] Recent sync complete");
   return result;
 }
+
+export async function syncCustomDays(days: number): Promise<SyncResult> {
+  const d = Math.max(1, Math.min(365, days));
+  logger.info({ days: d }, "[reviews-sync] Starting custom sync");
+  const result = await syncReviews(d);
+  logger.info(result, "[reviews-sync] Custom sync complete");
+  return result;
+}
