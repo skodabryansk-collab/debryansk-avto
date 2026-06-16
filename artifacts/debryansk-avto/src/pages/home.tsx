@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
+import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { Link } from "wouter";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
@@ -6,7 +8,7 @@ import { YandexMap, type YandexMapHandle } from "@/components/YandexMap";
 import {
   Car, RotateCcw, ArrowLeftRight, CreditCard, FileText, Shield,
   Wrench, Hammer, Building2, MapPin, Phone, Clock, Search,
-  Menu, X, ArrowRight, ChevronRight, Sparkles, ChevronLeft,
+  Menu, X, ArrowRight, ChevronRight, ChevronDown, Sparkles, ChevronLeft,
   Package, Users, Banknote, Navigation, MapPinned, ArrowUpRight,
   Heart, Scale
 } from "lucide-react";
@@ -28,6 +30,7 @@ import {
 } from "@/components/ui/form";
 
 import logoPng from "@/assets/logo-optimized.webp";
+import ChatWidget from "@/components/ChatWidget";
 import logoWhiteSvg from "@/assets/logo-white.svg";
 import miniLogo from "@/assets/mini-logo.webp";
 import heroDynamic from "../assets/hero-showroom-1.webp";
@@ -105,6 +108,7 @@ interface ApiBrand {
   bgColor: string | null;
   subName: string | null;
   isServiceOnly?: boolean;
+  carCount?: number;
 }
 
 async function fetchBrands(): Promise<ApiBrand[]> {
@@ -117,7 +121,7 @@ async function fetchBrands(): Promise<ApiBrand[]> {
 /* ── Form schema ─────────────────────────────────────────── */
 const formSchema = z.object({
   name: z.string().min(2, "Введите ваше имя"),
-  phone: z.string().min(10, "Введите корректный номер телефона"),
+  phone: z.string().refine(v => isPhoneValid(v), "Введите корректный номер (+7 ...)"),
   message: z.string().optional(),
 });
 
@@ -248,6 +252,8 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
                     <FormLabel className="text-slate-600 font-semibold">Телефон</FormLabel>
                     <FormControl>
                       <Input placeholder="+7 (___) ___-__-__" {...field}
+                        type="tel" inputMode="tel" maxLength={18}
+                        onChange={e => field.onChange(formatPhone(e.target.value))}
                         className="bg-slate-50 border-slate-200 rounded-xl h-12 focus-visible:ring-[#0070b8]" />
                     </FormControl>
                     <FormMessage />
@@ -593,6 +599,7 @@ function UsedCarsSection() {
 /* ══════════════════════════════════════════════════════════ */
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [carsDropdown, setCarsDropdown] = useState(false);
   const [modal, setModal] = useState<ModalType | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const [activeCardId, setActiveCardId] = useState<number | null>(null);
@@ -829,6 +836,27 @@ export default function Home() {
           </motion.button>
 
           <nav className="hidden lg:flex items-center gap-0.5 ml-2">
+            {/* Автомобили dropdown */}
+            <div className="relative" onMouseLeave={() => setCarsDropdown(false)}>
+              <button
+                onMouseEnter={() => setCarsDropdown(true)}
+                onClick={() => setCarsDropdown(v => !v)}
+                className="flex items-center gap-1 px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+                Автомобили <ChevronDown className={`w-3.5 h-3.5 transition-transform ${carsDropdown ? "rotate-180" : ""}`} />
+              </button>
+              {carsDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-44 bg-[#1a1d23] border border-white/10 rounded-xl shadow-xl py-1 z-50">
+                  <Link href="/new-cars" onClick={() => setCarsDropdown(false)}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white/70 hover:text-white hover:bg-white/8 transition-colors">
+                    <Car className="w-4 h-4 text-[#0070b8]" /> Новые автомобили
+                  </Link>
+                  <Link href="/cars" onClick={() => setCarsDropdown(false)}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white/70 hover:text-white hover:bg-white/8 transition-colors">
+                    <RotateCcw className="w-4 h-4 text-[#0070b8]" /> С пробегом
+                  </Link>
+                </div>
+              )}
+            </div>
             {[["О группе","about","/about"],["Дилеры","dealers","#dealers"],["Услуги","services","/service"],["Выкуп","buyout","/buyout"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
               href.startsWith("/") ? (
                 <Link key={id} href={href}
@@ -885,6 +913,14 @@ export default function Home() {
               exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
               className="overflow-hidden border-t border-white/[0.07] bg-[#111317]">
               <div className="px-4 py-3 flex flex-col gap-0.5">
+                <Link href="/new-cars" onClick={() => setMobileMenuOpen(false)}
+                  className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors flex items-center gap-2">
+                  <Car className="w-4 h-4 text-[#0070b8]" /> Новые автомобили
+                </Link>
+                <Link href="/cars" onClick={() => setMobileMenuOpen(false)}
+                  className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors flex items-center gap-2">
+                  <RotateCcw className="w-4 h-4 text-[#0070b8]" /> Автомобили с пробегом
+                </Link>
                 {[["О группе","about","/about"],["Дилеры","dealers","#dealers"],["Услуги","services","/service"],["Выкуп","buyout","/buyout"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
                   href.startsWith("/") ? (
                     <Link key={id} href={href}
@@ -1100,6 +1136,12 @@ export default function Home() {
                       {b.isServiceOnly && (
                         <span className="absolute bottom-2.5 left-3 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-[#0070b8] bg-[#0070b8]/10 border border-[#0070b8]/20 rounded-md px-1.5 py-0.5 leading-none">
                           Сервис
+                        </span>
+                      )}
+                      {/* Car count badge */}
+                      {!b.isServiceOnly && !!b.carCount && b.carCount > 0 && (
+                        <span className="absolute bottom-2.5 right-3 text-[9px] sm:text-[10px] font-semibold text-slate-400 group-hover:text-[#0070b8] transition-colors duration-300 leading-none">
+                          {b.carCount} авто
                         </span>
                       )}
                     </div>
@@ -1506,11 +1548,11 @@ export default function Home() {
                           ))}
                         </div>
                         {loc.phone && (
-                          <a href={`tel:${loc.phone}`}
+                          <a href={phoneHref(loc.phone)}
                             onClick={e => e.stopPropagation()}
                             className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0070b8] hover:text-[#0058a0] transition-colors mt-3">
                             <Phone className="w-3.5 h-3.5" />
-                            {loc.phone}
+                            {normalizePhone(loc.phone)}
                           </a>
                         )}
                       </div>
@@ -1628,6 +1670,8 @@ export default function Home() {
                         <FormLabel className="text-slate-300 text-sm font-semibold">Телефон</FormLabel>
                         <FormControl>
                           <Input placeholder="+7 (___) ___-__-__" {...field}
+                            type="tel" inputMode="tel" maxLength={18}
+                            onChange={e => field.onChange(formatPhone(e.target.value))}
                             className="bg-white/10 border-white/15 text-white placeholder:text-slate-500 rounded-xl h-11 sm:h-12 focus-visible:ring-[#0070b8] focus-visible:ring-offset-0" />
                         </FormControl>
                         <FormMessage />
@@ -1738,6 +1782,8 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      <ChatWidget onOpenCallback={() => setModal("callback")} />
     </div>
   );
 }
