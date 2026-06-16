@@ -48,31 +48,6 @@ const values = [
   },
 ];
 
-const organizationSchema = {
-  "@type": "Organization",
-  "name": "Дебрянск Авто",
-  "alternateName": "Debryansk Auto",
-  "url": "https://debryansk-auto.ru",
-  "logo": "https://debryansk-auto.ru/favicon.svg",
-  "foundingDate": "2011",
-  "description": "Крупнейшая автомобильная группа компаний в Брянской области. 4 дилерских центра.",
-  "address": {
-    "@type": "PostalAddress",
-    "addressLocality": "Брянск",
-    "addressRegion": "Брянская область",
-    "addressCountry": "RU"
-  },
-  "contactPoint": {
-    "@type": "ContactPoint",
-    "telephone": "+74832631000",
-    "contactType": "customer service",
-    "availableLanguage": "Russian"
-  },
-  "sameAs": [
-    "https://debryansk-auto.ru"
-  ]
-};
-
 /* ─── Page ──────────────────────────────────────────────────────────────────── */
 export default function AboutPage() {
   const { data: apiBrands = [] } = useQuery({
@@ -81,20 +56,45 @@ export default function AboutPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const totalBrands = apiBrands.length;
+  const totalBrands = apiBrands.length || 12;
+
+  const organizationSchema = {
+    "@type": "Organization",
+    "name": "Дебрянск Авто",
+    "alternateName": "Debryansk Auto",
+    "url": "https://debryansk-auto.ru",
+    "logo": "https://debryansk-auto.ru/favicon.svg",
+    "foundingDate": "2011",
+    "description": `Крупнейшая автомобильная группа компаний в Брянской области. ${totalBrands} брендов, 4 дилерских центра.`,
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Брянск",
+      "addressRegion": "Брянская область",
+      "addressCountry": "RU"
+    },
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "+74832631000",
+      "contactType": "customer service",
+      "availableLanguage": "Russian"
+    },
+    "sameAs": [
+      "https://debryansk-auto.ru"
+    ]
+  };
 
   const stats = [
-    { value: "2011",              label: "Год основания",         icon: Clock },
-    { value: totalBrands || "—",  label: "Брендов в группе",      icon: Car },
-    { value: "4",                 label: "Дилерских центра",       icon: Building2 },
-    { value: "15+",               label: "Лет на рынке",          icon: TrendingUp },
+    { value: "2011",        label: "Год основания",    icon: Clock },
+    { value: totalBrands,   label: "Брендов в группе", icon: Car },
+    { value: "4",           label: "Дилерских центра",  icon: Building2 },
+    { value: "15+",         label: "Лет на рынке",     icon: TrendingUp },
   ];
 
   return (
     <Layout>
       <SEO
         title="О группе компаний Дебрянск Авто — территория автомобилей"
-        description="Дебрянск Авто — крупнейший автодилер Брянска. 4 дилерских центра, 15 лет на рынке. Продажа, сервис, финансирование."
+        description={`Дебрянск Авто — крупнейший автодилер Брянска. ${totalBrands} брендов, 4 дилерских центра, 15 лет на рынке. Продажа, сервис, финансирование.`}
         canonical="/about"
         jsonLd={organizationSchema}
         breadcrumbs={[
