@@ -199,7 +199,7 @@ export const ReviewsSection = () => {
               })}
             </div>
 
-            {hasMore && (
+            {hasMore ? (
               <div className="mt-8 flex justify-center">
                 <button
                   onClick={() => setVisibleCount(c => c + 6)}
@@ -207,6 +207,29 @@ export const ReviewsSection = () => {
                 >
                   Показать ещё · {Math.min(6, reviews.length - visibleCount)} отзывов
                 </button>
+              </div>
+            ) : reviews.length > 0 && (
+              <div className="mt-8 flex justify-center">
+                <p className="text-sm text-slate-500 text-center">
+                  Больше отзывов смотрите на{" "}
+                  <a
+                    href="https://yandex.ru/maps/org/debryansk_avto/1127547147/reviews/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-[#0070b8] hover:underline"
+                  >
+                    Яндекс Картах
+                  </a>
+                  {" "}и{" "}
+                  <a
+                    href="https://2gis.ru/bryansk/firm/70000001085543814/tab/reviews"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-[#0070b8] hover:underline"
+                  >
+                    2ГИС
+                  </a>
+                </p>
               </div>
             )}
           </>
