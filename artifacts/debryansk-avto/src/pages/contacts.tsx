@@ -1,4 +1,6 @@
 import React from "react";
+import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
+import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -36,6 +38,13 @@ async function fetchLocations(): Promise<Location[]> {
   return json.ok ? json.data : [];
 }
 
+async function fetchSettings(): Promise<Record<string, string>> {
+  const r = await fetch("/api/settings");
+  if (!r.ok) return {};
+  const json = await r.json();
+  return json.data ?? {};
+}
+
 /* ─── Form state ────────────────────────────────────────────────────────────────────────────────────── */
 function FeedbackForm() {
   const { toast } = useToast();
@@ -45,7 +54,7 @@ function FeedbackForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.phone) {
+    if (!form.name || !isPhoneValid(form.phone)) {
       toast({ title: "Заполните обязательные поля", variant: "destructive" });
       return;
     }
@@ -99,9 +108,9 @@ function FeedbackForm() {
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1">Телефон *</label>
           <input
-            type="tel"
+            type="tel" inputMode="tel" maxLength={18}
             value={form.phone}
-            onChange={e => setForm({ ...form, phone: e.target.value })}
+            onChange={e => setForm({ ...form, phone: formatPhone(e.target.value) })}
             className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#0070b8]/50 transition-colors"
             placeholder="+7 (___) ___-__-__"
           />
@@ -161,6 +170,15 @@ export default function ContactsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: siteSettings } = useQuery({
+    queryKey: ["site-settings"],
+    queryFn: fetchSettings,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const headerPhone = normalizePhone(siteSettings?.header_phone) || "+7 (4832) 63-10-00";
+  const headerPhoneTel = phoneHref(siteSettings?.header_phone) || "tel:+74832631000";
+
   const dealerMapLocations = React.useMemo(() => {
     if (locations.length === 0) return [];
     return locations
@@ -183,7 +201,7 @@ export default function ContactsPage() {
     "@type": "AutoDealer",
     "name": `Дебрянск Авто — ${loc.title}`,
     "url": "https://debryansk-auto.ru/contacts",
-    "telephone": loc.phone ?? "+7-4832-63-10-00",
+    "telephone": phoneHref(loc.phone ?? "+74832631000").replace("tel:", ""),
     "address": {
       "@type": "PostalAddress",
       "streetAddress": loc.address,
@@ -215,10 +233,10 @@ export default function ContactsPage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-2xl sm:text-3xl font-black text-slate-900"
           >
-            Контакты
+            Контакты дилерских центров Дебрянск Авто
           </motion.h1>
           <p className="text-slate-500 text-sm mt-1">
-            6 дилерских центров в Брянске и Брянской области
+            4 дилерских центра в Брянске и Брянской области
           </p>
         </div>
 
@@ -235,8 +253,8 @@ export default function ContactsPage() {
             </div>
             <div>
               <p className="text-xs text-slate-400 font-semibold uppercase">Телефон</p>
-              <a href="tel:+74832631000" className="text-lg font-bold text-slate-900 hover:text-[#0070b8] transition-colors">
-                +7 (4832) 63-10-00
+              <a href={headerPhoneTel} className="text-lg font-bold text-slate-900 hover:text-[#0070b8] transition-colors">
+                {headerPhone}
               </a>
             </div>
           </div>
@@ -306,10 +324,10 @@ export default function ContactsPage() {
                     </div>
                   </div>
                   <a
-                    href={`tel:${(loc.phone || "").replace(/\D/g, "")}`}
+                    href={phoneHref(loc.phone) || "#"}
                     className="text-[#0070b8] font-bold text-sm hover:underline shrink-0"
                   >
-                    {loc.phone || "—"}
+                    {normalizePhone(loc.phone) || "—"}
                   </a>
                 </div>
                 <div className="flex items-start gap-2 text-sm text-slate-500">
