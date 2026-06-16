@@ -238,6 +238,33 @@ async function main() {
     }, 30 * 60 * 1000);
   }).catch(err => logger.warn({ err }, "Car sync module load failed"));
 
+  // Reviews sync — initial full load if table empty, then every 8 hours
+  import("./services/reviews-sync").then(({ syncAllReviews, syncRecentReviews }) => {
+    db.execute(sql`SELECT COUNT(*)::int AS cnt FROM reviews`)
+      .then(r => {
+        const cnt = Number((r.rows[0] as any)?.cnt ?? 0);
+        if (cnt === 0) {
+          logger.info("[reviews-sync] Table is empty — running initial full sync");
+          syncAllReviews()
+            .then(s => logger.info(s, "[reviews-sync] Initial full sync done"))
+            .catch(err => logger.warn({ err }, "[reviews-sync] Initial sync failed"));
+        } else {
+          logger.info({ cnt }, "[reviews-sync] Table has rows — running recent sync on startup");
+          syncRecentReviews()
+            .then(s => logger.info(s, "[reviews-sync] Startup recent sync done"))
+            .catch(err => logger.warn({ err }, "[reviews-sync] Startup recent sync failed"));
+        }
+      })
+      .catch(err => logger.warn({ err }, "[reviews-sync] Count check failed"));
+
+    // Sync recent reviews every 8 hours
+    setInterval(() => {
+      syncRecentReviews()
+        .then(s => logger.info(s, "[reviews-sync] Scheduled sync done"))
+        .catch(err => logger.warn({ err }, "[reviews-sync] Scheduled sync failed"));
+    }, 8 * 60 * 60 * 1000);
+  }).catch(err => logger.warn({ err }, "[reviews-sync] Module load failed"));
+
   // Warm Navigator context cache on startup so the first user doesn't hit a cold cache
   import("./routes/chat").then(({ warmContext }) => {
     warmContext()
