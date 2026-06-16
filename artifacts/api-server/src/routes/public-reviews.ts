@@ -39,11 +39,19 @@ async function fetchFromGetLoyalty(): Promise<CacheEntry> {
 
   /* Fetch page helper */
   async function fetchPage(page: number): Promise<{ sourcesMap: Record<string, { platform?: string; link?: string; filials?: string[]; reviews?: number }> | null; items: Record<string, unknown>[] }> {
-    const resp = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}`, "Accept": "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify({ page }),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    let resp: Response;
+    try {
+      resp = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${apiKey}`, "Accept": "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ page }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!resp.ok) throw new Error(`GetLoyalty API error: ${resp.status}`);
     const json = await resp.json() as Record<string, unknown>;
     const items = Array.isArray(json.reviews) ? json.reviews as Record<string, unknown>[]
@@ -126,8 +134,11 @@ router.get("/", async (_req, res) => {
     cache = entry;
     return res.json({ ok: true, data: entry.data, avg: entry.avg, total: entry.total, overallCount: entry.overallCount, cached: false });
   } catch (err) {
-    /* Graceful fallback — return empty array so frontend hides the block */
     console.error("[reviews]", String(err));
+    /* Stale cache fallback — serve last known data when GetLoyalty is down */
+    if (cache) {
+      return res.json({ ok: true, data: cache.data, avg: cache.avg, total: cache.total, overallCount: cache.overallCount, cached: true, stale: true });
+    }
     return res.json({ ok: true, data: [], avg: 5, total: 0, overallCount: 0 });
   }
 });
