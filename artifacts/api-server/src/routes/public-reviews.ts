@@ -33,23 +33,41 @@ async function fetchFromGetLoyalty(): Promise<CacheEntry> {
   const apiKey = process.env.GETLOYALTY_API_KEY;
   if (!apiKey) throw new Error("GETLOYALTY_API_KEY not set");
 
-  const url = "https://remake.getloyalty.io/api/v2/reviews";
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Accept": "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({}),
-  });
-
-  if (!resp.ok) throw new Error(`GetLoyalty API error: ${resp.status}`);
-  const json = await resp.json() as Record<string, unknown>;
-
-  /* GetLoyalty v2 response: { sources: { [key]: {platform, link, filials, reviews} }, reviews: [...] } */
   const EXCLUDED_PLATFORMS = ["plasopro", "flamp", "yell", "zoon"];
-  const sourcesMap = (json.sources ?? {}) as Record<string, { platform?: string; link?: string; filials?: string[]; reviews?: number; rating?: number }>;
+  const cutoffTs = Math.floor(Date.now() / 1000) - 90 * 24 * 3600;
+  const API_URL = "https://remake.getloyalty.io/api/v2/reviews";
+
+  /* Fetch page helper */
+  async function fetchPage(page: number): Promise<{ sourcesMap: Record<string, { platform?: string; link?: string; filials?: string[]; reviews?: number }> | null; items: Record<string, unknown>[] }> {
+    const resp = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Accept": "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ page }),
+    });
+    if (!resp.ok) throw new Error(`GetLoyalty API error: ${resp.status}`);
+    const json = await resp.json() as Record<string, unknown>;
+    const items = Array.isArray(json.reviews) ? json.reviews as Record<string, unknown>[]
+      : Array.isArray(json) ? json as Record<string, unknown>[]
+      : Array.isArray((json as Record<string, unknown[]>).data) ? (json as Record<string, unknown[]>).data as Record<string, unknown>[]
+      : [];
+    const sm = page === 1 ? (json.sources ?? {}) as Record<string, { platform?: string; link?: string; filials?: string[]; reviews?: number }> : null;
+    return { sourcesMap: sm, items };
+  }
+
+  /* Paginate — stop when page is empty or all items are older than cutoff */
+  let sourcesMap: Record<string, { platform?: string; link?: string; filials?: string[]; reviews?: number }> = {};
+  const rawList: Record<string, unknown>[] = [];
+  const MAX_PAGES = 50;
+
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const { sourcesMap: sm, items } = await fetchPage(page);
+    if (sm) sourcesMap = sm;
+    if (items.length === 0) break;
+    rawList.push(...items);
+    /* Stop if the oldest item on this page is beyond the 90-day window */
+    const oldestTs = Math.min(...items.map(r => (typeof r.date === "number" ? r.date as number : 0)));
+    if (oldestTs > 0 && oldestTs < cutoffTs) break;
+  }
 
   /* Overall count — sum of reviews across all non-excluded sources (all time) */
   const overallCount = Object.values(sourcesMap).reduce((sum, s) => {
@@ -57,15 +75,6 @@ async function fetchFromGetLoyalty(): Promise<CacheEntry> {
     if (EXCLUDED_PLATFORMS.some(ex => p.includes(ex))) return sum;
     return sum + (s.reviews ?? 0);
   }, 0);
-
-  let rawList: Record<string, unknown>[] = [];
-  if (Array.isArray(json.reviews)) {
-    rawList = json.reviews as Record<string, unknown>[];
-  } else if (Array.isArray(json)) {
-    rawList = json as Record<string, unknown>[];
-  } else if (Array.isArray((json as Record<string, unknown[]>).data)) {
-    rawList = (json as Record<string, unknown[]>).data as Record<string, unknown>[];
-  }
 
   /* Normalize each review */
   const all: Review[] = rawList.map((r, i) => {
@@ -91,13 +100,11 @@ async function fetchFromGetLoyalty(): Promise<CacheEntry> {
   });
 
   /* Keep only: positive (4–5★), non-empty text, non-excluded platform, last 90 days */
-  const cutoff = Math.floor(Date.now() / 1000) - 90 * 24 * 3600;
   const positive = all.filter(r => {
     if (r.rating < 4 || !r.text.trim()) return false;
     if (EXCLUDED_PLATFORMS.some(p => (r.source ?? "").toLowerCase().includes(p))) return false;
-    /* date was stored as ISO string "YYYY-MM-DD" — compare via unix */
     const ts = r.date ? Math.floor(new Date(r.date).getTime() / 1000) : 0;
-    return ts >= cutoff;
+    return ts >= cutoffTs;
   });
 
   const avg = positive.length > 0
