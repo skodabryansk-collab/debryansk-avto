@@ -3,7 +3,7 @@ import { Router, type IRouter } from "express";
 const router: IRouter = Router();
 
 /* ── In-memory cache (30 min TTL) ──────────────────────────────────────────── */
-interface CacheEntry { data: Review[]; avg: number; total: number; fetchedAt: number; }
+interface CacheEntry { data: Review[]; avg: number; total: number; overallCount: number; fetchedAt: number; }
 let cache: CacheEntry | null = null;
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -47,8 +47,16 @@ async function fetchFromGetLoyalty(): Promise<CacheEntry> {
   if (!resp.ok) throw new Error(`GetLoyalty API error: ${resp.status}`);
   const json = await resp.json() as Record<string, unknown>;
 
-  /* GetLoyalty v2 response: { sources: { [key]: {platform, link, filials} }, reviews: [...] } */
-  const sourcesMap = (json.sources ?? {}) as Record<string, { platform?: string; link?: string; filials?: string[] }>;
+  /* GetLoyalty v2 response: { sources: { [key]: {platform, link, filials, reviews} }, reviews: [...] } */
+  const EXCLUDED_PLATFORMS = ["plasopro", "flamp", "yell", "zoon"];
+  const sourcesMap = (json.sources ?? {}) as Record<string, { platform?: string; link?: string; filials?: string[]; reviews?: number; rating?: number }>;
+
+  /* Overall count — sum of reviews across all non-excluded sources (all time) */
+  const overallCount = Object.values(sourcesMap).reduce((sum, s) => {
+    const p = (s.platform ?? "").toLowerCase();
+    if (EXCLUDED_PLATFORMS.some(ex => p.includes(ex))) return sum;
+    return sum + (s.reviews ?? 0);
+  }, 0);
 
   let rawList: Record<string, unknown>[] = [];
   if (Array.isArray(json.reviews)) {
@@ -82,19 +90,21 @@ async function fetchFromGetLoyalty(): Promise<CacheEntry> {
     };
   });
 
-  /* Keep only positive reviews (4–5 stars), non-empty text, exclude plasopro */
-  const EXCLUDED_PLATFORMS = ["plasopro", "flamp", "yell", "zoon"];
-  const positive = all.filter(r =>
-    r.rating >= 4 &&
-    r.text.trim().length > 0 &&
-    !EXCLUDED_PLATFORMS.some(p => (r.source ?? "").toLowerCase().includes(p))
-  );
+  /* Keep only: positive (4–5★), non-empty text, non-excluded platform, last 90 days */
+  const cutoff = Math.floor(Date.now() / 1000) - 90 * 24 * 3600;
+  const positive = all.filter(r => {
+    if (r.rating < 4 || !r.text.trim()) return false;
+    if (EXCLUDED_PLATFORMS.some(p => (r.source ?? "").toLowerCase().includes(p))) return false;
+    /* date was stored as ISO string "YYYY-MM-DD" — compare via unix */
+    const ts = r.date ? Math.floor(new Date(r.date).getTime() / 1000) : 0;
+    return ts >= cutoff;
+  });
 
   const avg = positive.length > 0
     ? Math.round((positive.reduce((s, r) => s + r.rating, 0) / positive.length) * 10) / 10
     : 5.0;
 
-  return { data: positive, avg, total: positive.length, fetchedAt: Date.now() };
+  return { data: positive, avg, total: positive.length, overallCount, fetchedAt: Date.now() };
 }
 
 /* ── GET /api/reviews ──────────────────────────────────────────────────────── */
@@ -102,16 +112,16 @@ router.get("/", async (_req, res) => {
   try {
     const now = Date.now();
     if (cache && now - cache.fetchedAt < CACHE_TTL_MS) {
-      return res.json({ ok: true, data: cache.data, avg: cache.avg, total: cache.total, cached: true });
+      return res.json({ ok: true, data: cache.data, avg: cache.avg, total: cache.total, overallCount: cache.overallCount, cached: true });
     }
 
     const entry = await fetchFromGetLoyalty();
     cache = entry;
-    return res.json({ ok: true, data: entry.data, avg: entry.avg, total: entry.total, cached: false });
+    return res.json({ ok: true, data: entry.data, avg: entry.avg, total: entry.total, overallCount: entry.overallCount, cached: false });
   } catch (err) {
     /* Graceful fallback — return empty array so frontend hides the block */
     console.error("[reviews]", String(err));
-    return res.json({ ok: true, data: [], avg: 5, total: 0 });
+    return res.json({ ok: true, data: [], avg: 5, total: 0, overallCount: 0 });
   }
 });
 
