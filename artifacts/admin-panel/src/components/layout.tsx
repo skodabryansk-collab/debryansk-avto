@@ -6,17 +6,19 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
   LayoutDashboard, Newspaper, Phone, MapPin, LogOut,
-  ChevronRight, Menu, X, Tag, Users, Building2, Settings
+  ChevronRight, Menu, X, Tag, Users, Building2, Settings, Bot, Star
 } from "lucide-react";
 
 const navItems = [
   { path: "/", label: "Дашборд", icon: LayoutDashboard },
   { path: "/news", label: "Новости", icon: Newspaper },
   { path: "/leads", label: "Заявки", icon: Phone },
+  { path: "/reviews", label: "Отзывы", icon: Star },
   { path: "/locations", label: "Локации", icon: Building2 },
   { path: "/brands", label: "Бренды", icon: Tag },
   { path: "/users", label: "Пользователи", icon: Users },
   { path: "/settings", label: "Настройки", icon: Settings },
+  { path: "/navigator", label: "Навигатор", icon: Bot },
 ];
 
 function SidebarItem({ path, label, icon: Icon }: typeof navItems[0]) {
