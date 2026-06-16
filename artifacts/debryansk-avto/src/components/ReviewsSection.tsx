@@ -99,6 +99,7 @@ export const ReviewsSection = () => {
   const overallCount = reviewsData?.overallCount ?? 0;
 
   const [expanded, setExpanded] = React.useState<Record<string | number, boolean>>({});
+  const [visibleCount, setVisibleCount] = React.useState(9);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (dir: "left" | "right") => {
@@ -157,11 +158,12 @@ export const ReviewsSection = () => {
             ))}
           </div>
         ) : (
+          <>
           <div
             ref={scrollRef}
             className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden"
           >
-            {reviews.slice(0, 9).map((review, i) => {
+            {reviews.slice(0, visibleCount).map((review, i) => {
               const isExp = expanded[review.id];
               const longText = review.text.length > 200;
               const displayText = isExp || !longText ? review.text : review.text.slice(0, 200) + "…";
@@ -210,6 +212,18 @@ export const ReviewsSection = () => {
               );
             })}
           </div>
+
+          {!isLoading && visibleCount < reviews.length && (
+            <div className="mt-8 flex justify-center">
+              <button
+                onClick={() => setVisibleCount(c => c + 9)}
+                className="px-6 py-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:border-[#0070b8]/40 hover:text-[#0070b8] transition-colors"
+              >
+                Показать ещё · {Math.min(9, reviews.length - visibleCount)} отзывов
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
     </section>
