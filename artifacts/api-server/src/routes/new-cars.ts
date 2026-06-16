@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -41,7 +42,7 @@ export interface NewCarRecord {
 }
 
 let cache: { data: NewCarRecord[]; ts: number } | null = null;
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 30 * 60 * 1000;
 
 function getField(xml: string, field: string): string {
   const m = xml.match(new RegExp(`<${field}[^>]*>([\\s\\S]*?)<\\/${field}>`));
@@ -52,6 +53,24 @@ function getImages(xml: string): string[] {
   return [...xml.matchAll(/<image>([^<]+)<\/image>/g)].map((m) => m[1].trim());
 }
 
+const BRAND_CANONICAL: Record<string, string> = {
+  "CHERY": "Chery",
+  "TENET": "Tenet",
+  "GREAT WALL": "Great Wall",
+  "HAVAL": "Haval",
+  "JAECOO": "Jaecoo",
+  "JETOUR": "Jetour",
+  "OMODA": "Omoda",
+  "EXEED": "Exeed",
+  "TANK": "Tank",
+  "BYD": "BYD",
+};
+
+function normalizeBrand(raw: string): string {
+  const upper = raw.trim().toUpperCase();
+  return BRAND_CANONICAL[upper] ?? raw.trim();
+}
+
 function parseFeed(text: string, dealer: string): NewCarRecord[] {
   const cars: NewCarRecord[] = [];
   const blocks = text.match(/<car>[\s\S]*?<\/car>/g) ?? [];
@@ -60,7 +79,7 @@ function parseFeed(text: string, dealer: string): NewCarRecord[] {
     if (action !== "show") continue;
     cars.push({
       id: `${dealer}-${getField(block, "unique_id")}`,
-      mark: getField(block, "mark_id"),
+      mark: normalizeBrand(getField(block, "mark_id")),
       model: getField(block, "folder_id"),
       modification: getField(block, "modification_id"),
       complectation: getField(block, "complectation_name"),
@@ -90,32 +109,65 @@ function parseFeed(text: string, dealer: string): NewCarRecord[] {
   return cars;
 }
 
-router.get("/cars/new", async (_req, res) => {
-  try {
-    if (cache && Date.now() - cache.ts < CACHE_TTL) {
-      return res.json({ ok: true, data: cache.data, total: cache.data.length });
+export async function getNewCars(): Promise<NewCarRecord[]> {
+  if (cache && Date.now() - cache.ts < CACHE_TTL) return cache.data;
+  const results = await Promise.allSettled(
+    FEEDS.map(async (feed) => {
+      const r = await fetch(feed.url, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!r.ok) throw new Error(`${feed.dealer}: HTTP ${r.status}`);
+      const text = await r.text();
+      const parsed = parseFeed(text, feed.dealer);
+      logger.info({ dealer: feed.dealer, count: parsed.length }, "new-cars: feed fetched");
+      return parsed;
+    })
+  );
+  const data: NewCarRecord[] = [];
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (result.status === "fulfilled") {
+      data.push(...result.value);
+    } else {
+      logger.error({ dealer: FEEDS[i].dealer, url: FEEDS[i].url, err: String(result.reason) }, "new-cars: feed fetch FAILED");
     }
+  }
+  if (data.length === 0) {
+    logger.warn({ feedCount: FEEDS.length }, "new-cars: ALL feeds returned 0 cars — NOT caching empty result");
+    return data; // don't cache empty — retry on next call
+  }
+  cache = { data, ts: Date.now() };
+  return data;
+}
 
-    const results = await Promise.allSettled(
-      FEEDS.map(async (feed) => {
+/* ── Debug endpoint: проверить доступность фидов напрямую ── */
+router.get("/debug/feeds", async (_req, res) => {
+  const checks = await Promise.allSettled(
+    FEEDS.map(async (feed) => {
+      const start = Date.now();
+      try {
         const r = await fetch(feed.url, {
           headers: { "User-Agent": "Mozilla/5.0" },
           signal: AbortSignal.timeout(15_000),
         });
-        if (!r.ok) throw new Error(`${feed.dealer}: HTTP ${r.status}`);
         const text = await r.text();
-        return parseFeed(text, feed.dealer);
-      })
-    );
-
-    const data: NewCarRecord[] = [];
-    for (const result of results) {
-      if (result.status === "fulfilled") {
-        data.push(...result.value);
+        const parsed = parseFeed(text, feed.dealer);
+        return { dealer: feed.dealer, status: r.status, cars: parsed.length, ms: Date.now() - start, ok: r.ok };
+      } catch (err) {
+        return { dealer: feed.dealer, status: 0, cars: 0, ms: Date.now() - start, ok: false, error: String(err) };
       }
-    }
+    })
+  );
+  return res.json({
+    ok: true,
+    results: checks.map((c, i) => c.status === "fulfilled" ? c.value : { dealer: FEEDS[i].dealer, error: String((c as PromiseRejectedResult).reason) }),
+  });
+});
 
-    cache = { data, ts: Date.now() };
+router.get("/cars/new", async (_req, res) => {
+  try {
+    const data = await getNewCars();
     return res.json({ ok: true, data, total: data.length });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
