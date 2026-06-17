@@ -41,10 +41,23 @@ export interface NewCarRecord {
   acceptedAutoruExclusive: boolean;
 }
 
-let cache: { data: NewCarRecord[]; ts: number } | null = null;
 const CACHE_TTL = 30 * 60 * 1000;
 
-export function clearNewCarsCache() { cache = null; }
+interface DealerCache {
+  data: NewCarRecord[];
+  ts: number;
+  stale?: boolean;
+}
+
+const dealerCache: Map<string, DealerCache> = new Map();
+let lastMergedAt = 0;
+let mergedCache: NewCarRecord[] | null = null;
+
+export function clearNewCarsCache() {
+  dealerCache.clear();
+  mergedCache = null;
+  lastMergedAt = 0;
+}
 
 function getField(xml: string, field: string): string {
   const m = xml.match(new RegExp(`<${field}[^>]*>([\\s\\S]*?)<\\/${field}>`));
@@ -111,36 +124,60 @@ function parseFeed(text: string, dealer: string): NewCarRecord[] {
   return cars;
 }
 
+async function refreshDealer(feed: { url: string; dealer: string }): Promise<void> {
+  const r = await fetch(feed.url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const text = await r.text();
+  const parsed = parseFeed(text, feed.dealer);
+  logger.info({ dealer: feed.dealer, count: parsed.length }, "new-cars: feed fetched");
+  dealerCache.set(feed.dealer, { data: parsed, ts: Date.now(), stale: false });
+  mergedCache = null;
+}
+
 export async function getNewCars(): Promise<NewCarRecord[]> {
-  if (cache && Date.now() - cache.ts < CACHE_TTL) return cache.data;
-  const results = await Promise.allSettled(
-    FEEDS.map(async (feed) => {
-      const r = await fetch(feed.url, {
-        headers: { "User-Agent": "Mozilla/5.0" },
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!r.ok) throw new Error(`${feed.dealer}: HTTP ${r.status}`);
-      const text = await r.text();
-      const parsed = parseFeed(text, feed.dealer);
-      logger.info({ dealer: feed.dealer, count: parsed.length }, "new-cars: feed fetched");
-      return parsed;
-    })
-  );
-  const data: NewCarRecord[] = [];
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
-    if (result.status === "fulfilled") {
-      data.push(...result.value);
-    } else {
-      logger.error({ dealer: FEEDS[i].dealer, url: FEEDS[i].url, err: String(result.reason) }, "new-cars: feed fetch FAILED");
+  const now = Date.now();
+  const staleFeeds = FEEDS.filter(f => {
+    const c = dealerCache.get(f.dealer);
+    return !c || now - c.ts >= CACHE_TTL;
+  });
+
+  if (staleFeeds.length > 0) {
+    const results = await Promise.allSettled(staleFeeds.map(f => refreshDealer(f)));
+    results.forEach((r, i) => {
+      if (r.status === "rejected") {
+        const feed = staleFeeds[i];
+        const prev = dealerCache.get(feed.dealer);
+        if (prev) {
+          logger.warn(
+            { dealer: feed.dealer, err: String(r.reason), cachedCount: prev.data.length },
+            "new-cars: feed FAILED — using previous cached data as fallback"
+          );
+          dealerCache.set(feed.dealer, { ...prev, ts: now, stale: true });
+        } else {
+          logger.error(
+            { dealer: feed.dealer, url: feed.url, err: String(r.reason) },
+            "new-cars: feed FAILED — no previous cache, dealer will be missing"
+          );
+        }
+        mergedCache = null;
+      }
+    });
+  }
+
+  if (!mergedCache) {
+    const data: NewCarRecord[] = [];
+    for (const feed of FEEDS) {
+      const c = dealerCache.get(feed.dealer);
+      if (c) data.push(...c.data);
     }
+    mergedCache = data;
+    lastMergedAt = now;
   }
-  if (data.length === 0) {
-    logger.warn({ feedCount: FEEDS.length }, "new-cars: ALL feeds returned 0 cars — NOT caching empty result");
-    return data; // don't cache empty — retry on next call
-  }
-  cache = { data, ts: Date.now() };
-  return data;
+
+  return mergedCache;
 }
 
 /* ── Debug endpoint: проверить доступность фидов напрямую ── */
@@ -155,15 +192,38 @@ router.get("/debug/feeds", async (_req, res) => {
         });
         const text = await r.text();
         const parsed = parseFeed(text, feed.dealer);
-        return { dealer: feed.dealer, status: r.status, cars: parsed.length, ms: Date.now() - start, ok: r.ok };
+        const cached = dealerCache.get(feed.dealer);
+        return {
+          dealer: feed.dealer,
+          status: r.status,
+          cars: parsed.length,
+          ms: Date.now() - start,
+          ok: r.ok,
+          cacheAge: cached ? Math.round((Date.now() - cached.ts) / 1000) + "s" : "no cache",
+          stale: cached?.stale ?? false,
+        };
       } catch (err) {
-        return { dealer: feed.dealer, status: 0, cars: 0, ms: Date.now() - start, ok: false, error: String(err) };
+        const cached = dealerCache.get(feed.dealer);
+        return {
+          dealer: feed.dealer,
+          status: 0,
+          cars: 0,
+          ms: Date.now() - start,
+          ok: false,
+          error: String(err),
+          cacheAge: cached ? Math.round((Date.now() - cached.ts) / 1000) + "s" : "no cache",
+          cachedFallback: cached?.data.length ?? 0,
+          stale: cached?.stale ?? false,
+        };
       }
     })
   );
   return res.json({
     ok: true,
-    results: checks.map((c, i) => c.status === "fulfilled" ? c.value : { dealer: FEEDS[i].dealer, error: String((c as PromiseRejectedResult).reason) }),
+    mergedAt: lastMergedAt ? new Date(lastMergedAt).toISOString() : null,
+    results: checks.map((c, i) =>
+      c.status === "fulfilled" ? c.value : { dealer: FEEDS[i].dealer, error: String((c as PromiseRejectedResult).reason) }
+    ),
   });
 });
 
