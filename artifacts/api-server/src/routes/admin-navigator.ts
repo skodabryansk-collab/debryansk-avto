@@ -148,7 +148,20 @@ router.get("/sync-status", async (_req, res) => {
       FROM cars
     `).catch(() => ({ rows: [{ total: 0, last_synced: null }] }));
     const row = (result.rows[0] as any) ?? {};
-    return res.json({ ok: true, total: row.total ?? 0, lastSynced: row.last_synced ?? null });
+
+    const byDealer = await db.execute(sql`
+      SELECT dealer, type, COUNT(*)::int AS cnt
+      FROM cars
+      GROUP BY dealer, type
+      ORDER BY type, cnt DESC
+    `).catch(() => ({ rows: [] }));
+
+    return res.json({
+      ok: true,
+      total: row.total ?? 0,
+      lastSynced: row.last_synced ?? null,
+      byDealer: byDealer.rows as { dealer: string; type: string; cnt: number }[],
+    });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
   }
