@@ -627,7 +627,7 @@ function CreditFormCard({ base, prefillModel, history }: { base: string; prefill
 
 /* ── Trade-in form card ──────────────────────────────────────── */
 interface CmItem { id: string; name: string }
-interface ChatModItem { id: string; name: string; drive: string; engineVolume: string; power: string; gear: string; complectation: string }
+interface ChatModItem { id: string; name: string; drive: string; engineVolume: string; power: string; gear: string; complectation: string; doors: string }
 interface ChatModOptions {
   modifications: ChatModItem[];
   driveTypes: CmItem[];
@@ -635,6 +635,7 @@ interface ChatModOptions {
   powers: CmItem[];
   gearTypes: CmItem[];
   complectations: CmItem[];
+  doorNumbers: CmItem[];
 }
 
 function TradeInFormCard({ base, history }: { base: string; history?: Message[] }) {
@@ -663,6 +664,7 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
   const [power, setPower] = useState("");
   const [gear, setGear] = useState("");
   const [complectation, setComplectation] = useState("");
+  const [doorsNum, setDoorsNum] = useState("");
   const [mileage, setMileage] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -691,7 +693,7 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
     setYears([]); setYear("");
     setGenerations([]); setGenerationId("");
     setModOptions(null);
-    setModification(""); setDrive(""); setEngineVolume(""); setPower(""); setGear(""); setComplectation("");
+    setModification(""); setDrive(""); setEngineVolume(""); setPower(""); setGear(""); setComplectation(""); setDoorsNum("");
     fetch(`${base}/api/car-catalog/cm-models?brand=${encodeURIComponent(brandId)}`)
       .then(r => r.json())
       .then(j => setModels(j.ok ? (j.data ?? []) : []))
@@ -706,7 +708,7 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
     setYears([]); setYear("");
     setGenerations([]); setGenerationId("");
     setModOptions(null);
-    setModification(""); setDrive(""); setEngineVolume(""); setPower(""); setGear(""); setComplectation("");
+    setModification(""); setDrive(""); setEngineVolume(""); setPower(""); setGear(""); setComplectation(""); setDoorsNum("");
     const qs = new URLSearchParams({ brand: brandId, model: modelId });
     fetch(`${base}/api/car-catalog/cm-years?${qs}`)
       .then(r => r.json())
@@ -734,12 +736,12 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
     if (!brandId || !modelId || !year) { setModOptions(null); return; }
     setModOptionsLoading(true);
     setModOptions(null);
-    setModification(""); setDrive(""); setEngineVolume(""); setPower(""); setGear(""); setComplectation("");
+    setModification(""); setDrive(""); setEngineVolume(""); setPower(""); setGear(""); setComplectation(""); setDoorsNum("");
     const qs = new URLSearchParams({ brand: brandId, model: modelId, year });
     fetch(`${base}/api/car-catalog/cm-modifications-options?${qs}`)
       .then(r => r.json())
       .then(j => {
-        if (j.ok) setModOptions({ modifications: j.modifications ?? [], driveTypes: j.driveTypes ?? [], engineVolumes: j.engineVolumes ?? [], powers: j.powers ?? [], gearTypes: j.gearTypes ?? [], complectations: j.complectations ?? [] });
+        if (j.ok) setModOptions({ modifications: j.modifications ?? [], driveTypes: j.driveTypes ?? [], engineVolumes: j.engineVolumes ?? [], powers: j.powers ?? [], gearTypes: j.gearTypes ?? [], complectations: j.complectations ?? [], doorNumbers: j.doorNumbers ?? [] });
         else setModOptions(null);
       })
       .catch(() => setModOptions(null))
@@ -747,11 +749,11 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
   }, [brandId, modelId, year, base]);
 
   const handleEngineVolumeChange = useCallback((val: string) => {
-    setEngineVolume(val); setDrive(""); setPower(""); setGear(""); setModification("");
+    setEngineVolume(val); setDrive(""); setPower(""); setGear(""); setDoorsNum(""); setModification("");
   }, []);
 
   const handleDriveChange = useCallback((val: string) => {
-    setDrive(val); setPower(""); setGear(""); setModification("");
+    setDrive(val); setPower(""); setGear(""); setDoorsNum(""); setModification("");
   }, []);
 
   const fmtPrice = (n: number) =>
@@ -832,18 +834,22 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
   const chatFilteredGearItems = (modOptions?.gearTypes ?? []).filter(g =>
     (!engineVolume && !drive) || chatModsForVolumeDrive.some(m => m.gear === g.name)
   );
+  const chatFilteredDoorItems = (modOptions?.doorNumbers ?? []).filter(d =>
+    (!engineVolume && !drive) || chatModsForVolumeDrive.some(m => m.doors === d.id)
+  );
   const chatMatchingMods = chatMods.filter(m =>
     (!engineVolume || m.engineVolume === engineVolume) &&
     (!drive || m.drive === drive) &&
     (!power || m.power === power) &&
-    (!gear || m.gear === gear)
+    (!gear || m.gear === gear) &&
+    (!doorsNum || m.doors === doorsNum)
   );
   const chatAutoModId = chatMatchingMods.length === 1 ? chatMatchingMods[0].id : "";
 
   const hasModData = modOptions && (
     modOptions.engineVolumes.length > 0 || modOptions.driveTypes.length > 0 ||
     modOptions.powers.length > 0 || modOptions.gearTypes.length > 0 ||
-    modOptions.complectations.length > 0
+    modOptions.complectations.length > 0 || modOptions.doorNumbers.length > 0
   );
 
   // Result state
@@ -963,6 +969,14 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
                 </select>
               )}
             </div>
+          )}
+
+          {/* Кол-во дверей — full width */}
+          {!modOptionsLoading && chatFilteredDoorItems.length > 0 && (
+            <select value={doorsNum} onChange={e => { setDoorsNum(e.target.value); setModification(""); }} className={selectCls}>
+              <option value="">Кол-во дверей</option>
+              {chatFilteredDoorItems.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
           )}
 
           {/* Комплектация — full width */}
