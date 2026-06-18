@@ -93,6 +93,7 @@ async function fetchCmExpertPredict(params: {
   brandId: string; modelId: string; year: string; mileage: string;
   bodyId?: string; generationId?: string;
   drive?: string; engineVolume?: string; complectation?: string;
+  modificationId?: string;
 }): Promise<PredictResult | { ok: false }> {
   const qs = new URLSearchParams({
     brandId: params.brandId,
@@ -100,11 +101,12 @@ async function fetchCmExpertPredict(params: {
     year: params.year,
     mileage: params.mileage,
   });
-  if (params.bodyId)       qs.append("bodyId", params.bodyId);
-  if (params.generationId) qs.append("generationId", params.generationId);
-  if (params.drive)        qs.append("drive", params.drive);
-  if (params.engineVolume) qs.append("engineVolume", params.engineVolume);
-  if (params.complectation) qs.append("complectation", params.complectation);
+  if (params.bodyId)         qs.append("bodyId", params.bodyId);
+  if (params.generationId)   qs.append("generationId", params.generationId);
+  if (params.modificationId) qs.append("modificationId", params.modificationId);
+  if (params.drive)          qs.append("drive", params.drive);
+  if (params.engineVolume)   qs.append("engineVolume", params.engineVolume);
+  if (params.complectation)  qs.append("complectation", params.complectation);
   const r = await fetch(`/api/car-catalog/cm-expert-predict?${qs}`);
   if (!r.ok) return { ok: false };
   return r.json();
@@ -262,15 +264,16 @@ function BuyoutForm() {
     setPriceLoading(true);
     try {
       const result = await fetchCmExpertPredict({
-        brandId:      form.brand,
-        modelId:      form.model,
-        year:         form.year,
-        mileage:      form.mileage,
-        bodyId:       form.body          || undefined,
-        generationId: form.generation    || undefined,
-        drive:        form.drive         || undefined,
-        engineVolume: form.engineVolume  || undefined,
-        complectation: form.complectation || undefined,
+        brandId:        form.brand,
+        modelId:        form.model,
+        year:           form.year,
+        mileage:        form.mileage,
+        bodyId:         form.body           || undefined,
+        generationId:   form.generation     || undefined,
+        modificationId: form.modification   || undefined,
+        drive:          form.drive          || undefined,
+        engineVolume:   form.engineVolume   || undefined,
+        complectation:  form.complectation  || undefined,
       });
       setPriceResult(result);
       setStep(2);
