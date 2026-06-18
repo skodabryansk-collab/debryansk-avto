@@ -512,7 +512,7 @@ router.get("/cm-expert-predict", async (req, res) => {
     res.json({
       ok: true,
       buyoutMin: Math.round(minSellingPrice      * 0.90),
-      buyoutMax: Math.round(expectedSellingPrice * 0.90),
+      buyoutMax: Math.round(expectedSellingPrice * 0.95),
     });
   } catch (err: any) {
     res.json({ ok: false, error: err.message });
