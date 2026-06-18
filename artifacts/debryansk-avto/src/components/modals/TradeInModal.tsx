@@ -158,29 +158,19 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
         next.modification = "";
         next.drive = ""; next.engineVolume = ""; next.power = ""; next.gear = ""; next.complectation = "";
       }
-      if (["drive", "engineVolume", "power", "gear", "complectation"].includes(field)) {
+      if (field === "engineVolume") {
+        next.modification = ""; next.drive = ""; next.power = ""; next.gear = "";
+      }
+      if (field === "drive") {
+        next.modification = ""; next.power = ""; next.gear = "";
+      }
+      if (["power", "gear", "complectation"].includes(field)) {
         next.modification = "";
       }
       return next;
     });
     setEstimateResult(null);
   }, []);
-
-  const handleModificationChange = useCallback((modId: string) => {
-    const mod = modOptions?.modifications?.find(m => m.id === modId);
-    setFormData(prev => ({
-      ...prev,
-      modification: modId,
-      ...(mod ? {
-        drive: mod.drive || prev.drive,
-        engineVolume: mod.engineVolume || prev.engineVolume,
-        power: mod.power || prev.power,
-        gear: mod.gear || prev.gear,
-        complectation: mod.complectation || prev.complectation,
-      } : {}),
-    }));
-    setEstimateResult(null);
-  }, [modOptions]);
 
   const handleEstimate = useCallback(async () => {
     if (!formData.brand || !formData.model || !formData.year || !formData.mileage) return;
@@ -192,7 +182,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
         year: formData.year,
         mileage: formData.mileage,
       });
-      if (formData.modification)  params.append("modificationId", formData.modification);
+      if (autoModificationId)  params.append("modificationId", autoModificationId);
       if (formData.drive)         params.append("drive", formData.drive);
       if (formData.engineVolume)  params.append("engineVolume", formData.engineVolume);
       if (formData.complectation) params.append("complectation", formData.complectation);
@@ -245,6 +235,30 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
     setSubmitted(true);
     setLoading(false);
   }, [formData, estimateResult, brands, models]);
+
+  const mods = modOptions?.modifications ?? [];
+  const modsForVolume = formData.engineVolume
+    ? mods.filter(m => m.engineVolume === formData.engineVolume)
+    : mods;
+  const filteredDriveItems = (modOptions?.driveTypes ?? []).filter(d =>
+    !formData.engineVolume || modsForVolume.some(m => m.drive === d.name)
+  );
+  const modsForVolumeDrive = formData.drive
+    ? modsForVolume.filter(m => m.drive === formData.drive)
+    : modsForVolume;
+  const filteredPowerItems = (modOptions?.powers ?? []).filter(p =>
+    (!formData.engineVolume && !formData.drive) || modsForVolumeDrive.some(m => m.power === p.name)
+  );
+  const filteredGearItems = (modOptions?.gearTypes ?? []).filter(g =>
+    (!formData.engineVolume && !formData.drive) || modsForVolumeDrive.some(m => m.gear === g.name)
+  );
+  const matchingMods = mods.filter(m =>
+    (!formData.engineVolume || m.engineVolume === formData.engineVolume) &&
+    (!formData.drive || m.drive === formData.drive) &&
+    (!formData.power || m.power === formData.power) &&
+    (!formData.gear || m.gear === formData.gear)
+  );
+  const autoModificationId = matchingMods.length === 1 ? matchingMods[0].id : "";
 
   const canEstimate = formData.brand && formData.model && formData.year && formData.mileage;
 
@@ -380,36 +394,9 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                     </div>
                   </div>
 
-                  {/* ── Modification options: drive / volume / power / gear / complectation ── */}
-                  {(modOptionsLoading || (modOptions && (modOptions.engineVolumes.length > 0 || modOptions.driveTypes.length > 0 || modOptions.powers.length > 0 || modOptions.gearTypes.length > 0 || modOptions.complectations.length > 0 || modOptions.modifications.length > 0))) && (
+                  {/* ── Modification options: volume / drive / power / gear / complectation ── */}
+                  {(modOptionsLoading || (modOptions && (modOptions.engineVolumes.length > 0 || modOptions.driveTypes.length > 0 || modOptions.powers.length > 0 || modOptions.gearTypes.length > 0 || modOptions.complectations.length > 0))) && (
                     <div className="space-y-3">
-
-                      {/* Modification (full-width, top) */}
-                      {(modOptionsLoading || (modOptions?.modifications ?? []).length > 0) && (
-                        <div className="space-y-2">
-                          <Label className="text-xs text-slate-500">Модификация</Label>
-                          <div className="relative">
-                            <select
-                              value={formData.modification}
-                              onChange={(e) => handleModificationChange(e.target.value)}
-                              disabled={modOptionsLoading}
-                              className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm appearance-none focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
-                            >
-                              <option value="">{modOptionsLoading ? "Загрузка..." : "Выберите модификацию"}</option>
-                              {(modOptions?.modifications ?? []).map(m => (
-                                <option key={m.id} value={m.id}>{m.name}</option>
-                              ))}
-                            </select>
-                            {modOptionsLoading
-                              ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                              : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                            }
-                          </div>
-                          {formData.modification && (
-                            <p className="text-[11px] text-slate-400 mt-0.5">Поля ниже заполнены автоматически — при необходимости скорректируйте</p>
-                          )}
-                        </div>
-                      )}
 
                       <div className="grid grid-cols-2 gap-3">
                         {/* Engine volume */}
@@ -446,7 +433,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                                 className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm appearance-none focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
                               >
                                 <option value="">{modOptionsLoading ? "Загрузка..." : "Не указан"}</option>
-                                {(modOptions?.driveTypes ?? []).map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                                {filteredDriveItems.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                               </select>
                               {modOptionsLoading
                                 ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -468,7 +455,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                                 className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm appearance-none focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
                               >
                                 <option value="">{modOptionsLoading ? "Загрузка..." : "Не указана"}</option>
-                                {(modOptions?.powers ?? []).map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                                {filteredPowerItems.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                               </select>
                               {modOptionsLoading
                                 ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -490,7 +477,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                                 className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm appearance-none focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
                               >
                                 <option value="">{modOptionsLoading ? "Загрузка..." : "Не указан"}</option>
-                                {(modOptions?.gearTypes ?? []).map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
+                                {filteredGearItems.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
                               </select>
                               {modOptionsLoading
                                 ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
