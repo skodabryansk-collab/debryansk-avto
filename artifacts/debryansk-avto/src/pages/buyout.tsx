@@ -7,6 +7,7 @@ import {
   ArrowRight, Banknote, Tag, AlertCircle,
   ChevronDown, Loader2,
 } from "lucide-react";
+import { SearchableSelect } from "@/components/SearchableSelect";
 import SEO from "@/components/SEO";
 import Layout from "@/components/Layout";
 import { Link } from "wouter";
@@ -377,19 +378,28 @@ function BuyoutForm() {
             {/* Марка */}
             <div>
               <label className={labelCls}>Марка *</label>
-              <select value={form.brand} onChange={set("brand")} className={selectCls} disabled={brandsLoading}>
-                <option value="">{brandsLoading ? "Загрузка…" : "Выберите марку"}</option>
-                {brands.map(b => <option key={itemId(b)} value={itemId(b)}>{itemName(b)}</option>)}
-              </select>
+              <SearchableSelect
+                items={brands.map(b => ({ id: itemId(b), name: itemName(b) }))}
+                value={form.brand}
+                onChange={(id) => { setForm(f => ({ ...f, brand: id })); setPriceResult(null); }}
+                placeholder="Выберите марку"
+                loading={brandsLoading}
+                className={`${inputCls} cursor-text`}
+              />
             </div>
 
             {/* Модель */}
             <div>
               <label className={labelCls}>Модель *</label>
-              <select value={form.model} onChange={set("model")} className={selectCls} disabled={!form.brand || modelsLoading}>
-                <option value="">{!form.brand ? "Сначала марку" : modelsLoading ? "Загрузка…" : "Выберите модель"}</option>
-                {models.map(m => <option key={itemId(m)} value={itemId(m)}>{itemName(m)}</option>)}
-              </select>
+              <SearchableSelect
+                items={models.map(m => ({ id: itemId(m), name: itemName(m) }))}
+                value={form.model}
+                onChange={(id) => { setForm(f => ({ ...f, model: id })); setPriceResult(null); }}
+                placeholder={!form.brand ? "Сначала марку" : "Выберите модель"}
+                disabled={!form.brand}
+                loading={modelsLoading}
+                className={`${inputCls} cursor-text`}
+              />
             </div>
 
             {/* Год */}
