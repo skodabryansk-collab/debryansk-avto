@@ -63,7 +63,7 @@ async function fetchCmYears(brand: string, model: string): Promise<number[]> {
 
 interface ModificationItem {
   id: string; name: string;
-  drive: string; engineVolume: string; power: string; gear: string; complectation: string;
+  drive: string; engineVolume: string; power: string; gear: string; complectation: string; doors: string;
 }
 
 interface ModOptions {
@@ -73,6 +73,7 @@ interface ModOptions {
   powers: { id: string; name: string }[];
   gearTypes: { id: string; name: string }[];
   complectations: { id: string; name: string }[];
+  doorNumbers: { id: string; name: string }[];
 }
 
 async function fetchCmModificationsOptions(brand: string, model: string, year: string): Promise<ModOptions | null> {
@@ -81,7 +82,7 @@ async function fetchCmModificationsOptions(brand: string, model: string, year: s
   const r = await fetch(`/api/car-catalog/cm-modifications-options?${qs}`);
   if (!r.ok) return null;
   const j = await r.json();
-  return j.ok ? { modifications: j.modifications ?? [], driveTypes: j.driveTypes ?? [], engineVolumes: j.engineVolumes ?? [], powers: j.powers ?? [], gearTypes: j.gearTypes ?? [], complectations: j.complectations ?? [] } : null;
+  return j.ok ? { modifications: j.modifications ?? [], driveTypes: j.driveTypes ?? [], engineVolumes: j.engineVolumes ?? [], powers: j.powers ?? [], gearTypes: j.gearTypes ?? [], complectations: j.complectations ?? [], doorNumbers: j.doorNumbers ?? [] } : null;
 }
 
 interface PredictResult {
@@ -147,7 +148,7 @@ function BuyoutForm() {
   const [step, setStep] = useState<1 | 2>(1);
   const [form, setForm] = useState({
     brand: "", model: "", year: "", mileage: "",
-    modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "",
+    modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", doors: "",
     generation: "", body: "",
     name: "", phone: "", comment: "",
   });
@@ -218,31 +219,35 @@ function BuyoutForm() {
   const filteredGearItems = (modOptions?.gearTypes ?? []).filter(g =>
     (!form.engineVolume && !form.drive) || modsForVolumeDrive.some(m => m.gear === g.name)
   );
+  const filteredDoorItems = (modOptions?.doorNumbers ?? []).filter(d =>
+    (!form.engineVolume && !form.drive) || modsForVolumeDrive.some(m => m.doors === d.id)
+  );
   const matchingMods = mods.filter(m =>
     (!form.engineVolume || m.engineVolume === form.engineVolume) &&
     (!form.drive || m.drive === form.drive) &&
     (!form.power || m.power === form.power) &&
-    (!form.gear || m.gear === form.gear)
+    (!form.gear || m.gear === form.gear) &&
+    (!form.doors || m.doors === form.doors)
   );
   const autoModificationId = matchingMods.length === 1 ? matchingMods[0].id : "";
 
   const modFieldsVisible = modOptionsLoading || (modOptions != null && (
     modOptions.engineVolumes.length > 0 || modOptions.driveTypes.length > 0 ||
     modOptions.powers.length > 0 || modOptions.gearTypes.length > 0 ||
-    modOptions.complectations.length > 0
+    modOptions.complectations.length > 0 || modOptions.doorNumbers.length > 0
   ));
 
   /* Reset dependent fields on parent change */
   useEffect(() => {
-    setForm(f => ({ ...f, model: "", year: "", modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", generation: "", body: "" }));
+    setForm(f => ({ ...f, model: "", year: "", modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", doors: "", generation: "", body: "" }));
   }, [form.brand]);
 
   useEffect(() => {
-    setForm(f => ({ ...f, year: "", modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", generation: "", body: "" }));
+    setForm(f => ({ ...f, year: "", modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", doors: "", generation: "", body: "" }));
   }, [form.model]);
 
   useEffect(() => {
-    setForm(f => ({ ...f, modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", generation: "" }));
+    setForm(f => ({ ...f, modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", doors: "", generation: "" }));
   }, [form.year]);
 
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -250,10 +255,10 @@ function BuyoutForm() {
     setForm(f => {
       const next = { ...f, [key]: value };
       if (key === "engineVolume") {
-        next.modification = ""; next.drive = ""; next.power = ""; next.gear = "";
+        next.modification = ""; next.drive = ""; next.power = ""; next.gear = ""; next.doors = "";
       } else if (key === "drive") {
-        next.modification = ""; next.power = ""; next.gear = "";
-      } else if (["power", "gear", "complectation"].includes(key)) {
+        next.modification = ""; next.power = ""; next.gear = ""; next.doors = "";
+      } else if (["power", "gear", "complectation", "doors"].includes(key)) {
         next.modification = "";
       }
       return next;
@@ -341,7 +346,7 @@ function BuyoutForm() {
     setSubmitted(false);
     setStep(1);
     setPriceResult(null);
-    setForm({ brand: "", model: "", year: "", mileage: "", modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", generation: "", body: "", name: "", phone: "", comment: "" });
+    setForm({ brand: "", model: "", year: "", mileage: "", modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", doors: "", generation: "", body: "", name: "", phone: "", comment: "" });
   };
 
   if (submitted) {
@@ -530,6 +535,20 @@ function BuyoutForm() {
                 {bodies.map(b => <option key={itemId(b)} value={itemId(b)}>{itemName(b)}</option>)}
               </select>
             </div>
+
+            {/* Кол-во дверей (из данных модификаций) */}
+            {filteredDoorItems.length > 0 && (
+              <div>
+                <label className={labelCls}>Кол-во дверей</label>
+                <div className="relative">
+                  <select value={form.doors} onChange={set("doors")} className={`${selectCls} pr-9 appearance-none`}>
+                    <option value="">Не указано</option>
+                    {filteredDoorItems.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+            )}
           </div>
 
           <button
