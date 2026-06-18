@@ -3,6 +3,7 @@ import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { usePageCar } from "@/context/PageCarContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Send, Compass, Phone, Car, Loader2, ChevronDown, ExternalLink, ThumbsUp, ThumbsDown, Shield, Sparkles } from "lucide-react";
+import { SearchableSelect } from "@/components/SearchableSelect";
 
 export interface ChatCarItem {
   id: string;
@@ -853,36 +854,25 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
       <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Оценка автомобиля</p>
 
       {/* Марка */}
-      <select
+      <SearchableSelect
+        items={brands}
         value={brandId}
-        onChange={e => {
-          const sel = brands.find(b => b.id === e.target.value);
-          setBrandId(e.target.value);
-          setBrandName(sel?.name ?? "");
-        }}
-        disabled={brandsLoading}
-        required
-        className={selectCls}
-      >
-        <option value="">{brandsLoading ? "Загрузка марок…" : "Выберите марку"}</option>
-        {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-      </select>
+        onChange={(id, name) => { setBrandId(id); setBrandName(name); }}
+        placeholder="Выберите марку"
+        loading={brandsLoading}
+        className={inputCls}
+      />
 
       {/* Модель */}
-      <select
+      <SearchableSelect
+        items={models}
         value={modelId}
-        onChange={e => {
-          const sel = models.find(m => m.id === e.target.value);
-          setModelId(e.target.value);
-          setModelName(sel?.name ?? "");
-        }}
-        disabled={!brandId || modelsLoading}
-        required
-        className={selectCls}
-      >
-        <option value="">{!brandId ? "Сначала выберите марку" : modelsLoading ? "Загрузка моделей…" : "Выберите модель"}</option>
-        {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-      </select>
+        onChange={(id, name) => { setModelId(id); setModelName(name); }}
+        placeholder={!brandId ? "Сначала выберите марку" : "Выберите модель"}
+        disabled={!brandId}
+        loading={modelsLoading}
+        className={inputCls}
+      />
 
       {/* Год + Поколение */}
       <div className="grid grid-cols-2 gap-1.5">
