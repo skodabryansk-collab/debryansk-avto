@@ -746,17 +746,13 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
       .finally(() => setModOptionsLoading(false));
   }, [brandId, modelId, year, base]);
 
-  const handleModificationChange = useCallback((modId: string) => {
-    const mod = modOptions?.modifications?.find(m => m.id === modId);
-    setModification(modId);
-    if (mod) {
-      if (mod.drive)        setDrive(mod.drive);
-      if (mod.engineVolume) setEngineVolume(mod.engineVolume);
-      if (mod.power)        setPower(mod.power);
-      if (mod.gear)         setGear(mod.gear);
-      if (mod.complectation) setComplectation(mod.complectation);
-    }
-  }, [modOptions]);
+  const handleEngineVolumeChange = useCallback((val: string) => {
+    setEngineVolume(val); setDrive(""); setPower(""); setGear(""); setModification("");
+  }, []);
+
+  const handleDriveChange = useCallback((val: string) => {
+    setDrive(val); setPower(""); setGear(""); setModification("");
+  }, []);
 
   const fmtPrice = (n: number) =>
     new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n) + " ₽";
@@ -770,7 +766,7 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
       // 1. Get real estimate from CM Expert
       const qs = new URLSearchParams({ brandId, modelId, year, mileage });
       if (generationId)   qs.append("generationId",   generationId);
-      if (modification)   qs.append("modificationId", modification);
+      if (chatAutoModId)  qs.append("modificationId", chatAutoModId);
       if (drive)          qs.append("drive",          drive);
       if (engineVolume)   qs.append("engineVolume",   engineVolume);
       if (complectation)  qs.append("complectation",  complectation);
@@ -820,10 +816,34 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
   const inputCls  = "text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-[#0070b8]/50 bg-white placeholder:text-slate-300 w-full";
   const canSubmit = brandId && modelId && year && mileage && name.trim() && phone.trim();
 
+  const chatMods = modOptions?.modifications ?? [];
+  const chatModsForVolume = engineVolume
+    ? chatMods.filter(m => m.engineVolume === engineVolume)
+    : chatMods;
+  const chatFilteredDriveItems = (modOptions?.driveTypes ?? []).filter(d =>
+    !engineVolume || chatModsForVolume.some(m => m.drive === d.name)
+  );
+  const chatModsForVolumeDrive = drive
+    ? chatModsForVolume.filter(m => m.drive === drive)
+    : chatModsForVolume;
+  const chatFilteredPowerItems = (modOptions?.powers ?? []).filter(p =>
+    (!engineVolume && !drive) || chatModsForVolumeDrive.some(m => m.power === p.name)
+  );
+  const chatFilteredGearItems = (modOptions?.gearTypes ?? []).filter(g =>
+    (!engineVolume && !drive) || chatModsForVolumeDrive.some(m => m.gear === g.name)
+  );
+  const chatMatchingMods = chatMods.filter(m =>
+    (!engineVolume || m.engineVolume === engineVolume) &&
+    (!drive || m.drive === drive) &&
+    (!power || m.power === power) &&
+    (!gear || m.gear === gear)
+  );
+  const chatAutoModId = chatMatchingMods.length === 1 ? chatMatchingMods[0].id : "";
+
   const hasModData = modOptions && (
-    modOptions.modifications.length > 0 || modOptions.driveTypes.length > 0 ||
-    modOptions.engineVolumes.length > 0 || modOptions.powers.length > 0 ||
-    modOptions.gearTypes.length > 0 || modOptions.complectations.length > 0
+    modOptions.engineVolumes.length > 0 || modOptions.driveTypes.length > 0 ||
+    modOptions.powers.length > 0 || modOptions.gearTypes.length > 0 ||
+    modOptions.complectations.length > 0
   );
 
   // Result state
@@ -850,7 +870,7 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-3 rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2">
+    <form onSubmit={handleSubmit} className="mt-3 rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2 overflow-y-auto max-h-[70vh]">
       <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Оценка автомобиля</p>
 
       {/* Марка */}
@@ -912,49 +932,34 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
       {/* Модификация и технические параметры */}
       {year && (modOptionsLoading || hasModData) && (
         <div className="space-y-2">
-          {/* Модификация */}
-          {(modOptionsLoading || (modOptions?.modifications ?? []).length > 0) && (
-            <select
-              value={modification}
-              onChange={e => handleModificationChange(e.target.value)}
-              disabled={modOptionsLoading}
-              className={selectCls}
-            >
-              <option value="">{modOptionsLoading ? "Загрузка модификаций…" : "Модификация (опционально)"}</option>
-              {(modOptions?.modifications ?? []).map(m => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-          )}
-
           {!modOptionsLoading && hasModData && (
             <div className="grid grid-cols-2 gap-1.5">
               {/* Объём */}
               {(modOptions?.engineVolumes ?? []).length > 0 && (
-                <select value={engineVolume} onChange={e => { setEngineVolume(e.target.value); setModification(""); }} className={selectCls}>
+                <select value={engineVolume} onChange={e => handleEngineVolumeChange(e.target.value)} className={selectCls}>
                   <option value="">Объём дв.</option>
                   {(modOptions?.engineVolumes ?? []).map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
                 </select>
               )}
               {/* Привод */}
               {(modOptions?.driveTypes ?? []).length > 0 && (
-                <select value={drive} onChange={e => { setDrive(e.target.value); setModification(""); }} className={selectCls}>
+                <select value={drive} onChange={e => handleDriveChange(e.target.value)} className={selectCls}>
                   <option value="">Привод</option>
-                  {(modOptions?.driveTypes ?? []).map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                  {chatFilteredDriveItems.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                 </select>
               )}
               {/* Мощность */}
               {(modOptions?.powers ?? []).length > 0 && (
                 <select value={power} onChange={e => { setPower(e.target.value); setModification(""); }} className={selectCls}>
                   <option value="">Мощность</option>
-                  {(modOptions?.powers ?? []).map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                  {chatFilteredPowerItems.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                 </select>
               )}
               {/* КПП */}
               {(modOptions?.gearTypes ?? []).length > 0 && (
                 <select value={gear} onChange={e => { setGear(e.target.value); setModification(""); }} className={selectCls}>
                   <option value="">Тип КПП</option>
-                  {(modOptions?.gearTypes ?? []).map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
+                  {chatFilteredGearItems.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
                 </select>
               )}
             </div>
