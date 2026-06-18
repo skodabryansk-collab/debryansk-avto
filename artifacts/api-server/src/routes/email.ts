@@ -167,6 +167,27 @@ function hr() {
   return `<div style="height:1px;background:#e8edf2;margin:18px 28px 0"></div>`;
 }
 
+function chatHistorySection(history: string) {
+  if (!history) return "";
+  const lines = history.split("\n").filter(l => l.trim());
+  if (lines.length === 0) return "";
+  const rows = lines.map(line => {
+    if (line.startsWith("Клиент: ")) {
+      const text = line.slice(8).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return `<tr><td style="padding:4px 0;vertical-align:top;font-size:11px;color:#0070b8;font-weight:700;font-family:Arial,sans-serif;white-space:nowrap;width:90px">👤 Клиент:</td><td style="padding:4px 0 4px 8px;font-size:12px;color:#1a2332;font-family:Arial,sans-serif;line-height:1.5">${text}</td></tr>`;
+    }
+    const sepIdx = line.indexOf(": ");
+    const text = (sepIdx >= 0 ? line.slice(sepIdx + 2) : line).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return `<tr><td style="padding:4px 0;vertical-align:top;font-size:11px;color:#64748b;font-weight:700;font-family:Arial,sans-serif;white-space:nowrap;width:90px">🤖 Бот:</td><td style="padding:4px 0 4px 8px;font-size:12px;color:#64748b;font-family:Arial,sans-serif;line-height:1.5">${text}</td></tr>`;
+  }).join("");
+  return hr() + `<div style="margin:14px 28px 0;font-family:Arial,sans-serif">
+    <div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Диалог с навигатором</div>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px">
+      <table cellpadding="0" cellspacing="0" style="width:100%"><tbody>${rows}</tbody></table>
+    </div>
+  </div>`;
+}
+
 /* ── HTML builders for each form ── */
 
 function buildCallbackHtml(d: Record<string, string>) {
@@ -178,6 +199,7 @@ function buildCallbackHtml(d: Record<string, string>) {
       ["Телефон",         d.phone],
       ["Дата / время",    new Date().toLocaleString("ru-RU")],
     ]) +
+    chatHistorySection(d.chatHistory ?? "") +
     hr() +
     actionBlock(d.phone, undefined, "Перезвонить клиенту", BLUE),
     BLUE
@@ -193,11 +215,13 @@ function buildTestDriveHtml(d: Record<string, string>) {
     dataTable([
       ["Имя клиента",     d.name],
       ["Телефон",         d.phone],
+      ["Модель",          d.model],
       ["Желаемая дата",   d.preferredDate],
       ["Желаемое время",  d.preferredTime],
       ["Дилерский центр", d.dealer],
       ["Комментарий",     d.comment],
     ]) +
+    chatHistorySection(d.chatHistory ?? "") +
     hr() +
     actionBlock(d.phone, undefined, "Подтвердить запись и позвонить клиенту", accent),
     accent
@@ -220,6 +244,7 @@ function buildCreditHtml(d: Record<string, string>) {
       ["Итоговая сумма",       d.totalAmount],
       ["Дилерский центр",      d.dealer],
     ]) +
+    chatHistorySection(d.chatHistory ?? "") +
     hr() +
     actionBlock(d.phone, undefined, "Проконсультировать клиента по кредиту", accent),
     accent
@@ -246,14 +271,18 @@ function buildTradeInHtml(d: Record<string, string>) {
       ["Имя клиента",    d.name],
       ["Телефон",        d.phone],
       ["Марка / Модель", d.brand && d.model ? `${d.brand} ${d.model}` : (d.brand || d.model)],
-      ["Год выпуска",    d.year],
-      ["Пробег",         d.mileage ? Number(d.mileage).toLocaleString("ru-RU") + " км" : undefined],
-      ["Состояние",      d.condition],
-      ["Владельцев",     d.owners],
+      ["Год выпуска",        d.year],
+      ["Пробег",             d.mileage ? Number(d.mileage).toLocaleString("ru-RU") + " км" : undefined],
+      ["Объём двигателя",    d.engineVolume],
+      ["Тип привода",        d.drive],
+      ["Комплектация",       d.complectation],
+      ["Состояние",          d.condition],
+      ["Владельцев",         d.owners],
       ["Онлайн-оценка",  d.estimateMin && d.estimateMax ? `${Number(d.estimateMin).toLocaleString("ru-RU")} — ${Number(d.estimateMax).toLocaleString("ru-RU")} ₽` : d.estimate],
       ["Комментарий",    d.comment],
     ]) +
     targetSection +
+    chatHistorySection(d.chatHistory ?? "") +
     hr() +
     actionBlock(d.phone, undefined, "Связаться и уточнить оценку", accent),
     accent
@@ -349,6 +378,7 @@ function buildServiceHtml(d: Record<string, string>) {
       ["Что нужно сделать", d.comment],
       ["Источник",         d.source || "Навигатор (чат)"],
     ]) +
+    chatHistorySection(d.chatHistory ?? "") +
     hr() +
     actionBlock(d.phone, undefined, "Записать клиента на сервис", accent),
     accent
@@ -403,7 +433,13 @@ router.post(
       }
 
       const clientName = body.name || "Клиент";
-      const subject = `${SUBJECTS[type]} — ${clientName} | debryansk-auto.ru`;
+      let subject = `${SUBJECTS[type]} — ${clientName} | debryansk-auto.ru`;
+      if (type === "testdrive") {
+        const modelPart = body.model ? ` — ${body.model}` : "";
+        const datePart = body.preferredDate ? `, ${body.preferredDate}` : "";
+        const timePart = body.preferredTime ? ` в ${body.preferredTime}` : "";
+        subject = `🏁 Тест-драйв — ${clientName}${modelPart}${datePart}${timePart} | debryansk-auto.ru`;
+      }
 
       // Attachments
       const files = (req.files || []) as Express.Multer.File[];
