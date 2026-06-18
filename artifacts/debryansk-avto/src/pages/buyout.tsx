@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
+import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { motion } from "framer-motion";
 import {
   TrendingUp, Clock, Shield, BadgeCheck,
   Phone, MessageSquare, Car, Gauge, CheckCircle,
   ArrowRight, Banknote, Tag, AlertCircle,
+  ChevronDown, Loader2,
 } from "lucide-react";
 import SEO from "@/components/SEO";
 import Layout from "@/components/Layout";
@@ -49,6 +51,38 @@ async function fetchCmBodies(brand: string, model: string): Promise<CmItem[]> {
   return j.ok ? (j.data ?? []) : [];
 }
 
+async function fetchCmYears(brand: string, model: string): Promise<number[]> {
+  if (!brand || !model) return [];
+  const qs = new URLSearchParams({ brand, model });
+  const r = await fetch(`/api/car-catalog/cm-years?${qs}`);
+  if (!r.ok) return [];
+  const j = await r.json();
+  return j.ok ? (j.data ?? []) : [];
+}
+
+interface ModificationItem {
+  id: string; name: string;
+  drive: string; engineVolume: string; power: string; gear: string; complectation: string;
+}
+
+interface ModOptions {
+  modifications: ModificationItem[];
+  driveTypes: { id: string; name: string }[];
+  engineVolumes: { id: string; name: string }[];
+  powers: { id: string; name: string }[];
+  gearTypes: { id: string; name: string }[];
+  complectations: { id: string; name: string }[];
+}
+
+async function fetchCmModificationsOptions(brand: string, model: string, year: string): Promise<ModOptions | null> {
+  if (!brand || !model || !year) return null;
+  const qs = new URLSearchParams({ brand, model, year });
+  const r = await fetch(`/api/car-catalog/cm-modifications-options?${qs}`);
+  if (!r.ok) return null;
+  const j = await r.json();
+  return j.ok ? { modifications: j.modifications ?? [], driveTypes: j.driveTypes ?? [], engineVolumes: j.engineVolumes ?? [], powers: j.powers ?? [], gearTypes: j.gearTypes ?? [], complectations: j.complectations ?? [] } : null;
+}
+
 interface PredictResult {
   ok: true;
   buyoutMin: number;
@@ -58,6 +92,7 @@ interface PredictResult {
 async function fetchCmExpertPredict(params: {
   brandId: string; modelId: string; year: string; mileage: string;
   bodyId?: string; generationId?: string;
+  drive?: string; engineVolume?: string; complectation?: string;
 }): Promise<PredictResult | { ok: false }> {
   const qs = new URLSearchParams({
     brandId: params.brandId,
@@ -67,6 +102,9 @@ async function fetchCmExpertPredict(params: {
   });
   if (params.bodyId)       qs.append("bodyId", params.bodyId);
   if (params.generationId) qs.append("generationId", params.generationId);
+  if (params.drive)        qs.append("drive", params.drive);
+  if (params.engineVolume) qs.append("engineVolume", params.engineVolume);
+  if (params.complectation) qs.append("complectation", params.complectation);
   const r = await fetch(`/api/car-catalog/cm-expert-predict?${qs}`);
   if (!r.ok) return { ok: false };
   return r.json();
@@ -87,10 +125,6 @@ function FadeIn({ children, delay = 0, className = "" }: { children: React.React
   );
 }
 
-/* ── Year range ─────────────────────────────────────────────── */
-const currentYear = new Date().getFullYear();
-const years = Array.from({ length: currentYear - 1999 }, (_, i) => currentYear - i);
-
 /* ── Price helpers ───────────────────────────────────────────── */
 function formatPriceRUB(n: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n) + " ₽";
@@ -110,6 +144,7 @@ function BuyoutForm() {
   const [step, setStep] = useState<1 | 2>(1);
   const [form, setForm] = useState({
     brand: "", model: "", year: "", mileage: "",
+    modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "",
     generation: "", body: "",
     name: "", phone: "", comment: "",
   });
@@ -132,6 +167,14 @@ function BuyoutForm() {
     staleTime: 24 * 60 * 60 * 1000,
   });
 
+  /* CM Expert years — depends on brand + model */
+  const { data: cmYears = [], isLoading: yearsLoading } = useQuery({
+    queryKey: ["cm-years", form.brand, form.model],
+    queryFn: () => fetchCmYears(form.brand, form.model),
+    enabled: !!form.brand && !!form.model,
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+
   /* CM Expert generations — depends on brand + model + year */
   const { data: generations = [], isLoading: generationsLoading } = useQuery({
     queryKey: ["cm-generations", form.brand, form.model, form.year],
@@ -148,21 +191,60 @@ function BuyoutForm() {
     staleTime: 24 * 60 * 60 * 1000,
   });
 
+  /* CM Expert modification options — depends on brand + model + year */
+  const { data: modOptions, isLoading: modOptionsLoading } = useQuery({
+    queryKey: ["cm-modifications-options", form.brand, form.model, form.year],
+    queryFn: () => fetchCmModificationsOptions(form.brand, form.model, form.year),
+    enabled: !!form.brand && !!form.model && !!form.year,
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+
+  const modFieldsVisible = modOptionsLoading || (modOptions != null && (
+    modOptions.modifications.length > 0 || modOptions.engineVolumes.length > 0 ||
+    modOptions.driveTypes.length > 0 || modOptions.powers.length > 0 ||
+    modOptions.gearTypes.length > 0 || modOptions.complectations.length > 0
+  ));
+
   /* Reset dependent fields on parent change */
   useEffect(() => {
-    setForm(f => ({ ...f, model: "", generation: "", body: "" }));
+    setForm(f => ({ ...f, model: "", year: "", modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", generation: "", body: "" }));
   }, [form.brand]);
 
   useEffect(() => {
-    setForm(f => ({ ...f, generation: "", body: "" }));
+    setForm(f => ({ ...f, year: "", modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", generation: "", body: "" }));
   }, [form.model]);
 
   useEffect(() => {
-    setForm(f => ({ ...f, generation: "" }));
+    setForm(f => ({ ...f, modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", generation: "" }));
   }, [form.year]);
 
-  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    setForm(f => ({ ...f, [key]: e.target.value }));
+  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setForm(f => {
+      const next = { ...f, [key]: value };
+      if (["drive", "engineVolume", "power", "gear", "complectation"].includes(key)) {
+        next.modification = "";
+      }
+      return next;
+    });
+    setPriceResult(null);
+  };
+
+  const handleModificationChange = (modId: string) => {
+    const mod = modOptions?.modifications?.find(m => m.id === modId);
+    setForm(f => ({
+      ...f,
+      modification: modId,
+      ...(mod ? {
+        drive: mod.drive || f.drive,
+        engineVolume: mod.engineVolume || f.engineVolume,
+        power: mod.power || f.power,
+        gear: mod.gear || f.gear,
+        complectation: mod.complectation || f.complectation,
+      } : {}),
+    }));
+    setPriceResult(null);
+  };
 
   const handleCalculate = async () => {
     if (!form.brand || !form.model) {
@@ -184,8 +266,11 @@ function BuyoutForm() {
         modelId:      form.model,
         year:         form.year,
         mileage:      form.mileage,
-        bodyId:       form.body       || undefined,
-        generationId: form.generation || undefined,
+        bodyId:       form.body          || undefined,
+        generationId: form.generation    || undefined,
+        drive:        form.drive         || undefined,
+        engineVolume: form.engineVolume  || undefined,
+        complectation: form.complectation || undefined,
       });
       setPriceResult(result);
       setStep(2);
@@ -199,8 +284,8 @@ function BuyoutForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.phone) {
-      toast({ title: "Укажите имя и телефон", variant: "destructive" });
+    if (!form.name || !isPhoneValid(form.phone)) {
+      toast({ title: "Укажите корректный номер телефона", variant: "destructive" });
       return;
     }
     try {
@@ -208,11 +293,20 @@ function BuyoutForm() {
       fd.append("type", "buyout");
       const brandName = brands.find(b => itemId(b) === form.brand)?.name ?? form.brand;
       const modelName = models.find(m => itemId(m) === form.model)?.name ?? form.model;
-      Object.entries(form).forEach(([k, v]) => {
-        if (k !== "brand" && k !== "model") fd.append(k, v);
-      });
       fd.append("brand", brandName);
       fd.append("model", modelName);
+      fd.append("year", form.year);
+      fd.append("mileage", form.mileage);
+      if (form.drive)          fd.append("drive", form.drive);
+      if (form.engineVolume)   fd.append("engineVolume", form.engineVolume);
+      if (form.power)          fd.append("power", form.power);
+      if (form.gear)           fd.append("gear", form.gear);
+      if (form.complectation)  fd.append("complectation", form.complectation);
+      if (form.generation)     fd.append("generation", form.generation);
+      if (form.body)           fd.append("body", form.body);
+      if (form.comment)        fd.append("comment", form.comment);
+      fd.append("name", form.name);
+      fd.append("phone", form.phone);
       if (priceResult?.ok) {
         fd.append("estimateMin", String(priceResult.buyoutMin));
         fd.append("estimateMax", String(priceResult.buyoutMax));
@@ -231,7 +325,7 @@ function BuyoutForm() {
     setSubmitted(false);
     setStep(1);
     setPriceResult(null);
-    setForm({ brand: "", model: "", year: "", mileage: "", generation: "", body: "", name: "", phone: "", comment: "" });
+    setForm({ brand: "", model: "", year: "", mileage: "", modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", generation: "", body: "", name: "", phone: "", comment: "" });
   };
 
   if (submitted) {
@@ -298,9 +392,9 @@ function BuyoutForm() {
             {/* Год */}
             <div>
               <label className={labelCls}>Год *</label>
-              <select value={form.year} onChange={set("year")} className={selectCls}>
-                <option value="">Выберите год</option>
-                {years.map(y => <option key={y} value={y}>{y}</option>)}
+              <select value={form.year} onChange={set("year")} className={selectCls} disabled={!form.brand || !form.model || yearsLoading}>
+                <option value="">{!form.model ? "Сначала модель" : yearsLoading ? "Загрузка…" : cmYears.length ? "Выберите год" : "Не указано"}</option>
+                {cmYears.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
 
@@ -310,6 +404,111 @@ function BuyoutForm() {
               <input type="number" min="0" value={form.mileage} onChange={set("mileage")} placeholder="Например, 75 000" className={inputCls} />
             </div>
 
+          </div>
+
+          {/* ── Modification options (shown when year selected) ── */}
+          {modFieldsVisible && (
+            <div className="space-y-3 pt-1">
+              {/* Modification select — full width */}
+              {(modOptionsLoading || (modOptions?.modifications ?? []).length > 0) && (
+                <div>
+                  <label className={labelCls}>Модификация</label>
+                  <div className="relative">
+                    <select
+                      value={form.modification}
+                      onChange={e => handleModificationChange(e.target.value)}
+                      disabled={modOptionsLoading}
+                      className={`${selectCls} pr-9 appearance-none`}
+                    >
+                      <option value="">{modOptionsLoading ? "Загрузка…" : "Выберите модификацию"}</option>
+                      {(modOptions?.modifications ?? []).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                    {modOptionsLoading
+                      ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    }
+                  </div>
+                  {form.modification && (
+                    <p className="text-[11px] text-[#0070b8] mt-1">✓ Технические параметры заполнены автоматически</p>
+                  )}
+                </div>
+              )}
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                {/* Объём двигателя */}
+                {(modOptionsLoading || (modOptions?.engineVolumes ?? []).length > 0) && (
+                  <div>
+                    <label className={labelCls}>Объём двигателя</label>
+                    <div className="relative">
+                      <select value={form.engineVolume} onChange={set("engineVolume")} disabled={modOptionsLoading} className={`${selectCls} pr-9 appearance-none`}>
+                        <option value="">{modOptionsLoading ? "Загрузка…" : "Не указан"}</option>
+                        {(modOptions?.engineVolumes ?? []).map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
+                      </select>
+                      {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                    </div>
+                  </div>
+                )}
+
+                {/* Тип привода */}
+                {(modOptionsLoading || (modOptions?.driveTypes ?? []).length > 0) && (
+                  <div>
+                    <label className={labelCls}>Тип привода</label>
+                    <div className="relative">
+                      <select value={form.drive} onChange={set("drive")} disabled={modOptionsLoading} className={`${selectCls} pr-9 appearance-none`}>
+                        <option value="">{modOptionsLoading ? "Загрузка…" : "Не указан"}</option>
+                        {(modOptions?.driveTypes ?? []).map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                      </select>
+                      {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                    </div>
+                  </div>
+                )}
+
+                {/* Мощность */}
+                {(modOptionsLoading || (modOptions?.powers ?? []).length > 0) && (
+                  <div>
+                    <label className={labelCls}>Мощность, л.с.</label>
+                    <div className="relative">
+                      <select value={form.power} onChange={set("power")} disabled={modOptionsLoading} className={`${selectCls} pr-9 appearance-none`}>
+                        <option value="">{modOptionsLoading ? "Загрузка…" : "Не указана"}</option>
+                        {(modOptions?.powers ?? []).map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                      </select>
+                      {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                    </div>
+                  </div>
+                )}
+
+                {/* Тип КПП */}
+                {(modOptionsLoading || (modOptions?.gearTypes ?? []).length > 0) && (
+                  <div>
+                    <label className={labelCls}>Тип КПП</label>
+                    <div className="relative">
+                      <select value={form.gear} onChange={set("gear")} disabled={modOptionsLoading} className={`${selectCls} pr-9 appearance-none`}>
+                        <option value="">{modOptionsLoading ? "Загрузка…" : "Не указан"}</option>
+                        {(modOptions?.gearTypes ?? []).map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
+                      </select>
+                      {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Комплектация — full width */}
+              {(modOptionsLoading || (modOptions?.complectations ?? []).length > 0) && (
+                <div>
+                  <label className={labelCls}>Комплектация</label>
+                  <div className="relative">
+                    <select value={form.complectation} onChange={set("complectation")} disabled={modOptionsLoading} className={`${selectCls} pr-9 appearance-none`}>
+                      <option value="">{modOptionsLoading ? "Загрузка…" : "Не указана"}</option>
+                      {(modOptions?.complectations ?? []).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                    {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="grid sm:grid-cols-2 gap-4">
             {/* Поколение */}
             <div>
               <label className={labelCls}>Поколение</label>
@@ -331,7 +530,6 @@ function BuyoutForm() {
                 {bodies.map(b => <option key={itemId(b)} value={itemId(b)}>{itemName(b)}</option>)}
               </select>
             </div>
-
           </div>
 
           <button
@@ -385,7 +583,7 @@ function BuyoutForm() {
             </div>
             <div>
               <label className={labelCls}>Телефон *</label>
-              <input type="tel" value={form.phone} onChange={set("phone")} placeholder="+7 (___) ___-__-__" className={inputCls} />
+              <input type="tel" inputMode="tel" maxLength={18} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: formatPhone(e.target.value) }))} placeholder="+7 (___) ___-__-__" className={inputCls} />
             </div>
           </div>
 
@@ -582,7 +780,7 @@ export default function BuyoutPage() {
               Выкуп и комиссия
             </p>
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-4 leading-tight">
-              Продайте автомобиль на Территории автомобилей
+              Выкуп и комиссия автомобилей в Брянске
             </h1>
             <p className="text-slate-400 text-sm sm:text-base max-w-xl mb-8">
               Два пути — по честной цене. Срочный выкуп: деньги в тот же день. Комиссионная продажа: мы берём всё на себя и продаём по максимуму. За вами — решение, за нами — сделка.
