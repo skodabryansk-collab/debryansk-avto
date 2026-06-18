@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import {
   X, Car, Gauge, Calendar, Phone, User, ArrowRightLeft,
-  CheckCircle, Tag, ChevronDown, Loader2, Users, AlertCircle
+  CheckCircle, ChevronDown, Loader2, Users, LayoutPanelTop, Calculator
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,7 @@ interface ModificationItem {
   gear: string;
   complectation: string;
   doors: string;
+  bodyId: string;
 }
 
 interface EstimateResult {
@@ -48,14 +49,15 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
   const [submitted, setSubmitted] = useState(false);
   const [estimateResult, setEstimateResult] = useState<EstimateResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [estimating, setEstimating] = useState(false);
 
   const [brands, setBrands] = useState<CmItem[]>([]);
   const [models, setModels] = useState<CmItem[]>([]);
   const [years, setYears] = useState<number[]>([]);
+  const [bodies, setBodies] = useState<CmItem[]>([]);
   const [brandsLoading, setBrandsLoading] = useState(true);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [yearsLoading, setYearsLoading] = useState(false);
+  const [bodiesLoading, setBodiesLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     brand: "",
@@ -69,6 +71,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
     gear: "",
     complectation: "",
     doors: "",
+    body: "",
     condition: "",
     owners: "",
     name: "",
@@ -130,6 +133,16 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
   }, [formData.brand, formData.model]);
 
   useEffect(() => {
+    if (!formData.brand || !formData.model) { setBodies([]); return; }
+    setBodiesLoading(true);
+    fetch(`/api/car-catalog/cm-bodies?brand=${encodeURIComponent(formData.brand)}&model=${encodeURIComponent(formData.model)}`)
+      .then(r => r.json())
+      .then(data => setBodies(data.ok ? (data.data ?? []) : []))
+      .catch(() => setBodies([]))
+      .finally(() => setBodiesLoading(false));
+  }, [formData.brand, formData.model]);
+
+  useEffect(() => {
     if (!formData.brand || !formData.model || !formData.year) {
       setModOptions(null);
       return;
@@ -139,8 +152,10 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
     fetch(`/api/car-catalog/cm-modifications-options?${qs}`)
       .then(r => r.json())
       .then(data => {
-        if (data.ok) setModOptions({ driveTypes: data.driveTypes ?? [], engineVolumes: data.engineVolumes ?? [], complectations: data.complectations ?? [], powers: data.powers ?? [], gearTypes: data.gearTypes ?? [], doorNumbers: data.doorNumbers ?? [], modifications: data.modifications ?? [] });
-        else setModOptions(null);
+        if (data.ok) {
+          const mods = (data.modifications ?? []).map((m: any) => ({ ...m, bodyId: m.bodyId ?? "" }));
+          setModOptions({ driveTypes: data.driveTypes ?? [], engineVolumes: data.engineVolumes ?? [], complectations: data.complectations ?? [], powers: data.powers ?? [], gearTypes: data.gearTypes ?? [], doorNumbers: data.doorNumbers ?? [], modifications: mods });
+        } else setModOptions(null);
       })
       .catch(() => setModOptions(null))
       .finally(() => setModOptionsLoading(false));
@@ -150,16 +165,19 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
     setFormData(prev => {
       const next = { ...prev, [field]: value };
       if (field === "brand") {
-        next.model = ""; next.year = ""; next.modification = "";
+        next.model = ""; next.year = ""; next.body = ""; next.modification = "";
         next.drive = ""; next.engineVolume = ""; next.power = ""; next.gear = ""; next.complectation = ""; next.doors = "";
       }
       if (field === "model") {
-        next.year = ""; next.modification = "";
+        next.year = ""; next.body = ""; next.modification = "";
         next.drive = ""; next.engineVolume = ""; next.power = ""; next.gear = ""; next.complectation = ""; next.doors = "";
       }
       if (field === "year") {
         next.modification = "";
         next.drive = ""; next.engineVolume = ""; next.power = ""; next.gear = ""; next.complectation = ""; next.doors = "";
+      }
+      if (field === "body") {
+        next.modification = ""; next.doors = "";
       }
       if (field === "engineVolume") {
         next.modification = ""; next.drive = ""; next.power = ""; next.gear = ""; next.doors = "";
@@ -172,12 +190,13 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
       }
       return next;
     });
-    setEstimateResult(null);
   }, []);
 
-  const handleEstimate = useCallback(async () => {
-    if (!formData.brand || !formData.model || !formData.year || !formData.mileage) return;
-    setEstimating(true);
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name.trim() || !isPhoneValid(formData.phone)) return;
+    setLoading(true);
+    let estimate: EstimateResult | null = null;
     try {
       const params = new URLSearchParams({
         brandId: formData.brand,
@@ -185,24 +204,16 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
         year: formData.year,
         mileage: formData.mileage,
       });
-      if (autoModificationId)  params.append("modificationId", autoModificationId);
-      if (formData.drive)         params.append("drive", formData.drive);
-      if (formData.engineVolume)  params.append("engineVolume", formData.engineVolume);
-      if (formData.complectation) params.append("complectation", formData.complectation);
+      if (autoModificationId)      params.append("modificationId", autoModificationId);
+      if (formData.body)           params.append("bodyId",         formData.body);
+      if (formData.drive)          params.append("drive",          formData.drive);
+      if (formData.engineVolume)   params.append("engineVolume",   formData.engineVolume);
+      if (formData.complectation)  params.append("complectation",  formData.complectation);
+      if (formData.owners)         params.append("ownersNumber",   formData.owners);
       const resp = await fetch(`/api/car-catalog/cm-expert-predict?${params}`);
-      const data = await resp.json();
-      setEstimateResult(data);
-    } catch {
-      setEstimateResult({ ok: false, message: "Ошибка при расчете" });
-    } finally {
-      setEstimating(false);
-    }
-  }, [formData]);
+      estimate = await resp.json();
+    } catch { estimate = { ok: false }; }
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name.trim() || !isPhoneValid(formData.phone)) return;
-    setLoading(true);
     try {
       const fd = new FormData();
       fd.append("type", "tradein");
@@ -214,17 +225,19 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
       fd.append("model", modelName);
       fd.append("year", formData.year);
       fd.append("mileage", formData.mileage);
+      if (formData.body) fd.append("bodyName", bodies.find(b => b.id === formData.body)?.name ?? formData.body);
       if (formData.drive) fd.append("drive", formData.drive);
       if (formData.engineVolume) fd.append("engineVolume", formData.engineVolume);
       if (formData.power) fd.append("power", formData.power);
       if (formData.gear) fd.append("gear", formData.gear);
+      if (formData.doors) fd.append("doors", (modOptions?.doorNumbers ?? []).find(d => d.id === formData.doors)?.name ?? formData.doors);
       if (formData.complectation) fd.append("complectation", formData.complectation);
-      fd.append("condition", formData.condition);
-      fd.append("owners", formData.owners);
-      fd.append("comment", formData.comment);
-      if (estimateResult?.ok && estimateResult.buyoutMin && estimateResult.buyoutMax) {
-        fd.append("estimateMin", String(estimateResult.buyoutMin));
-        fd.append("estimateMax", String(estimateResult.buyoutMax));
+      if (formData.condition) fd.append("condition", formData.condition);
+      if (formData.owners) fd.append("owners", formData.owners);
+      if (formData.comment) fd.append("comment", formData.comment);
+      if (estimate?.ok && estimate.buyoutMin && estimate.buyoutMax) {
+        fd.append("estimateMin", String(estimate.buyoutMin));
+        fd.append("estimateMax", String(estimate.buyoutMax));
       }
       if (targetCar) {
         fd.append("targetMark", targetCar.mark);
@@ -235,9 +248,11 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
       }
       await fetch("/api/send-email", { method: "POST", body: fd });
     } catch (_) {}
+
+    setEstimateResult(estimate);
     setSubmitted(true);
     setLoading(false);
-  }, [formData, estimateResult, brands, models]);
+  }, [formData, brands, models, bodies, modOptions]);
 
   const mods = modOptions?.modifications ?? [];
   const modsForVolume = formData.engineVolume
@@ -255,19 +270,23 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
   const filteredGearItems = (modOptions?.gearTypes ?? []).filter(g =>
     (!formData.engineVolume && !formData.drive) || modsForVolumeDrive.some(m => m.gear === g.name)
   );
+  const modsForBody = formData.body
+    ? modsForVolumeDrive.filter(m => m.bodyId === formData.body)
+    : modsForVolumeDrive;
   const filteredDoorItems = (modOptions?.doorNumbers ?? []).filter(d =>
-    (!formData.engineVolume && !formData.drive) || modsForVolumeDrive.some(m => m.doors === d.id)
+    (!formData.engineVolume && !formData.drive && !formData.body) || modsForBody.some(m => m.doors === d.id)
   );
   const matchingMods = mods.filter(m =>
     (!formData.engineVolume || m.engineVolume === formData.engineVolume) &&
     (!formData.drive || m.drive === formData.drive) &&
     (!formData.power || m.power === formData.power) &&
     (!formData.gear || m.gear === formData.gear) &&
-    (!formData.doors || m.doors === formData.doors)
+    (!formData.doors || m.doors === formData.doors) &&
+    (!formData.body || m.bodyId === formData.body)
   );
   const autoModificationId = matchingMods.length === 1 ? matchingMods[0].id : "";
 
-  const canEstimate = formData.brand && formData.model && formData.year && formData.mileage;
+  const canSubmit = !!(formData.brand && formData.model && formData.year && formData.mileage && formData.name.trim() && isPhoneValid(formData.phone));
 
 
   return (
@@ -295,18 +314,33 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="flex flex-col items-center justify-center py-16 px-6 text-center"
+              className="flex flex-col items-center justify-center py-10 px-6 text-center"
             >
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 200, damping: 15 }}
               >
-                <CheckCircle className="w-16 h-16 text-[#87b63c] mb-4" />
+                <CheckCircle className="w-14 h-14 text-[#87b63c] mb-3" />
               </motion.div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Заявка отправлена!</h3>
-              <p className="text-slate-500 text-sm">Оценщик свяжется для уточнения деталей</p>
-              <Button onClick={onClose} className="mt-6 w-full h-12 bg-gradient-to-r from-[#d97706] to-[#b45309] text-white font-bold rounded-xl hover:opacity-90">
+              <h3 className="text-xl font-bold text-slate-900 mb-1">Заявка отправлена!</h3>
+              <p className="text-slate-500 text-sm mb-4">Оценщик свяжется для уточнения деталей</p>
+
+              {estimateResult?.ok && estimateResult.buyoutMin && estimateResult.buyoutMax ? (
+                <div className="w-full bg-[#d97706]/10 border border-[#d97706]/25 rounded-xl p-4 mb-4">
+                  <p className="text-xs font-semibold text-[#b45309] uppercase tracking-wider mb-1">Предварительная оценка</p>
+                  <p className="text-2xl font-extrabold text-[#d97706]">
+                    {estimateResult.buyoutMin.toLocaleString("ru-RU")} — {estimateResult.buyoutMax.toLocaleString("ru-RU")} ₽
+                  </p>
+                  <p className="text-xs text-[#d97706]/60 mt-1">Точная стоимость определяется после осмотра</p>
+                </div>
+              ) : (
+                <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+                  <p className="text-sm text-slate-600">Менеджер назовёт точную цену при звонке</p>
+                </div>
+              )}
+
+              <Button onClick={onClose} className="w-full h-12 bg-gradient-to-r from-[#d97706] to-[#b45309] text-white font-bold rounded-xl hover:opacity-90">
                 Закрыть
               </Button>
             </motion.div>
@@ -360,6 +394,30 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                       className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
                     />
                   </div>
+
+                  {/* Body type */}
+                  {(bodiesLoading || bodies.length > 0) && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-slate-500 flex items-center gap-1">
+                        <LayoutPanelTop className="w-3 h-3" />Тип кузова
+                      </Label>
+                      <div className="relative">
+                        <select
+                          value={formData.body}
+                          onChange={(e) => handleChange("body", e.target.value)}
+                          disabled={bodiesLoading || !formData.brand || !formData.model}
+                          className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm appearance-none focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
+                        >
+                          <option value="">{bodiesLoading ? "Загрузка..." : "Не указан"}</option>
+                          {bodies.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                        {bodiesLoading
+                          ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        }
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-3">
                     {/* Year */}
@@ -578,51 +636,6 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                     </div>
                   </div>
 
-                  {/* Estimate button */}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleEstimate}
-                    disabled={!canEstimate || estimating}
-                    className="w-full h-10 border-[#d97706]/30 text-[#d97706] hover:bg-[#d97706]/5 disabled:opacity-50"
-                  >
-                    {estimating ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Tag className="w-4 h-4 mr-2" />
-                    )}
-                    {estimating ? "Расчет..." : "Рассчитать оценку"}
-                  </Button>
-
-                  {/* Estimate result */}
-                  {estimateResult && (
-                    <AnimatePresence>
-                      <motion.div
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-[#d97706]/10 rounded-lg p-3 border border-[#d97706]/20"
-                      >
-                        {estimateResult.ok && estimateResult.buyoutMin && estimateResult.buyoutMax ? (
-                          <div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-[#b45309] font-medium">Предварительная оценка</span>
-                            </div>
-                            <div className="text-base font-bold text-[#d97706] mt-1">
-                              {estimateResult.buyoutMin.toLocaleString("ru-RU")} ₽ — {estimateResult.buyoutMax.toLocaleString("ru-RU")} ₽
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 text-sm text-[#b45309]">
-                            <AlertCircle className="w-4 h-4" />
-                            <span>{estimateResult.message || "Не удалось рассчитать оценку"}</span>
-                          </div>
-                        )}
-                        <p className="text-xs text-[#d97706]/60 mt-1">
-                          Точная стоимость после осмотра
-                        </p>
-                      </motion.div>
-                    </AnimatePresence>
-                  )}
                 </div>
 
                 {/* Contact info */}
@@ -667,15 +680,15 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
 
                 <Button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !canSubmit}
                   className="w-full h-12 bg-gradient-to-r from-[#d97706] to-[#b45309] hover:from-[#b45309] hover:to-[#92400e] text-white font-semibold text-base shadow-lg shadow-[#d97706]/25 transition-all duration-300 hover:shadow-xl hover:shadow-[#d97706]/30 hover:-translate-y-0.5 disabled:opacity-50"
                 >
                   {loading ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
-                    <ArrowRightLeft className="w-4 h-4 mr-2" />
+                    <Calculator className="w-4 h-4 mr-2" />
                   )}
-                  {loading ? "Отправка..." : "Оставить заявку на Trade-in"}
+                  {loading ? "Расчёт..." : "Рассчитать стоимость автомобиля"}
                 </Button>
 
                 <p className="text-xs text-center text-slate-400">
