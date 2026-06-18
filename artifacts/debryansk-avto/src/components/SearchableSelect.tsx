@@ -27,16 +27,22 @@ export function SearchableSelect({
   const [inputValue, setInputValue] = useState("");
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  // True while user is actively editing — prevents useEffect from overwriting typed text
+  const editingRef = useRef(false);
 
+  // Sync display text when value or items change externally (parent reset, items load)
   useEffect(() => {
+    if (editingRef.current) return;
     const selected = items.find((i) => i.id === value);
     setInputValue(selected?.name ?? "");
   }, [value, items]);
 
+  // Close dropdown on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        editingRef.current = false;
         const selected = items.find((i) => i.id === value);
         setInputValue(selected?.name ?? "");
         setOpen(false);
@@ -51,12 +57,19 @@ export function SearchableSelect({
     : items;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
+    const text = e.target.value;
+    editingRef.current = true;
+    setInputValue(text);
     setOpen(true);
-    if (!e.target.value) onChange("", "");
+    // Deselect if typed text no longer exactly matches the currently selected item
+    const currentSelected = items.find((i) => i.id === value);
+    if (text !== (currentSelected?.name ?? "")) {
+      onChange("", "");
+    }
   };
 
   const handleSelect = (item: SearchableSelectItem) => {
+    editingRef.current = false;
     onChange(item.id, item.name);
     setInputValue(item.name);
     setOpen(false);
@@ -64,6 +77,7 @@ export function SearchableSelect({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") {
+      editingRef.current = false;
       const selected = items.find((i) => i.id === value);
       setInputValue(selected?.name ?? "");
       setOpen(false);
@@ -71,8 +85,11 @@ export function SearchableSelect({
   };
 
   const handleBlur = () => {
+    // Delay to let onMouseDown on dropdown items fire first
     setTimeout(() => {
+      editingRef.current = false;
       const selected = items.find((i) => i.id === value);
+      // If value was deselected (empty), clear input too; otherwise restore selected name
       setInputValue(selected?.name ?? "");
       setOpen(false);
     }, 150);
