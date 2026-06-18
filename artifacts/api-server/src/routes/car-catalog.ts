@@ -191,7 +191,13 @@ router.get("/cm-bodies", async (req, res) => {
   try {
     const qs = new URLSearchParams({ brand, model });
     const data = await fetchCm(`/autocatalog/bodies?${qs}`, CM_CATALOG_TTL);
-    res.json({ ok: true, data: normalizeCmItems(data, "bodies") });
+    const seen = new Set<string>();
+    const items = normalizeCmItems(data, "bodies").filter(item => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+    res.json({ ok: true, data: items });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -266,23 +272,98 @@ router.get("/cm-modifications-options", async (req, res) => {
     const driveMap   = new Map<string, string>();
     const volumeMap  = new Map<string, string>();
     const complMap   = new Map<string, string>();
+    const powerMap   = new Map<string, string>();
+    const gearMap    = new Map<string, string>();
+    const doorsMap   = new Map<string, string>();
 
-    for (const m of mods) {
+    interface ModDetail {
+      id: string;
+      name: string;
+      drive: string;
+      engineVolume: string;
+      power: string;
+      gear: string;
+      complectation: string;
+      doors: string;
+    }
+    const modificationsList: ModDetail[] = [];
+    const seenModIds = new Set<string>();
+
+    for (let i = 0; i < mods.length; i++) {
+      const m = mods[i];
+
+      // Drive
+      let driveName = "";
       if (m.drive?.id) {
-        driveMap.set(String(m.drive.id), String(m.drive.text ?? m.drive.name ?? m.drive.id));
+        driveName = String(m.drive.text ?? m.drive.name ?? m.drive.id);
+        driveMap.set(String(m.drive.id), driveName);
       }
+
+      // Volume
+      let volName = "";
       if (m.volume != null && m.volume !== "") {
         const v = parseFloat(m.volume);
         if (!isNaN(v) && v > 0) {
-          const key = String(v);
-          volumeMap.set(key, `${v.toFixed(1)} л`);
+          volName = `${v.toFixed(1)} л`;
+          volumeMap.set(String(v), volName);
         }
       }
+
+      // Complectation
+      let cmplName = "";
       const cmpl = m.complectation ?? m.complectationName ?? m.complectation_name;
       if (cmpl) {
-        const name = typeof cmpl === "object" ? (cmpl.text ?? cmpl.name ?? String(cmpl.id ?? "")) : String(cmpl);
-        const id   = typeof cmpl === "object" ? String(cmpl.id ?? name) : name;
-        if (id && name) complMap.set(id, name);
+        cmplName = typeof cmpl === "object" ? (cmpl.text ?? cmpl.name ?? String(cmpl.id ?? "")) : String(cmpl);
+        const cmplId = typeof cmpl === "object" ? String(cmpl.id ?? cmplName) : cmplName;
+        if (cmplId && cmplName) complMap.set(cmplId, cmplName);
+      }
+
+      // Power
+      let powName = "";
+      if (m.power != null && m.power !== "") {
+        const p = parseInt(String(m.power), 10);
+        if (!isNaN(p) && p > 0) {
+          powName = `${p} л.с.`;
+          powerMap.set(String(p), powName);
+        }
+      }
+
+      // Gear
+      let gearName = "";
+      const gear = m.gear ?? m.gearbox ?? m.transmission;
+      if (gear != null && gear !== "") {
+        gearName = typeof gear === "object" ? (gear.text ?? gear.name ?? String(gear.id ?? "")) : String(gear);
+        const gearId = typeof gear === "object" ? String(gear.id ?? gearName) : gearName;
+        if (gearId && gearName) gearMap.set(gearId, gearName);
+      }
+
+      // Doors
+      let doorsVal = "";
+      if (m.doors != null && m.doors !== "") {
+        const d = parseInt(String(m.doors), 10);
+        if (!isNaN(d) && d > 0) {
+          doorsVal = String(d);
+          const label = d === 1 ? "1 дверь" : d < 5 ? `${d} двери` : `${d} дверей`;
+          doorsMap.set(doorsVal, label);
+        }
+      }
+
+      // Build modification entry
+      const modId = String(m.id ?? i);
+      if (!seenModIds.has(modId)) {
+        seenModIds.add(modId);
+        const parts = [volName, driveName, powName, gearName, cmplName].filter(Boolean);
+        const modName = parts.join(" · ") || `Модификация ${i + 1}`;
+        modificationsList.push({
+          id: modId,
+          name: modName,
+          drive: driveName,
+          engineVolume: volName,
+          power: powName,
+          gear: gearName,
+          complectation: cmplName,
+          doors: doorsVal,
+        });
       }
     }
 
@@ -291,6 +372,10 @@ router.get("/cm-modifications-options", async (req, res) => {
       driveTypes:    [...driveMap.entries()].map(([id, name]) => ({ id, name })),
       engineVolumes: [...volumeMap.entries()].sort((a, b) => parseFloat(a[0]) - parseFloat(b[0])).map(([id, name]) => ({ id, name })),
       complectations: [...complMap.entries()].map(([id, name]) => ({ id, name })),
+      powers:        [...powerMap.entries()].sort((a, b) => parseInt(a[0]) - parseInt(b[0])).map(([id, name]) => ({ id, name })),
+      gearTypes:     [...gearMap.entries()].map(([id, name]) => ({ id, name })),
+      doorNumbers:   [...doorsMap.entries()].sort((a, b) => parseInt(a[0]) - parseInt(b[0])).map(([id, name]) => ({ id, name })),
+      modifications: modificationsList,
     });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
@@ -308,7 +393,10 @@ const BRYANSK_REGION_ID = "1751832";
  */
 async function getModificationParams(
   token: string,
-  brand: string, model: string, year: string, generationId?: string, bodyId?: string,
+  brand: string, model: string, year: string,
+  generationId?: string, bodyId?: string,
+  driveId?: string, volumeId?: string, complectationId?: string,
+  modificationId?: string,
 ): Promise<Record<string, string> | null> {
   const qs = new URLSearchParams({ brand, model, creationYear: year });
   if (generationId) qs.append("generation", generationId);
@@ -323,26 +411,42 @@ async function getModificationParams(
   const mods: any[] = Array.isArray(json) ? json : (json.modifications ?? []);
   if (!mods.length) return null;
 
-  // Prefer modification matching chosen body, then just pick first
-  const mod = bodyId
-    ? (mods.find((m: any) => String(m.body?.id) === bodyId) ?? mods[0])
-    : mods[0];
+  let best: any;
+
+  if (modificationId) {
+    // Use the exact modification the user selected — no score-matching needed.
+    best = mods.find((m: any) => String(m.id) === modificationId) ?? mods[0];
+  } else {
+    // Score each modification by how well it matches the user-chosen params.
+    // Higher score = better match. Tiebreak: prefer matching bodyId.
+    const score = (m: any): number => {
+      let s = 0;
+      if (bodyId        && String(m.body?.id)   === bodyId)        s += 1;
+      if (driveId       && String(m.drive?.id)  === driveId)       s += 4;
+      if (volumeId      && String(parseFloat(m.volume ?? "")) === String(parseFloat(volumeId))) s += 4;
+      const cmpl = m.complectation ?? m.complectationName ?? m.complectation_name;
+      const cmplId = cmpl ? (typeof cmpl === "object" ? String(cmpl.id ?? "") : String(cmpl)) : "";
+      if (complectationId && cmplId && cmplId === complectationId) s += 2;
+      return s;
+    };
+    best = mods.reduce((a: any, b: any) => score(b) > score(a) ? b : a, mods[0]);
+  }
 
   return {
-    generation: String(mod.generation?.id ?? ""),
-    body:       String(mod.body?.id       ?? ""),
-    doors:      String(mod.doors          ?? ""),
-    engine:     String(mod.engine?.id     ?? ""),
-    volume:     String(mod.volume         ?? ""),
-    power:      String(mod.power          ?? ""),
-    gear:       String(mod.gear?.id       ?? ""),
-    drive:      String(mod.drive?.id      ?? ""),
-    wheel:      String(mod.wheel?.id      ?? ""),
+    generation: String(best.generation?.id ?? ""),
+    body:       String(best.body?.id       ?? ""),
+    doors:      String(best.doors          ?? ""),
+    engine:     String(best.engine?.id     ?? ""),
+    volume:     String(best.volume         ?? ""),
+    power:      String(best.power          ?? ""),
+    gear:       String(best.gear?.id       ?? ""),
+    drive:      String(best.drive?.id      ?? ""),
+    wheel:      String(best.wheel?.id      ?? ""),
   };
 }
 
 router.get("/cm-expert-predict", async (req, res) => {
-  const { brandId, modelId, year, mileage, bodyId, generationId } =
+  const { brandId, modelId, year, mileage, bodyId, generationId, drive, engineVolume, complectation, modificationId } =
     req.query as Record<string, string | undefined>;
 
   if (!brandId || !modelId || !year || !mileage) {
@@ -353,15 +457,21 @@ router.get("/cm-expert-predict", async (req, res) => {
   try {
     const token = await getCmToken();
 
-    // Fetch modification to get required technical params
-    const modParams = await getModificationParams(token, brandId, modelId, year, generationId, bodyId);
+    // Fetch modification params. If modificationId is provided, use that exact modification
+    // directly (no score-matching). Otherwise fall back to score-based selection.
+    const modParams = await getModificationParams(
+      token, brandId, modelId, year,
+      generationId, bodyId,
+      drive, engineVolume, complectation,
+      modificationId,
+    );
     if (!modParams) {
       res.json({ ok: false });
       return;
     }
 
     // modParams contains generation, body, doors, engine, volume, power, gear, drive, wheel
-    // from the closest matching modification. User-provided ids override mod defaults.
+    // from the selected (or closest matching) modification.
     const qs = new URLSearchParams({
       regionId:     BRYANSK_REGION_ID,
       brand:        brandId,
@@ -369,8 +479,9 @@ router.get("/cm-expert-predict", async (req, res) => {
       creationYear: year,
       mileage:      mileage,
       ...modParams,
-      ...(generationId ? { generation: generationId } : {}),
-      ...(bodyId       ? { body:       bodyId       } : {}),
+      ...(modificationId ? { modification: modificationId } : {}),
+      ...(generationId   ? { generation:   generationId   } : {}),
+      ...(bodyId         ? { body:         bodyId         } : {}),
     });
 
     const res2 = await fetch(`${CM_API_BASE()}/predict?${qs}`, {
