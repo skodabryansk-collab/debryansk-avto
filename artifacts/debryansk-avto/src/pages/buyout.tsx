@@ -202,10 +202,34 @@ function BuyoutForm() {
     staleTime: 24 * 60 * 60 * 1000,
   });
 
+  const mods = modOptions?.modifications ?? [];
+  const modsForVolume = form.engineVolume
+    ? mods.filter(m => m.engineVolume === form.engineVolume)
+    : mods;
+  const filteredDriveItems = (modOptions?.driveTypes ?? []).filter(d =>
+    !form.engineVolume || modsForVolume.some(m => m.drive === d.name)
+  );
+  const modsForVolumeDrive = form.drive
+    ? modsForVolume.filter(m => m.drive === form.drive)
+    : modsForVolume;
+  const filteredPowerItems = (modOptions?.powers ?? []).filter(p =>
+    (!form.engineVolume && !form.drive) || modsForVolumeDrive.some(m => m.power === p.name)
+  );
+  const filteredGearItems = (modOptions?.gearTypes ?? []).filter(g =>
+    (!form.engineVolume && !form.drive) || modsForVolumeDrive.some(m => m.gear === g.name)
+  );
+  const matchingMods = mods.filter(m =>
+    (!form.engineVolume || m.engineVolume === form.engineVolume) &&
+    (!form.drive || m.drive === form.drive) &&
+    (!form.power || m.power === form.power) &&
+    (!form.gear || m.gear === form.gear)
+  );
+  const autoModificationId = matchingMods.length === 1 ? matchingMods[0].id : "";
+
   const modFieldsVisible = modOptionsLoading || (modOptions != null && (
-    modOptions.modifications.length > 0 || modOptions.engineVolumes.length > 0 ||
-    modOptions.driveTypes.length > 0 || modOptions.powers.length > 0 ||
-    modOptions.gearTypes.length > 0 || modOptions.complectations.length > 0
+    modOptions.engineVolumes.length > 0 || modOptions.driveTypes.length > 0 ||
+    modOptions.powers.length > 0 || modOptions.gearTypes.length > 0 ||
+    modOptions.complectations.length > 0
   ));
 
   /* Reset dependent fields on parent change */
@@ -225,27 +249,15 @@ function BuyoutForm() {
     const value = e.target.value;
     setForm(f => {
       const next = { ...f, [key]: value };
-      if (["drive", "engineVolume", "power", "gear", "complectation"].includes(key)) {
+      if (key === "engineVolume") {
+        next.modification = ""; next.drive = ""; next.power = ""; next.gear = "";
+      } else if (key === "drive") {
+        next.modification = ""; next.power = ""; next.gear = "";
+      } else if (["power", "gear", "complectation"].includes(key)) {
         next.modification = "";
       }
       return next;
     });
-    setPriceResult(null);
-  };
-
-  const handleModificationChange = (modId: string) => {
-    const mod = modOptions?.modifications?.find(m => m.id === modId);
-    setForm(f => ({
-      ...f,
-      modification: modId,
-      ...(mod ? {
-        drive: mod.drive || f.drive,
-        engineVolume: mod.engineVolume || f.engineVolume,
-        power: mod.power || f.power,
-        gear: mod.gear || f.gear,
-        complectation: mod.complectation || f.complectation,
-      } : {}),
-    }));
     setPriceResult(null);
   };
 
@@ -271,7 +283,7 @@ function BuyoutForm() {
         mileage:        form.mileage,
         bodyId:         form.body           || undefined,
         generationId:   form.generation     || undefined,
-        modificationId: form.modification   || undefined,
+        modificationId: autoModificationId  || undefined,
         drive:          form.drive          || undefined,
         engineVolume:   form.engineVolume   || undefined,
         complectation:  form.complectation  || undefined,
@@ -422,31 +434,6 @@ function BuyoutForm() {
           {/* ── Modification options (shown when year selected) ── */}
           {modFieldsVisible && (
             <div className="space-y-3 pt-1">
-              {/* Modification select — full width */}
-              {(modOptionsLoading || (modOptions?.modifications ?? []).length > 0) && (
-                <div>
-                  <label className={labelCls}>Модификация</label>
-                  <div className="relative">
-                    <select
-                      value={form.modification}
-                      onChange={e => handleModificationChange(e.target.value)}
-                      disabled={modOptionsLoading}
-                      className={`${selectCls} pr-9 appearance-none`}
-                    >
-                      <option value="">{modOptionsLoading ? "Загрузка…" : "Выберите модификацию"}</option>
-                      {(modOptions?.modifications ?? []).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                    {modOptionsLoading
-                      ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    }
-                  </div>
-                  {form.modification && (
-                    <p className="text-[11px] text-[#0070b8] mt-1">✓ Технические параметры заполнены автоматически</p>
-                  )}
-                </div>
-              )}
-
               <div className="grid sm:grid-cols-2 gap-4">
                 {/* Объём двигателя */}
                 {(modOptionsLoading || (modOptions?.engineVolumes ?? []).length > 0) && (
@@ -469,7 +456,7 @@ function BuyoutForm() {
                     <div className="relative">
                       <select value={form.drive} onChange={set("drive")} disabled={modOptionsLoading} className={`${selectCls} pr-9 appearance-none`}>
                         <option value="">{modOptionsLoading ? "Загрузка…" : "Не указан"}</option>
-                        {(modOptions?.driveTypes ?? []).map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                        {filteredDriveItems.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                       </select>
                       {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
                     </div>
@@ -483,7 +470,7 @@ function BuyoutForm() {
                     <div className="relative">
                       <select value={form.power} onChange={set("power")} disabled={modOptionsLoading} className={`${selectCls} pr-9 appearance-none`}>
                         <option value="">{modOptionsLoading ? "Загрузка…" : "Не указана"}</option>
-                        {(modOptions?.powers ?? []).map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                        {filteredPowerItems.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                       </select>
                       {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
                     </div>
@@ -497,7 +484,7 @@ function BuyoutForm() {
                     <div className="relative">
                       <select value={form.gear} onChange={set("gear")} disabled={modOptionsLoading} className={`${selectCls} pr-9 appearance-none`}>
                         <option value="">{modOptionsLoading ? "Загрузка…" : "Не указан"}</option>
-                        {(modOptions?.gearTypes ?? []).map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
+                        {filteredGearItems.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
                       </select>
                       {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
                     </div>
