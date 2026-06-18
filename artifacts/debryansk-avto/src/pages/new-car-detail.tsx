@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,6 +14,8 @@ import { TestDriveModal } from "@/components/modals/TestDriveModal";
 import { CreditModal } from "@/components/modals/CreditModal";
 import { TradeInModal } from "@/components/modals/TradeInModal";
 import Layout from "@/components/Layout";
+import { PageCarProvider } from "@/context/PageCarContext";
+import PhotoLightbox from "@/components/PhotoLightbox";
 
 interface NewCarRecord {
   id: string;
@@ -80,6 +83,9 @@ function parseFuelType(mod: string): string {
 function formatPrice(p: number) {
   return p.toLocaleString("ru-RU") + " ₽";
 }
+function formatRun(km: number) {
+  return km < 1000 ? km + " км" : Math.round(km / 1000) + " тыс. км";
+}
 
 async function fetchNewCars(): Promise<NewCarRecord[]> {
   const r = await fetch("/api/cars/new");
@@ -87,6 +93,32 @@ async function fetchNewCars(): Promise<NewCarRecord[]> {
   const json = await r.json();
   if (!json.ok) throw new Error(json.error ?? "Unknown error");
   return json.data as NewCarRecord[];
+}
+
+interface UsedCarRecord {
+  id: string;
+  mark: string;
+  model: string;
+  modification: string;
+  year: number;
+  price: number;
+  run: number;
+  color: string;
+  bodyType: string;
+  availability: string;
+  url: string;
+  images: string[];
+  ownersNumber: string;
+  state: string;
+  extras: string;
+  description: string;
+}
+async function fetchUsedCars(): Promise<UsedCarRecord[]> {
+  const r = await fetch("/api/cars/used");
+  if (!r.ok) throw new Error(`API error: ${r.status}`);
+  const json = await r.json();
+  if (!json.ok) throw new Error(json.error ?? "Unknown error");
+  return json.data as UsedCarRecord[];
 }
 
 async function fetchBrandLocations(): Promise<Record<string, { phone: string; locationTitle: string }>> {
@@ -103,7 +135,7 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !phone.trim()) return;
+    if (!name.trim() || !isPhoneValid(phone)) return;
     setSubmitted(true);
   }
 
@@ -146,8 +178,8 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
               </div>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input value={phone} onChange={e => setPhone(e.target.value)}
-                  placeholder="+7 (___) ___-__-__" required type="tel"
+                <input value={phone} onChange={e => setPhone(formatPhone(e.target.value))}
+                  placeholder="+7 (___) ___-__-__" required type="tel" inputMode="tel" maxLength={18}
                   className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8]" />
               </div>
               <button type="submit"
@@ -174,6 +206,8 @@ function Gallery({
   dealer: string;
   badge?: React.ReactNode;
 }) {
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
   return (
     <>
       <div className="relative w-full bg-white overflow-hidden" style={{ aspectRatio: "16/9", maxHeight: "70vh" }}>
@@ -181,7 +215,8 @@ function Gallery({
           <img
             src={imgs[imgIdx]}
             alt="Фото автомобиля"
-            className="absolute inset-0 w-full h-full object-contain"
+            className="absolute inset-0 w-full h-full object-contain cursor-zoom-in"
+            onClick={() => setLightboxOpen(true)}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-slate-300">
@@ -222,7 +257,7 @@ function Gallery({
           {imgs.map((src, i) => (
             <button
               key={i}
-              onClick={() => setImgIdx(i)}
+              onClick={() => { setImgIdx(i); setLightboxOpen(true); }}
               className={`shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition-all ${
                 i === imgIdx ? "border-[#0070b8]" : "border-transparent opacity-55 hover:opacity-90"
               }`}
@@ -231,6 +266,13 @@ function Gallery({
             </button>
           ))}
         </div>
+      )}
+      {lightboxOpen && imgs.length > 0 && (
+        <PhotoLightbox
+          images={imgs}
+          initialIndex={imgIdx}
+          onClose={() => setLightboxOpen(false)}
+        />
       )}
     </>
   );
@@ -244,6 +286,12 @@ export default function NewCarDetail() {
   const { data: cars = [], isLoading, isError } = useQuery<NewCarRecord[]>({
     queryKey: ["new-cars"],
     queryFn: fetchNewCars,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: usedCars = [] } = useQuery<UsedCarRecord[]>({
+    queryKey: ["used-cars"],
+    queryFn: fetchUsedCars,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -262,6 +310,18 @@ export default function NewCarDetail() {
       .sort((a, b) => Math.abs(a.price - car.price) - Math.abs(b.price - car.price))
       .slice(0, 6);
   }, [cars, car]);
+
+  const sameUsed = useMemo(() => {
+    if (!car) return [];
+    const baseModel = (m: string) => m.split(",")[0].trim().toLowerCase();
+    return usedCars
+      .filter(c =>
+        c.mark.toLowerCase() === car.mark.toLowerCase() &&
+        baseModel(c.model) === baseModel(car.model)
+      )
+      .sort((a, b) => (a.price - b.price))
+      .slice(0, 3);
+  }, [usedCars, car]);
 
   const carMark = car?.mark?.toLowerCase() ?? "";
   const locationEntry = brandLocations[carMark]
@@ -469,6 +529,7 @@ export default function NewCarDetail() {
   } : undefined;
 
   return (
+    <PageCarProvider car={{ carId: car.id, brand: car.mark, model: car.model, year: car.year, price: car.price, isNew: true, bodyType: car.bodyType }}>
     <Layout>
       {car && (
         <SEO
@@ -568,8 +629,34 @@ export default function NewCarDetail() {
             </div>
           )}
 
-          {/* Spacer for sticky bar when no similar */}
-          {similarNew.length === 0 && <div className="pb-20" />}
+          {/* Same used — mobile */}
+          {sameUsed.length > 0 && (
+            <div className="pb-20">
+              <h2 className="text-sm font-extrabold mb-3 text-slate-900">Такой же с пробегом</h2>
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory" style={{ scrollbarWidth: "none" }}>
+                {sameUsed.map(c => (
+                  <Link key={c.id} href={`/cars/${c.id}`}>
+                    <div className="snap-start shrink-0 w-44 rounded-2xl overflow-hidden border border-slate-100 bg-white hover:shadow-md transition-shadow cursor-pointer">
+                      <div className="h-28 bg-slate-50 overflow-hidden">
+                        {c.images[0]
+                          ? <img src={c.images[0]} className="w-full h-full object-cover" loading="lazy" decoding="async" alt={`${c.mark} ${c.model}`} />
+                          : <div className="w-full h-full flex items-center justify-center text-slate-200"><Car className="w-8 h-8" /></div>
+                        }
+                      </div>
+                      <div className="p-2.5">
+                        <p className="text-xs font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
+                        <p className="text-[10px] text-slate-400">{c.year} · {formatRun(c.run)}</p>
+                        <p className="text-sm font-extrabold text-[#0070b8] mt-0.5">{formatPrice(c.price)}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Spacer for sticky bar when no similar / same used */}
+          {similarNew.length === 0 && sameUsed.length === 0 && <div className="pb-20" />}
         </div>
       </div>
 
@@ -655,6 +742,32 @@ export default function NewCarDetail() {
                 </div>
               </div>
             )}
+
+            {/* Same used — desktop */}
+            {sameUsed.length > 0 && (
+              <div className="mt-6">
+                <h2 className="text-base font-extrabold mb-4 text-slate-900">Такой же с пробегом</h2>
+                <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory" style={{ scrollbarWidth: "none" }}>
+                  {sameUsed.map(c => (
+                    <Link key={c.id} href={`/cars/${c.id}`}>
+                      <div className="snap-start shrink-0 w-52 rounded-2xl overflow-hidden border border-slate-100 bg-white hover:shadow-md transition-shadow cursor-pointer">
+                        <div className="h-32 bg-slate-50 overflow-hidden">
+                          {c.images[0]
+                            ? <img src={c.images[0]} className="w-full h-full object-cover" loading="lazy" decoding="async" alt={`${c.mark} ${c.model}`} />
+                            : <div className="w-full h-full flex items-center justify-center text-slate-200"><Car className="w-10 h-10" /></div>
+                          }
+                        </div>
+                        <div className="p-3">
+                          <p className="text-sm font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">{c.year} · {formatRun(c.run)}</p>
+                          <p className="text-base font-extrabold text-[#0070b8] mt-1">{formatPrice(c.price)}</p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right — sticky price card */}
@@ -697,5 +810,6 @@ export default function NewCarDetail() {
         {showTradeIn && <TradeInModal onClose={() => setShowTradeIn(false)} targetCar={{ mark: car.mark, model: car.model, price: car.price, isNew: true }} />}
       </AnimatePresence>
     </Layout>
+    </PageCarProvider>
   );
 }
