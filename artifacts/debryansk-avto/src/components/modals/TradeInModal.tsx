@@ -34,6 +34,7 @@ interface ModificationItem {
   power: string;
   gear: string;
   complectation: string;
+  doors: string;
 }
 
 interface EstimateResult {
@@ -67,6 +68,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
     power: "",
     gear: "",
     complectation: "",
+    doors: "",
     condition: "",
     owners: "",
     name: "",
@@ -80,6 +82,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
     complectations: { id: string; name: string }[];
     powers: { id: string; name: string }[];
     gearTypes: { id: string; name: string }[];
+    doorNumbers: { id: string; name: string }[];
     modifications: ModificationItem[];
   }
   const [modOptions, setModOptions] = useState<ModOptions | null>(null);
@@ -136,7 +139,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
     fetch(`/api/car-catalog/cm-modifications-options?${qs}`)
       .then(r => r.json())
       .then(data => {
-        if (data.ok) setModOptions({ driveTypes: data.driveTypes ?? [], engineVolumes: data.engineVolumes ?? [], complectations: data.complectations ?? [], powers: data.powers ?? [], gearTypes: data.gearTypes ?? [], modifications: data.modifications ?? [] });
+        if (data.ok) setModOptions({ driveTypes: data.driveTypes ?? [], engineVolumes: data.engineVolumes ?? [], complectations: data.complectations ?? [], powers: data.powers ?? [], gearTypes: data.gearTypes ?? [], doorNumbers: data.doorNumbers ?? [], modifications: data.modifications ?? [] });
         else setModOptions(null);
       })
       .catch(() => setModOptions(null))
@@ -148,23 +151,23 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
       const next = { ...prev, [field]: value };
       if (field === "brand") {
         next.model = ""; next.year = ""; next.modification = "";
-        next.drive = ""; next.engineVolume = ""; next.power = ""; next.gear = ""; next.complectation = "";
+        next.drive = ""; next.engineVolume = ""; next.power = ""; next.gear = ""; next.complectation = ""; next.doors = "";
       }
       if (field === "model") {
         next.year = ""; next.modification = "";
-        next.drive = ""; next.engineVolume = ""; next.power = ""; next.gear = ""; next.complectation = "";
+        next.drive = ""; next.engineVolume = ""; next.power = ""; next.gear = ""; next.complectation = ""; next.doors = "";
       }
       if (field === "year") {
         next.modification = "";
-        next.drive = ""; next.engineVolume = ""; next.power = ""; next.gear = ""; next.complectation = "";
+        next.drive = ""; next.engineVolume = ""; next.power = ""; next.gear = ""; next.complectation = ""; next.doors = "";
       }
       if (field === "engineVolume") {
-        next.modification = ""; next.drive = ""; next.power = ""; next.gear = "";
+        next.modification = ""; next.drive = ""; next.power = ""; next.gear = ""; next.doors = "";
       }
       if (field === "drive") {
-        next.modification = ""; next.power = ""; next.gear = "";
+        next.modification = ""; next.power = ""; next.gear = ""; next.doors = "";
       }
-      if (["power", "gear", "complectation"].includes(field)) {
+      if (["power", "gear", "complectation", "doors"].includes(field)) {
         next.modification = "";
       }
       return next;
@@ -252,11 +255,15 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
   const filteredGearItems = (modOptions?.gearTypes ?? []).filter(g =>
     (!formData.engineVolume && !formData.drive) || modsForVolumeDrive.some(m => m.gear === g.name)
   );
+  const filteredDoorItems = (modOptions?.doorNumbers ?? []).filter(d =>
+    (!formData.engineVolume && !formData.drive) || modsForVolumeDrive.some(m => m.doors === d.id)
+  );
   const matchingMods = mods.filter(m =>
     (!formData.engineVolume || m.engineVolume === formData.engineVolume) &&
     (!formData.drive || m.drive === formData.drive) &&
     (!formData.power || m.power === formData.power) &&
-    (!formData.gear || m.gear === formData.gear)
+    (!formData.gear || m.gear === formData.gear) &&
+    (!formData.doors || m.doors === formData.doors)
   );
   const autoModificationId = matchingMods.length === 1 ? matchingMods[0].id : "";
 
@@ -487,6 +494,24 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                           </div>
                         )}
                       </div>
+
+                      {/* Кол-во дверей — full width */}
+                      {!modOptionsLoading && filteredDoorItems.length > 0 && (
+                        <div className="space-y-2">
+                          <Label className="text-xs text-slate-500">Кол-во дверей</Label>
+                          <div className="relative">
+                            <select
+                              value={formData.doors}
+                              onChange={(e) => handleChange("doors", e.target.value)}
+                              className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm appearance-none focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none"
+                            >
+                              <option value="">Не указано</option>
+                              {filteredDoorItems.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          </div>
+                        </div>
+                      )}
 
                       {/* Complectation — full width */}
                       {(modOptionsLoading || (modOptions?.complectations ?? []).length > 0) && (
