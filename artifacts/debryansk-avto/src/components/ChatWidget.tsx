@@ -650,6 +650,8 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
   const [generationsLoading, setGenerationsLoading] = useState(false);
   const [modOptions, setModOptions] = useState<ChatModOptions | null>(null);
   const [modOptionsLoading, setModOptionsLoading] = useState(false);
+  const [bodies, setBodies] = useState<{ id: string; name: string }[]>([]);
+  const [bodiesLoading, setBodiesLoading] = useState(false);
 
   // Selections
   const [brandId, setBrandId] = useState("");
@@ -658,6 +660,8 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
   const [modelName, setModelName] = useState("");
   const [year, setYear] = useState("");
   const [generationId, setGenerationId] = useState("");
+  const [bodyId, setBodyId] = useState("");
+  const [bodyName, setBodyName] = useState("");
   const [modification, setModification] = useState("");
   const [drive, setDrive] = useState("");
   const [engineVolume, setEngineVolume] = useState("");
@@ -692,6 +696,7 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
     setModelId(""); setModelName("");
     setYears([]); setYear("");
     setGenerations([]); setGenerationId("");
+    setBodies([]); setBodyId(""); setBodyName("");
     setModOptions(null);
     setModification(""); setDrive(""); setEngineVolume(""); setPower(""); setGear(""); setComplectation(""); setDoorsNum("");
     fetch(`${base}/api/car-catalog/cm-models?brand=${encodeURIComponent(brandId)}`)
@@ -707,6 +712,7 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
     setYearsLoading(true);
     setYears([]); setYear("");
     setGenerations([]); setGenerationId("");
+    setBodyId(""); setBodyName("");
     setModOptions(null);
     setModification(""); setDrive(""); setEngineVolume(""); setPower(""); setGear(""); setComplectation(""); setDoorsNum("");
     const qs = new URLSearchParams({ brand: brandId, model: modelId });
@@ -715,6 +721,18 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
       .then(j => setYears(j.ok ? (j.data ?? []) : []))
       .catch(() => {})
       .finally(() => setYearsLoading(false));
+  }, [brandId, modelId, base]);
+
+  // Load bodies when brand + model change
+  useEffect(() => {
+    if (!brandId || !modelId) { setBodies([]); return; }
+    setBodiesLoading(true);
+    setBodies([]);
+    fetch(`${base}/api/car-catalog/cm-bodies?brand=${encodeURIComponent(brandId)}&model=${encodeURIComponent(modelId)}`)
+      .then(r => r.json())
+      .then(j => setBodies(j.ok ? (j.data ?? []) : []))
+      .catch(() => setBodies([]))
+      .finally(() => setBodiesLoading(false));
   }, [brandId, modelId, base]);
 
   // Load generations when brand + model + year change
@@ -741,12 +759,18 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
     fetch(`${base}/api/car-catalog/cm-modifications-options?${qs}`)
       .then(r => r.json())
       .then(j => {
-        if (j.ok) setModOptions({ modifications: j.modifications ?? [], driveTypes: j.driveTypes ?? [], engineVolumes: j.engineVolumes ?? [], powers: j.powers ?? [], gearTypes: j.gearTypes ?? [], complectations: j.complectations ?? [], doorNumbers: j.doorNumbers ?? [] });
-        else setModOptions(null);
+        if (j.ok) {
+          const mods = (j.modifications ?? []).map((m: any) => ({ ...m, bodyId: m.bodyId ?? "" }));
+          setModOptions({ modifications: mods, driveTypes: j.driveTypes ?? [], engineVolumes: j.engineVolumes ?? [], powers: j.powers ?? [], gearTypes: j.gearTypes ?? [], complectations: j.complectations ?? [], doorNumbers: j.doorNumbers ?? [] });
+        } else setModOptions(null);
       })
       .catch(() => setModOptions(null))
       .finally(() => setModOptionsLoading(false));
   }, [brandId, modelId, year, base]);
+
+  const handleBodyChange = useCallback((id: string, name: string) => {
+    setBodyId(id); setBodyName(name); setDoorsNum(""); setModification("");
+  }, []);
 
   const handleEngineVolumeChange = useCallback((val: string) => {
     setEngineVolume(val); setDrive(""); setPower(""); setGear(""); setDoorsNum(""); setModification("");
@@ -769,6 +793,7 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
       const qs = new URLSearchParams({ brandId, modelId, year, mileage });
       if (generationId)   qs.append("generationId",   generationId);
       if (chatAutoModId)  qs.append("modificationId", chatAutoModId);
+      if (bodyId)         qs.append("bodyId",         bodyId);
       if (drive)          qs.append("drive",          drive);
       if (engineVolume)   qs.append("engineVolume",   engineVolume);
       if (complectation)  qs.append("complectation",  complectation);
@@ -789,10 +814,12 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
       fd.append("model", modelName);
       fd.append("year", year);
       fd.append("mileage", mileage);
+      if (bodyName)      fd.append("body",          bodyName);
       if (drive)         fd.append("drive",         drive);
       if (engineVolume)  fd.append("engineVolume",  engineVolume);
       if (power)         fd.append("power",         power);
       if (gear)          fd.append("gear",          gear);
+      if (doorsNum)      fd.append("doors",         (modOptions?.doorNumbers ?? []).find(d => d.id === doorsNum)?.name ?? doorsNum);
       if (complectation) fd.append("complectation", complectation);
       fd.append("name", name.trim());
       fd.append("phone", phone.trim());
@@ -834,15 +861,19 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
   const chatFilteredGearItems = (modOptions?.gearTypes ?? []).filter(g =>
     (!engineVolume && !drive) || chatModsForVolumeDrive.some(m => m.gear === g.name)
   );
+  const chatModsForBody = bodyId
+    ? chatModsForVolumeDrive.filter((m: any) => m.bodyId === bodyId)
+    : chatModsForVolumeDrive;
   const chatFilteredDoorItems = (modOptions?.doorNumbers ?? []).filter(d =>
-    (!engineVolume && !drive) || chatModsForVolumeDrive.some(m => m.doors === d.id)
+    (!engineVolume && !drive && !bodyId) || chatModsForBody.some(m => m.doors === d.id)
   );
-  const chatMatchingMods = chatMods.filter(m =>
+  const chatMatchingMods = chatMods.filter((m: any) =>
     (!engineVolume || m.engineVolume === engineVolume) &&
     (!drive || m.drive === drive) &&
     (!power || m.power === power) &&
     (!gear || m.gear === gear) &&
-    (!doorsNum || m.doors === doorsNum)
+    (!doorsNum || m.doors === doorsNum) &&
+    (!bodyId || m.bodyId === bodyId)
   );
   const chatAutoModId = chatMatchingMods.length === 1 ? chatMatchingMods[0].id : "";
 
@@ -899,6 +930,22 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
         loading={modelsLoading}
         className={inputCls}
       />
+
+      {/* Тип кузова (показываем если есть) */}
+      {(bodiesLoading || bodies.length > 0) && (
+        <select
+          value={bodyId}
+          onChange={e => {
+            const opt = bodies.find(b => b.id === e.target.value);
+            handleBodyChange(e.target.value, opt?.name ?? "");
+          }}
+          disabled={bodiesLoading || !modelId}
+          className={selectCls}
+        >
+          <option value="">{bodiesLoading ? "Загрузка..." : "Тип кузова"}</option>
+          {bodies.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+      )}
 
       {/* Год + Поколение */}
       <div className="grid grid-cols-2 gap-1.5">
