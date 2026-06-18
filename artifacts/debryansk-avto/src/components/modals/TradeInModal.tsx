@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import {
   X, Car, Gauge, Calendar, Phone, User, ArrowRightLeft,
   CheckCircle, Tag, ChevronDown, Loader2, Users, AlertCircle
@@ -51,12 +52,23 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
     model: "",
     year: "",
     mileage: "",
+    drive: "",
+    engineVolume: "",
+    complectation: "",
     condition: "",
     owners: "",
     name: "",
     phone: "",
     comment: "",
   });
+
+  interface ModOptions {
+    driveTypes: { id: string; name: string }[];
+    engineVolumes: { id: string; name: string }[];
+    complectations: { id: string; name: string }[];
+  }
+  const [modOptions, setModOptions] = useState<ModOptions | null>(null);
+  const [modOptionsLoading, setModOptionsLoading] = useState(false);
 
   useEffect(() => {
     fetch("/api/car-catalog/cm-brands")
@@ -99,15 +111,43 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
       .finally(() => setYearsLoading(false));
   }, [formData.brand, formData.model]);
 
+  useEffect(() => {
+    if (!formData.brand || !formData.model || !formData.year) {
+      setModOptions(null);
+      return;
+    }
+    setModOptionsLoading(true);
+    const qs = new URLSearchParams({ brand: formData.brand, model: formData.model, year: formData.year });
+    fetch(`/api/car-catalog/cm-modifications-options?${qs}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) setModOptions({ driveTypes: data.driveTypes ?? [], engineVolumes: data.engineVolumes ?? [], complectations: data.complectations ?? [] });
+        else setModOptions(null);
+      })
+      .catch(() => setModOptions(null))
+      .finally(() => setModOptionsLoading(false));
+  }, [formData.brand, formData.model, formData.year]);
+
   const handleChange = useCallback((field: string, value: string) => {
     setFormData(prev => {
       const next = { ...prev, [field]: value };
       if (field === "brand") {
         next.model = "";
         next.year = "";
+        next.drive = "";
+        next.engineVolume = "";
+        next.complectation = "";
       }
       if (field === "model") {
         next.year = "";
+        next.drive = "";
+        next.engineVolume = "";
+        next.complectation = "";
+      }
+      if (field === "year") {
+        next.drive = "";
+        next.engineVolume = "";
+        next.complectation = "";
       }
       return next;
     });
@@ -136,7 +176,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.phone.trim()) return;
+    if (!formData.name.trim() || !isPhoneValid(formData.phone)) return;
     setLoading(true);
     try {
       const fd = new FormData();
@@ -149,6 +189,9 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
       fd.append("model", modelName);
       fd.append("year", formData.year);
       fd.append("mileage", formData.mileage);
+      if (formData.drive) fd.append("drive", formData.drive);
+      if (formData.engineVolume) fd.append("engineVolume", formData.engineVolume);
+      if (formData.complectation) fd.append("complectation", formData.complectation);
       fd.append("condition", formData.condition);
       fd.append("owners", formData.owners);
       fd.append("comment", formData.comment);
@@ -359,6 +402,79 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                     </div>
                   </div>
 
+                  {/* ── Modification options: drive / volume / complectation ── */}
+                  {(modOptionsLoading || (modOptions && (modOptions.engineVolumes.length > 0 || modOptions.driveTypes.length > 0 || modOptions.complectations.length > 0))) && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* Engine volume */}
+                        {(modOptionsLoading || (modOptions?.engineVolumes ?? []).length > 0) && (
+                          <div className="space-y-2">
+                            <Label className="text-xs text-slate-500">Объём двигателя</Label>
+                            <div className="relative">
+                              <select
+                                value={formData.engineVolume}
+                                onChange={(e) => handleChange("engineVolume", e.target.value)}
+                                disabled={modOptionsLoading}
+                                className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm appearance-none focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
+                              >
+                                <option value="">{modOptionsLoading ? "Загрузка..." : "Не указан"}</option>
+                                {(modOptions?.engineVolumes ?? []).map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
+                              </select>
+                              {modOptionsLoading
+                                ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                              }
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Drive type */}
+                        {(modOptionsLoading || (modOptions?.driveTypes ?? []).length > 0) && (
+                          <div className="space-y-2">
+                            <Label className="text-xs text-slate-500">Тип привода</Label>
+                            <div className="relative">
+                              <select
+                                value={formData.drive}
+                                onChange={(e) => handleChange("drive", e.target.value)}
+                                disabled={modOptionsLoading}
+                                className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm appearance-none focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
+                              >
+                                <option value="">{modOptionsLoading ? "Загрузка..." : "Не указан"}</option>
+                                {(modOptions?.driveTypes ?? []).map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                              </select>
+                              {modOptionsLoading
+                                ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                              }
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Complectation — full width */}
+                      {(modOptionsLoading || (modOptions?.complectations ?? []).length > 0) && (
+                        <div className="space-y-2">
+                          <Label className="text-xs text-slate-500">Комплектация</Label>
+                          <div className="relative">
+                            <select
+                              value={formData.complectation}
+                              onChange={(e) => handleChange("complectation", e.target.value)}
+                              disabled={modOptionsLoading}
+                              className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm appearance-none focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
+                            >
+                              <option value="">{modOptionsLoading ? "Загрузка..." : "Не указана"}</option>
+                              {(modOptions?.complectations ?? []).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            </select>
+                            {modOptionsLoading
+                              ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                              : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            }
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-3">
                     {/* Condition */}
                     <div className="space-y-2">
@@ -467,10 +583,12 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                     </Label>
                     <Input
                       type="tel"
+                      inputMode="tel"
                       placeholder="+7 (___) ___-__-__"
                       value={formData.phone}
-                      onChange={(e) => handleChange("phone", e.target.value)}
+                      onChange={(e) => handleChange("phone", formatPhone(e.target.value))}
                       required
+                      maxLength={18}
                       className="h-11 border-slate-200 focus:border-[#d97706] focus:ring-[#d97706]/20"
                     />
                   </div>
