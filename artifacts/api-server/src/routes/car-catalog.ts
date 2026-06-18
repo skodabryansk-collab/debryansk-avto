@@ -232,6 +232,71 @@ router.get("/cm-years", async (req, res) => {
   }
 });
 
+/* ── CM Expert modifications options (drive / volume / complectation) ── */
+
+router.get("/cm-modifications-options", async (req, res) => {
+  const { brand, model, year } = req.query as Record<string, string | undefined>;
+  if (!brand || !model || !year) {
+    res.status(400).json({ ok: false, error: "brand, model, year required" });
+    return;
+  }
+  try {
+    const qs = new URLSearchParams({ brand, model, creationYear: year });
+    const cacheKey = `cm:/autocatalog/modifications?${qs}`;
+
+    let data: any;
+    const cached = cache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      data = cached.data;
+    } else {
+      const token = await getCmToken();
+      const r = await fetch(`${CM_API_BASE()}/autocatalog/modifications?${qs}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      });
+      if (!r.ok) {
+        res.json({ ok: true, driveTypes: [], engineVolumes: [], complectations: [] });
+        return;
+      }
+      data = await r.json();
+      cache.set(cacheKey, { data, expiresAt: Date.now() + CM_CATALOG_TTL });
+    }
+
+    const mods: any[] = Array.isArray(data) ? data : (data?.modifications ?? data?.data ?? []);
+
+    const driveMap   = new Map<string, string>();
+    const volumeMap  = new Map<string, string>();
+    const complMap   = new Map<string, string>();
+
+    for (const m of mods) {
+      if (m.drive?.id) {
+        driveMap.set(String(m.drive.id), String(m.drive.text ?? m.drive.name ?? m.drive.id));
+      }
+      if (m.volume != null && m.volume !== "") {
+        const v = parseFloat(m.volume);
+        if (!isNaN(v) && v > 0) {
+          const key = String(v);
+          volumeMap.set(key, `${v.toFixed(1)} л`);
+        }
+      }
+      const cmpl = m.complectation ?? m.complectationName ?? m.complectation_name;
+      if (cmpl) {
+        const name = typeof cmpl === "object" ? (cmpl.text ?? cmpl.name ?? String(cmpl.id ?? "")) : String(cmpl);
+        const id   = typeof cmpl === "object" ? String(cmpl.id ?? name) : name;
+        if (id && name) complMap.set(id, name);
+      }
+    }
+
+    res.json({
+      ok: true,
+      driveTypes:    [...driveMap.entries()].map(([id, name]) => ({ id, name })),
+      engineVolumes: [...volumeMap.entries()].sort((a, b) => parseFloat(a[0]) - parseFloat(b[0])).map(([id, name]) => ({ id, name })),
+      complectations: [...complMap.entries()].map(([id, name]) => ({ id, name })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 /* ── CM Expert predict endpoint ─────────────────────────────────── */
 
 const BRYANSK_REGION_ID = "1751832";
