@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { SearchableSelect } from "@/components/SearchableSelect";
 
 interface TargetCar {
   mark: string;
@@ -24,6 +25,16 @@ interface TradeInModalProps {
 }
 
 interface CmItem { id: string; name: string }
+
+interface ModificationItem {
+  id: string;
+  name: string;
+  drive: string;
+  engineVolume: string;
+  power: string;
+  gear: string;
+  complectation: string;
+}
 
 interface EstimateResult {
   ok: boolean;
@@ -41,8 +52,6 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
   const [brands, setBrands] = useState<CmItem[]>([]);
   const [models, setModels] = useState<CmItem[]>([]);
   const [years, setYears] = useState<number[]>([]);
-  const [brandOpen, setBrandOpen] = useState(false);
-  const [modelOpen, setModelOpen] = useState(false);
   const [brandsLoading, setBrandsLoading] = useState(true);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [yearsLoading, setYearsLoading] = useState(false);
@@ -52,8 +61,11 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
     model: "",
     year: "",
     mileage: "",
+    modification: "",
     drive: "",
     engineVolume: "",
+    power: "",
+    gear: "",
     complectation: "",
     condition: "",
     owners: "",
@@ -66,6 +78,9 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
     driveTypes: { id: string; name: string }[];
     engineVolumes: { id: string; name: string }[];
     complectations: { id: string; name: string }[];
+    powers: { id: string; name: string }[];
+    gearTypes: { id: string; name: string }[];
+    modifications: ModificationItem[];
   }
   const [modOptions, setModOptions] = useState<ModOptions | null>(null);
   const [modOptionsLoading, setModOptionsLoading] = useState(false);
@@ -121,7 +136,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
     fetch(`/api/car-catalog/cm-modifications-options?${qs}`)
       .then(r => r.json())
       .then(data => {
-        if (data.ok) setModOptions({ driveTypes: data.driveTypes ?? [], engineVolumes: data.engineVolumes ?? [], complectations: data.complectations ?? [] });
+        if (data.ok) setModOptions({ driveTypes: data.driveTypes ?? [], engineVolumes: data.engineVolumes ?? [], complectations: data.complectations ?? [], powers: data.powers ?? [], gearTypes: data.gearTypes ?? [], modifications: data.modifications ?? [] });
         else setModOptions(null);
       })
       .catch(() => setModOptions(null))
@@ -132,27 +147,40 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
     setFormData(prev => {
       const next = { ...prev, [field]: value };
       if (field === "brand") {
-        next.model = "";
-        next.year = "";
-        next.drive = "";
-        next.engineVolume = "";
-        next.complectation = "";
+        next.model = ""; next.year = ""; next.modification = "";
+        next.drive = ""; next.engineVolume = ""; next.power = ""; next.gear = ""; next.complectation = "";
       }
       if (field === "model") {
-        next.year = "";
-        next.drive = "";
-        next.engineVolume = "";
-        next.complectation = "";
+        next.year = ""; next.modification = "";
+        next.drive = ""; next.engineVolume = ""; next.power = ""; next.gear = ""; next.complectation = "";
       }
       if (field === "year") {
-        next.drive = "";
-        next.engineVolume = "";
-        next.complectation = "";
+        next.modification = "";
+        next.drive = ""; next.engineVolume = ""; next.power = ""; next.gear = ""; next.complectation = "";
+      }
+      if (["drive", "engineVolume", "power", "gear", "complectation"].includes(field)) {
+        next.modification = "";
       }
       return next;
     });
     setEstimateResult(null);
   }, []);
+
+  const handleModificationChange = useCallback((modId: string) => {
+    const mod = modOptions?.modifications?.find(m => m.id === modId);
+    setFormData(prev => ({
+      ...prev,
+      modification: modId,
+      ...(mod ? {
+        drive: mod.drive || prev.drive,
+        engineVolume: mod.engineVolume || prev.engineVolume,
+        power: mod.power || prev.power,
+        gear: mod.gear || prev.gear,
+        complectation: mod.complectation || prev.complectation,
+      } : {}),
+    }));
+    setEstimateResult(null);
+  }, [modOptions]);
 
   const handleEstimate = useCallback(async () => {
     if (!formData.brand || !formData.model || !formData.year || !formData.mileage) return;
@@ -164,6 +192,10 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
         year: formData.year,
         mileage: formData.mileage,
       });
+      if (formData.modification)  params.append("modificationId", formData.modification);
+      if (formData.drive)         params.append("drive", formData.drive);
+      if (formData.engineVolume)  params.append("engineVolume", formData.engineVolume);
+      if (formData.complectation) params.append("complectation", formData.complectation);
       const resp = await fetch(`/api/car-catalog/cm-expert-predict?${params}`);
       const data = await resp.json();
       setEstimateResult(data);
@@ -191,6 +223,8 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
       fd.append("mileage", formData.mileage);
       if (formData.drive) fd.append("drive", formData.drive);
       if (formData.engineVolume) fd.append("engineVolume", formData.engineVolume);
+      if (formData.power) fd.append("power", formData.power);
+      if (formData.gear) fd.append("gear", formData.gear);
       if (formData.complectation) fd.append("complectation", formData.complectation);
       fd.append("condition", formData.condition);
       fd.append("owners", formData.owners);
@@ -214,8 +248,6 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
 
   const canEstimate = formData.brand && formData.model && formData.year && formData.mileage;
 
-  const selectedBrandName = brands.find(b => b.id === formData.brand)?.name ?? "";
-  const selectedModelName = models.find(m => m.id === formData.model)?.name ?? "";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -281,86 +313,32 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                     Ваш автомобиль
                   </h4>
 
-                  {/* Brand dropdown */}
+                  {/* Brand searchable */}
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-500">Марка</Label>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setBrandOpen(!brandOpen)}
-                        className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between text-sm hover:border-[#d97706] transition-colors"
-                      >
-                        <span className={selectedBrandName ? "text-slate-900" : "text-slate-400"}>
-                          {selectedBrandName || "Выберите марку"}
-                        </span>
-                        {brandsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                      </button>
-                      <AnimatePresence>
-                        {brandOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -5 }}
-                            className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-[200px] overflow-y-auto"
-                          >
-                            {brands.map(b => (
-                              <button
-                                key={b.id}
-                                type="button"
-                                onClick={() => { handleChange("brand", b.id); setBrandOpen(false); }}
-                                className="w-full px-3 py-2 text-sm text-left hover:bg-slate-50 transition-colors"
-                              >
-                                {b.name}
-                              </button>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
+                    <SearchableSelect
+                      items={brands}
+                      value={formData.brand}
+                      onChange={(id) => handleChange("brand", id)}
+                      placeholder="Выберите марку"
+                      loading={brandsLoading}
+                      className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
+                    />
                   </div>
 
-                  {/* Model dropdown */}
-                  {formData.brand && (
-                    <div className="space-y-2">
-                      <Label className="text-xs text-slate-500">Модель</Label>
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setModelOpen(!modelOpen)}
-                          className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between text-sm hover:border-[#d97706] transition-colors"
-                        >
-                          <span className={selectedModelName ? "text-slate-900" : "text-slate-400"}>
-                            {selectedModelName || "Выберите модель"}
-                          </span>
-                          {modelsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                        </button>
-                        <AnimatePresence>
-                          {modelOpen && (
-                            <motion.div
-                              initial={{ opacity: 0, y: -5 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -5 }}
-                              className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-[200px] overflow-y-auto"
-                            >
-                              {models.length === 0 && !modelsLoading && (
-                                <div className="px-3 py-2 text-sm text-slate-400">Нет моделей в каталоге</div>
-                              )}
-                              {models.map(m => (
-                                <button
-                                  key={m.id}
-                                  type="button"
-                                  onClick={() => { handleChange("model", m.id); setModelOpen(false); }}
-                                  className="w-full px-3 py-2 text-sm text-left hover:bg-slate-50 transition-colors"
-                                >
-                                  {m.name}
-                                </button>
-                              ))}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </div>
-                  )}
+                  {/* Model searchable */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-500">Модель</Label>
+                    <SearchableSelect
+                      items={models}
+                      value={formData.model}
+                      onChange={(id) => handleChange("model", id)}
+                      placeholder={!formData.brand ? "Сначала выберите марку" : "Выберите модель"}
+                      disabled={!formData.brand}
+                      loading={modelsLoading}
+                      className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
+                    />
+                  </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     {/* Year */}
@@ -402,9 +380,37 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                     </div>
                   </div>
 
-                  {/* ── Modification options: drive / volume / complectation ── */}
-                  {(modOptionsLoading || (modOptions && (modOptions.engineVolumes.length > 0 || modOptions.driveTypes.length > 0 || modOptions.complectations.length > 0))) && (
+                  {/* ── Modification options: drive / volume / power / gear / complectation ── */}
+                  {(modOptionsLoading || (modOptions && (modOptions.engineVolumes.length > 0 || modOptions.driveTypes.length > 0 || modOptions.powers.length > 0 || modOptions.gearTypes.length > 0 || modOptions.complectations.length > 0 || modOptions.modifications.length > 0))) && (
                     <div className="space-y-3">
+
+                      {/* Modification (full-width, top) */}
+                      {(modOptionsLoading || (modOptions?.modifications ?? []).length > 0) && (
+                        <div className="space-y-2">
+                          <Label className="text-xs text-slate-500">Модификация</Label>
+                          <div className="relative">
+                            <select
+                              value={formData.modification}
+                              onChange={(e) => handleModificationChange(e.target.value)}
+                              disabled={modOptionsLoading}
+                              className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm appearance-none focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
+                            >
+                              <option value="">{modOptionsLoading ? "Загрузка..." : "Выберите модификацию"}</option>
+                              {(modOptions?.modifications ?? []).map(m => (
+                                <option key={m.id} value={m.id}>{m.name}</option>
+                              ))}
+                            </select>
+                            {modOptionsLoading
+                              ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                              : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            }
+                          </div>
+                          {formData.modification && (
+                            <p className="text-[11px] text-slate-400 mt-0.5">Поля ниже заполнены автоматически — при необходимости скорректируйте</p>
+                          )}
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-2 gap-3">
                         {/* Engine volume */}
                         {(modOptionsLoading || (modOptions?.engineVolumes ?? []).length > 0) && (
@@ -441,6 +447,50 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                               >
                                 <option value="">{modOptionsLoading ? "Загрузка..." : "Не указан"}</option>
                                 {(modOptions?.driveTypes ?? []).map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                              </select>
+                              {modOptionsLoading
+                                ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                              }
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Power */}
+                        {(modOptionsLoading || (modOptions?.powers ?? []).length > 0) && (
+                          <div className="space-y-2">
+                            <Label className="text-xs text-slate-500">Мощность, л.с.</Label>
+                            <div className="relative">
+                              <select
+                                value={formData.power}
+                                onChange={(e) => handleChange("power", e.target.value)}
+                                disabled={modOptionsLoading}
+                                className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm appearance-none focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
+                              >
+                                <option value="">{modOptionsLoading ? "Загрузка..." : "Не указана"}</option>
+                                {(modOptions?.powers ?? []).map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                              </select>
+                              {modOptionsLoading
+                                ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                              }
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Gear type */}
+                        {(modOptionsLoading || (modOptions?.gearTypes ?? []).length > 0) && (
+                          <div className="space-y-2">
+                            <Label className="text-xs text-slate-500">Тип КПП</Label>
+                            <div className="relative">
+                              <select
+                                value={formData.gear}
+                                onChange={(e) => handleChange("gear", e.target.value)}
+                                disabled={modOptionsLoading}
+                                className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm appearance-none focus:border-[#d97706] focus:ring-1 focus:ring-[#d97706]/20 outline-none disabled:opacity-50"
+                              >
+                                <option value="">{modOptionsLoading ? "Загрузка..." : "Не указан"}</option>
+                                {(modOptions?.gearTypes ?? []).map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
                               </select>
                               {modOptionsLoading
                                 ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
