@@ -63,7 +63,7 @@ async function fetchCmYears(brand: string, model: string): Promise<number[]> {
 
 interface ModificationItem {
   id: string; name: string;
-  drive: string; engineVolume: string; power: string; gear: string; complectation: string; doors: string;
+  drive: string; engineVolume: string; power: string; gear: string; complectation: string; doors: string; bodyId: string;
 }
 
 interface ModOptions {
@@ -82,7 +82,9 @@ async function fetchCmModificationsOptions(brand: string, model: string, year: s
   const r = await fetch(`/api/car-catalog/cm-modifications-options?${qs}`);
   if (!r.ok) return null;
   const j = await r.json();
-  return j.ok ? { modifications: j.modifications ?? [], driveTypes: j.driveTypes ?? [], engineVolumes: j.engineVolumes ?? [], powers: j.powers ?? [], gearTypes: j.gearTypes ?? [], complectations: j.complectations ?? [], doorNumbers: j.doorNumbers ?? [] } : null;
+  if (!j.ok) return null;
+  const mods = (j.modifications ?? []).map((m: any) => ({ ...m, bodyId: m.bodyId ?? "" }));
+  return { modifications: mods, driveTypes: j.driveTypes ?? [], engineVolumes: j.engineVolumes ?? [], powers: j.powers ?? [], gearTypes: j.gearTypes ?? [], complectations: j.complectations ?? [], doorNumbers: j.doorNumbers ?? [] };
 }
 
 interface PredictResult {
@@ -95,7 +97,7 @@ async function fetchCmExpertPredict(params: {
   brandId: string; modelId: string; year: string; mileage: string;
   bodyId?: string; generationId?: string;
   drive?: string; engineVolume?: string; complectation?: string;
-  modificationId?: string;
+  modificationId?: string; ownersNumber?: string;
 }): Promise<PredictResult | { ok: false }> {
   const qs = new URLSearchParams({
     brandId: params.brandId,
@@ -103,12 +105,13 @@ async function fetchCmExpertPredict(params: {
     year: params.year,
     mileage: params.mileage,
   });
-  if (params.bodyId)         qs.append("bodyId", params.bodyId);
+  if (params.bodyId)         qs.append("bodyId",       params.bodyId);
   if (params.generationId)   qs.append("generationId", params.generationId);
   if (params.modificationId) qs.append("modificationId", params.modificationId);
-  if (params.drive)          qs.append("drive", params.drive);
+  if (params.drive)          qs.append("drive",        params.drive);
   if (params.engineVolume)   qs.append("engineVolume", params.engineVolume);
   if (params.complectation)  qs.append("complectation", params.complectation);
+  if (params.ownersNumber)   qs.append("ownersNumber", params.ownersNumber);
   const r = await fetch(`/api/car-catalog/cm-expert-predict?${qs}`);
   if (!r.ok) return { ok: false };
   return r.json();
@@ -150,6 +153,7 @@ function BuyoutForm() {
     brand: "", model: "", year: "", mileage: "",
     modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", doors: "",
     generation: "", body: "",
+    ownersCount: "",
     name: "", phone: "", comment: "",
   });
   const [priceResult, setPriceResult] = useState<PredictResult | { ok: false } | null>(null);
@@ -219,8 +223,11 @@ function BuyoutForm() {
   const filteredGearItems = (modOptions?.gearTypes ?? []).filter(g =>
     (!form.engineVolume && !form.drive) || modsForVolumeDrive.some(m => m.gear === g.name)
   );
+  const modsForBody = form.body
+    ? modsForVolumeDrive.filter(m => m.bodyId === form.body)
+    : modsForVolumeDrive;
   const filteredDoorItems = (modOptions?.doorNumbers ?? []).filter(d =>
-    (!form.engineVolume && !form.drive) || modsForVolumeDrive.some(m => m.doors === d.id)
+    (!form.engineVolume && !form.drive && !form.body) || modsForBody.some(m => m.doors === d.id)
   );
   const matchingMods = mods.filter(m =>
     (!form.engineVolume || m.engineVolume === form.engineVolume) &&
@@ -258,6 +265,8 @@ function BuyoutForm() {
         next.modification = ""; next.drive = ""; next.power = ""; next.gear = ""; next.doors = "";
       } else if (key === "drive") {
         next.modification = ""; next.power = ""; next.gear = ""; next.doors = "";
+      } else if (key === "body") {
+        next.modification = ""; next.doors = "";
       } else if (["power", "gear", "complectation", "doors"].includes(key)) {
         next.modification = "";
       }
@@ -292,6 +301,7 @@ function BuyoutForm() {
         drive:          form.drive          || undefined,
         engineVolume:   form.engineVolume   || undefined,
         complectation:  form.complectation  || undefined,
+        ownersNumber:   form.ownersCount    || undefined,
       });
       setPriceResult(result);
       setStep(2);
@@ -322,9 +332,11 @@ function BuyoutForm() {
       if (form.engineVolume)   fd.append("engineVolume", form.engineVolume);
       if (form.power)          fd.append("power", form.power);
       if (form.gear)           fd.append("gear", form.gear);
+      if (form.doors)          fd.append("doors", (modOptions?.doorNumbers ?? []).find(d => d.id === form.doors)?.name ?? form.doors);
       if (form.complectation)  fd.append("complectation", form.complectation);
       if (form.generation)     fd.append("generation", form.generation);
-      if (form.body)           fd.append("body", form.body);
+      if (form.body)           fd.append("body", bodies.find(b => b.id === form.body)?.name ?? form.body);
+      if (form.ownersCount)    fd.append("owners", form.ownersCount);
       if (form.comment)        fd.append("comment", form.comment);
       fd.append("name", form.name);
       fd.append("phone", form.phone);
@@ -346,7 +358,7 @@ function BuyoutForm() {
     setSubmitted(false);
     setStep(1);
     setPriceResult(null);
-    setForm({ brand: "", model: "", year: "", mileage: "", modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", doors: "", generation: "", body: "", name: "", phone: "", comment: "" });
+    setForm({ brand: "", model: "", year: "", mileage: "", modification: "", drive: "", engineVolume: "", power: "", gear: "", complectation: "", doors: "", generation: "", body: "", ownersCount: "", name: "", phone: "", comment: "" });
   };
 
   if (submitted) {
@@ -549,6 +561,21 @@ function BuyoutForm() {
                 </div>
               </div>
             )}
+
+            {/* Кол-во владельцев */}
+            <div>
+              <label className={labelCls}>Кол-во владельцев <span className="normal-case font-normal text-slate-400">(опционально)</span></label>
+              <div className="relative">
+                <select value={form.ownersCount} onChange={set("ownersCount")} className={`${selectCls} pr-9 appearance-none`}>
+                  <option value="">Не указано</option>
+                  <option value="1">1 владелец</option>
+                  <option value="2">2 владельца</option>
+                  <option value="3">3 владельца</option>
+                  <option value="4">4 и более</option>
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
           </div>
 
           <button
