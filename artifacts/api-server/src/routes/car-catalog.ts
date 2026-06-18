@@ -285,6 +285,7 @@ router.get("/cm-modifications-options", async (req, res) => {
       gear: string;
       complectation: string;
       doors: string;
+      bodyId: string;
     }
     const modificationsList: ModDetail[] = [];
     const seenModIds = new Set<string>();
@@ -348,6 +349,9 @@ router.get("/cm-modifications-options", async (req, res) => {
         }
       }
 
+      // Body
+      const bodyIdVal = m.body?.id != null ? String(m.body.id) : "";
+
       // Build modification entry
       const modId = String(m.id ?? i);
       if (!seenModIds.has(modId)) {
@@ -363,6 +367,7 @@ router.get("/cm-modifications-options", async (req, res) => {
           gear: gearName,
           complectation: cmplName,
           doors: doorsVal,
+          bodyId: bodyIdVal,
         });
       }
     }
@@ -446,7 +451,7 @@ async function getModificationParams(
 }
 
 router.get("/cm-expert-predict", async (req, res) => {
-  const { brandId, modelId, year, mileage, bodyId, generationId, drive, engineVolume, complectation, modificationId } =
+  const { brandId, modelId, year, mileage, bodyId, generationId, drive, engineVolume, complectation, modificationId, ownersNumber } =
     req.query as Record<string, string | undefined>;
 
   if (!brandId || !modelId || !year || !mileage) {
@@ -479,9 +484,10 @@ router.get("/cm-expert-predict", async (req, res) => {
       creationYear: year,
       mileage:      mileage,
       ...modParams,
-      ...(modificationId ? { modification: modificationId } : {}),
-      ...(generationId   ? { generation:   generationId   } : {}),
-      ...(bodyId         ? { body:         bodyId         } : {}),
+      ...(modificationId ? { modification:  modificationId } : {}),
+      ...(generationId   ? { generation:    generationId   } : {}),
+      ...(bodyId         ? { body:          bodyId         } : {}),
+      ...(ownersNumber   ? { ownersNumber:  ownersNumber   } : {}),
     });
 
     const res2 = await fetch(`${CM_API_BASE()}/predict?${qs}`, {
