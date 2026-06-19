@@ -192,7 +192,7 @@ export function syncCars() {
   );
 }
 export function getSyncStatus() {
-  return api<{ ok: true; total: number; lastSynced: string | null }>("GET", "/admin/navigator/sync-status");
+  return api<{ ok: true; total: number; lastSynced: string | null; byDealer?: { dealer: string; type: string; cnt: number }[] }>("GET", "/admin/navigator/sync-status");
 }
 
 /* Upload - Object Storage (GCS) */
