@@ -81,13 +81,28 @@ export function deleteDealer(id: number) { return api<{ ok: true }>("DELETE", `/
 
 /* Brands */
 export interface Brand {
-  id: number; name: string; websiteUrl: string | null; logoUrl: string | null; isServiceOnly: boolean; createdAt: string;
+  id: number; name: string; slug: string | null; websiteUrl: string | null; logoUrl: string | null; isServiceOnly: boolean; createdAt: string;
 }
 export function getBrands() { return api<Brand[]>("GET", "/admin/brands"); }
 export function getBrand(id: number) { return api<Brand>("GET", `/admin/brands/${id}`); }
-export function createBrand(data: Omit<Brand, "id" | "createdAt">) { return api<Brand>("POST", "/admin/brands", data); }
+export function createBrand(data: Omit<Brand, "id" | "createdAt" | "slug">) { return api<Brand>("POST", "/admin/brands", data); }
 export function updateBrand(id: number, data: Partial<Brand>) { return api<Brand>("PUT", `/admin/brands/${id}`, data); }
 export function deleteBrand(id: number) { return api<{ ok: true }>("DELETE", `/admin/brands/${id}`); }
+
+/* Brand page content */
+export interface BrandPageContent {
+  id: number; brandId: number;
+  description: string | null; serviceText: string | null; promoText: string | null;
+  metaTitle: string | null; metaDescription: string | null; updatedAt: string | null;
+}
+export function getBrandPageContent(brandId: number) {
+  return api<{ ok: true; data: { brand: Brand; content: BrandPageContent | null } }>(
+    "GET", `/admin/brand-pages/${brandId}`
+  ).then(r => r.data);
+}
+export function updateBrandPageContent(brandId: number, data: Omit<BrandPageContent, "id" | "brandId" | "updatedAt">) {
+  return api<{ ok: true; data: BrandPageContent }>("PUT", `/admin/brand-pages/${brandId}`, data).then(r => r.data);
+}
 
 /* Users */
 export interface User {
