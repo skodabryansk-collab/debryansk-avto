@@ -118,7 +118,7 @@ async function enrichWithApiDetails(vacancies: HhVacancy[]): Promise<HhVacancy[]
         signal: AbortSignal.timeout(4000),
       });
       if (!res.ok) return v;
-      const d = await res.json();
+      const d = await res.json() as Record<string, any>;
 
       const rawDescription: string | undefined = d.description;
       const description = rawDescription
