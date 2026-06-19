@@ -1316,7 +1316,7 @@ export default function Home() {
                 <span className="text-[#87b63c]">в Брянске с 2011 года</span>
               </h2>
               <p className="text-slate-300 text-sm sm:text-base leading-relaxed mb-8 max-w-md">
-                Группа компаний с 9 официальными брендами.
+                Группа компаний с {apiBrands.length} официальными брендами.
                 Продажа новых автомобилей, авто с пробегом,
                 сервис и финансирование — всё в одном холдинге.
               </p>
