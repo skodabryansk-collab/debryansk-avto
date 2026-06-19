@@ -96,15 +96,14 @@ export default function BrandsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      {b.slug && (
-                        <Button
-                          variant="ghost" size="icon" className="w-8 h-8"
-                          title="Редактировать страницу бренда"
-                          onClick={() => setPageEditBrand(b)}
-                        >
-                          <Globe className="w-4 h-4 text-[#0070b8]" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost" size="sm" className="h-8 px-2 text-xs"
+                        title={b.slug ? "Редактировать страницу бренда" : "Назначьте slug бренду, чтобы создать страницу"}
+                        onClick={() => setPageEditBrand(b)}
+                      >
+                        <Globe className="w-3.5 h-3.5 mr-1 text-[#0070b8]" />
+                        <span className="text-[#0070b8]">Страница</span>
+                      </Button>
                       <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => setEditItem(b)}>
                         <Pencil className="w-4 h-4 text-slate-500" />
                       </Button>
@@ -152,6 +151,7 @@ export default function BrandsPage() {
 function BrandFormDialog({ item, onClose }: { item: Brand | null; onClose: () => void }) {
   const [form, setForm] = React.useState({
     name: item?.name ?? "",
+    slug: item?.slug ?? "",
     websiteUrl: item?.websiteUrl ?? "",
     logoUrl: item?.logoUrl ?? "",
     isServiceOnly: item?.isServiceOnly ?? false,
@@ -199,6 +199,17 @@ function BrandFormDialog({ item, onClose }: { item: Brand | null; onClose: () =>
           <div>
             <Label>Название</Label>
             <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div>
+            <Label>Slug (URL страницы бренда)</Label>
+            <Input
+              value={form.slug}
+              onChange={e => setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") }))}
+              placeholder="например: jetour, haval, volkswagen"
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              {form.slug ? `Страница будет доступна по адресу /brands/${form.slug}` : "Оставьте пустым, если страница бренда не нужна"}
+            </p>
           </div>
           <div>
             <Label>Сайт</Label>
@@ -313,25 +324,34 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     onError: () => toast({ title: "Ошибка сохранения", variant: "destructive" }),
   });
 
-  const siteUrl = `/brands/${brand.slug}`;
-
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between gap-2 flex-wrap">
             <span>Страница бренда: {brand.name}</span>
-            <a
-              href={siteUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-sm font-normal text-[#0070b8] hover:underline"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              Открыть страницу
-            </a>
+            {brand.slug ? (
+              <a
+                href={`/brands/${brand.slug}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-sm font-normal text-[#0070b8] hover:underline"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Открыть страницу
+              </a>
+            ) : (
+              <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                Нет slug — страница недоступна
+              </span>
+            )}
           </DialogTitle>
         </DialogHeader>
+        {!brand.slug && (
+          <div className="text-sm text-slate-500 bg-slate-50 border rounded-lg p-3">
+            Назначьте slug этому бренду в настройках (кнопка карандаша), чтобы активировать публичную страницу. Контент можно заполнить заранее.
+          </div>
+        )}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-10">
