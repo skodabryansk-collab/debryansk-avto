@@ -71,7 +71,7 @@ interface BrandPageData {
 }
 
 async function fetchBrandPage(slug: string): Promise<BrandPageData> {
-  const r = await fetch(`/api/brands/page/${slug}`);
+  const r = await fetch(`/api/brands/${slug}`);
   if (!r.ok) throw new Error("Brand not found");
   const json = await r.json();
   if (!json.ok) throw new Error(json.error ?? "Error");
