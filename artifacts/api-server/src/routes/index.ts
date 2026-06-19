@@ -27,6 +27,7 @@ import carCatalogRouter from "./car-catalog";
 import brandLocationsRouter from "./brand-locations";
 import adminNavigatorRouter from "./admin-navigator";
 import adminReviewsRouter from "./admin-reviews";
+import adminBrandPagesRouter from "./admin-brand-pages";
 
 const router: IRouter = Router();
 
@@ -64,6 +65,7 @@ router.use("/admin/locations", adminLocationsRouter);
 router.use("/admin/settings", adminSettingsRouter);
 router.use("/admin/navigator", adminNavigatorRouter);
 router.use("/admin/reviews", adminReviewsRouter);
+router.use("/admin/brand-pages", adminBrandPagesRouter);
 
 // Public settings
 router.use("/settings", publicSettingsRouter);
