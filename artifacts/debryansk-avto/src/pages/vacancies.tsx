@@ -705,7 +705,7 @@ function VacancyCard({ vacancy, onOpen }: { vacancy: Vacancy; onOpen: () => void
         </h3>
         {vacancy.description && (
           <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">
-            {vacancy.description.replace(/<[^>]+>/g, " ").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#x27;/g, "'").replace(/\s+/g, " ").trim()}
+            {vacancy.description.replace(/<[^>]+>/g, " ").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#x27;/g, "'").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim()}
           </p>
         )}
       </div>
