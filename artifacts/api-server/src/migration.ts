@@ -263,6 +263,13 @@ export async function runMigration() {
 
     // Brand slugs + brand_page_content table (Task #192)
     await db.execute(sql`ALTER TABLE brands ADD COLUMN IF NOT EXISTS slug TEXT`);
+
+    // Enforce uniqueness on brands.slug (idempotent)
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_brands_slug ON brands(slug)
+      WHERE slug IS NOT NULL
+    `);
+
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS brand_page_content (
         id SERIAL PRIMARY KEY,
@@ -282,25 +289,28 @@ export async function runMigration() {
       )
     `);
 
-    // Backfill slugs for all brands (idempotent via WHERE slug IS NULL)
-    await db.execute(sql`UPDATE brands SET slug = 'omoda'           WHERE LOWER(name) LIKE '%omoda%'      AND slug IS NULL`);
-    await db.execute(sql`UPDATE brands SET slug = 'jaecoo'          WHERE LOWER(name) LIKE '%jaecoo%'     AND slug IS NULL`);
-    await db.execute(sql`UPDATE brands SET slug = 'haval-city'      WHERE LOWER(name) LIKE '%haval city%' AND slug IS NULL`);
-    await db.execute(sql`UPDATE brands SET slug = 'haval-pro'       WHERE LOWER(name) LIKE '%haval pro%'  AND slug IS NULL`);
-    await db.execute(sql`UPDATE brands SET slug = 'tenet'           WHERE LOWER(name) LIKE '%tenet%'      AND slug IS NULL`);
-    await db.execute(sql`UPDATE brands SET slug = 'jetour'          WHERE LOWER(name) LIKE '%jetour%'     AND slug IS NULL`);
-    await db.execute(sql`UPDATE brands SET slug = 'mb-bryansk'      WHERE LOWER(name) LIKE '%мб%'         AND slug IS NULL`);
-    await db.execute(sql`UPDATE brands SET slug = 's-probegom'      WHERE LOWER(name) LIKE '%пробег%'     AND slug IS NULL`);
-    await db.execute(sql`UPDATE brands SET slug = 'volkswagen'      WHERE LOWER(name) LIKE '%volkswagen%' AND slug IS NULL`);
-    await db.execute(sql`UPDATE brands SET slug = 'skoda'           WHERE LOWER(name) LIKE '%skoda%'      AND slug IS NULL`);
-    await db.execute(sql`UPDATE brands SET slug = 'exeed'           WHERE LOWER(name) LIKE '%exeed%'      AND slug IS NULL`);
-    await db.execute(sql`UPDATE brands SET slug = 'mercedes-benz'   WHERE LOWER(name) LIKE '%mercedes%'   AND slug IS NULL`);
+    // Backfill slugs for all brands (idempotent via WHERE slug IS NULL).
+    // Ordered most-specific first to avoid ambiguous partial matches.
+    await db.execute(sql`UPDATE brands SET slug = 'haval-city'    WHERE (LOWER(name) LIKE '%haval%city%' OR LOWER(name) = 'haval city') AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'haval-pro'     WHERE (LOWER(name) LIKE '%haval%pro%'  OR LOWER(name) = 'haval pro')  AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'mercedes-benz' WHERE (LOWER(name) LIKE '%mercedes%'   OR LOWER(name) LIKE '%benz%')  AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'mb-bryansk'    WHERE (LOWER(name) LIKE '%мб%брянск%'  OR LOWER(name) LIKE '%мб-%')   AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'volkswagen'    WHERE (LOWER(name) LIKE '%volkswagen%' OR LOWER(name) IN ('vw','volkswagen')) AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'omoda'         WHERE  LOWER(name) LIKE '%omoda%'      AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'jaecoo'        WHERE  LOWER(name) LIKE '%jaecoo%'     AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'tenet'         WHERE  LOWER(name) LIKE '%tenet%'      AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'jetour'        WHERE  LOWER(name) LIKE '%jetour%'     AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 's-probegom'    WHERE  LOWER(name) LIKE '%пробег%'     AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'skoda'         WHERE  LOWER(name) LIKE '%skoda%'      AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'exeed'         WHERE  LOWER(name) LIKE '%exeed%'      AND slug IS NULL`);
 
-    // Seed template brand_page_content for all brands that don't have a row yet
+    // Seed template brand_page_content for all slugged brands without a row yet.
+    // Includes description, service_text, meta_title, meta_description.
     await db.execute(sql`
-      INSERT INTO brand_page_content (brand_id, description, meta_title, meta_description)
+      INSERT INTO brand_page_content (brand_id, description, service_text, meta_title, meta_description)
       SELECT b.id,
         'Официальный дилер ' || b.name || ' в Брянске — широкий выбор автомобилей, сервисное обслуживание и выгодные условия покупки в Дебрянск Авто.' AS description,
+        'Сервисный центр ' || b.name || ' в Брянске: гарантийное и постгарантийное обслуживание, оригинальные запчасти, запись онлайн. Опытные мастера, современное оборудование.' AS service_text,
         b.name || ' в Брянске — официальный дилер Дебрянск Авто' AS meta_title,
         'Купить ' || b.name || ' в Брянске. Официальный дилер Дебрянск Авто: новые автомобили, трейд-ин, кредит, сервис.' AS meta_description
       FROM brands b
