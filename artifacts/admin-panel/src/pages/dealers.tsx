@@ -157,8 +157,8 @@ function DealerFormDialog({ item, brands, onClose }: { item: Dealer | null; bran
         brandIds: brandIds || null,
         brands: brandNames.length ? brandNames : undefined,
       };
-      if (isEdit) return updateDealer(item!.id, payload);
-      return createDealer(payload as Parameters<typeof createDealer>[0]);
+      if (isEdit) return updateDealer(item!.id, payload as Partial<Dealer>);
+      return createDealer(payload as unknown as Parameters<typeof createDealer>[0]);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["dealers"] });
