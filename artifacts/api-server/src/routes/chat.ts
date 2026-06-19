@@ -14,6 +14,17 @@ interface ChatMessage {
   car_ids?: string[];
 }
 
+interface PageContextInput {
+  car_id?: string;
+  brand: string;
+  model: string;
+  year: number;
+  price: number;
+  is_new: boolean;
+  body_type?: string;
+  run?: number;
+}
+
 export interface ChatCarItem {
   id: string;
   mark: string;
@@ -37,6 +48,7 @@ interface CachedContext {
 interface FilterParams {
   brandTerms: string[];
   bodyTypeTerms: string[];
+  driveTerms: string[];
   priceMax: number | null;
   priceMin: number | null;
   typeFilter: "new" | "used" | null;
@@ -171,14 +183,36 @@ const BRAND_KEYWORDS: Record<string, string[]> = {
   хавала:        ["haval"],   // genitive
   хавалу:        ["haval"],   // dative
   хавалом:       ["haval"],   // instrumental
+  // ── Haval City dealer keyword ──────────────────────────────
+  "haval city":  ["haval"],
+  "хавал сити":  ["haval"],
+  "хавал-сити":  ["haval"],
   // ── Jolion ─────────────────────────────────────────────────
-  jolion:        ["jolion"],
-  джолион:       ["jolion"],
-  жолион:        ["jolion"],  // typo (no д)
-  джолиона:      ["jolion"],  // genitive
-  // ── Haval models ───────────────────────────────────────────
-  "h6":          ["h6"],
-  "h9":          ["h9"],
+  jolion:        ["jolion", "haval"],
+  джолион:       ["jolion", "haval"],
+  жолион:        ["jolion", "haval"],  // typo (no д)
+  джолиона:      ["jolion", "haval"],  // genitive
+  джолиону:      ["jolion", "haval"],  // dative
+  // ── Dargo ──────────────────────────────────────────────────
+  dargo:         ["dargo", "haval"],
+  дарго:         ["dargo", "haval"],
+  дарга:         ["dargo", "haval"],   // genitive
+  даргу:         ["dargo", "haval"],   // dative
+  // ── F7 / F7x ───────────────────────────────────────────────
+  "f7x":         ["f7x", "haval"],
+  "f7":          ["f7", "haval"],
+  "ф7":          ["f7", "haval"],
+  // ── M6 ─────────────────────────────────────────────────────
+  "m6":          ["m6", "haval"],
+  "м6":          ["m6", "haval"],
+  // ── Haval Pro models ───────────────────────────────────────
+  "haval pro":   ["haval"],
+  "хавал про":   ["haval"],
+  "h3":          ["h3", "haval"],
+  "h5":          ["h5", "haval"],
+  "h6":          ["h6", "haval"],
+  "h7":          ["h7", "haval"],
+  "h9":          ["h9", "haval"],
   // ── Jetour ─────────────────────────────────────────────────
   jetour:        ["jetour"],
   джетур:        ["jetour"],
@@ -288,6 +322,112 @@ const BRAND_KEYWORDS: Record<string, string[]> = {
   vesta:         ["vesta", "lada"],
   веста:         ["vesta", "lada"],
   весту:         ["vesta", "lada"],
+  kalina:        ["kalina", "lada"],
+  калина:        ["kalina", "lada"],
+  largus:        ["largus", "lada"],
+  ларгус:        ["largus", "lada"],
+  niva:          ["niva", "lada"],
+  нива:          ["niva", "lada"],
+  xray:          ["xray", "lada"],
+  // ── Jetour models ──────────────────────────────────────────
+  dashing:       ["dashing", "jetour"],
+  дашинг:        ["dashing", "jetour"],
+  "t1":          ["t1", "jetour"],
+  "t2":          ["t2", "jetour"],
+  "x50":         ["x50", "jetour"],
+  "x70":         ["x70", "jetour"],
+  "x70+":        ["x70", "jetour"],
+  "x90":         ["x90", "jetour"],
+  "x90+":        ["x90", "jetour"],
+  // ── Tenet models ───────────────────────────────────────────
+  "t4":          ["t4", "tenet"],
+  "t4l":         ["t4l", "tenet"],
+  "t7":          ["t7", "tenet"],
+  "t8":          ["t8", "tenet"],
+  // ── OMODA / Omoda models ───────────────────────────────────
+  "c5":          ["c5", "omoda"],
+  "c7":          ["c7", "omoda"],
+  // ── JAECOO / Jaecoo models ─────────────────────────────────
+  "j6":          ["j6", "jaecoo"],
+  "j7":          ["j7", "jaecoo"],
+  "j8":          ["j8", "jaecoo"],
+  // ── JAC ────────────────────────────────────────────────────
+  jac:           ["jac"],
+  джак:          ["jac"],
+  // ── Chery models ───────────────────────────────────────────
+  arrizo:        ["arrizo", "chery"],
+  арризо:        ["arrizo", "chery"],
+  tiggo:         ["tiggo", "chery"],
+  тигго:         ["tiggo", "chery"],
+  // ── Subaru ─────────────────────────────────────────────────
+  subaru:        ["subaru"],
+  субару:        ["subaru"],
+  // ── Porsche ────────────────────────────────────────────────
+  porsche:       ["porsche"],
+  порше:         ["porsche"],
+  macan:         ["macan", "porsche"],
+  макан:         ["macan", "porsche"],
+  // ── Xcite ──────────────────────────────────────────────────
+  xcite:         ["xcite"],
+  эксайт:        ["xcite"],
+  "x-cross":     ["x-cross", "xcite"],
+  // ── Kia models ─────────────────────────────────────────────
+  rio:           ["rio", "kia"],
+  рио:           ["rio", "kia"],
+  sorento:       ["sorento", "kia"],
+  соренто:       ["sorento", "kia"],
+  mohave:        ["mohave", "kia"],
+  мохаве:        ["mohave", "kia"],
+  // ── Hyundai models ─────────────────────────────────────────
+  creta:         ["creta", "hyundai"],
+  крета:         ["creta", "hyundai"],
+  solaris:       ["solaris", "hyundai"],
+  соларис:       ["solaris", "hyundai"],
+  tucson:        ["tucson", "hyundai"],
+  туксон:        ["tucson", "hyundai"],
+  elantra:       ["elantra", "hyundai"],
+  элантра:       ["elantra", "hyundai"],
+  // ── Toyota models ──────────────────────────────────────────
+  camry:         ["camry", "toyota"],
+  камри:         ["camry", "toyota"],
+  corolla:       ["corolla", "toyota"],
+  королла:       ["corolla", "toyota"],
+  "rav4":        ["rav4", "toyota"],
+  // ── Volkswagen models ──────────────────────────────────────
+  polo:          ["polo", "volkswagen"],
+  tiguan:        ["tiguan", "volkswagen"],
+  тигуан:        ["tiguan", "volkswagen"],
+  golf:          ["golf", "volkswagen"],
+  гольф:         ["golf", "volkswagen"],
+  // ── Renault models ─────────────────────────────────────────
+  duster:        ["duster", "renault"],
+  дастер:        ["duster", "renault"],
+  kaptur:        ["kaptur", "renault"],
+  каптур:        ["kaptur", "renault"],
+  logan:         ["logan", "renault"],
+  логан:         ["logan", "renault"],
+  sandero:       ["sandero", "renault"],
+  сандеро:       ["sandero", "renault"],
+  // ── Nissan models ──────────────────────────────────────────
+  qashqai:       ["qashqai", "nissan"],
+  кашкай:        ["qashqai", "nissan"],
+  "x-trail":     ["x-trail", "nissan"],
+  almera:        ["almera", "nissan"],
+  алмера:        ["almera", "nissan"],
+  // ── Mazda models ───────────────────────────────────────────
+  "cx-5":        ["cx-5", "mazda"],
+  "cx5":         ["cx-5", "mazda"],
+  // ── Mitsubishi models ──────────────────────────────────────
+  pajero:        ["pajero", "mitsubishi"],
+  паджеро:       ["pajero", "mitsubishi"],
+  "pajero sport":["pajero sport", "mitsubishi"],
+  // ── Mercedes-Benz models ───────────────────────────────────
+  gla:           ["gla", "mercedes"],
+  гла:           ["gla", "mercedes"],
+  gle:           ["gle", "mercedes"],
+  гле:           ["gle", "mercedes"],
+  gls:           ["gls", "mercedes"],
+  глс:           ["gls", "mercedes"],
 };
 
 /* ─── Body-type keyword → model substrings ───────────────────── */
@@ -347,13 +487,26 @@ const MAX_CATALOG_CHARS = 90_000;
 // Pinned cars use full format (with extras/complectation).
 // Catalog goes in the user turn, not system prompt, to avoid Replit proxy quirks.
 
+/* ─── Normalize Cyrillic homoglyphs/phonetics → Latin for model code matching ─ */
+// Handles: Т4→t4 (Tenet), Х70→x70 (Jetour), С5→c5 (OMODA), Н6→h6 (Haval), etc.
+function normalizeCyrToLat(str: string): string {
+  // Two-char "дж" → "j" before digits (J6, J7, J8…)
+  let r = str.replace(/дж(?=\d)/g, "j");
+  // Single-char Cyrillic → Latin before digits
+  r = r.replace(/[авсеклмнотхф](?=\d)/g, (c: string) =>
+    (({ а: "a", в: "b", с: "c", е: "e", к: "k", л: "l", м: "m", н: "h", о: "o", т: "t", х: "x", ф: "f" } as Record<string, string>)[c] ?? c)
+  );
+  // Cyrillic х as model suffix after digit (e.g. "ф7х" → "f7x")
+  r = r.replace(/(\d)х/g, "$1x");
+  return r;
+}
+
 /* ─── Parse filter params from user message ────────────────── */
 
 function parseMessageFilters(message: string): FilterParams {
-  const msg = " " + message.toLowerCase()
-    .replace(/ё/g, "е")
-    .replace(/[ьъ]/g, "")
-    + " ";
+  const msg = normalizeCyrToLat(
+    " " + message.toLowerCase().replace(/ё/g, "е").replace(/[ьъ]/g, "") + " "
+  );
 
   const brandTerms: string[] = [];
   for (const [kw, terms] of Object.entries(BRAND_KEYWORDS)) {
@@ -401,9 +554,22 @@ function parseMessageFilters(message: string): FilterParams {
     typeFilter = "new";
   }
 
+  // Detect drive type — modification field contains strings like "2.0d AT 4WD (190 л.с.)"
+  const driveTerms: string[] = [];
+  if (/полный привод|4wd|awd|4[хx]4|четыре.{0,5}привод/.test(msg)) {
+    driveTerms.push("4wd", "awd", "4x4");
+  }
+  if (/передний привод|fwd|переднеприводн/.test(msg)) {
+    driveTerms.push("fwd");
+  }
+  if (/задний привод|rwd|заднеприводн/.test(msg)) {
+    driveTerms.push("rwd");
+  }
+
   return {
     brandTerms: [...new Set(brandTerms)],
     bodyTypeTerms: [...new Set(bodyTypeTerms)],
+    driveTerms: [...new Set(driveTerms)],
     priceMax,
     priceMin,
     typeFilter,
@@ -417,39 +583,44 @@ function preFilter(
   newCars: NewCarRecord[],
   message: string,
 ): { used: CarRecord[]; newCars: NewCarRecord[] } {
-  // XML fallback: pass full stock, no slicing — AI must see every car.
-  // typeFilter used only to sort matching type first, not to exclude.
-  const { brandTerms, bodyTypeTerms, priceMax, priceMin, typeFilter } = parseMessageFilters(message);
-  const hasFilter = brandTerms.length > 0 || bodyTypeTerms.length > 0 || priceMax !== null || priceMin !== null;
+  const { brandTerms, bodyTypeTerms, driveTerms, priceMax, priceMin, typeFilter } = parseMessageFilters(message);
+  const hasFilter = brandTerms.length > 0 || bodyTypeTerms.length > 0 || driveTerms.length > 0 || priceMax !== null || priceMin !== null || typeFilter !== null;
 
   const byPriceAsc = (a: { price: number }, b: { price: number }) => a.price - b.price;
   const byPriceDesc = (a: { price: number }, b: { price: number }) => b.price - a.price;
   const sortFn = priceMax !== null ? byPriceDesc : byPriceAsc;
 
-  const matchXml = (mark: string, model: string, price: number, bodyType = "") => {
+  const matchXml = (mark: string, model: string, price: number, bodyType = "", type?: string, modification = "") => {
+    if (typeFilter !== null && type !== typeFilter) return false;
     const carStr = `${mark} ${model}`.toLowerCase().replace(/ё/g, "е");
     if (brandTerms.length > 0 && !brandTerms.some(b => carStr.includes(b))) return false;
     if (bodyTypeTerms.length > 0) {
       const bt = bodyType.toLowerCase().replace(/ё/g, "е");
       if (!bodyTypeTerms.some(t => bt.includes(t))) return false;
     }
+    if (driveTerms.length > 0) {
+      const mod = modification.toLowerCase().replace(/ё/g, "е");
+      if (!driveTerms.some(d => mod.includes(d))) return false;
+    }
     if (priceMax !== null && price > priceMax) return false;
     if (priceMin !== null && price < priceMin) return false;
     return true;
   };
 
-  const sortAll = <T extends { price: number; mark: string; model: string; bodyType?: string }>(arr: T[]): T[] =>
-    [...arr].sort((a, b) => {
-      if (hasFilter) {
-        const aHit = matchXml(a.mark, a.model, a.price, a.bodyType ?? "") ? 0 : 1;
-        const bHit = matchXml(b.mark, b.model, b.price, b.bodyType ?? "") ? 0 : 1;
-        if (aHit !== bHit) return aHit - bHit;
-      }
-      return sortFn(a, b);
-    });
+  if (hasFilter) {
+    const filterUsed = used
+      .filter(c => matchXml(c.mark, c.model, c.price, c.bodyType ?? "", "used", c.modification ?? ""))
+      .sort(sortFn);
+    const filterNew = newCars
+      .filter(c => matchXml(c.mark, c.model, c.price, c.bodyType ?? "", "new", c.modification ?? ""))
+      .sort(sortFn);
+    return { used: filterUsed, newCars: filterNew };
+  }
 
-  // Always return both types — typeFilter is a soft sort hint, not an exclusion.
-  return { used: sortAll(used), newCars: sortAll(newCars) };
+  return {
+    used: [...used].sort(sortFn),
+    newCars: [...newCars].sort(sortFn),
+  };
 }
 
 /* ─── Build catalog from DB (richer context) ──────────────── */
@@ -470,37 +641,44 @@ async function buildCarCatalogFromDB(
              max_discount, credit_discount, tradein_discount
       FROM cars ORDER BY price ASC LIMIT 1000
     `);
-    allDbCars = result.rows as DbCar[];
+    allDbCars = result.rows as unknown as DbCar[];
     dbRowsCache = { rows: allDbCars, expiresAt: Date.now() + 30 * 60 * 1000 };
     catalogTextCache = null; // invalidate text cache when rows refresh
   }
 
-  // Early return from catalog text cache (no pinned = same text every time)
-  if (pinnedIds.length === 0 && catalogTextCache && catalogTextCache.expiresAt > Date.now()) {
+  // Parse filters early — required to decide if the catalog text cache is applicable
+  const { brandTerms, bodyTypeTerms, driveTerms, priceMax, priceMin, typeFilter } = parseMessageFilters(message);
+  const hasFilter = brandTerms.length > 0 || bodyTypeTerms.length > 0 || driveTerms.length > 0 || priceMax !== null || priceMin !== null || typeFilter !== null;
+
+  // Early return from catalog text cache — only for unfiltered, unpinned requests
+  if (pinnedIds.length === 0 && !hasFilter && catalogTextCache && catalogTextCache.expiresAt > Date.now()) {
     return { lines: catalogTextCache.text, map: catalogTextCache.map, total: catalogTextCache.total };
   }
 
-  // Compute minPrice per brand+model for new cars
-  const newModelMinPrice = new Map<string, number>();
+  // Compute min effective price (price − max_discount) per brand+model for new cars
+  // max_discount is already the total maximum discount (= credit_discount + tradein_discount combined)
+  const newModelMinEffective = new Map<string, number>();
   for (const c of allDbCars) {
     if (c.type !== "new") continue;
     const key = `${(c.brand ?? "").toLowerCase()}|${(c.model ?? "").toLowerCase()}`;
-    const cur = newModelMinPrice.get(key) ?? Infinity;
-    if ((c.price ?? 0) < cur) newModelMinPrice.set(key, c.price ?? 0);
+    const effective = (c.price ?? 0) - (c.max_discount ?? 0);
+    const cur = newModelMinEffective.get(key) ?? Infinity;
+    if (effective < cur) newModelMinEffective.set(key, effective);
   }
 
   // Build complete map (for response car card lookups)
   for (const c of allDbCars) {
     const isNew = c.type === "new";
     const modelKey = `${(c.brand ?? "").toLowerCase()}|${(c.model ?? "").toLowerCase()}`;
+    const maxDisc = c.max_discount ?? 0;
     const item: ChatCarItem = {
       id: c.external_id,
       mark: c.brand ?? "",
       model: c.model ?? "",
       year: c.year ?? 0,
       price: c.price ?? 0,
-      minPrice: isNew ? (newModelMinPrice.get(modelKey) ?? c.price ?? 0) : undefined,
-      discount: (c.max_discount ?? 0) > 0 ? (c.max_discount ?? 0) : undefined,
+      minPrice: isNew ? (newModelMinEffective.get(modelKey) ?? ((c.price ?? 0) - maxDisc)) : undefined,
+      discount: maxDisc > 0 ? maxDisc : undefined,
       color: c.color ?? "",
       image: c.image_url ?? "",
       path: isNew
@@ -525,11 +703,10 @@ async function buildCarCatalogFromDB(
     const typeStr = c.type === "new" ? `новый/${c.dealer ?? ""}` : "б/у";
     // Shorten body_type: "Внедорожник 5 дв." → "Внедорожник", "Хэтчбек 5 дв." → "Хэтчбек"
     const bt = c.body_type?.replace(/\s*\d+\s*дв\.?/i, "").trim() || null;
-    const discountParts = [
-      (c.max_discount ?? 0) > 0 ? `скидка:${c.max_discount}₽` : null,
-      (c.tradein_discount ?? 0) > 0 ? `трейдин:${c.tradein_discount}₽` : null,
-      (c.credit_discount ?? 0) > 0 ? `кредит:${c.credit_discount}₽` : null,
-    ].filter(Boolean);
+    const maxDisc = c.max_discount ?? 0;
+    const discountParts: string[] = maxDisc > 0
+      ? [`скидка:${maxDisc}₽`, `итог:${(c.price ?? 0) - maxDisc}₽`]
+      : [];
     const parts = [
       c.year,
       mod || null,
@@ -551,11 +728,10 @@ async function buildCarCatalogFromDB(
     const extras = c.extras?.trim().slice(0, 120) || "";
     const typeStr = c.type === "new" ? `новый/${c.dealer ?? ""}` : "б/у";
     const bt = c.body_type?.replace(/\s*\d+\s*дв\.?/i, "").trim() || null;
-    const discountParts = [
-      (c.max_discount ?? 0) > 0 ? `скидка:${c.max_discount}₽` : null,
-      (c.tradein_discount ?? 0) > 0 ? `трейдин:${c.tradein_discount}₽` : null,
-      (c.credit_discount ?? 0) > 0 ? `кредит:${c.credit_discount}₽` : null,
-    ].filter(Boolean);
+    const maxDiscFull = c.max_discount ?? 0;
+    const discountParts: string[] = maxDiscFull > 0
+      ? [`скидка:${maxDiscFull}₽`, `итог:${(c.price ?? 0) - maxDiscFull}₽`]
+      : [];
     const parts = [
       c.year,
       mod || null,
@@ -572,48 +748,40 @@ async function buildCarCatalogFromDB(
     return `[${c.external_id}] ${c.brand} ${c.model} ${parts}`;
   };
 
-  // Apply filter
-  const { brandTerms, bodyTypeTerms, priceMax, priceMin, typeFilter } = parseMessageFilters(message);
-  const hasFilter = brandTerms.length > 0 || bodyTypeTerms.length > 0 || priceMax !== null || priceMin !== null;
-
   // Sort: closest to budget first when priceMax is set, otherwise cheapest first
   const byPriceDesc = (a: DbCar, b: DbCar) => (b.price ?? 0) - (a.price ?? 0);
   const byPriceAsc = (a: DbCar, b: DbCar) => (a.price ?? 0) - (b.price ?? 0);
   const sortFn = priceMax !== null ? byPriceDesc : byPriceAsc;
 
-  // Split by type (for stats header)
+  // Split by type (for stats header — always from full set)
   const usedDbCars = allDbCars.filter(c => c.type !== "new");
   const newDbCars = allDbCars.filter(c => c.type === "new");
   const totalUsed = usedDbCars.length;
   const totalNew = newDbCars.length;
 
+  // Matching function — checks all active filter dimensions including typeFilter and drive
   const matchesBrandPrice = (c: DbCar): boolean => {
+    if (typeFilter !== null && c.type !== typeFilter) return false;
     const carStr = `${c.brand} ${c.model}`.toLowerCase().replace(/ё/g, "е");
     if (brandTerms.length && !brandTerms.some(b => carStr.includes(b))) return false;
     if (bodyTypeTerms.length) {
       const bt = (c.body_type ?? "").toLowerCase().replace(/ё/g, "е");
       if (!bodyTypeTerms.some(t => bt.includes(t))) return false;
     }
+    if (driveTerms.length) {
+      const mod = (c.modification ?? "").toLowerCase().replace(/ё/g, "е");
+      if (!driveTerms.some(d => mod.includes(d))) return false;
+    }
     if (priceMax !== null && (c.price ?? 0) > priceMax) return false;
     if (priceMin !== null && (c.price ?? 0) < priceMin) return false;
     return true;
   };
 
-  // Always send the full stock — AI sees every car, no arbitrary cuts.
-  // typeFilter used only for sort priority (matching type floated to top), not for exclusion.
-  const candidates = [...allDbCars].sort((a, b) => {
-    // Pinned cars already handled above; here sort by: type match first, then price
-    const aMatch = typeFilter === null || a.type === typeFilter ? 0 : 1;
-    const bMatch = typeFilter === null || b.type === typeFilter ? 0 : 1;
-    if (aMatch !== bMatch) return aMatch - bMatch;
-    // Brand/model match floated up when filter present
-    if (hasFilter) {
-      const aHit = matchesBrandPrice(a) ? 0 : 1;
-      const bHit = matchesBrandPrice(b) ? 0 : 1;
-      if (aHit !== bHit) return aHit - bHit;
-    }
-    return sortFn(a, b);
-  }).slice(0, MAX_CATALOG_CARS);
+  // When filter detected: send ONLY matching cars (char limit MAX_CATALOG_CHARS is the safety net)
+  // When no filter: send all cars sorted by price — AI sees full stock
+  const candidates = hasFilter
+    ? [...allDbCars].filter(matchesBrandPrice).sort(sortFn)
+    : [...allDbCars].sort(sortFn);
 
   const pinnedSet = new Set(pinnedIds);
   const stockHeader = `НАЛИЧИЕ В СТОКЕ: ${totalUsed} б/у, ${totalNew} новых (итого ${totalUsed + totalNew})\n`;
@@ -642,8 +810,8 @@ async function buildCarCatalogFromDB(
 
   const fullText = stockHeader + lines.join("\n");
 
-  // Store in catalog text cache when no pinned cars (pinned vary per request)
-  if (pinnedIds.length === 0) {
+  // Store in catalog text cache only when no filter and no pinned cars
+  if (pinnedIds.length === 0 && !hasFilter) {
     catalogTextCache = { text: fullText, map, total: lines.length, expiresAt: Date.now() + 30 * 60 * 1000 };
   }
 
@@ -759,15 +927,21 @@ const SYSTEM_PROMPT = (context: string) =>
 ФОРМАТ ОТВЕТА:
 Пиши ответ напрямую — без JSON-обёртки и без markdown-блоков.
 В самом конце ответа, на отдельных новых строках, добавляй теги если нужно:
-[[CARS:id1,id2,id3]] — ID авто из каталога (max 3), только если рекомендуешь конкретные машины
+[[CARS:id1,id2,id3,id4,id5]] — ID авто из каталога (max 5), только если рекомендуешь конкретные машины
 [[ACTION:тип]] — один из четырёх типов (см. правила ниже), если нужно предложить действие
 Теги ставь ТОЛЬКО если нужны. Для общих вопросов (адреса, услуги, цены в целом) — теги не нужны.
+
+СТИЛЬ ОТВЕТА — ГЛАВНЫЙ ПРИОРИТЕТ:
+• Отвечай чётко и по делу. Без вступлений, предисловий и воды.
+• Объём — ровно столько, сколько нужно. Простой вопрос = 1–3 предложения. Сравнение вариантов = компактный список с ключевыми отличиями. Не растягивай.
+• Не повторяй вопрос клиента. Не пиши «Отличный выбор!», «Конечно!», «Я рад помочь» и другие пустые фразы.
+• Если нужно показать несколько авто — перечисли кратко (марка, модель, цена, 1–2 ключевых параметра), без развёрнутых описаний каждого.
 
 ПРАВИЛА — ОБЯЗАТЕЛЬНЫ:
 1. Ответ всегда содержит осмысленный текст. Никогда не оставляй пустым.
 2. Отвечай ТОЛЬКО на основе данных ниже. Не придумывай цены, адреса, характеристики.
 3. Если данных нет — скажи: «Уточните у менеджера по телефону» и дай номер.
-4. Обращайся на «Вы». Тон: дружелюбный эксперт, без канцелярита. Кратко и конкретно.
+4. Обращайся на «Вы». Тон: дружелюбный эксперт, без канцелярита.
 5. Не обсуждай конкурентов.
 6. Скидки и акции: если в блоке «АКТУАЛЬНЫЕ АКЦИИ И СКИДКИ» ниже есть данные — рассказывай о них клиенту. Если такого блока нет — не обещай скидок и направляй к менеджеру.
 7. [[ACTION:testdrive]] — ТОЛЬКО если клиент явно хочет тест-драйв (попробовать, посидеть, проехаться на авто).
@@ -788,6 +962,7 @@ const SYSTEM_PROMPT = (context: string) =>
 21. Каталог содержит ВЕСЬ сток без фильтров — все авто переданы тебе. Строка «НАЛИЧИЕ В СТОКЕ» в начале показывает точные числа — используй их для ответов «сколько у вас авто». Любая модель из каталога (Dargo, Shimo, Jolion, Tank, Jaecoo, Omoda и др.) есть в списке — просто найди её по марке и модели. Для вопросов об опциях — смотри поле «опции:» (есть у машин из истории диалога).
 22. Если клиент не уточнил тип (новый или б/у) — ВСЕГДА предлагай варианты из ОБОИХ типов. Покажи лучшие новые И лучшие б/у под запрос — дай клиенту выбор. Не ограничивайся одним типом без явной просьбы.
 23. Тип кузова: в каталоге каждая машина имеет поле кузова (Внедорожник, Седан, Хэтчбек, Универсал, Лифтбек, Пикап, Минивэн). При запросе «седан», «хэтчбек», «кроссовер», «внедорожник», «универсал», «пикап», «минивэн» — строго фильтруй авто по полю кузова, не по марке и модели.
+24. ЦЕНА ДЛЯ НОВЫХ АВТОМОБИЛЕЙ: если у машины в каталоге есть поле «итог:X₽» — это и есть финальная цена с учётом всех скидок. Используй именно это значение в ответе. Не пересчитывай цену самостоятельно (не вычитай скидки из базовой цены и не складывай числа). Если поля «итог:» нет — используй поле «цена:».
 
 ДАННЫЕ О КОМПАНИИ:
 ${context}`;
@@ -846,6 +1021,89 @@ function parseRawResponse(raw: string): { reply: string; car_ids: string[]; acti
 }
 
 /* ─── Route: POST /chat ───────────────────────────────────────── */
+function buildPageContextHint(pc: PageContextInput, isProactive: boolean): string {
+  const priceStr = pc.price.toLocaleString("ru-RU") + " ₽";
+  const typeStr = pc.is_new ? "новый" : `с пробегом${pc.run ? ", пробег " + Math.round(pc.run / 1000) + " тыс. км" : ""}`;
+  const bodyStr = pc.body_type ? `, кузов ${pc.body_type}` : "";
+  if (isProactive) {
+    return `Клиент только что открыл страницу автомобиля: **${pc.brand} ${pc.model} ${pc.year} г.**, цена ${priceStr}${bodyStr}, ${typeStr}.\n` +
+      `Поприветствуй его как Навигатор, кратко расскажи об этом авто (цена, кузов, ключевые особенности если знаешь) и предложи похожие варианты из каталога — покажи до 5 автомобилей через [[CARS:...]]. Не задавай вопросов в конце, просто представь варианты.`;
+  }
+  return `[Клиент сейчас смотрит: ${pc.brand} ${pc.model} ${pc.year} г., цена ${priceStr}, ${typeStr}]\n`;
+}
+
+/* ─── FAQ fast-path (no OpenAI call for simple contact questions) ── */
+async function tryFaqAnswer(message: string): Promise<{ reply: string; action: string | null } | null> {
+  const msg = normalizeCyrToLat(" " + message.toLowerCase().replace(/ё/g, "е").replace(/[ьъ]/g, "") + " ");
+
+  // If any brand keyword present — full AI context needed, not FAQ
+  const hasBrand = Object.keys(BRAND_KEYWORDS).some(kw => msg.includes(" " + kw.replace(/[ьъ]/g, "") + " ") || msg.includes(" " + kw.replace(/[ьъ]/g, "")));
+  if (hasBrand) return null;
+
+  const isPhone = /\bтелефон|\bномер.{0,12}звон|\bпозвони|\bкак.{0,10}связа|\bконтакт/.test(msg);
+  const isHours = /\bрежим.{0,10}работ|\bчасы.{0,10}работ|\bработаете.{0,8}до|\bдо скольк|\bкогда.{0,10}работа|\bоткрыт/.test(msg);
+  const isAddress = /\bадрес|\bгде.{0,12}находит|\bкак.{0,12}добрат|\bкак.{0,12}проехат|\bкуда.{0,12}прие/.test(msg);
+  const isEmail = /\bemail|\bпочт[аеи]|\bэлектронн/.test(msg);
+  const isTestDrive = /тест.?драйв|тестдрайв|записат.{0,15}тест|попробоват.{0,10}авто|проехат.{0,10}авто|покататся/.test(msg);
+  const isTradeIn = /трейд.?ин|трейдин|сдат.{0,12}авто|обмен.{0,15}авто|зачет.{0,8}авто|зачёт.{0,8}авто/.test(msg);
+  const isCredit = /\bкредит|\bрассрочк|\bавтокредит|\bкредитован/.test(msg);
+  const isService = /\bсервис|\bремонт|\bдиагностик|\bзапис.{0,10}сервис|\bзамен.{0,8}масл/.test(msg);
+
+  if (!isPhone && !isHours && !isAddress && !isEmail && !isTestDrive && !isTradeIn && !isCredit && !isService) return null;
+
+  // Form fast-paths — return action so the chat shows the right form immediately, no AI needed
+  if (isTestDrive) {
+    return {
+      reply: "Запишитесь на тест-драйв — выберите удобную дату и время. Менеджер свяжется и подтвердит запись.",
+      action: "testdrive",
+    };
+  }
+  if (isTradeIn) {
+    return {
+      reply: "Оценим ваш автомобиль онлайн и рассчитаем зачёт в счёт нового. Заполните форму — займёт пару минут.",
+      action: "tradein_form",
+    };
+  }
+  if (isCredit) {
+    return {
+      reply: "Работаем с 15+ банками-партнёрами. Ставки от 0%, одобрение за 1 час. Оставьте контакты — менеджер рассчитает персональные условия.",
+      action: "contact_form",
+    };
+  }
+  if (isService) {
+    return {
+      reply: "Запишитесь на сервис — ТО, ремонт или диагностика. Укажите что нужно сделать, и мы свяжемся с вами.",
+      action: "service_form",
+    };
+  }
+
+  // Use cached context as data source — essentially free after first call
+  const ctx = await buildContext().catch(() => null);
+
+  if (isPhone) {
+    const phone = ctx?.match(/ОБЩИЙ ТЕЛЕФОН ГРУППЫ:\s*(.+)/)?.[1].trim() ?? "+7 (4832) 77-77-70";
+    return { reply: `Общий телефон группы компаний Дебрянск Авто: **${phone}**\n\nЗвоните ежедневно с 9:00 до 21:00 — ответим на любые вопросы.`, action: null };
+  }
+  if (isHours) {
+    const hoursMatch = ctx?.match(/\|\s*(Ежедневно[^|\n]+)/);
+    const hours = hoursMatch?.[1].trim() ?? "Ежедневно 9:00–21:00";
+    return { reply: `Все дилерские центры Дебрянск Авто работают **${hours.toLowerCase()}** без выходных.`, action: null };
+  }
+  if (isAddress) {
+    const locSection = ctx?.match(/ДИЛЕРСКИЕ ЦЕНТРЫ[^:\n]*:\n([\s\S]+?)(?:\n\nБРЕНДЫ)/)?.[1].trim();
+    const body = locSection
+      ? `${locSection}\n\nПодробнее с картой — на странице [Контакты](/contacts).`
+      : "Все адреса наших дилерских центров — на странице [Контакты](/contacts).";
+    return { reply: `У нас 4 дилерских центра:\n\n${body}`, action: null };
+  }
+  if (isEmail) {
+    const phone = ctx?.match(/ОБЩИЙ ТЕЛЕФОН ГРУППЫ:\s*(.+)/)?.[1].trim() ?? "+7 (4832) 77-77-70";
+    return { reply: `Email группы: **info@debryansk-auto.ru**\n\nТакже можно позвонить: ${phone} или написать здесь, в чате.`, action: null };
+  }
+
+  return null;
+}
+
 router.post("/chat", async (req, res) => {
   try {
     const {
@@ -853,21 +1111,32 @@ router.post("/chat", async (req, res) => {
       history = [],
       session_id,
       consented_at,
+      page_context,
     } = req.body as {
       message: string;
       history: ChatMessage[];
       session_id?: string;
       consented_at?: string;
+      page_context?: PageContextInput;
     };
 
-    if (!message || typeof message !== "string" || message.trim().length === 0) {
+    const trimmed = (message ?? "").trim();
+    const isProactive = trimmed.length === 0 && !!page_context;
+
+    if (!isProactive && trimmed.length === 0) {
       return res.status(400).json({ ok: false, error: "message required" });
     }
-    if (message.trim().length > 1000) {
+    if (trimmed.length > 1000) {
       return res.status(400).json({ ok: false, error: "message too long" });
     }
 
-    const trimmed = message.trim();
+    // FAQ fast-path: answer contact/address/hours/form questions without calling OpenAI
+    if (!isProactive) {
+      const faqResult = await tryFaqAnswer(trimmed);
+      if (faqResult) {
+        return res.json({ ok: true, reply: faqResult.reply, action: faqResult.action, cars: [], message_id: null });
+      }
+    }
 
     // Extract car_ids from previous AI messages for dialog context (Task #95)
     const pinnedIds = history
@@ -877,8 +1146,9 @@ router.post("/chat", async (req, res) => {
       .slice(0, 10);
 
     // Start user message save in parallel with context+catalog build (non-blocking)
+    // Proactive messages have no user content to save
     const userSavePromise: Promise<number | null> =
-      session_id && consented_at && session_id.length <= 128
+      session_id && consented_at && session_id.length <= 128 && !isProactive
         ? (async () => {
             try {
               await db.execute(sql`
@@ -904,14 +1174,23 @@ router.post("/chat", async (req, res) => {
           })()
         : Promise.resolve(null);
 
+    const catalogQuery = isProactive && page_context
+      ? `${page_context.brand} ${page_context.model}`
+      : trimmed;
+
     const [context, { lines: carCatalog, map: carMap, total: catalogSize }] = await Promise.all([
       buildContext(),
-      buildCarCatalog(trimmed, pinnedIds),
+      buildCarCatalog(catalogQuery, pinnedIds),
     ]);
 
     const catalogBlock = carCatalog
       ? `[КАТАЛОГ — ${catalogSize} авто в выборке (формат: [id] марка модель год|модификация(КПП/привод)|цвет|пробег|цена|тип|владельцев:N; у машин из истории диалога дополнительно: комплектация|опции)]\n${carCatalog}\n\n`
       : "";
+
+    const pageHint = page_context ? buildPageContextHint(page_context, isProactive) : "";
+    const userContent = isProactive
+      ? `${catalogBlock}${pageHint}`
+      : `${catalogBlock}${pageHint}Вопрос клиента: ${trimmed}`;
 
     const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
       { role: "system", content: SYSTEM_PROMPT(context) },
@@ -919,12 +1198,12 @@ router.post("/chat", async (req, res) => {
         role: m.role as "user" | "assistant",
         content: m.content,
       })),
-      { role: "user", content: `${catalogBlock}Вопрос клиента: ${trimmed}` },
+      { role: "user", content: userContent },
     ];
 
     const completion = await openai.chat.completions.create({
       model: "gpt-5-mini",
-      max_completion_tokens: 4000,
+      max_completion_tokens: 8000,
       messages,
     });
 
@@ -932,12 +1211,12 @@ router.post("/chat", async (req, res) => {
     const { reply, car_ids, action } = parseRawResponse(raw);
 
     const cars: ChatCarItem[] = car_ids
-      .slice(0, 3)
+      .slice(0, 5)
       .map(id => carMap.get(id))
       .filter((c): c is ChatCarItem => c !== undefined);
 
     // Respond immediately — DB saves happen in background (fire-and-forget)
-    res.json({ ok: true, reply, action, cars, message_id: null });
+    return void res.json({ ok: true, reply, action, cars, message_id: null });
 
     // Background: await user save then insert AI message
     userSavePromise
@@ -974,23 +1253,37 @@ router.post("/chat/stream", async (req, res) => {
   };
 
   try {
-    const { message, history = [], session_id, consented_at } = req.body as {
+    const { message, history = [], session_id, consented_at, page_context } = req.body as {
       message: string;
       history: ChatMessage[];
       session_id?: string;
       consented_at?: string;
+      page_context?: PageContextInput;
     };
 
-    if (!message || typeof message !== "string" || message.trim().length === 0) {
+    const trimmed = (message ?? "").trim();
+    const isProactive = trimmed.length === 0 && !!page_context;
+
+    if (!isProactive && trimmed.length === 0) {
       sendEvt({ t: "error", message: "Сообщение не может быть пустым." });
       return res.end();
     }
-    if (message.trim().length > 1000) {
+    if (trimmed.length > 1000) {
       sendEvt({ t: "error", message: "Сообщение слишком длинное." });
       return res.end();
     }
 
-    const trimmed = message.trim();
+    // Immediately signal that the request is being processed
+    sendEvt({ t: "thinking" });
+
+    // FAQ fast-path: answer contact/address/hours/form questions without calling OpenAI
+    if (!isProactive) {
+      const faqResult = await tryFaqAnswer(trimmed);
+      if (faqResult) {
+        sendEvt({ t: "done", reply: faqResult.reply, action: faqResult.action, cars: [], message_id: null });
+        return res.end();
+      }
+    }
 
     const pinnedIds = history
       .filter(m => m.role === "assistant" && Array.isArray(m.car_ids) && (m.car_ids?.length ?? 0) > 0)
@@ -999,7 +1292,7 @@ router.post("/chat/stream", async (req, res) => {
       .slice(0, 10);
 
     const userSavePromise: Promise<number | null> =
-      session_id && consented_at && session_id.length <= 128
+      session_id && consented_at && session_id.length <= 128 && !isProactive
         ? (async () => {
             try {
               await db.execute(sql`
@@ -1022,14 +1315,23 @@ router.post("/chat/stream", async (req, res) => {
           })()
         : Promise.resolve(null);
 
+    const catalogQuery = isProactive && page_context
+      ? `${page_context.brand} ${page_context.model}`
+      : trimmed;
+
     const [context, { lines: carCatalog, map: carMap, total: catalogSize }] = await Promise.all([
       buildContext(),
-      buildCarCatalog(trimmed, pinnedIds),
+      buildCarCatalog(catalogQuery, pinnedIds),
     ]);
 
     const catalogBlock = carCatalog
       ? `[КАТАЛОГ — ${catalogSize} авто в выборке (формат: [id] марка модель год|модификация(КПП/привод)|цвет|пробег|цена|тип|владельцев:N; у машин из истории диалога дополнительно: комплектация|опции)]\n${carCatalog}\n\n`
       : "";
+
+    const pageHint = page_context ? buildPageContextHint(page_context, isProactive) : "";
+    const userContent = isProactive
+      ? `${catalogBlock}${pageHint}`
+      : `${catalogBlock}${pageHint}Вопрос клиента: ${trimmed}`;
 
     const msgs: { role: "system" | "user" | "assistant"; content: string }[] = [
       { role: "system", content: SYSTEM_PROMPT(context) },
@@ -1037,12 +1339,12 @@ router.post("/chat/stream", async (req, res) => {
         role: m.role as "user" | "assistant",
         content: m.content,
       })),
-      { role: "user", content: `${catalogBlock}Вопрос клиента: ${trimmed}` },
+      { role: "user", content: userContent },
     ];
 
     const stream = await openai.chat.completions.create({
       model: "gpt-5-mini",
-      max_completion_tokens: 4000,
+      max_completion_tokens: 8000,
       messages: msgs,
       stream: true,
     });
@@ -1059,7 +1361,7 @@ router.post("/chat/stream", async (req, res) => {
 
     const { reply, car_ids, action } = parseRawResponse(accumulated);
     const cars: ChatCarItem[] = car_ids
-      .slice(0, 3)
+      .slice(0, 5)
       .map(id => carMap.get(id))
       .filter((c): c is ChatCarItem => c !== undefined);
 
@@ -1067,7 +1369,7 @@ router.post("/chat/stream", async (req, res) => {
     res.end();
 
     // Background DB save
-    userSavePromise
+    void userSavePromise
       .then(convId => {
         if (!convId) return;
         return db.execute(sql`
@@ -1080,12 +1382,14 @@ router.post("/chat/stream", async (req, res) => {
       })
       .catch(err => logger.warn({ err }, "Chat/stream: failed to save AI message"));
 
+    return;
   } catch (err: any) {
     logger.error({ err }, "Chat/stream error");
     try {
       sendEvt({ t: "error", message: "Не удалось получить ответ. Попробуйте ещё раз." });
       res.end();
     } catch { /* already closed */ }
+    return;
   }
 });
 
