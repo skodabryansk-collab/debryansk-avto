@@ -57,9 +57,9 @@ async function saveToGCS(route, html) {
 async function getRoutes() {
   const staticRoutes = carsOnly
     ? []
-    : ["/", "/new-cars", "/cars", "/service", "/about", "/contacts", "/news"];
+    : ["/", "/new-cars", "/cars", "/service", "/about", "/contacts", "/news", "/buyout", "/vacancies"];
 
-  const [newCarsRes, usedCarsRes, newsRes] = await Promise.all([
+  const [newCarsRes, usedCarsRes, newsRes, brandsRes] = await Promise.all([
     fetch(`${SITE_URL}/api/cars/new`)
       .then((r) => r.json())
       .catch(() => ({ data: [] })),
@@ -69,6 +69,11 @@ async function getRoutes() {
     carsOnly
       ? Promise.resolve({ data: [] })
       : fetch(`${SITE_URL}/api/news`)
+          .then((r) => r.json())
+          .catch(() => ({ data: [] })),
+    carsOnly
+      ? Promise.resolve({ ok: true, data: [] })
+      : fetch(`${SITE_URL}/api/brands`)
           .then((r) => r.json())
           .catch(() => ({ data: [] })),
   ]);
@@ -82,8 +87,11 @@ async function getRoutes() {
   const newsRoutes = (newsRes.data || []).map(
     (n) => `/news/${encodeURIComponent(n.slug)}`,
   );
+  const brandRoutes = (brandsRes.data || [])
+    .filter((b) => b.slug && b.slug !== "s-probegom")
+    .map((b) => `/brands/${b.slug}`);
 
-  return [...staticRoutes, ...newCarRoutes, ...usedCarRoutes, ...newsRoutes];
+  return [...staticRoutes, ...newCarRoutes, ...usedCarRoutes, ...newsRoutes, ...brandRoutes];
 }
 
 async function processRoute(page, route) {
