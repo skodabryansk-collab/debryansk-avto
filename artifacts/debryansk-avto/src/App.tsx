@@ -18,6 +18,7 @@ import ServicePage from "@/pages/service";
 import BuyoutPage from "@/pages/buyout";
 import ContactsPage from "@/pages/contacts";
 import AboutPage from "@/pages/about";
+import BrandPage from "@/pages/brand-page";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ function Router() {
       <Route path="/buyout" component={BuyoutPage} />
       <Route path="/contacts" component={ContactsPage} />
       <Route path="/about" component={AboutPage} />
+      <Route path="/brands/:slug" component={BrandPage} />
       <Route component={NotFound} />
     </Switch>
   );
