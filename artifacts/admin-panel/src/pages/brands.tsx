@@ -1,22 +1,28 @@
 import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getBrands, createBrand, updateBrand, deleteBrand, uploadFile, type Brand } from "@/lib/api";
+import {
+  getBrands, createBrand, updateBrand, deleteBrand, uploadFile,
+  getBrandPageContent, updateBrandPageContent,
+  type Brand, type BrandPageContent,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, ExternalLink, Upload, X } from "lucide-react";
+import { Plus, Pencil, Trash2, ExternalLink, Upload, X, Globe, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function BrandsPage() {
   const [editItem, setEditItem] = React.useState<Brand | null>(null);
   const [isCreate, setIsCreate] = React.useState(false);
   const [deleteId, setDeleteId] = React.useState<number | null>(null);
+  const [pageEditBrand, setPageEditBrand] = React.useState<Brand | null>(null);
   const { data, isLoading } = useQuery({ queryKey: ["brands"], queryFn: getBrands });
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -50,7 +56,7 @@ export default function BrandsPage() {
                 <TableHead>Название</TableHead>
                 <TableHead>Сайт</TableHead>
                 <TableHead className="w-32">Только сервис</TableHead>
-                <TableHead className="w-24">Действия</TableHead>
+                <TableHead className="w-36">Действия</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -67,7 +73,12 @@ export default function BrandsPage() {
                       <div className="w-10 h-10 bg-slate-100 rounded flex items-center justify-center text-xs text-slate-400">нет</div>
                     )}
                   </TableCell>
-                  <TableCell className="font-medium">{b.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div>{b.name}</div>
+                    {b.slug && (
+                      <div className="text-xs text-slate-400 font-mono">{b.slug}</div>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {b.websiteUrl ? (
                       <a href={b.websiteUrl} target="_blank" rel="noreferrer" className="text-[#0070b8] hover:underline flex items-center gap-1 text-sm">
@@ -85,6 +96,15 @@ export default function BrandsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
+                      {b.slug && (
+                        <Button
+                          variant="ghost" size="icon" className="w-8 h-8"
+                          title="Редактировать страницу бренда"
+                          onClick={() => setPageEditBrand(b)}
+                        >
+                          <Globe className="w-4 h-4 text-[#0070b8]" />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => setEditItem(b)}>
                         <Pencil className="w-4 h-4 text-slate-500" />
                       </Button>
@@ -115,14 +135,20 @@ export default function BrandsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit/Create */}
+      {/* Edit/Create brand */}
       {(editItem || isCreate) && (
         <BrandFormDialog item={editItem} onClose={() => { setEditItem(null); setIsCreate(false); }} />
+      )}
+
+      {/* Brand page content editor */}
+      {pageEditBrand && (
+        <BrandPageDialog brand={pageEditBrand} onClose={() => setPageEditBrand(null)} />
       )}
     </div>
   );
 }
 
+/* ── Brand form dialog (create / edit basic brand info) ─────── */
 function BrandFormDialog({ item, onClose }: { item: Brand | null; onClose: () => void }) {
   const [form, setForm] = React.useState({
     name: item?.name ?? "",
@@ -223,6 +249,160 @@ function BrandFormDialog({ item, onClose }: { item: Brand | null; onClose: () =>
           <Button variant="outline" onClick={onClose}>Отмена</Button>
           <Button className="bg-[#0070b8] hover:bg-[#005a94]" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
             {mutation.isPending ? "Сохранение..." : isEdit ? "Сохранить" : "Создать"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ── Brand page content dialog ──────────────────────────────── */
+function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["brand-page-content", brand.id],
+    queryFn: () => getBrandPageContent(brand.id),
+  });
+
+  const [form, setForm] = React.useState<{
+    description: string;
+    serviceText: string;
+    promoText: string;
+    metaTitle: string;
+    metaDescription: string;
+  }>({
+    description: "",
+    serviceText: "",
+    promoText: "",
+    metaTitle: "",
+    metaDescription: "",
+  });
+
+  const [hydrated, setHydrated] = React.useState(false);
+
+  React.useEffect(() => {
+    if (data?.content && !hydrated) {
+      setForm({
+        description: data.content.description ?? "",
+        serviceText: data.content.serviceText ?? "",
+        promoText: data.content.promoText ?? "",
+        metaTitle: data.content.metaTitle ?? "",
+        metaDescription: data.content.metaDescription ?? "",
+      });
+      setHydrated(true);
+    } else if (data && !data.content && !hydrated) {
+      setHydrated(true);
+    }
+  }, [data, hydrated]);
+
+  const mutation = useMutation({
+    mutationFn: () => updateBrandPageContent(brand.id, {
+      description: form.description || null,
+      serviceText: form.serviceText || null,
+      promoText: form.promoText || null,
+      metaTitle: form.metaTitle || null,
+      metaDescription: form.metaDescription || null,
+    } as Parameters<typeof updateBrandPageContent>[1]),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["brand-page-content", brand.id] });
+      toast({ title: "Страница обновлена" });
+      onClose();
+    },
+    onError: () => toast({ title: "Ошибка сохранения", variant: "destructive" }),
+  });
+
+  const siteUrl = `/brands/${brand.slug}`;
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between gap-2 flex-wrap">
+            <span>Страница бренда: {brand.name}</span>
+            <a
+              href={siteUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-sm font-normal text-[#0070b8] hover:underline"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Открыть страницу
+            </a>
+          </DialogTitle>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <Label className="mb-1.5 block">Описание бренда</Label>
+              <Textarea
+                rows={4}
+                value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Основное описание бренда для раздела «О бренде»..."
+              />
+            </div>
+            <div>
+              <Label className="mb-1.5 block">Текст о сервисе</Label>
+              <Textarea
+                rows={3}
+                value={form.serviceText}
+                onChange={e => setForm(f => ({ ...f, serviceText: e.target.value }))}
+                placeholder="Описание сервисного обслуживания для данного бренда..."
+              />
+            </div>
+            <div>
+              <Label className="mb-1.5 block">Промо-текст</Label>
+              <Textarea
+                rows={2}
+                value={form.promoText}
+                onChange={e => setForm(f => ({ ...f, promoText: e.target.value }))}
+                placeholder="Акционное предложение или спецусловия покупки..."
+              />
+            </div>
+            <div className="border-t pt-4">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">SEO</p>
+              <div className="space-y-3">
+                <div>
+                  <Label className="mb-1.5 block">Meta Title</Label>
+                  <Input
+                    value={form.metaTitle}
+                    onChange={e => setForm(f => ({ ...f, metaTitle: e.target.value }))}
+                    placeholder={`${brand.name} в Брянске — официальный дилер Дебрянск Авто`}
+                    maxLength={120}
+                  />
+                  <p className="text-xs text-slate-400 mt-1">{form.metaTitle.length} / 120 символов</p>
+                </div>
+                <div>
+                  <Label className="mb-1.5 block">Meta Description</Label>
+                  <Textarea
+                    rows={2}
+                    value={form.metaDescription}
+                    onChange={e => setForm(f => ({ ...f, metaDescription: e.target.value }))}
+                    placeholder={`Купить ${brand.name} в Брянске. Официальный дилер...`}
+                    maxLength={320}
+                  />
+                  <p className="text-xs text-slate-400 mt-1">{form.metaDescription.length} / 320 символов</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Отмена</Button>
+          <Button
+            className="bg-[#0070b8] hover:bg-[#005a94]"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending || isLoading}
+          >
+            {mutation.isPending ? "Сохранение..." : "Сохранить"}
           </Button>
         </DialogFooter>
       </DialogContent>
