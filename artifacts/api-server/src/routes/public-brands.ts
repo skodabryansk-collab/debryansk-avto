@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, brandsTable, brandPageContentTable, locationsTable, locationBrandsTable } from "@workspace/db";
+import { db, brandsTable, brandPageContentTable } from "@workspace/db";
 import { asc, eq, sql } from "drizzle-orm";
 import { getNewCars } from "./new-cars";
 
@@ -53,10 +53,23 @@ router.get("/", async (_req, res) => {
   }
 });
 
-/* ── GET /api/brands/page/:slug — full brand page data ──────── */
-router.get("/page/:slug", async (req, res) => {
+/* ── GET /api/brands/:slug — full brand page data ───────────── */
+/* Numeric :slug falls back to ID lookup (basic brand row only). */
+router.get("/:slug", async (req, res) => {
   try {
-    const slug = req.params["slug"];
+    const param = req.params["slug"]!;
+    const numId = Number(param);
+    const isNumeric = !isNaN(numId) && Number.isInteger(numId) && numId > 0;
+
+    /* Numeric ID → simple brand row (used by admin panel / internal calls) */
+    if (isNumeric) {
+      const rows = await db.select().from(brandsTable).where(eq(brandsTable.id, numId));
+      if (!rows.length) return res.status(404).json({ ok: false, error: "Not found" });
+      return res.json({ ok: true, data: rows[0] });
+    }
+
+    /* Slug → full brand page payload */
+    const slug = param;
 
     const brandRows = await db
       .select()
@@ -87,14 +100,33 @@ router.get("/page/:slug", async (req, res) => {
 
     // New cars for this brand (first 6) — from in-memory XML feed cache
     const brandNameLower = brand.name.toLowerCase();
-    // Build search key: strip city qualifiers for Haval City / Haval Pro
+    // Build search key: strip city/dealer qualifiers (Haval City / Haval Pro / МБ-Брянск)
     const searchName = brandNameLower.replace(/ (city|pro|брянск)$/i, "").trim();
 
     const allNewCars = await getNewCars();
     const brandCars = allNewCars
       .filter(c => c.mark.toLowerCase().includes(searchName) || searchName.includes(c.mark.toLowerCase()))
       .sort((a, b) => a.price - b.price)
-      .slice(0, 6);
+      .slice(0, 6)
+      // Normalize camelCase NewCarRecord → snake_case DTO expected by frontend
+      .map(c => ({
+        id: c.id,
+        mark: c.mark,
+        model: c.model,
+        modification: c.modification,
+        complectation: c.complectation,
+        year: c.year,
+        price: c.price,
+        color: c.color,
+        body_type: c.bodyType,
+        availability: c.availability,
+        url: c.url,
+        images: c.images,
+        dealer: c.dealer,
+        max_discount: c.maxDiscount,
+        credit_discount: c.creditDiscount,
+        tradein_discount: c.tradeinDiscount,
+      }));
 
     // News mentioning brand name
     const newsRows = await db.execute(sql`
@@ -116,26 +148,6 @@ router.get("/page/:slug", async (req, res) => {
         news: newsRows.rows,
       },
     });
-  } catch (err) {
-    return res.status(500).json({ ok: false, error: String(err) });
-  }
-});
-
-/* ── GET /api/brands/:id — single brand by numeric ID or slug ─ */
-router.get("/:id", async (req, res) => {
-  try {
-    const param = req.params["id"]!;
-    const numId = Number(param);
-
-    let rows;
-    if (!isNaN(numId) && Number.isInteger(numId)) {
-      rows = await db.select().from(brandsTable).where(eq(brandsTable.id, numId));
-    } else {
-      rows = await db.select().from(brandsTable).where(eq(brandsTable.slug, param));
-    }
-
-    if (!rows.length) return res.status(404).json({ ok: false, error: "Not found" });
-    return res.json({ ok: true, data: rows[0] });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
   }
