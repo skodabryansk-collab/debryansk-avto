@@ -17,7 +17,12 @@ export const modules: ModuleMap = {
   "./components/mockups/email-templates/EmailVacancy.tsx": () => import("../components/mockups/email-templates/EmailVacancy.tsx"),
   "./components/mockups/hero-banner/HeroBanner.tsx": () => import("../components/mockups/hero-banner/HeroBanner.tsx"),
   "./components/mockups/icons/IconSet.tsx": () => import("../components/mockups/icons/IconSet.tsx"),
+  "./components/mockups/isometric-hero/IsometricHero.tsx": () => import("../components/mockups/isometric-hero/IsometricHero.tsx"),
   "./components/mockups/modals/CreditModal.tsx": () => import("../components/mockups/modals/CreditModal.tsx"),
   "./components/mockups/modals/TestDriveModal.tsx": () => import("../components/mockups/modals/TestDriveModal.tsx"),
-  "./components/mockups/modals/TradeInModal.tsx": () => import("../components/mockups/modals/TradeInModal.tsx")
+  "./components/mockups/modals/TradeInModal.tsx": () => import("../components/mockups/modals/TradeInModal.tsx"),
+  "./components/mockups/navigator-redesign/Current.tsx": () => import("../components/mockups/navigator-redesign/Current.tsx"),
+  "./components/mockups/navigator-redesign/VariantA.tsx": () => import("../components/mockups/navigator-redesign/VariantA.tsx"),
+  "./components/mockups/navigator-redesign/VariantB.tsx": () => import("../components/mockups/navigator-redesign/VariantB.tsx"),
+  "./components/mockups/navigator-redesign/VariantC.tsx": () => import("../components/mockups/navigator-redesign/VariantC.tsx")
 };
