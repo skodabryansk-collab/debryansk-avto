@@ -104,6 +104,7 @@ async function fetchPublicNews(): Promise<ApiNewsItem[]> {
 interface ApiBrand {
   id: number;
   name: string;
+  slug: string | null;
   logoUrl: string | null;
   websiteUrl: string | null;
   bgColor: string | null;
@@ -1089,12 +1090,13 @@ export default function Home() {
         <div className="container mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 sm:gap-6">
             {apiBrands.map((b, i) => {
-              const external = b.websiteUrl ? b.websiteUrl.startsWith("http") : false;
+              const brandHref = b.slug && b.slug !== "s-probegom" ? `/brands/${b.slug}` : (b.websiteUrl ?? "#");
+              const isExternal = !b.slug || b.slug === "s-probegom";
               return (
                 <FadeIn key={`${b.name}-${b.subName ?? i}`} delay={i * 0.05}>
                   <a
-                    href={b.websiteUrl ?? "#"}
-                    {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                    href={brandHref}
+                    {...(isExternal && b.websiteUrl ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                     className="group relative w-full block rounded-2xl overflow-hidden transition-all duration-500 hover:scale-[1.04] hover:-translate-y-1"
                     style={{ aspectRatio: "5/3" }}
                   >
