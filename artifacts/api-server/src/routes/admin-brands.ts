@@ -28,8 +28,8 @@ router.get("/:id", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { name, websiteUrl, logoUrl, bgColor, subName, isServiceOnly } = req.body as { name: string; websiteUrl?: string; logoUrl?: string; bgColor?: string; subName?: string; isServiceOnly?: boolean };
-    const rows = await db.insert(brandsTable).values({ name, websiteUrl, logoUrl, bgColor, subName, isServiceOnly: isServiceOnly ?? false }).returning();
+    const { name, slug, websiteUrl, logoUrl, bgColor, subName, isServiceOnly } = req.body as { name: string; slug?: string; websiteUrl?: string; logoUrl?: string; bgColor?: string; subName?: string; isServiceOnly?: boolean };
+    const rows = await db.insert(brandsTable).values({ name, slug: slug || null, websiteUrl, logoUrl, bgColor, subName, isServiceOnly: isServiceOnly ?? false }).returning();
     return res.json(rows[0]);
   } catch (err) {
     return res.status(500).json({ error: String(err) });
@@ -39,8 +39,8 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const id = Number(req.params["id"]);
-    const { name, websiteUrl, logoUrl, bgColor, subName, isServiceOnly } = req.body as { name?: string; websiteUrl?: string; logoUrl?: string; bgColor?: string; subName?: string; isServiceOnly?: boolean };
-    const rows = await db.update(brandsTable).set({ name, websiteUrl, logoUrl, bgColor, subName, isServiceOnly }).where(eq(brandsTable.id, id)).returning();
+    const { name, slug, websiteUrl, logoUrl, bgColor, subName, isServiceOnly } = req.body as { name?: string; slug?: string; websiteUrl?: string; logoUrl?: string; bgColor?: string; subName?: string; isServiceOnly?: boolean };
+    const rows = await db.update(brandsTable).set({ name, slug: slug !== undefined ? (slug || null) : undefined, websiteUrl, logoUrl, bgColor, subName, isServiceOnly }).where(eq(brandsTable.id, id)).returning();
     if (!rows.length) return res.status(404).json({ error: "Not found" });
     return res.json(rows[0]);
   } catch (err) {
