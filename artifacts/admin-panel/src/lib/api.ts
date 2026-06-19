@@ -85,7 +85,7 @@ export interface Brand {
 }
 export function getBrands() { return api<Brand[]>("GET", "/admin/brands"); }
 export function getBrand(id: number) { return api<Brand>("GET", `/admin/brands/${id}`); }
-export function createBrand(data: Omit<Brand, "id" | "createdAt" | "slug">) { return api<Brand>("POST", "/admin/brands", data); }
+export function createBrand(data: Omit<Brand, "id" | "createdAt">) { return api<Brand>("POST", "/admin/brands", data); }
 export function updateBrand(id: number, data: Partial<Brand>) { return api<Brand>("PUT", `/admin/brands/${id}`, data); }
 export function deleteBrand(id: number) { return api<{ ok: true }>("DELETE", `/admin/brands/${id}`); }
 
