@@ -261,6 +261,55 @@ export async function runMigration() {
     `);
     logger.info("reviews + reviews_meta schema ready (idempotent)");
 
+    // Brand slugs + brand_page_content table (Task #192)
+    await db.execute(sql`ALTER TABLE brands ADD COLUMN IF NOT EXISTS slug TEXT`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS brand_page_content (
+        id SERIAL PRIMARY KEY,
+        brand_id INTEGER NOT NULL UNIQUE REFERENCES brands(id) ON DELETE CASCADE,
+        description TEXT,
+        advantages JSONB DEFAULT '[]',
+        features JSONB DEFAULT '[]',
+        faq JSONB DEFAULT '[]',
+        service_text TEXT,
+        promo_text TEXT,
+        external_url TEXT,
+        hero_image_url TEXT,
+        meta_title TEXT,
+        meta_description TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Backfill slugs for all brands (idempotent via WHERE slug IS NULL)
+    await db.execute(sql`UPDATE brands SET slug = 'omoda'           WHERE LOWER(name) LIKE '%omoda%'      AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'jaecoo'          WHERE LOWER(name) LIKE '%jaecoo%'     AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'haval-city'      WHERE LOWER(name) LIKE '%haval city%' AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'haval-pro'       WHERE LOWER(name) LIKE '%haval pro%'  AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'tenet'           WHERE LOWER(name) LIKE '%tenet%'      AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'jetour'          WHERE LOWER(name) LIKE '%jetour%'     AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'mb-bryansk'      WHERE LOWER(name) LIKE '%мб%'         AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 's-probegom'      WHERE LOWER(name) LIKE '%пробег%'     AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'volkswagen'      WHERE LOWER(name) LIKE '%volkswagen%' AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'skoda'           WHERE LOWER(name) LIKE '%skoda%'      AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'exeed'           WHERE LOWER(name) LIKE '%exeed%'      AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'mercedes-benz'   WHERE LOWER(name) LIKE '%mercedes%'   AND slug IS NULL`);
+
+    // Seed template brand_page_content for all brands that don't have a row yet
+    await db.execute(sql`
+      INSERT INTO brand_page_content (brand_id, description, meta_title, meta_description)
+      SELECT b.id,
+        'Официальный дилер ' || b.name || ' в Брянске — широкий выбор автомобилей, сервисное обслуживание и выгодные условия покупки в Дебрянск Авто.' AS description,
+        b.name || ' в Брянске — официальный дилер Дебрянск Авто' AS meta_title,
+        'Купить ' || b.name || ' в Брянске. Официальный дилер Дебрянск Авто: новые автомобили, трейд-ин, кредит, сервис.' AS meta_description
+      FROM brands b
+      WHERE b.slug IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM brand_page_content bpc WHERE bpc.brand_id = b.id)
+    `);
+
+    logger.info("brands.slug + brand_page_content schema ready (idempotent)");
+
   } catch (err) {
     logger.error({ err }, "Migration error");
   }
