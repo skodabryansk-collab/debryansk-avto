@@ -13,12 +13,10 @@ router.get("/", async (req, res) => {
     const limit = 50;
     const offset = (page - 1) * limit;
 
-    let query = db.select().from(leadsTable).orderBy(desc(leadsTable.createdAt)).limit(limit).offset(offset);
-    if (type && type !== "all") {
-      query = db.select().from(leadsTable).where(eq(leadsTable.type, type)).orderBy(desc(leadsTable.createdAt)).limit(limit).offset(offset);
-    }
-
-    const rows = await query;
+    const rows = await (type && type !== "all"
+      ? db.select().from(leadsTable).where(eq(leadsTable.type, type)).orderBy(desc(leadsTable.createdAt)).limit(limit).offset(offset)
+      : db.select().from(leadsTable).orderBy(desc(leadsTable.createdAt)).limit(limit).offset(offset)
+    );
     const countResult = await db.select({ count: sql<number>`count(*)` }).from(leadsTable);
     return res.json({ ok: true, data: rows, total: Number(countResult[0]?.count ?? 0) });
   } catch (err) {
