@@ -34,8 +34,8 @@ import ChatWidget from "@/components/ChatWidget";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import logoWhiteSvg from "@/assets/logo-white.svg";
 import miniLogo from "@/assets/mini-logo.webp";
-import heroDynamic from "../assets/hero-showroom-1.webp";
-import heroMobile from "../assets/hero-showroom-1-mobile.webp";
+import heroDynamic from "../assets/hero-isometric.webp";
+import heroMobile from "../assets/hero-isometric-mobile.webp";
 import dealerChery from "../assets/dealer-chery.webp";
 import dealerOmoda from "../assets/dealer-omoda.webp";
 import dealerJaecoo from "../assets/dealer-jaecoo.webp";
@@ -1316,7 +1316,7 @@ export default function Home() {
                 <span className="text-[#87b63c]">в Брянске с 2011 года</span>
               </h2>
               <p className="text-slate-300 text-sm sm:text-base leading-relaxed mb-8 max-w-md">
-                Группа компаний с {apiBrands.length} официальными брендами.
+                Группа компаний с 9 официальными брендами.
                 Продажа новых автомобилей, авто с пробегом,
                 сервис и финансирование — всё в одном холдинге.
               </p>
