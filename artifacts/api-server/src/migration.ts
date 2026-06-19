@@ -301,8 +301,31 @@ export async function runMigration() {
     await db.execute(sql`UPDATE brands SET slug = 'tenet'         WHERE  LOWER(name) LIKE '%tenet%'      AND slug IS NULL`);
     await db.execute(sql`UPDATE brands SET slug = 'jetour'        WHERE  LOWER(name) LIKE '%jetour%'     AND slug IS NULL`);
     await db.execute(sql`UPDATE brands SET slug = 's-probegom'    WHERE  LOWER(name) LIKE '%пробег%'     AND slug IS NULL`);
+    await db.execute(sql`UPDATE brands SET slug = 'haval'         WHERE  LOWER(name) = 'haval'            AND slug IS NULL`);
     await db.execute(sql`UPDATE brands SET slug = 'skoda'         WHERE  LOWER(name) LIKE '%skoda%'      AND slug IS NULL`);
     await db.execute(sql`UPDATE brands SET slug = 'exeed'         WHERE  LOWER(name) LIKE '%exeed%'      AND slug IS NULL`);
+
+    // Fallback: auto-generate slug for any remaining NULL brands using ASCII name
+    // (covers future Latin-named brands added without explicit slug rules)
+    await db.execute(sql`
+      UPDATE brands
+      SET slug = LOWER(
+        REGEXP_REPLACE(
+          REGEXP_REPLACE(TRIM(name), '[^a-zA-Z0-9]+', '-', 'g'),
+          '(^-|-$)', '', 'g'
+        )
+      )
+      WHERE slug IS NULL
+        AND name ~ '^[a-zA-Z]'
+        AND TRIM(LOWER(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(name), '[^a-zA-Z0-9]+', '-', 'g'), '(^-|-$)', '', 'g')))
+            NOT IN (SELECT slug FROM brands WHERE slug IS NOT NULL)
+    `);
+
+    // Log any brands that still have no slug after all rules (Cyrillic-only names without a rule)
+    const nullSlugs = await db.execute(sql`SELECT id, name FROM brands WHERE slug IS NULL`);
+    if (nullSlugs.rows.length) {
+      logger.warn({ brands: nullSlugs.rows }, "brands.slug backfill: some brands still have NULL slug — add explicit rule");
+    }
 
     // Seed template brand_page_content for all slugged brands without a row yet.
     // Includes description, service_text, meta_title, meta_description.
