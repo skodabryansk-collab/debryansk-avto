@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -453,7 +454,7 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !phone.trim()) return;
+    if (!name.trim() || !isPhoneValid(phone)) return;
     try {
       const fd = new FormData();
       fd.append("type", "vacancy");
@@ -621,7 +622,8 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Телефон</label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 (___) ___-__-__" required
+                    <input value={phone} onChange={e => setPhone(formatPhone(e.target.value))} placeholder="+7 (___) ___-__-__" required
+                      type="tel" inputMode="tel" maxLength={18}
                       className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors" />
                   </div>
                 </div>
@@ -703,7 +705,7 @@ function VacancyCard({ vacancy, onOpen }: { vacancy: Vacancy; onOpen: () => void
         </h3>
         {vacancy.description && (
           <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">
-            {vacancy.description.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}
+            {vacancy.description.replace(/<[^>]+>/g, " ").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#x27;/g, "'").replace(/\s+/g, " ").trim()}
           </p>
         )}
       </div>
@@ -778,12 +780,58 @@ export default function Vacancies() {
     [dept, vacancies]
   );
 
+  const jobPostingsJsonLd = vacancies.length > 0 ? {
+    "@type": "ItemList",
+    "name": "Вакансии Дебрянск Авто",
+    "url": "https://debryansk-auto.ru/vacancies",
+    "numberOfItems": vacancies.length,
+    "itemListElement": vacancies.map((v, i) => ({
+      "@type": "ListItem",
+      "position": i + 1,
+      "item": {
+        "@type": "JobPosting",
+        "title": v.title,
+        "description": v.description,
+        "datePosted": "2026-01-01",
+        "employmentType": "FULL_TIME",
+        "hiringOrganization": {
+          "@type": "Organization",
+          "name": "Дебрянск Авто",
+          "sameAs": "https://debryansk-auto.ru",
+          "logo": "https://debryansk-auto.ru/favicon.svg",
+        },
+        "jobLocation": {
+          "@type": "Place",
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "Брянск",
+            "addressRegion": "Брянская область",
+            "addressCountry": "RU",
+          },
+        },
+        ...(v.salaryFrom ? {
+          "baseSalary": {
+            "@type": "MonetaryAmount",
+            "currency": "RUB",
+            "value": {
+              "@type": "QuantitativeValue",
+              "minValue": v.salaryFrom,
+              ...(v.salaryTo ? { "maxValue": v.salaryTo } : {}),
+              "unitText": "MONTH",
+            },
+          },
+        } : {}),
+      },
+    })),
+  } : undefined;
+
   return (
     <Layout>
       <SEO
         title="Вакансии — Дебрянск Авто"
         description="Работа в автодилерском центре Брянска. Вакансии: менеджер, автоподборщик, автомеханик, автомойщик, директор."
         canonical="/vacancies"
+        jsonLd={jobPostingsJsonLd}
         breadcrumbs={[
           { name: "Главная", url: "/" },
           { name: "Вакансии", url: "/vacancies" },
@@ -796,7 +844,7 @@ export default function Vacancies() {
           <div className="container mx-auto px-4 sm:px-6">
             <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#87b63c] mb-3">Карьера</p>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3">
-              Работайте с нами
+              Вакансии в Дебрянск Авто
             </h1>
             <p className="text-slate-400 text-sm sm:text-base max-w-lg mb-7">
               Дебрянск Авто — один из крупнейших автодилеров Брянска. Приглашаем в команду профессионалов.
@@ -1009,7 +1057,8 @@ export default function Vacancies() {
                     </div>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input value={openPhone} onChange={e => setOpenPhone(e.target.value)} placeholder="Телефон" required
+                      <input value={openPhone} onChange={e => setOpenPhone(formatPhone(e.target.value))} placeholder="+7 (___) ___-__-__" required
+                        type="tel" inputMode="tel" maxLength={18}
                         className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8]" />
                     </div>
                     <input ref={openFileRef} type="file" accept=".pdf,.doc,.docx" className="hidden"
