@@ -84,7 +84,7 @@ async function buildSitemap(): Promise<string> {
 }
 
 export function registerSitemapRoute(app: Express): void {
-  app.get("/api/sitemap.xml", async (_req, res) => {
+  app.get("/sitemap.xml", async (_req, res) => {
     try {
       if (cache && Date.now() - cache.ts < CACHE_TTL) {
         res.setHeader("Content-Type", "application/xml; charset=utf-8");
