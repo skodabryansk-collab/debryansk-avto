@@ -98,6 +98,7 @@ export function registerSitemapRoute(app: Express): void {
         "Disallow: /admin/",
         "",
         `Sitemap: ${SITE}/sitemap.xml`,
+        `# IndexNow key: ${SITE}/${key}.txt`,
       ].join("\n"),
     );
   });
