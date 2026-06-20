@@ -613,21 +613,33 @@ export default function Home() {
   const { favorites, compare, isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
   const reducedMotion = useReducedMotion();
 
+  // Play stagger only on first visit per session; repeat visits get instant show
+  const heroAlreadySeen = React.useRef(
+    typeof sessionStorage !== "undefined" && sessionStorage.getItem("homeHeroSeen") === "1"
+  );
+  React.useEffect(() => {
+    if (!heroAlreadySeen.current) {
+      sessionStorage.setItem("homeHeroSeen", "1");
+    }
+  }, []);
+
+  const skipAnimation = reducedMotion || heroAlreadySeen.current;
+
   const heroHeadlineContainer = {
     hidden: {},
     visible: {
       transition: {
-        staggerChildren: reducedMotion ? 0 : 0.13,
-        delayChildren: reducedMotion ? 0 : 0.22,
+        staggerChildren: skipAnimation ? 0 : 0.13,
+        delayChildren: skipAnimation ? 0 : 0.22,
       },
     },
   };
   const heroHeadlineLine = {
-    hidden: reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 38 },
+    hidden: skipAnimation ? { opacity: 1, y: 0 } : { opacity: 0, y: 38 },
     visible: {
       opacity: 1,
       y: 0,
-      transition: { duration: 0.62, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+      transition: { duration: skipAnimation ? 0 : 0.62, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
     },
   };
 
