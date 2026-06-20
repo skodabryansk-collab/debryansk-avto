@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import compression from "compression";
 import pinoHttp from "pino-http";
 import path from "path";
 import { existsSync } from "fs";
@@ -10,6 +11,20 @@ import { prerenderMiddleware } from "./middleware/prerender";
 import { seoMetaMiddleware } from "./middleware/seoMeta";
 
 const app: Express = express();
+
+// Security headers
+app.use((_req, res, next) => {
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; img-src 'self' data: https: http:; frame-ancestors 'self';"
+  );
+  next();
+});
+
+app.use(compression());
 
 app.use(
   pinoHttp({
@@ -62,9 +77,23 @@ if (existsSync(frontendDist)) {
   app.use(prerenderMiddleware);
   app.use(seoMetaMiddleware);
 
-  app.use(express.static(frontendDist, { index: false }));
+  app.use(
+    express.static(frontendDist, {
+      index: false,
+      setHeaders(res, filePath) {
+        if (/\.html?$/i.test(filePath)) {
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        } else if (/-[A-Za-z0-9_]{8,}\.(js|css|mjs|woff2?|png|webp|jpe?g|svg|ico|gif|avif)$/i.test(filePath)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else {
+          res.setHeader("Cache-Control", "public, max-age=3600");
+        }
+      },
+    }),
+  );
 
-  app.use((_req, res) => {
+  app.use((req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.sendFile(path.join(frontendDist, "index.html"));
   });
 } else {
