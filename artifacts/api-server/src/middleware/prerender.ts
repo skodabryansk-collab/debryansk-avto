@@ -57,6 +57,7 @@ export function prerenderMiddleware(
   }
 
   const ua = (req.headers["user-agent"] ?? "") as string;
+  logger.info(`[bot-check] path=${req.path} raw_ua="${ua}" matched=${BOT_UA.test(ua)}`);
   if (!BOT_UA.test(ua)) {
     next();
     return;
