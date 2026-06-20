@@ -7,6 +7,7 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import { registerSitemapRoute } from "./routes/sitemap";
 import { prerenderMiddleware } from "./middleware/prerender";
+import { seoMetaMiddleware } from "./middleware/seoMeta";
 
 const app: Express = express();
 
@@ -46,6 +47,7 @@ if (existsSync(frontendDist)) {
   logger.info({ frontendDist }, "Serving frontend static files");
 
   app.use(prerenderMiddleware);
+  app.use(seoMetaMiddleware);
 
   app.use(express.static(frontendDist, { index: false }));
 
