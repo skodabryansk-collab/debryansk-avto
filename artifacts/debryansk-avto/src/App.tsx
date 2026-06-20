@@ -19,6 +19,8 @@ import BuyoutPage from "@/pages/buyout";
 import ContactsPage from "@/pages/contacts";
 import AboutPage from "@/pages/about";
 import BrandPage from "@/pages/brand-page";
+import PrivacyPage from "@/pages/privacy";
+import LegalPage from "@/pages/legal";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +50,8 @@ function Router() {
       <Route path="/contacts" component={ContactsPage} />
       <Route path="/about" component={AboutPage} />
       <Route path="/brands/:slug" component={BrandPage} />
+      <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/legal" component={LegalPage} />
       <Route component={NotFound} />
     </Switch>
   );
