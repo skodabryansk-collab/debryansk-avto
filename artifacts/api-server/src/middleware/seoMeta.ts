@@ -26,42 +26,42 @@ const STATIC_META: Record<string, { title: string; description: string; h1: stri
   },
   "/cars": {
     title: "Автомобили с пробегом в Брянске — каталог | Дебрянск Авто",
-    description: "Проверенные автомобили с пробегом в наличии у официального дилера Брянска. Отбор по качеству, кредит, трейд-ин.",
+    description: "Проверенные автомобили с пробегом в наличии у официального дилера «Дебрянск Авто» в Брянске. Более 200 авто на площадке. Кредит, трейд-ин, гарантия на все автомобили.",
     h1: "Автомобили с пробегом в Брянске",
   },
   "/service": {
     title: "Сервисное обслуживание в Брянске — дилер «Дебрянск Авто»",
-    description: "Профессиональное ТО и ремонт автомобилей в дилерских центрах Брянска. Запись онлайн, оригинальные запчасти.",
+    description: "Профессиональное ТО и ремонт автомобилей в дилерских центрах Брянска. Онлайн-запись, оригинальные запчасти и расходники, гарантийный сервис всех брендов группы компаний.",
     h1: "Сервисное обслуживание автомобилей в Брянске",
   },
   "/buyout": {
     title: "Выкуп автомобилей в Брянске — оценка онлайн | Дебрянск Авто",
-    description: "Продайте свой автомобиль за 30 минут. Онлайн-оценка, бесплатный выезд, мгновенная оплата.",
+    description: "Продайте свой автомобиль за 30 минут в дилерском центре «Дебрянск Авто» в Брянске. Онлайн-оценка, бесплатный выезд оценщика, мгновенная оплата на счёт или наличными.",
     h1: "Выкуп автомобилей в Брянске",
   },
   "/news": {
     title: "Новости автосалона Дебрянск Авто в Брянске",
-    description: "Актуальные новости об автомобилях, акциях и жизни группы компаний «Дебрянск Авто».",
+    description: "Актуальные новости об автомобилях, новинках рынка, акциях и скидках, а также о жизни группы компаний «Дебрянск Авто» — официального дилера в Брянске.",
     h1: "Новости Дебрянск Авто",
   },
   "/about": {
     title: "О компании Дебрянск Авто — группа компаний 9 БР",
-    description: "Группа компаний «Дебрянск Авто» — официальный мультибрендовый дилер в Брянске. 9 брендов, 4 дилерских центра с 2011 года.",
+    description: "Группа компаний «Дебрянск Авто» — официальный мультибрендовый дилер в Брянске с 2011 года. 9 брендов: Haval, Jetour, OMODA, Jaecoo, Tenet и другие. 4 дилерских центра.",
     h1: "О компании Дебрянск Авто",
   },
   "/contacts": {
     title: "Контакты дилерских центров Дебрянск Авто в Брянске",
-    description: "Адреса, телефоны, часы работы всех дилерских центров «Дебрянск Авто» в Брянске.",
+    description: "Адреса, телефоны и часы работы дилерских центров «Дебрянск Авто» в Брянске. Звоните: +7 (4832) 63-10-00. Ежедневно 9:00–21:00. Улица Литейная, Советская, Московский, Супонево.",
     h1: "Контакты дилерских центров Дебрянск Авто",
   },
   "/vacancies": {
     title: "Вакансии дилера «Дебрянск Авто» — работа в Брянске",
-    description: "Работа в автодилерских центрах «Дебрянск Авто». Менеджеры, автомеханики, администраторы.",
+    description: "Актуальные вакансии в автодилерских центрах «Дебрянск Авто» в Брянске. Менеджеры по продажам, автомеханики, администраторы. Достойная зарплата, обучение, карьерный рост.",
     h1: "Вакансии в Дебрянск Авто",
   },
   "/privacy": {
     title: "Политика конфиденциальности | Дебрянск Авто",
-    description: "Политика конфиденциальности ООО «9 БР» (Дебрянск Авто) — порядок сбора, хранения и обработки персональных данных пользователей сайта.",
+    description: "Политика конфиденциальности ООО «9 БР» (Дебрянск Авто) — порядок сбора, хранения и обработки персональных данных пользователей сайта debryansk-auto.ru в соответствии с ФЗ-152.",
     h1: "Политика конфиденциальности",
   },
 };
@@ -179,21 +179,30 @@ function injectMeta(
     );
   }
 
-  // Inject static navigation for crawlers (visually hidden, no duplicate H1)
+  // Inject main landmark + static navigation for crawlers (visually hidden)
   result = result.replace(
     /<div id="root"><\/div>/,
     `<div id="root"></div>
-    <nav aria-label="Основная навигация" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">
-      <a href="/new-cars">Новые автомобили в Брянске</a>
-      <a href="/cars">Автомобили с пробегом в Брянске</a>
-      <a href="/service">Сервисное обслуживание</a>
-      <a href="/buyout">Выкуп автомобилей</a>
-      <a href="/about">О компании Дебрянск Авто</a>
-      <a href="/contacts">Контакты дилерских центров Дебрянск Авто — телефон +7 (4832) 63-10-00</a>
-      <a href="/news">Новости</a>
-      <a href="/vacancies">Вакансии</a>
-      <a href="/privacy">Политика конфиденциальности</a>
-    </nav>`
+    <main aria-label="Основной контент" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">
+      <nav aria-label="Основная навигация">
+        <a href="/new-cars">Новые автомобили в Брянске</a>
+        <a href="/cars">Автомобили с пробегом в Брянске</a>
+        <a href="/service">Сервисное обслуживание</a>
+        <a href="/buyout">Выкуп автомобилей</a>
+        <a href="/about">О компании Дебрянск Авто</a>
+        <a href="/contacts">Контакты</a>
+        <a href="/news">Новости</a>
+        <a href="/vacancies">Вакансии</a>
+        <a href="/privacy">Политика конфиденциальности</a>
+      </nav>
+      <address>
+        <p>Дебрянск Авто — официальный дилер Haval, Jetour, OMODA в Брянске</p>
+        <p>Телефон: <a href="tel:+74832631000">+7 (4832) 63-10-00</a></p>
+        <p>Адрес: г. Брянск, ул. Литейная, 3/2 | ул. Советская, 77 | пр. Московский, 2Г | с. Супонево, ул. Шоссейная, 12Г</p>
+        <p>Режим работы: ежедневно 9:00–21:00</p>
+        <p>Email: <a href="mailto:info@debryansk-auto.ru">info@debryansk-auto.ru</a></p>
+      </address>
+    </main>`
   );
 
   return result;
@@ -261,15 +270,16 @@ async function resolveMeta(
       const modShort = row.modification ? row.modification.replace(/\s*\([^)]+\)/, "").trim() : null;
       // Stock number from external_id for guaranteed uniqueness
       const stockNum = row.external_id.replace(/^.*?(\d+)$/, "$1").slice(-6);
+      // Shorten model to 25 chars max to avoid >70 char titles
+      const modelShort = row.model.length > 25 ? row.model.slice(0, 23) + "…" : row.model;
       const title = isNew
-        ? `Купить ${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} — №${stockNum} | Дебрянск Авто`
-        : `${row.brand} ${row.model} ${row.year} б/у — ${priceStr} №${stockNum} | Дебрянск Авто`;
+        ? `Купить ${row.brand} ${modelShort} ${row.year}${modShort ? `, ${modShort}` : ""} — №${stockNum} | Дебрянск Авто`
+        : `${row.brand} ${modelShort} ${row.year} б/у — ${priceStr} №${stockNum} | Дебрянск Авто`;
       const h1 = isNew
         ? `Купить ${row.brand} ${row.model} ${row.year} в Брянске`
         : `${row.brand} ${row.model} ${row.year} с пробегом`;
-      // Truncate description to 160 chars
-      const rawDesc = row.description || `${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} в Брянске. Цена ${priceStr}. Официальный дилер «Дебрянск Авто».`;
-      const description = rawDesc.length > 160 ? rawDesc.slice(0, 157) + "…" : rawDesc;
+      // Always generate unique description from car attributes (DB description is shared promo text)
+      const description = `${isNew ? "Купите" : "Купите"} ${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} в Брянске. Цена ${priceStr}. Официальный дилер «Дебрянск Авто» — +7 (4832) 63-10-00.`;
       return {
         title,
         description,
