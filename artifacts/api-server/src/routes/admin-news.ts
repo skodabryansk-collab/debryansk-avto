@@ -2,6 +2,9 @@ import { Router, type IRouter } from "express";
 import { db, newsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/requireAdmin";
+import { pingIndexNow } from "../services/indexnow";
+
+const SITE = "https://debryansk-auto.ru";
 
 const router: IRouter = Router();
 router.use(requireAdmin);
@@ -33,6 +36,9 @@ router.post("/", async (req, res) => {
       .insert(newsTable)
       .values({ title, excerpt, content, category, image, slug, publishedAt: publishedAt ? new Date(publishedAt) : new Date(), readTime: readTime ? Number(readTime) : 3 })
       .returning();
+    if (slug) {
+      pingIndexNow([`${SITE}/news/${slug}`]).catch(() => {});
+    }
     return res.json({ ok: true, data: rows[0] });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
