@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { logger } from "../lib/logger";
 
 const BOT_UA =
-  /googlebot|yandexbot|bingbot|duckduckbot|facebookexternalhit|twitterbot|telegrambot|whatsapp|slackbot|linkedinbot|applebot|baiduspider|ia_archiver|vkshare|odklbot|claude|anthropic/i;
+  /googlebot|yandexbot|bingbot|duckduckbot|facebookexternalhit|twitterbot|telegrambot|whatsapp|slackbot|linkedinbot|applebot|baiduspider|ia_archiver|vkshare|odklbot|claude|anthropic|squirrel|squirrelscan|screamingfrog|ahrefs|semrush|mj12bot|dotbot/i;
 
 interface PrerenderCacheState {
   pages: Map<string, string>;
@@ -81,7 +81,7 @@ export function prerenderMiddleware(
   if (html) {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("X-Prerendered", "1");
-    res.setHeader("Cache-Control", "public, max-age=900");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.status(200).send(html);
     return;
   }
