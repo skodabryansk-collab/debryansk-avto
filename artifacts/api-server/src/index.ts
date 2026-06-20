@@ -289,13 +289,10 @@ async function main() {
         .then(async ({ loadPrerenderCacheFromGCS }) => {
           const { countPrerendered } = await import("./lib/prerenderStorage");
           const count = await countPrerendered();
-          if (count === 0) {
-            logger.info("prerender: GCS cache is empty — triggering full prerender");
-            spawnPrerender([]);
-          } else {
-            logger.info({ count }, "prerender: loading existing cache from GCS");
-            await loadPrerenderCacheFromGCS();
-          }
+          logger.info({ count }, "prerender: startup cache check");
+          await loadPrerenderCacheFromGCS();
+          logger.info("prerender: triggering full prerender on startup (refreshes cache)");
+          spawnPrerender([]);
         })
         .catch(err => logger.warn({ err }, "prerender: startup init failed"));
     }
