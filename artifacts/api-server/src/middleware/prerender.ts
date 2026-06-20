@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { logger } from "../lib/logger";
 
 const BOT_UA =
-  /googlebot|yandexbot|bingbot|duckduckbot|facebookexternalhit|twitterbot|telegrambot|whatsapp|slackbot|linkedinbot|applebot|baiduspider|ia_archiver|vkshare|odklbot/i;
+  /googlebot|yandexbot|bingbot|duckduckbot|facebookexternalhit|twitterbot|telegrambot|whatsapp|slackbot|linkedinbot|applebot|baiduspider|ia_archiver|vkshare|odklbot|claude|anthropic/i;
 
 interface PrerenderCacheState {
   pages: Map<string, string>;
@@ -27,7 +27,10 @@ export async function loadPrerenderCacheFromGCS(): Promise<void> {
     for (const [route, html] of loaded) {
       cache.pages.set(route, html);
     }
-    logger.info({ count: cache.pages.size }, "prerender: cache loaded from GCS");
+    logger.info(
+      { count: cache.pages.size },
+      "prerender: cache loaded from GCS",
+    );
   } catch (err) {
     logger.warn({ err }, "prerender: failed to load cache from GCS");
   }
@@ -43,7 +46,11 @@ export function deletePrerenderCache(route: string): void {
   cache.gone.add(route);
 }
 
-export function prerenderMiddleware(req: Request, res: Response, next: NextFunction): void {
+export function prerenderMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
   if (process.env.PRERENDER_ENABLED !== "true") {
     next();
     return;
@@ -61,7 +68,9 @@ export function prerenderMiddleware(req: Request, res: Response, next: NextFunct
   }
 
   const route = req.path || "/";
-
+  console.log(
+    `[DEBUG] path=${route}, ua=${ua.substring(0, 50)}, cached=${cache.pages.has(route)}, isGone=${cache.gone.has(route)}`,
+  );
   if (cache.gone.has(route)) {
     res.status(410).end();
     return;
