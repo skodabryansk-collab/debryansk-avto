@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { logger } from "../lib/logger";
+import { slugifyCarId } from "../lib/slugify";
 
 const router: IRouter = Router();
 
@@ -93,7 +94,7 @@ function parseFeed(text: string, dealer: string): NewCarRecord[] {
     const action = getField(block, "action");
     if (action !== "show") continue;
     cars.push({
-      id: `${dealer}-${getField(block, "unique_id")}`,
+      id: slugifyCarId(dealer, getField(block, "unique_id")),
       mark: normalizeBrand(getField(block, "mark_id")),
       model: getField(block, "folder_id"),
       modification: getField(block, "modification_id"),
