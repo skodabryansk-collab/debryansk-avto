@@ -16,6 +16,8 @@ export interface SyncStats {
   total: number;
   durationMs: number;
   addedOrUpdatedExternalIds: string[];
+  addedNewCarIds: string[];
+  addedUsedCarIds: string[];
   removedCars: RemovedCar[];
 }
 
@@ -28,14 +30,21 @@ export async function syncCars(): Promise<SyncStats> {
   ]);
 
   if (!usedCars.length && !newCars.length) {
-    return { added: 0, updated: 0, removed: 0, total: 0, durationMs: Date.now() - startedAt, addedOrUpdatedExternalIds: [], removedCars: [] };
+    return { added: 0, updated: 0, removed: 0, total: 0, durationMs: Date.now() - startedAt, addedOrUpdatedExternalIds: [], addedNewCarIds: [], addedUsedCarIds: [], removedCars: [] };
   }
 
-  const countBefore = await db.execute(sql`SELECT COUNT(*)::int AS cnt FROM cars`)
-    .then(r => Number((r.rows[0] as any)?.cnt ?? 0))
-    .catch(() => 0);
+  const [countBeforeResult, existingIdsResult] = await Promise.all([
+    db.execute(sql`SELECT COUNT(*)::int AS cnt FROM cars`).catch(() => ({ rows: [{ cnt: 0 }] })),
+    db.execute(sql`SELECT external_id FROM cars`).catch(() => ({ rows: [] })),
+  ]);
+  const countBefore = Number((countBeforeResult.rows[0] as any)?.cnt ?? 0);
+  const existingIds = new Set<string>(
+    (existingIdsResult.rows as { external_id: string }[]).map(r => r.external_id),
+  );
 
   const allExternalIds: string[] = [];
+  const addedNewCarIds: string[] = [];
+  const addedUsedCarIds: string[] = [];
 
   const parseOwners = (val: string | undefined | null): number | null => {
     if (!val) return null;
@@ -50,6 +59,7 @@ export async function syncCars(): Promise<SyncStats> {
 
   for (const c of usedCars) {
     allExternalIds.push(c.id);
+    if (!existingIds.has(c.id)) addedUsedCarIds.push(c.id);
     const ownersNum = parseOwners(c.ownersNumber);
     await db.execute(sql`
       INSERT INTO cars (external_id, type, brand, model, year, color, price, mileage,
@@ -86,6 +96,7 @@ export async function syncCars(): Promise<SyncStats> {
 
   for (const c of newCars) {
     allExternalIds.push(c.id);
+    if (!existingIds.has(c.id)) addedNewCarIds.push(c.id);
     // image_url policy: use first image from feed when available; on conflict keep
     // the existing non-NULL image_url rather than overwriting it with NULL — this
     // prevents transient feed gaps (supplier forgot to upload a photo) from
@@ -163,6 +174,8 @@ export async function syncCars(): Promise<SyncStats> {
     total: countAfter,
     durationMs: Date.now() - startedAt,
     addedOrUpdatedExternalIds: allExternalIds,
+    addedNewCarIds,
+    addedUsedCarIds,
     removedCars,
   };
 
