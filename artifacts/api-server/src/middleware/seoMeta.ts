@@ -179,18 +179,17 @@ function injectMeta(
     );
   }
 
-  // Inject H1 and static navigation for crawlers (screen-reader only)
+  // Inject static navigation for crawlers (visually hidden, no duplicate H1)
   result = result.replace(
     /<div id="root"><\/div>/,
     `<div id="root"></div>
-    <h1 class="sr-only">${h1}</h1>
     <nav aria-label="Основная навигация" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">
       <a href="/new-cars">Новые автомобили в Брянске</a>
       <a href="/cars">Автомобили с пробегом в Брянске</a>
       <a href="/service">Сервисное обслуживание</a>
       <a href="/buyout">Выкуп автомобилей</a>
       <a href="/about">О компании Дебрянск Авто</a>
-      <a href="/contacts">Контакты дилерских центров</a>
+      <a href="/contacts">Контакты дилерских центров Дебрянск Авто — телефон +7 (4832) 63-10-00</a>
       <a href="/news">Новости</a>
       <a href="/vacancies">Вакансии</a>
       <a href="/privacy">Политика конфиденциальности</a>
@@ -252,21 +251,28 @@ async function resolveMeta(
     const type = carMatch[1] === "new-cars" ? "new" : "used";
     const id = decodeURIComponent(carMatch[2]);
     const result = await db.execute(
-      sql`SELECT brand, model, year, price, description, image_url FROM cars WHERE external_id = ${id} AND type = ${type} LIMIT 1`
+      sql`SELECT brand, model, modification, year, price, description, image_url, external_id FROM cars WHERE external_id = ${id} AND type = ${type} LIMIT 1`
     );
-    const row = result.rows[0] as { brand: string; model: string; year: number; price: number; description: string | null; image_url: string | null } | undefined;
+    const row = result.rows[0] as { brand: string; model: string; modification: string | null; year: number; price: number; description: string | null; image_url: string | null; external_id: string } | undefined;
     if (row) {
       const priceStr = new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 }).format(row.price);
       const isNew = type === "new";
+      // Short modification suffix for title uniqueness (e.g. "1.5 AMT" from "1.5 AMT (143 л.с.)")
+      const modShort = row.modification ? row.modification.replace(/\s*\([^)]+\)/, "").trim() : null;
+      // Stock number from external_id for guaranteed uniqueness
+      const stockNum = row.external_id.replace(/^.*?(\d+)$/, "$1").slice(-6);
       const title = isNew
-        ? `Купить ${row.brand} ${row.model} ${row.year} в Брянске — цена ${priceStr} | Дебрянск Авто`
-        : `${row.brand} ${row.model} ${row.year} б/у — ${priceStr} | Дебрянск Авто`;
+        ? `Купить ${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} — №${stockNum} | Дебрянск Авто`
+        : `${row.brand} ${row.model} ${row.year} б/у — ${priceStr} №${stockNum} | Дебрянск Авто`;
       const h1 = isNew
         ? `Купить ${row.brand} ${row.model} ${row.year} в Брянске`
         : `${row.brand} ${row.model} ${row.year} с пробегом`;
+      // Truncate description to 160 chars
+      const rawDesc = row.description || `${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} в Брянске. Цена ${priceStr}. Официальный дилер «Дебрянск Авто».`;
+      const description = rawDesc.length > 160 ? rawDesc.slice(0, 157) + "…" : rawDesc;
       return {
         title,
-        description: row.description || `${isNew ? "Купите" : "Купите"} ${row.brand} ${row.model} ${row.year} в Брянске. Цена ${priceStr}. Официальный дилер «Дебрянск Авто».`,
+        description,
         canonical: `${SITE}${pathStr}`,
         ogImage: row.image_url || DEFAULT_OG_IMAGE,
         h1,
