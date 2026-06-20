@@ -18,6 +18,7 @@ const STATIC_PAGES = [
   { loc: "/about",     changefreq: "monthly", priority: "0.7" },
   { loc: "/contacts",  changefreq: "monthly", priority: "0.7" },
   { loc: "/vacancies", changefreq: "weekly",  priority: "0.6" },
+  { loc: "/privacy",   changefreq: "yearly",  priority: "0.3" },
 ];
 
 function fmt(d: Date | string | null): string {
@@ -84,8 +85,23 @@ async function buildSitemap(): Promise<string> {
   ].join("\n");
 }
 
+const FAKE_SITEMAPS = [
+  "/news-sitemap.xml",
+  "/page-sitemap.xml",
+  "/post-sitemap.xml",
+  "/sitemap_index.xml",
+  "/sitemap-index.xml",
+  "/sitemap1.xml",
+  "/sitemap2.xml",
+  "/wp-sitemap.xml",
+];
+
 export function registerSitemapRoute(app: Express): void {
   const key = getIndexNowKey();
+
+  for (const path of FAKE_SITEMAPS) {
+    app.get(path, (_req, res) => res.status(404).end());
+  }
 
   app.get("/robots.txt", (_req, res) => {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
