@@ -236,6 +236,14 @@ async function main() {
         })
         .catch(err => logger.warn({ err }, "Scheduled car sync failed"));
     }, 30 * 60 * 1000);
+
+    // Full prerender refresh every 6 hours (covers new brands, news, cars)
+    setInterval(() => {
+      if (process.env.PRERENDER_ENABLED === "true") {
+        logger.info("Scheduled full prerender triggered");
+        spawnPrerender([]);
+      }
+    }, 6 * 60 * 60 * 1000);
   }).catch(err => logger.warn({ err }, "Car sync module load failed"));
 
   // Reviews sync — initial full load if table empty, then every 8 hours
