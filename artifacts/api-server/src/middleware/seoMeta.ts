@@ -26,42 +26,42 @@ const STATIC_META: Record<string, { title: string; description: string; h1: stri
   },
   "/cars": {
     title: "Автомобили с пробегом в Брянске — каталог | Дебрянск Авто",
-    description: "Проверенные автомобили с пробегом в наличии у официального дилера «Дебрянск Авто» в Брянске. Более 200 авто на площадке. Кредит, трейд-ин, гарантия на все автомобили.",
+    description: "Проверенные авто с пробегом у официального дилера в Брянске. Более 200 машин в наличии. Кредит, трейд-ин, гарантия.",
     h1: "Автомобили с пробегом в Брянске",
   },
   "/service": {
     title: "Сервисное обслуживание в Брянске — дилер «Дебрянск Авто»",
-    description: "Профессиональное ТО и ремонт автомобилей в дилерских центрах Брянска. Онлайн-запись, оригинальные запчасти и расходники, гарантийный сервис всех брендов группы компаний.",
+    description: "Профессиональное ТО и ремонт в дилерских центрах Брянска. Онлайн-запись, оригинальные запчасти, гарантийный сервис.",
     h1: "Сервисное обслуживание автомобилей в Брянске",
   },
   "/buyout": {
     title: "Выкуп автомобилей в Брянске — оценка онлайн | Дебрянск Авто",
-    description: "Продайте свой автомобиль за 30 минут в дилерском центре «Дебрянск Авто» в Брянске. Онлайн-оценка, бесплатный выезд оценщика, мгновенная оплата на счёт или наличными.",
+    description: "Продайте автомобиль за 30 минут у официального дилера «Дебрянск Авто». Онлайн-оценка, бесплатный выезд, мгновенная оплата.",
     h1: "Выкуп автомобилей в Брянске",
   },
   "/news": {
     title: "Новости автосалона Дебрянск Авто в Брянске",
-    description: "Актуальные новости об автомобилях, новинках рынка, акциях и скидках, а также о жизни группы компаний «Дебрянск Авто» — официального дилера в Брянске.",
+    description: "Актуальные новости об автомобилях, акциях и жизни группы компаний «Дебрянск Авто» — официального дилера в Брянске.",
     h1: "Новости Дебрянск Авто",
   },
   "/about": {
     title: "О компании Дебрянск Авто — группа компаний 9 БР",
-    description: "Группа компаний «Дебрянск Авто» — официальный мультибрендовый дилер в Брянске с 2011 года. 9 брендов: Haval, Jetour, OMODA, Jaecoo, Tenet и другие. 4 дилерских центра.",
+    description: "«Дебрянск Авто» — официальный мультибрендовый дилер в Брянске с 2011 года. 9 брендов: Haval, Jetour, OMODA, Jaecoo. 4 центра.",
     h1: "О компании Дебрянск Авто",
   },
   "/contacts": {
     title: "Контакты дилерских центров Дебрянск Авто в Брянске",
-    description: "Адреса, телефоны и часы работы дилерских центров «Дебрянск Авто» в Брянске. Звоните: +7 (4832) 63-10-00. Ежедневно 9:00–21:00. Улица Литейная, Советская, Московский, Супонево.",
+    description: "Адреса и телефоны дилерских центров «Дебрянск Авто» в Брянске. Звоните: +7 (4832) 63-10-00. Ежедневно 9:00–21:00.",
     h1: "Контакты дилерских центров Дебрянск Авто",
   },
   "/vacancies": {
     title: "Вакансии дилера «Дебрянск Авто» — работа в Брянске",
-    description: "Актуальные вакансии в автодилерских центрах «Дебрянск Авто» в Брянске. Менеджеры по продажам, автомеханики, администраторы. Достойная зарплата, обучение, карьерный рост.",
+    description: "Актуальные вакансии в автодилерских центрах «Дебрянск Авто». Менеджеры, механики, администраторы. Обучение и карьерный рост.",
     h1: "Вакансии в Дебрянск Авто",
   },
   "/privacy": {
     title: "Политика конфиденциальности | Дебрянск Авто",
-    description: "Политика конфиденциальности ООО «9 БР» (Дебрянск Авто) — порядок сбора, хранения и обработки персональных данных пользователей сайта debryansk-auto.ru в соответствии с ФЗ-152.",
+    description: "Политика конфиденциальности ООО «9 БР» — порядок сбора и обработки персональных данных на сайте debryansk-auto.ru (ФЗ-152).",
     h1: "Политика конфиденциальности",
   },
 };
@@ -82,6 +82,53 @@ function getIndexHtml(): string | null {
   }
 }
 
+const LOCAL_BUSINESS_SCHEMA = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": ["AutoDealer", "LocalBusiness"],
+  "name": "Дебрянск Авто",
+  "url": "https://debryansk-auto.ru",
+  "logo": "https://debryansk-auto.ru/logo.svg",
+  "image": "https://debryansk-auto.ru/og-image.jpg",
+  "telephone": "+7-4832-63-10-00",
+  "email": "info@debryansk-auto.ru",
+  "openingHours": "Mo-Su 09:00-21:00",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "ул. Литейная, 3/2",
+    "addressLocality": "Брянск",
+    "addressRegion": "Брянская область",
+    "postalCode": "241019",
+    "addressCountry": "RU"
+  },
+  "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": 53.2431,
+    "longitude": 34.3636
+  },
+  "sameAs": ["https://vk.com/debryansk_avto"],
+  "priceRange": "₽₽₽"
+});
+
+const CONTACT_PAGE_SCHEMA = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "ContactPage",
+  "name": "Контакты Дебрянск Авто",
+  "url": "https://debryansk-auto.ru/contacts",
+  "description": "Адреса и телефоны дилерских центров Дебрянск Авто в Брянске",
+  "mainEntity": {
+    "@type": "AutoDealer",
+    "name": "Дебрянск Авто",
+    "telephone": "+7-4832-63-10-00",
+    "openingHours": "Mo-Su 09:00-21:00",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "ул. Литейная, 3/2",
+      "addressLocality": "Брянск",
+      "addressCountry": "RU"
+    }
+  }
+});
+
 function injectMeta(
   html: string,
   title: string,
@@ -89,6 +136,7 @@ function injectMeta(
   canonical: string,
   ogImage: string,
   h1: string,
+  extraJsonLd?: string,
 ): string {
   let result = html;
 
@@ -179,6 +227,13 @@ function injectMeta(
     );
   }
 
+  // Inject schema.org JSON-LD before </head>
+  const ldScripts = [
+    `<script type="application/ld+json">${LOCAL_BUSINESS_SCHEMA}</script>`,
+    extraJsonLd ? `<script type="application/ld+json">${extraJsonLd}</script>` : "",
+  ].filter(Boolean).join("\n    ");
+  result = result.replace("</head>", `  ${ldScripts}\n  </head>`);
+
   // Inject main landmark + static navigation for crawlers (visually hidden)
   result = result.replace(
     /<div id="root"><\/div>/,
@@ -210,10 +265,11 @@ function injectMeta(
 
 async function resolveMeta(
   pathStr: string,
-): Promise<{ title: string; description: string; canonical: string; ogImage: string; h1: string } | null> {
+): Promise<{ title: string; description: string; canonical: string; ogImage: string; h1: string; jsonLd?: string } | null> {
   const meta = STATIC_META[pathStr];
   if (meta) {
-    return { ...meta, canonical: `${SITE}${pathStr}`, ogImage: DEFAULT_OG_IMAGE };
+    const extra = pathStr === "/contacts" ? { jsonLd: CONTACT_PAGE_SCHEMA } : {};
+    return { ...meta, canonical: `${SITE}${pathStr}`, ogImage: DEFAULT_OG_IMAGE, ...extra };
   }
 
   // Brand pages: /brands/:slug
@@ -270,16 +326,19 @@ async function resolveMeta(
       const modShort = row.modification ? row.modification.replace(/\s*\([^)]+\)/, "").trim() : null;
       // Stock number from external_id for guaranteed uniqueness
       const stockNum = row.external_id.replace(/^.*?(\d+)$/, "$1").slice(-6);
-      // Shorten model to 25 chars max to avoid >70 char titles
-      const modelShort = row.model.length > 25 ? row.model.slice(0, 23) + "…" : row.model;
-      const title = isNew
-        ? `Купить ${row.brand} ${modelShort} ${row.year}${modShort ? `, ${modShort}` : ""} — №${stockNum} | Дебрянск Авто`
-        : `${row.brand} ${modelShort} ${row.year} б/у — ${priceStr} №${stockNum} | Дебрянск Авто`;
+      // Build title — drop modification if full title >70 chars
+      const titleWithMod = isNew
+        ? `Купить ${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} — №${stockNum} | Дебрянск Авто`
+        : `${row.brand} ${row.model} ${row.year} б/у — ${priceStr} №${stockNum} | Дебрянск Авто`;
+      const titleNoMod = isNew
+        ? `Купить ${row.brand} ${row.model} ${row.year} — №${stockNum} | Дебрянск Авто`
+        : `${row.brand} ${row.model} ${row.year} б/у №${stockNum} | Дебрянск Авто`;
+      const title = titleWithMod.length > 70 ? titleNoMod : titleWithMod;
       const h1 = isNew
         ? `Купить ${row.brand} ${row.model} ${row.year} в Брянске`
         : `${row.brand} ${row.model} ${row.year} с пробегом`;
-      // Always generate unique description from car attributes (DB description is shared promo text)
-      const description = `${isNew ? "Купите" : "Купите"} ${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} в Брянске. Цена ${priceStr}. Официальный дилер «Дебрянск Авто» — +7 (4832) 63-10-00.`;
+      // Unique description: include stock# to differentiate identical brand+model+year+mod+price
+      const description = `Купите ${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} в Брянске. Цена ${priceStr}. Арт. №${stockNum}. Официальный дилер «Дебрянск Авто» — +7 (4832) 63-10-00.`;
       return {
         title,
         description,
@@ -319,7 +378,7 @@ export function seoMetaMiddleware(
         next();
         return;
       }
-      const enriched = injectMeta(html, meta.title, meta.description, meta.canonical, meta.ogImage, meta.h1);
+      const enriched = injectMeta(html, meta.title, meta.description, meta.canonical, meta.ogImage, meta.h1, meta.jsonLd);
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader("X-SeoMeta", "1");
       res.setHeader("Cache-Control", "public, max-age=300");
