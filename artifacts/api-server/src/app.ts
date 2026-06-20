@@ -33,10 +33,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+registerSitemapRoute(app);
+
 app.use("/api", router);
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
-
-registerSitemapRoute(app);
 
 const frontendDist =
   process.env.FRONTEND_DIST_PATH ||
