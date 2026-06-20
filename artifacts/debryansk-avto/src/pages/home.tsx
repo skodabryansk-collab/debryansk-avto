@@ -1046,13 +1046,13 @@ export default function Home() {
               animate="visible"
               className="text-[2.6rem] sm:text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight text-white mb-4 sm:mb-5 max-w-3xl"
             >
-              <span className="block overflow-hidden">
-                <motion.span variants={heroHeadlineLine} className="block">
-                  Дебрянск Авто&nbsp;—
+              <span className="block overflow-hidden sm:inline-block">
+                <motion.span variants={heroHeadlineLine} className="inline-block sm:block">
+                  Дебрянск Авто
                 </motion.span>
-              </span>
-              <span className="block overflow-hidden">
-                <motion.span variants={heroHeadlineLine} className="block">
+              </span>{" "}
+              <span className="block overflow-hidden sm:inline-block">
+                <motion.span variants={heroHeadlineLine} className="inline-block sm:block">
                   <span className="brand-gradient-text">Территория Автомобилей.</span>
                 </motion.span>
               </span>
