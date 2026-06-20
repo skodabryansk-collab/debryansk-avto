@@ -208,18 +208,26 @@ async function handlePrerenderAfterSync(
       spawnPrerender(["--cars-only"]);
     }
 
-    if (stats.added > 0) {
-      const { getNewCars } = await import("./routes/new-cars");
-      const { pingIndexNow } = await import("./services/indexnow");
-      const newCars = await getNewCars().catch(() => []);
-      const urls = newCars.map(c => `https://debryansk-auto.ru/new-cars/${encodeURIComponent(c.id)}`);
-      if (urls.length > 0) {
-        pingIndexNow(urls).catch(err => logger.warn({ err }, "[indexnow] post-sync ping failed"));
-        logger.info({ count: urls.length }, "[indexnow] queued ping after car sync");
-      }
-    }
   } catch (err) {
     logger.warn({ err }, "prerender: post-sync handler failed");
+  }
+}
+
+async function handleIndexNowAfterSync(
+  stats: import("./services/car-sync").SyncStats,
+): Promise<void> {
+  const { addedNewCarIds, addedUsedCarIds } = stats;
+  if (!addedNewCarIds.length && !addedUsedCarIds.length) return;
+  const urls = [
+    ...addedNewCarIds.map(id => `https://debryansk-auto.ru/new-cars/${encodeURIComponent(id)}`),
+    ...addedUsedCarIds.map(id => `https://debryansk-auto.ru/cars/${encodeURIComponent(id)}`),
+  ];
+  try {
+    const { pingIndexNow } = await import("./services/indexnow");
+    pingIndexNow(urls).catch(err => logger.warn({ err }, "[indexnow] ping failed"));
+    logger.info({ newCount: addedNewCarIds.length, usedCount: addedUsedCarIds.length }, "[indexnow] queued ping for new cars");
+  } catch (err) {
+    logger.warn({ err }, "[indexnow] post-sync handler failed");
   }
 }
 
@@ -235,6 +243,7 @@ async function main() {
       .then(stats => {
         logger.info(stats, "Startup car sync complete");
         handlePrerenderAfterSync(stats);
+        handleIndexNowAfterSync(stats);
       })
       .catch(err => logger.warn({ err }, "Startup car sync failed"));
 
@@ -244,6 +253,7 @@ async function main() {
         .then(stats => {
           logger.info(stats, "Scheduled car sync complete");
           handlePrerenderAfterSync(stats);
+          handleIndexNowAfterSync(stats);
         })
         .catch(err => logger.warn({ err }, "Scheduled car sync failed"));
     }, 30 * 60 * 1000);
