@@ -79,10 +79,12 @@ export function prerenderMiddleware(
 
   const html = cache.pages.get(route);
   if (html) {
+    // Deduplicate <title> tags — Puppeteer renders both index.html title and React Helmet title
+    const dedupedHtml = html.replace(/(<title>[^<]*<\/title>)(<title>[^<]*<\/title>)+/, "$1");
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("X-Prerendered", "1");
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.status(200).send(html);
+    res.status(200).send(dedupedHtml);
     return;
   }
 
