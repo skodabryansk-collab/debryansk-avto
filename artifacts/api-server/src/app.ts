@@ -46,6 +46,19 @@ const frontendDist =
 if (existsSync(frontendDist)) {
   logger.info({ frontendDist }, "Serving frontend static files");
 
+  app.use((req, res, next) => {
+    const m = req.path.match(/^\/(new-cars)\/(.+)$/);
+    if (!m) return next();
+    const segment = m[2];
+    const decoded = decodeURIComponent(segment);
+    const normalized = decoded.toLowerCase().replace(/\s+/g, "-").replace(/_/g, "-");
+    if (normalized !== segment) {
+      const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+      return res.redirect(301, `/new-cars/${normalized}${qs}`);
+    }
+    next();
+  });
+
   app.use(prerenderMiddleware);
   app.use(seoMetaMiddleware);
 
