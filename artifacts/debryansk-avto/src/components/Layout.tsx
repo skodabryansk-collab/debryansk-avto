@@ -1,8 +1,10 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Heart, Scale, ArrowLeft, Phone, User, CheckCircle } from "lucide-react";
+import { Menu, X, Heart, Scale, ArrowLeft, Phone, User, CheckCircle, Car, ChevronDown } from "lucide-react";
+import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import { SiVk, SiTelegram } from "react-icons/si";
 import { Helmet } from "react-helmet-async";
@@ -11,6 +13,7 @@ import logoWhiteSvg from "@/assets/logo-white.svg";
 import logoPng from "@/assets/logo-optimized.webp";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import ChatWidget from "@/components/ChatWidget";
 
 const GLOBAL_DEALER_LD = JSON.stringify({
   "@context": "https://schema.org",
@@ -18,7 +21,7 @@ const GLOBAL_DEALER_LD = JSON.stringify({
   "name": "Дебрянск Авто",
   "alternateName": "Территория Автомобилей",
   "url": "https://debryansk-auto.ru",
-  "telephone": "+74832777770",
+  "telephone": "+74832631000",
   "description": "Группа автодилеров в Брянске. 9 брендов: CHERY, OMODA, JAECOO, HAVAL, TENET, Jetour, МБ-Брянск и другие.",
   "address": {
     "@type": "PostalAddress",
@@ -54,7 +57,7 @@ function CallbackModal({ onClose }: { onClose: () => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !phone.trim()) return;
+    if (!name.trim() || !isPhoneValid(phone)) return;
     setLoading(true);
     try {
       const fd = new FormData();
@@ -107,9 +110,10 @@ function CallbackModal({ onClose }: { onClose: () => void }) {
                 <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
                   <Phone className="w-4 h-4 text-slate-400" />
                   <input
-                    type="tel" required value={phone} onChange={e => setPhone(e.target.value)}
+                    type="tel" required value={phone} onChange={e => setPhone(formatPhone(e.target.value))}
                     className="bg-transparent flex-1 text-sm outline-none placeholder:text-slate-400"
                     placeholder="+7 (___) ___-__-__"
+                    maxLength={18} inputMode="tel"
                   />
                 </div>
               </div>
@@ -129,6 +133,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [callbackOpen, setCallbackOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [carsDropdownOpen, setCarsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [location] = useLocation();
   const { favorites, compare } = useCarStorage();
   const favCount = favorites.length;
@@ -140,13 +146,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     queryFn: () => fetch("/api/settings").then(r => r.json()).then(j => j.data as Record<string, string>),
     staleTime: 5 * 60 * 1000,
   });
-  const headerPhone = siteSettings?.header_phone ?? "+7 (4832) 77 77 70";
-  const headerPhoneTel = "tel:+" + (siteSettings?.header_phone ?? "+7 (4832) 77 77 70").replace(/\D/g, "");
+  const headerPhone = normalizePhone(siteSettings?.header_phone) || "+7 (4832) 63-10-00";
+  const headerPhoneTel = phoneHref(siteSettings?.header_phone) || "tel:+74832631000";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 80);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setCarsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   const handleNav = useCallback((href: string) => {
@@ -175,6 +191,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {headerPhone}
               </a>
               <Button size="sm"
+                data-callback-trigger
                 className="h-7 sm:h-8 px-3 sm:px-4 brand-gradient border-0 text-white font-bold rounded-lg text-[11px] sm:text-xs hover:opacity-90"
                 onClick={() => setCallbackOpen(true)}>
                 Заказать звонок
@@ -208,8 +225,54 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </motion.button>
 
           <nav className="hidden lg:flex items-center gap-0.5 ml-2">
+            {/* Автомобили dropdown */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setCarsDropdownOpen(o => !o)}
+                className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all flex items-center gap-1 ${
+                  location === "/new-cars" || location === "/cars"
+                    ? "text-white bg-white/10"
+                    : "text-white/60 hover:text-white hover:bg-white/8"
+                }`}
+              >
+                Автомобили
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${carsDropdownOpen ? "rotate-180" : ""}`} />
+              </button>
+              <AnimatePresence>
+                {carsDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden min-w-[220px] z-50"
+                  >
+                    <Link href="/new-cars"
+                      onClick={() => setCarsDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
+                    >
+                      <Car className="w-4 h-4 text-[#0070b8]" />
+                      Новые автомобили
+                    </Link>
+                    <div className="mx-4 border-t border-slate-100" />
+                    <Link href="/cars"
+                      onClick={() => setCarsDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
+                    >
+                      <Car className="w-4 h-4 text-slate-400" />
+                      Автомобили с пробегом
+                    </Link>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             {NAV_LINKS.map(([label, id, href]) => (
-              href.startsWith("/") ? (
+              href.startsWith("/#") ? (
+                <button key={id} onClick={() => handleNav(href)}
+                  className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+                  {label}
+                </button>
+              ) : (
                 <Link key={id} href={href}
                   className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all ${
                     location === href
@@ -218,11 +281,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   }`}>
                   {label}
                 </Link>
-              ) : (
-                <button key={id} onClick={() => handleNav(href)}
-                  className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
-                  {label}
-                </button>
               )
             ))}
             <Link href="/vacancies"
@@ -276,17 +334,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
               className="overflow-hidden border-t border-white/[0.07] bg-[#111317]">
               <div className="px-4 py-3 flex flex-col gap-0.5">
+                <Link href="/new-cars" onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors">
+                  <Car className="w-4 h-4" /> Новые автомобили
+                </Link>
+                <Link href="/cars" onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors">
+                  <Car className="w-4 h-4 opacity-60" /> Автомобили с пробегом
+                </Link>
                 {NAV_LINKS.map(([label, id, href]) => (
-                  href.startsWith("/") ? (
-                    <Link key={id} href={href}
-                      className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block">
-                      {label}
-                    </Link>
-                  ) : (
+                  href.startsWith("/#") ? (
                     <button key={id} onClick={() => handleNav(href)}
                       className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors">
                       {label}
                     </button>
+                  ) : (
+                    <Link key={id} href={href} onClick={() => setMobileMenuOpen(false)}
+                      className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block">
+                      {label}
+                    </Link>
                   )
                 ))}
                 <Link href="/vacancies"
@@ -380,7 +446,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="pt-6 sm:pt-8 border-t border-white/[0.07] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
             <p>© {new Date().getFullYear()} Дебрянск Авто — Территория Автомобилей</p>
-            <Link href="/privacy" className="hover:text-white transition-colors">Политика конфиденциальности</Link>
+            <div className="flex items-center gap-4">
+              <Link href="/legal" className="hover:text-white transition-colors">Юридическая информация</Link>
+              <Link href="/privacy" className="hover:text-white transition-colors">Политика конфиденциальности</Link>
+            </div>
           </div>
         </div>
       </footer>
@@ -389,6 +458,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <AnimatePresence>
         {callbackOpen && <CallbackModal onClose={() => setCallbackOpen(false)} />}
       </AnimatePresence>
+
+      {/* Navigator AI chat widget */}
+      <ChatWidget onOpenCallback={() => setCallbackOpen(true)} />
     </div>
   );
 }
