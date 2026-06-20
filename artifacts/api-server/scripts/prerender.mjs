@@ -15,6 +15,7 @@ import puppeteer from "puppeteer";
 const SIDECAR = "http://127.0.0.1:1106";
 const SITE_URL = (process.env.PRERENDER_SITE_URL || "http://localhost:8080").replace(/\/$/, "");
 const BUCKET_ID = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+const INTERNAL_SECRET = process.env.PRERENDER_INTERNAL_SECRET;
 const POOL_SIZE = 5;
 const PAGE_TIMEOUT_MS = 14_000;
 const NETWORK_IDLE_MS = 800;
@@ -120,6 +121,19 @@ async function processRoute(page, route) {
     }
 
     await saveToGCS(route, html);
+
+    // Notify Express server to update in-memory cache immediately (don't wait for script exit)
+    if (INTERNAL_SECRET) {
+      fetch(`${SITE_URL}/api/internal/prerender-update`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-prerender-secret": INTERNAL_SECRET,
+        },
+        body: JSON.stringify({ route, html }),
+      }).catch(() => {}); // fire-and-forget, don't block prerender
+    }
+
     console.log(`[prerender] OK   ${route} (${Math.round(html.length / 1024)}KB)`);
   } catch (err) {
     console.error(`[prerender] FAIL ${route}: ${err.message}`);
