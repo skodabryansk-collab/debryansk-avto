@@ -207,6 +207,17 @@ async function handlePrerenderAfterSync(
     if (stats.added > 0 || stats.updated > 0) {
       spawnPrerender(["--cars-only"]);
     }
+
+    if (stats.added > 0) {
+      const { getNewCars } = await import("./routes/new-cars");
+      const { pingIndexNow } = await import("./services/indexnow");
+      const newCars = await getNewCars().catch(() => []);
+      const urls = newCars.map(c => `https://debryansk-auto.ru/new-cars/${encodeURIComponent(c.id)}`);
+      if (urls.length > 0) {
+        pingIndexNow(urls).catch(err => logger.warn({ err }, "[indexnow] post-sync ping failed"));
+        logger.info({ count: urls.length }, "[indexnow] queued ping after car sync");
+      }
+    }
   } catch (err) {
     logger.warn({ err }, "prerender: post-sync handler failed");
   }
