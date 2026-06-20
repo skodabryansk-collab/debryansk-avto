@@ -22,7 +22,7 @@ const GLOBAL_DEALER_LD = JSON.stringify({
   "alternateName": "Территория Автомобилей",
   "url": "https://debryansk-auto.ru",
   "telephone": "+74832631000",
-  "description": "Группа автодилеров в Брянске. 9 брендов: CHERY, OMODA, JAECOO, HAVAL, TENET, Jetour, МБ-Брянск и другие.",
+  "description": "Группа автодилеров в Брянске. 6 брендов новых авто: OMODA, JAECOO, HAVAL, Tenet, Jetour. Автомобили с пробегом, сервис, выкуп.",
   "address": {
     "@type": "PostalAddress",
     "addressLocality": "Брянск",
@@ -400,10 +400,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <footer className="bg-[#0d0f14] text-slate-400 pt-12 sm:pt-14 pb-8 border-t border-white/[0.07]">
         <div className="container mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 mb-10 sm:mb-12">
+
+            {/* О компании */}
             <div className="col-span-2 sm:col-span-1 lg:col-span-1">
               <img src={logoPng} alt="Дебрянск Авто" className="h-8 sm:h-9 w-auto mb-4 sm:mb-5 opacity-50 hover:opacity-100 transition-opacity" />
+              <p className="text-sm text-slate-500 mb-1 leading-relaxed">
+                Территория Автомобилей.
+              </p>
               <p className="text-sm text-slate-500 mb-4 sm:mb-5 leading-relaxed">
-                Территория Автомобилей. Группа компаний с 9 брендами в Брянске с 2011 года.
+                Официальный мультибрендовый дилер в Брянске с&nbsp;2011&nbsp;года.
               </p>
               <div className="flex gap-2.5">
                 <a href="#" aria-label="ВКонтакте" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#0070b8] transition-colors group">
@@ -414,38 +419,49 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </a>
               </div>
             </div>
+
+            {/* Каталог */}
             <div>
               <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Каталог</h4>
               <ul className="space-y-2 text-sm">
                 <li><Link href="/new-cars" className="hover:text-[#0070b8] transition-colors">Новые автомобили</Link></li>
                 <li><Link href="/cars" className="hover:text-[#0070b8] transition-colors">Автомобили с пробегом</Link></li>
                 <li><Link href="/buyout" className="hover:text-[#0070b8] transition-colors">Выкуп и комиссия</Link></li>
+                <li><Link href="/favorites" className="hover:text-[#0070b8] transition-colors">Избранное</Link></li>
                 <li><Link href="/compare" className="hover:text-[#0070b8] transition-colors">Сравнение авто</Link></li>
               </ul>
             </div>
+
+            {/* Бренды */}
             <div>
-              <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Услуги</h4>
+              <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Бренды</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/service" className="hover:text-[#0070b8] transition-colors">Сервис и ТО</Link></li>
-                <li><Link href="/about" className="hover:text-[#0070b8] transition-colors">О группе</Link></li>
-                {["CHERY", "OMODA", "JAECOO", "HAVAL"].map(b => (
-                  <li key={b}>
-                    <Link href={`/new-cars?brand=${encodeURIComponent(b)}`} className="hover:text-[#0070b8] transition-colors">{b}</Link>
-                  </li>
-                ))}
+                <li><Link href="/brands/omoda" className="hover:text-[#0070b8] transition-colors">OMODA</Link></li>
+                <li><Link href="/brands/jaecoo" className="hover:text-[#0070b8] transition-colors">JAECOO</Link></li>
+                <li><Link href="/brands/tenet" className="hover:text-[#0070b8] transition-colors">Tenet</Link></li>
+                <li><Link href="/brands/jetour" className="hover:text-[#0070b8] transition-colors">Jetour</Link></li>
+                <li><Link href="/brands/haval-city" className="hover:text-[#0070b8] transition-colors">HAVAL City</Link></li>
+                <li><Link href="/brands/haval-pro" className="hover:text-[#0070b8] transition-colors">HAVAL Pro</Link></li>
               </ul>
             </div>
+
+            {/* Компания */}
             <div>
               <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Компания</h4>
               <ul className="space-y-2 text-sm">
+                <li><Link href="/about" className="hover:text-[#0070b8] transition-colors">О группе</Link></li>
                 <li><Link href="/contacts" className="hover:text-[#0070b8] transition-colors">Контакты</Link></li>
-                <li><Link href="/vacancies" className="hover:text-[#0070b8] transition-colors">Вакансии</Link></li>
                 <li><Link href="/news" className="hover:text-[#0070b8] transition-colors">Новости</Link></li>
+                <li><Link href="/vacancies" className="hover:text-[#0070b8] transition-colors">Вакансии</Link></li>
+                <li><Link href="/service" className="hover:text-[#0070b8] transition-colors">Сервис и ТО</Link></li>
               </ul>
             </div>
+
           </div>
+
+          {/* Bottom bar */}
           <div className="pt-6 sm:pt-8 border-t border-white/[0.07] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-            <p>© {new Date().getFullYear()} Дебрянск Авто — Территория Автомобилей</p>
+            <p>© {new Date().getFullYear()} ООО «Дебрянск Авто» — Территория Автомобилей</p>
             <div className="flex items-center gap-4">
               <Link href="/legal" className="hover:text-white transition-colors">Юридическая информация</Link>
               <Link href="/privacy" className="hover:text-white transition-colors">Политика конфиденциальности</Link>
