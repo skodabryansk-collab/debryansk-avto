@@ -179,10 +179,22 @@ function injectMeta(
     );
   }
 
-  // Inject H1 as screen-reader-only element for bots
+  // Inject H1 and static navigation for crawlers (screen-reader only)
   result = result.replace(
     /<div id="root"><\/div>/,
-    `<div id="root"></div>\n    <h1 class="sr-only">${h1}</h1>`
+    `<div id="root"></div>
+    <h1 class="sr-only">${h1}</h1>
+    <nav aria-label="Основная навигация" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">
+      <a href="/new-cars">Новые автомобили в Брянске</a>
+      <a href="/cars">Автомобили с пробегом в Брянске</a>
+      <a href="/service">Сервисное обслуживание</a>
+      <a href="/buyout">Выкуп автомобилей</a>
+      <a href="/about">О компании Дебрянск Авто</a>
+      <a href="/contacts">Контакты дилерских центров</a>
+      <a href="/news">Новости</a>
+      <a href="/vacancies">Вакансии</a>
+      <a href="/privacy">Политика конфиденциальности</a>
+    </nav>`
   );
 
   return result;
@@ -270,16 +282,7 @@ export function seoMetaMiddleware(
   res: Response,
   next: NextFunction,
 ): void {
-  if (process.env.PRERENDER_ENABLED !== "true") {
-    next();
-    return;
-  }
-
   const ua = (req.headers["user-agent"] ?? "") as string;
-  if (!BOT_UA.test(ua)) {
-    next();
-    return;
-  }
 
   // Skip static files
   if (/\.\w{2,10}$/.test(req.path)) {
