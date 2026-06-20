@@ -2,6 +2,5 @@ User-agent: *
 Allow: /
 Disallow: /compare
 Disallow: /favorites
-Disallow: /api/
 
 Sitemap: https://debryansk-auto.ru/sitemap.xml
