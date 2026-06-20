@@ -139,7 +139,7 @@ async function resolveMeta(
   if (newsMatch) {
     const slug = newsMatch[1];
     const result = await db.execute(
-      sql`SELECT title, slug, excerpt FROM news WHERE slug = ${slug} AND is_published = true LIMIT 1`
+      sql`SELECT title, slug, excerpt FROM news WHERE slug = ${slug} LIMIT 1`
     );
     const row = result.rows[0] as { title: string; slug: string; excerpt: string | null } | undefined;
     if (row) {
