@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { Link } from "wouter";
-import { motion, useInView, AnimatePresence } from "framer-motion";
+import { motion, useInView, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { YandexMap, type YandexMapHandle } from "@/components/YandexMap";
 import {
@@ -35,7 +35,7 @@ import { ReviewsSection } from "@/components/ReviewsSection";
 import logoWhiteSvg from "@/assets/logo-white.svg";
 import miniLogo from "@/assets/mini-logo.webp";
 import heroDynamic from "../assets/hero-isometric.webp";
-import heroMobile from "../assets/hero-isometric-mobile.webp";
+import heroMobile from "../assets/hero-showroom-1-mobile.webp";
 import dealerChery from "../assets/dealer-chery.webp";
 import dealerOmoda from "../assets/dealer-omoda.webp";
 import dealerJaecoo from "../assets/dealer-jaecoo.webp";
@@ -611,6 +611,25 @@ export default function Home() {
   const yandexMapRef = useRef<YandexMapHandle>(null);
   const mapSectionRef = useRef<HTMLDivElement>(null);
   const { favorites, compare, isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
+  const reducedMotion = useReducedMotion();
+
+  const heroHeadlineContainer = {
+    hidden: {},
+    visible: {
+      transition: {
+        staggerChildren: reducedMotion ? 0 : 0.13,
+        delayChildren: reducedMotion ? 0 : 0.22,
+      },
+    },
+  };
+  const heroHeadlineLine = {
+    hidden: reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 38 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.62, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+    },
+  };
 
   const { data: siteSettings } = useQuery({
     queryKey: ["site-settings"],
@@ -1010,13 +1029,21 @@ export default function Home() {
 
             {/* Headline */}
             <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.25 }}
+              variants={heroHeadlineContainer}
+              initial="hidden"
+              animate="visible"
               className="text-[2.6rem] sm:text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight text-white mb-4 sm:mb-5 max-w-3xl"
             >
-              Дебрянск Авто —<br />
-              <span className="brand-gradient-text">Территория Автомобилей.</span>
+              <span className="block overflow-hidden">
+                <motion.span variants={heroHeadlineLine} className="block">
+                  Дебрянск Авто&nbsp;—
+                </motion.span>
+              </span>
+              <span className="block overflow-hidden">
+                <motion.span variants={heroHeadlineLine} className="block">
+                  <span className="brand-gradient-text">Территория Автомобилей.</span>
+                </motion.span>
+              </span>
             </motion.h1>
 
             {/* Subtitle */}
