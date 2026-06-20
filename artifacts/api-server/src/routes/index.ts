@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { updatePrerenderCache, getPrerenderCache } from "../middleware/prerender";
 import healthRouter from "./health";
 import chatRouter from "./chat";
 import carsRouter from "./cars";
@@ -72,5 +73,40 @@ router.use("/settings", publicSettingsRouter);
 
 // GetLoyalty reviews proxy
 router.use("/reviews", publicReviewsRouter);
+
+// Internal: live prerender cache update (called by prerender.mjs after each page)
+router.post("/internal/prerender-update", (req, res) => {
+  const secret = req.headers["x-prerender-secret"];
+  if (secret !== process.env.PRERENDER_INTERNAL_SECRET) {
+    res.status(403).json({ ok: false });
+    return;
+  }
+  const { route, html } = req.body as { route?: string; html?: string };
+  if (!route || !html) {
+    res.status(400).json({ ok: false, error: "missing route or html" });
+    return;
+  }
+  updatePrerenderCache(route, html);
+  res.json({ ok: true, route, size: html.length });
+});
+
+// Debug: prerender cache status (internal use only)
+router.get("/debug/prerender-cache", (req, res) => {
+  const secret = req.query["secret"];
+  if (!secret || secret !== process.env.PRERENDER_INTERNAL_SECRET) {
+    res.status(403).json({ ok: false });
+    return;
+  }
+  const cache = getPrerenderCache();
+  const routes = [...cache.pages.keys()].sort();
+  res.json({
+    ok: true,
+    size: cache.pages.size,
+    gone: cache.gone.size,
+    hasRoot: cache.pages.has("/"),
+    routes: routes.slice(0, 30),
+    totalRoutes: routes.length,
+  });
+});
 
 export default router;
