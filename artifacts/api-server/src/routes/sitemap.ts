@@ -1,6 +1,7 @@
 import { type Express } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { getIndexNowKey } from "../services/indexnow";
 
 const SITE = "https://debryansk-auto.ru";
 const CACHE_TTL = 60 * 60 * 1000;
@@ -84,6 +85,29 @@ async function buildSitemap(): Promise<string> {
 }
 
 export function registerSitemapRoute(app: Express): void {
+  const key = getIndexNowKey();
+
+  app.get("/robots.txt", (_req, res) => {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(
+      [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /api/",
+        "Disallow: /admin/",
+        "",
+        `Sitemap: ${SITE}/sitemap.xml`,
+      ].join("\n"),
+    );
+  });
+
+  app.get(`/${key}.txt`, (_req, res) => {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(key);
+  });
+
   app.get("/sitemap.xml", async (_req, res) => {
     try {
       if (cache && Date.now() - cache.ts < CACHE_TTL) {
