@@ -6,48 +6,63 @@ import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 const BOT_UA =
-  /googlebot|yandexbot|bingbot|duckduckbot|facebookexternalhit|twitterbot|telegrambot|whatsapp|slackbot|linkedinbot|applebot|baiduspider|ia_archiver|vkshare|odklbot|yandex.com\/bots|yandexadnet|yandeximages|yandexscreenshot|yandexwebmaster|msnbot|seznambot|serpstatbot|ahrefsbot|semrushbot|dotbot|mj12bot|petalbot|screamingfrog|lighthouse|claude|anthropic/i;
+  /googlebot|yandexbot|bingbot|duckduckbot|facebookexternalhit|twitterbot|telegrambot|whatsapp|slackbot|linkedinbot|applebot|baiduspider|ia_archiver|vkshare|odklbot|yandex.com\/bots|yandexadnet|yandeximages|yandexscreenshot|yandexwebmaster|msnbot|seznambot|serpstatbot|ahrefsbot|semrushbot|dotbot|mj12bot|petalbot|screamingfrog|lighthouse|claude|anthropic|squirrel|squirrelscan/i;
 
 const SITE = "https://debryansk-auto.ru";
+const DEFAULT_OG_IMAGE = `${SITE}/opengraph.jpg`;
 
 const DEFAULT_META = {
-  title: "Дебрянск Авто — Территория Автомобилей",
-  description: "Дебрянск Авто — Территория Автомобилей. Группа компаний 9 брендов в Брянске. Продажа, сервис и финансирование с 2011 года.",
+  title: "Дебрянск Авто — официальный дилер Haval, Jetour, Volkswagen в Брянске",
+  description: "Дебрянск Авто — официальный мультибрендовый дилер в Брянске. 9 брендов, 4 дилерских центра. Продажа, сервис и финансирование с 2011 года.",
+  h1: "Дебрянск Авто — официальный дилер автомобилей в Брянске",
 };
 
-const STATIC_META: Record<string, { title: string; description: string }> = {
+const STATIC_META: Record<string, { title: string; description: string; h1: string }> = {
   "/": DEFAULT_META,
   "/new-cars": {
-    title: "Новые автомобили в Брянске — дилерский центр «Дебрянск Авто»",
+    title: "Новые автомобили в Брянске — каталог и цены | Дебрянск Авто",
     description: "Купите новый автомобиль у официального дилера в Брянске. Большой выбор авто в наличии, кредит, trade-in, гарантийное обслуживание.",
+    h1: "Новые автомобили в Брянске",
   },
   "/cars": {
-    title: "Автомобили с пробегом в Брянске — дилер «Дебрянск Авто»",
+    title: "Автомобили с пробегом в Брянске — каталог | Дебрянск Авто",
     description: "Проверенные автомобили с пробегом в наличии у официального дилера Брянска. Отбор по качеству, кредит, трейд-ин.",
+    h1: "Автомобили с пробегом в Брянске",
   },
   "/service": {
     title: "Сервисное обслуживание в Брянске — дилер «Дебрянск Авто»",
     description: "Профессиональное ТО и ремонт автомобилей в дилерских центрах Брянска. Запись онлайн, оригинальные запчасти.",
+    h1: "Сервисное обслуживание автомобилей в Брянске",
   },
   "/buyout": {
-    title: "Выкуп автомобилей в Брянске — честная цена «Дебрянск Авто»",
+    title: "Выкуп автомобилей в Брянске — оценка онлайн | Дебрянск Авто",
     description: "Продайте свой автомобиль за 30 минут. Онлайн-оценка, бесплатный выезд, мгновенная оплата.",
+    h1: "Выкуп автомобилей в Брянске",
   },
   "/news": {
-    title: "Новости автомобильного рынка — Дебрянск Авто",
+    title: "Новости автосалона Дебрянск Авто в Брянске",
     description: "Актуальные новости об автомобилях, акциях и жизни группы компаний «Дебрянск Авто».",
+    h1: "Новости Дебрянск Авто",
   },
   "/about": {
-    title: "О компании «Дебрянск Авто» — официальный дилер в Брянске",
-    description: "Группа компаний «Дебрянск Авто» — официальный мультибрендовый дилер в Брянске. 9 брендов, 4 дилерских центра.",
+    title: "О компании Дебрянск Авто — группа компаний 9 БР",
+    description: "Группа компаний «Дебрянск Авто» — официальный мультибрендовый дилер в Брянске. 9 брендов, 4 дилерских центра с 2011 года.",
+    h1: "О компании Дебрянск Авто",
   },
   "/contacts": {
-    title: "Контакты «Дебрянск Авто» — адреса и телефоны дилерских центров Брянска",
+    title: "Контакты дилерских центров Дебрянск Авто в Брянске",
     description: "Адреса, телефоны, часы работы всех дилерских центров «Дебрянск Авто» в Брянске.",
+    h1: "Контакты дилерских центров Дебрянск Авто",
   },
   "/vacancies": {
     title: "Вакансии дилера «Дебрянск Авто» — работа в Брянске",
     description: "Работа в автодилерских центрах «Дебрянск Авто». Менеджеры, автомеханики, администраторы.",
+    h1: "Вакансии в Дебрянск Авто",
+  },
+  "/privacy": {
+    title: "Политика конфиденциальности | Дебрянск Авто",
+    description: "Политика конфиденциальности ООО «9 БР» (Дебрянск Авто) — порядок сбора, хранения и обработки персональных данных пользователей сайта.",
+    h1: "Политика конфиденциальности",
   },
 };
 
@@ -67,8 +82,16 @@ function getIndexHtml(): string | null {
   }
 }
 
-function injectMeta(html: string, title: string, description: string, canonical: string): string {
+function injectMeta(
+  html: string,
+  title: string,
+  description: string,
+  canonical: string,
+  ogImage: string,
+  h1: string,
+): string {
   let result = html;
+
   result = result.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
   result = result.replace(
     /<meta name="description" content="[^"]*"\s*\/>/,
@@ -83,10 +106,6 @@ function injectMeta(html: string, title: string, description: string, canonical:
     `<meta property="og:description" content="${description}" />`
   );
   result = result.replace(
-    /<meta property="og:url" content="[^"]*"\s*\/>/,
-    `<meta property="og:url" content="${canonical}" />`
-  );
-  result = result.replace(
     /<meta name="twitter:title" content="[^"]*"\s*\/>/,
     `<meta name="twitter:title" content="${title}" />`
   );
@@ -94,8 +113,61 @@ function injectMeta(html: string, title: string, description: string, canonical:
     /<meta name="twitter:description" content="[^"]*"\s*\/>/,
     `<meta name="twitter:description" content="${description}" />`
   );
+
+  // Inject or replace og:url
+  if (/<meta property="og:url" content="[^"]*"\s*\/>/.test(result)) {
+    result = result.replace(
+      /<meta property="og:url" content="[^"]*"\s*\/>/,
+      `<meta property="og:url" content="${canonical}" />`
+    );
+  } else {
+    result = result.replace(
+      /<meta property="og:type"/,
+      `<meta property="og:url" content="${canonical}" />\n    <meta property="og:type"`
+    );
+  }
+
+  // Inject or replace og:image
+  if (/<meta property="og:image" content="[^"]*"\s*\/>/.test(result)) {
+    result = result.replace(
+      /<meta property="og:image" content="[^"]*"\s*\/>/,
+      `<meta property="og:image" content="${ogImage}" />`
+    );
+  } else {
+    result = result.replace(
+      /<meta property="og:type"/,
+      `<meta property="og:image" content="${ogImage}" />\n    <meta property="og:type"`
+    );
+  }
+
+  // Inject or replace og:site_name
+  if (/<meta property="og:site_name" content="[^"]*"\s*\/>/.test(result)) {
+    result = result.replace(
+      /<meta property="og:site_name" content="[^"]*"\s*\/>/,
+      `<meta property="og:site_name" content="Дебрянск Авто" />`
+    );
+  } else {
+    result = result.replace(
+      /<meta property="og:type"/,
+      `<meta property="og:site_name" content="Дебрянск Авто" />\n    <meta property="og:type"`
+    );
+  }
+
+  // twitter:image
+  if (/<meta name="twitter:image" content="[^"]*"\s*\/>/.test(result)) {
+    result = result.replace(
+      /<meta name="twitter:image" content="[^"]*"\s*\/>/,
+      `<meta name="twitter:image" content="${ogImage}" />`
+    );
+  } else {
+    result = result.replace(
+      /<meta name="twitter:card"/,
+      `<meta name="twitter:image" content="${ogImage}" />\n    <meta name="twitter:card"`
+    );
+  }
+
   // Ensure canonical link exists
-  if (result.includes('<link rel="canonical"')) {
+  if (/<link rel="canonical" href="[^"]*"\s*\/>/.test(result)) {
     result = result.replace(
       /<link rel="canonical" href="[^"]*"\s*\/>/,
       `<link rel="canonical" href="${canonical}" />`
@@ -106,15 +178,22 @@ function injectMeta(html: string, title: string, description: string, canonical:
       `<meta name="description" content="${description}" />\n    <link rel="canonical" href="${canonical}" />`
     );
   }
+
+  // Inject H1 as screen-reader-only element for bots
+  result = result.replace(
+    /<div id="root"><\/div>/,
+    `<div id="root"></div>\n    <h1 class="sr-only">${h1}</h1>`
+  );
+
   return result;
 }
 
 async function resolveMeta(
   pathStr: string,
-): Promise<{ title: string; description: string; canonical: string } | null> {
+): Promise<{ title: string; description: string; canonical: string; ogImage: string; h1: string } | null> {
   const meta = STATIC_META[pathStr];
   if (meta) {
-    return { ...meta, canonical: `${SITE}${pathStr}` };
+    return { ...meta, canonical: `${SITE}${pathStr}`, ogImage: DEFAULT_OG_IMAGE };
   }
 
   // Brand pages: /brands/:slug
@@ -130,6 +209,8 @@ async function resolveMeta(
         title: `${row.name} в Брянске — официальный дилер | Дебрянск Авто`,
         description: `Купите ${row.name} у официального дилера в Брянске. Широкий выбор в наличии, кредит, trade-in, гарантийный сервис. Дебрянск Авто.`,
         canonical: `${SITE}/brands/${slug}`,
+        ogImage: DEFAULT_OG_IMAGE,
+        h1: `${row.name} в Брянске — официальный дилер`,
       };
     }
   }
@@ -144,9 +225,11 @@ async function resolveMeta(
     const row = result.rows[0] as { title: string; slug: string; excerpt: string | null } | undefined;
     if (row) {
       return {
-        title: `${row.title} — Дебрянск Авто`,
+        title: `${row.title} | Дебрянск Авто`,
         description: row.excerpt || "Актуальная новость автомобильного рынка от дилерского центра «Дебрянск Авто».",
         canonical: `${SITE}/news/${slug}`,
+        ogImage: DEFAULT_OG_IMAGE,
+        h1: row.title,
       };
     }
   }
@@ -157,15 +240,24 @@ async function resolveMeta(
     const type = carMatch[1] === "new-cars" ? "new" : "used";
     const id = decodeURIComponent(carMatch[2]);
     const result = await db.execute(
-      sql`SELECT brand, model, year, price, description FROM cars WHERE external_id = ${id} AND type = ${type} LIMIT 1`
+      sql`SELECT brand, model, year, price, description, image_url FROM cars WHERE external_id = ${id} AND type = ${type} LIMIT 1`
     );
-    const row = result.rows[0] as { brand: string; model: string; year: number; price: number; description: string | null } | undefined;
+    const row = result.rows[0] as { brand: string; model: string; year: number; price: number; description: string | null; image_url: string | null } | undefined;
     if (row) {
       const priceStr = new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 }).format(row.price);
+      const isNew = type === "new";
+      const title = isNew
+        ? `Купить ${row.brand} ${row.model} ${row.year} в Брянске — цена ${priceStr} | Дебрянск Авто`
+        : `${row.brand} ${row.model} ${row.year} б/у — ${priceStr} | Дебрянск Авто`;
+      const h1 = isNew
+        ? `Купить ${row.brand} ${row.model} ${row.year} в Брянске`
+        : `${row.brand} ${row.model} ${row.year} с пробегом`;
       return {
-        title: `${row.brand} ${row.model} ${row.year} — ${priceStr} — Дебрянск Авто`,
-        description: row.description || `Купите ${row.brand} ${row.model} ${row.year} в Брянске. Цена ${priceStr}. Официальный дилер «Дебрянск Авто».`,
+        title,
+        description: row.description || `${isNew ? "Купите" : "Купите"} ${row.brand} ${row.model} ${row.year} в Брянске. Цена ${priceStr}. Официальный дилер «Дебрянск Авто».`,
         canonical: `${SITE}${pathStr}`,
+        ogImage: row.image_url || DEFAULT_OG_IMAGE,
+        h1,
       };
     }
   }
@@ -208,7 +300,7 @@ export function seoMetaMiddleware(
         next();
         return;
       }
-      const enriched = injectMeta(html, meta.title, meta.description, meta.canonical);
+      const enriched = injectMeta(html, meta.title, meta.description, meta.canonical, meta.ogImage, meta.h1);
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader("X-SeoMeta", "1");
       res.setHeader("Cache-Control", "public, max-age=300");
