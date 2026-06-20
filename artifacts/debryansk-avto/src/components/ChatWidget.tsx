@@ -1078,8 +1078,10 @@ function ConsentScreen({ onConsent, onDecline }: { onConsent: () => void; onDecl
       <div>
         <p className="text-sm font-bold text-slate-800 mb-2">Согласие на обработку данных</p>
         <p className="text-xs text-slate-500 leading-relaxed">
-          Чтобы улучшать качество ответов, мы сохраняем историю вашей переписки с Навигатором согласно{" "}
-          <a href="/privacy" className="text-[#0070b8] underline underline-offset-2">политике конфиденциальности</a>.
+          Чтобы улучшать качество ответов, мы сохраняем историю вашей переписки с Навигатором. Нажимая «Согласен», вы принимаете{" "}
+          <a href="/privacy" className="text-[#0070b8] underline underline-offset-2">политику конфиденциальности</a>{" "}
+          ООО «Дебрянск Авто» (ИНН&nbsp;3250521481) и даёте согласие на обработку персональных данных согласно ФЗ-152.{" "}
+          <a href="/legal" className="text-[#0070b8] underline underline-offset-2">Реквизиты оператора</a>.
         </p>
       </div>
       <div className="flex gap-2.5 w-full">
