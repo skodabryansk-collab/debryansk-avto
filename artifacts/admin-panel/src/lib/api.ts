@@ -97,6 +97,7 @@ export interface BrandFaqItem {
   answer: string;
   is_published?: boolean;
   include_in_schema?: boolean;
+  sort_order?: number;
 }
 export interface BrandPageContent {
   id: number; brandId: number;
