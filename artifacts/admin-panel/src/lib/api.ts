@@ -40,6 +40,7 @@ export function getStats() { return api<Stats>("GET", "/admin/stats"); }
 export interface NewsItem {
   id: number; title: string; excerpt: string; content: string; category: string;
   image: string; imageMobile: string | null; slug: string; publishedAt: string; readTime: number;
+  brandId: number | null;
   createdAt: string; updatedAt: string;
 }
 export function getNews() { return api<{ data: NewsItem[] }>("GET", "/admin/news").then(r => r.data); }
@@ -90,9 +91,14 @@ export function updateBrand(id: number, data: Partial<Brand>) { return api<Brand
 export function deleteBrand(id: number) { return api<{ ok: true }>("DELETE", `/admin/brands/${id}`); }
 
 /* Brand page content */
+export interface BrandAdvantage { icon: string; text: string; }
+export interface BrandFaqItem { question: string; answer: string; }
 export interface BrandPageContent {
   id: number; brandId: number;
   description: string | null; serviceText: string | null; promoText: string | null;
+  advantages: BrandAdvantage[] | null;
+  features: string[] | null;
+  faq: BrandFaqItem[] | null;
   metaTitle: string | null; metaDescription: string | null; updatedAt: string | null;
 }
 export function getBrandPageContent(brandId: number) {
