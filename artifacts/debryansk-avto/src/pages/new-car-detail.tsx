@@ -128,6 +128,15 @@ async function fetchBrandLocations(): Promise<Record<string, { phone: string; lo
   return json.ok ? json.data : {};
 }
 
+async function fetchReviewsAggregate(): Promise<{ avg: number; total: number; overallCount: number }> {
+  try {
+    const r = await fetch("/api/reviews/aggregate");
+    if (!r.ok) return { avg: 4.9, total: 0, overallCount: 0 };
+    const json = await r.json();
+    return json.ok ? { avg: json.avg, total: json.total, overallCount: json.overallCount } : { avg: 4.9, total: 0, overallCount: 0 };
+  } catch { return { avg: 4.9, total: 0, overallCount: 0 }; }
+}
+
 function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -299,6 +308,12 @@ export default function NewCarDetail() {
     queryKey: ["brand-locations"],
     queryFn: fetchBrandLocations,
     staleTime: 10 * 60 * 1000,
+  });
+
+  const { data: reviewStats } = useQuery<{ avg: number; total: number; overallCount: number }>({
+    queryKey: ["reviews-aggregate"],
+    queryFn: fetchReviewsAggregate,
+    staleTime: 60 * 60 * 1000,
   });
 
   const car = cars.find(c => c.id === id);
@@ -498,9 +513,14 @@ export default function NewCarDetail() {
     </div>
   );
 
+  const priceValidUntil = new Date(new Date().getFullYear(), 11, 31).toISOString().split("T")[0];
+  const carImages = car ? car.images.filter(Boolean).slice(0, 5) : [];
+  const effectivePrice = car ? (car.maxDiscount > 0 ? car.price - car.maxDiscount : car.price) : 0;
+
   const carJsonLd = car ? {
     "@type": "Car",
     "name": `${car.mark} ${car.model} ${car.year}`,
+    "description": car.description || `Новый ${car.mark} ${car.model} ${car.year} года, ${car.bodyType}, цвет ${car.color}, комплектация ${car.complectation || car.modification}. Официальный дилер Дебрянск Авто, Брянск.`,
     "brand": { "@type": "Brand", "name": car.mark },
     "model": car.model,
     "vehicleTransmission": parseTransmission(car.modification),
@@ -515,15 +535,31 @@ export default function NewCarDetail() {
     "bodyType": car.bodyType,
     "mileageFromOdometer": { "@type": "QuantitativeValue", "value": 0, "unitCode": "KMT" },
     ...(car.vin ? { "vehicleIdentificationNumber": car.vin } : {}),
+    ...(car.doorsCount ? { "numberOfDoors": car.doorsCount } : {}),
     "offers": {
       "@type": "Offer",
-      "price": car.maxDiscount > 0 ? car.price - car.maxDiscount : car.price,
+      "price": effectivePrice,
       "priceCurrency": "RUB",
+      "priceValidUntil": priceValidUntil,
       "availability": car.availability === "В наличии" ? "https://schema.org/InStock" : "https://schema.org/PreOrder",
       "itemCondition": "https://schema.org/NewCondition",
-      "seller": { "@type": "AutoDealer", "name": "Дебрянск Авто", "url": "https://debryansk-auto.ru" }
+      "seller": {
+        "@type": "AutoDealer",
+        "name": "Дебрянск Авто",
+        "url": "https://debryansk-auto.ru",
+        "address": { "@type": "PostalAddress", "addressLocality": "Брянск", "addressCountry": "RU" }
+      }
     },
-    "image": car.images.filter(Boolean)[0],
+    ...(reviewStats && reviewStats.overallCount > 0 ? {
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": reviewStats.avg,
+        "reviewCount": reviewStats.overallCount,
+        "bestRating": 5,
+        "worstRating": 1
+      }
+    } : {}),
+    "image": carImages.length > 1 ? carImages : (carImages[0] ?? ""),
     "url": `https://debryansk-auto.ru/new-cars/${encodeURIComponent(car.id)}`,
     "productionDate": String(car.year)
   } : undefined;
