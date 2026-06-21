@@ -375,7 +375,7 @@ function ModelCard({
       transition={{ duration: 0.45, delay: index * 0.07 }}
       className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer flex flex-col"
       onClick={() =>
-        navigate(`/new-cars?dealer=${encodeURIComponent(brandName)}`)
+        navigate(`/new-cars?dealer=${encodeURIComponent(brandName)}&model=${encodeURIComponent(modelName)}`)
       }
     >
       <div className="relative bg-slate-50 overflow-hidden h-[120px] sm:h-[160px]">
@@ -400,18 +400,16 @@ function ModelCard({
         {bodyType && (
           <p className="text-[11px] text-slate-400 mb-2">{bodyType}</p>
         )}
-        <div className="mt-auto flex items-center justify-between">
-          <div>
-            {minPrice ? (
-              <>
-                <div className="text-[9px] sm:text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">от</div>
-                <div className="text-sm sm:text-base font-extrabold text-[#0070b8]">{fmtPrice(minPrice)}</div>
-              </>
-            ) : (
-              <div className="text-[11px] text-slate-400 font-medium">Уточнить цену</div>
-            )}
-          </div>
-          <span className="flex items-center gap-1 text-[11px] font-bold text-[#0070b8] group-hover:gap-2 transition-all shrink-0 ml-1">
+        <div className="mt-auto">
+          {minPrice ? (
+            <div className="mb-1.5">
+              <div className="text-[9px] text-slate-400 uppercase tracking-wide">от</div>
+              <div className="text-[11px] sm:text-sm font-extrabold text-[#0070b8] leading-tight">{fmtPrice(minPrice)}</div>
+            </div>
+          ) : (
+            <div className="text-[10px] text-slate-400 font-medium mb-1.5">Уточнить цену</div>
+          )}
+          <span className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-[#0070b8] group-hover:gap-2 transition-all">
             Смотреть <ArrowRight className="w-3 h-3" />
           </span>
         </div>
@@ -436,12 +434,12 @@ function BrandCarCard({ car }: { car: BrandPageData["cars"][number] }) {
       className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow group flex flex-col cursor-pointer"
       onClick={() => navigate(`/new-cars/${encodeURIComponent(car.id)}`)}
     >
-      <div className="relative h-44 bg-slate-100 overflow-hidden">
+      <div className="relative bg-slate-50 overflow-hidden" style={{ aspectRatio: "16/9" }}>
         {img ? (
           <img
             src={img}
             alt={`${car.mark} ${car.model}`}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
             decoding="async"
           />
