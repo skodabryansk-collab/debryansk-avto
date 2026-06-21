@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, useInView } from "framer-motion";
+import { Helmet } from "react-helmet-async";
 
 /* ── Types ────────────────────────────────────────────── */
 export interface ApiReview {
@@ -105,8 +106,39 @@ export const ReviewsSection = () => {
   const visible = reviews.slice(0, visibleCount);
   const hasMore = visibleCount < reviews.length;
 
+  const reviewsJsonLd = !isLoading && overallCount > 0 ? JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "AutoDealer",
+    "name": "Дебрянск Авто",
+    "url": "https://debryansk-auto.ru",
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": avg.toFixed(1),
+      "reviewCount": overallCount,
+      "bestRating": "5",
+      "worstRating": "1",
+    },
+    "review": reviews.slice(0, 10).map(r => ({
+      "@type": "Review",
+      "author": { "@type": "Person", "name": r.author },
+      "reviewRating": {
+        "@type": "Rating",
+        "ratingValue": r.rating,
+        "bestRating": "5",
+        "worstRating": "1",
+      },
+      "reviewBody": r.text,
+      ...(r.date ? { "datePublished": r.date.split("T")[0] } : {}),
+    })),
+  }) : null;
+
   return (
     <section className="py-12 sm:py-20 bg-slate-50 border-t border-slate-100">
+      {reviewsJsonLd && (
+        <Helmet>
+          <script type="application/ld+json">{reviewsJsonLd}</script>
+        </Helmet>
+      )}
       <div className="container mx-auto px-4 sm:px-6">
 
         {/* Header */}
