@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Layout from "@/components/Layout";
 import SEO from "@/components/SEO";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
 import { YandexMap, type DealerLocation } from "@/components/YandexMap";
@@ -32,6 +33,7 @@ interface BrandPageData {
     promoText: string | null;
     metaTitle: string | null;
     metaDescription: string | null;
+    faq: Array<{ question: string; answer: string; include_in_schema?: boolean }> | null;
   } | null;
   locations: Array<{
     id: number;
@@ -546,7 +548,7 @@ export default function BrandPage() {
     content?.metaDescription ??
     `Купите ${brandName} у официального дилера в Брянске. Широкий выбор в наличии, кредит, trade-in, гарантийный сервис. Дебрянск Авто.`;
 
-  const jsonLd = {
+  const autoDealer = {
     "@type": "AutoDealer",
     name: `${brandName} — Дебрянск Авто`,
     description: metaDesc,
@@ -561,6 +563,20 @@ export default function BrandPage() {
     telephone: "+74832631000",
     areaServed: "Брянск",
   };
+
+  const publishedFaq = content?.faq ?? [];
+  const schemaFaq = publishedFaq.filter(item => item.include_in_schema !== false);
+  const faqPage = schemaFaq.length > 0
+    ? {
+        "@type": "FAQPage",
+        mainEntity: schemaFaq.map(item => ({
+          "@type": "Question",
+          name: item.question,
+          acceptedAnswer: { "@type": "Answer", text: item.answer },
+        })),
+      }
+    : null;
+  const jsonLd = faqPage ? [autoDealer, faqPage] : autoDealer;
 
   const hasAbout = !!content?.description;
   const hasService = true;
@@ -934,6 +950,34 @@ export default function BrandPage() {
           </FadeIn>
         </div>
       </section>
+
+      {/* ── FAQ ───────────────────────────────────────────── */}
+      {publishedFaq.length > 0 && (
+        <section id="section-faq" className="scroll-mt-24 py-14 sm:py-20 bg-white border-b border-slate-100">
+          <div className="container mx-auto px-4 sm:px-6 max-w-3xl">
+            <FadeIn>
+              <SectionLabel>FAQ</SectionLabel>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-8">
+                Часто задаваемые вопросы
+              </h2>
+            </FadeIn>
+            <FadeIn delay={0.1}>
+              <Accordion type="single" collapsible className="w-full divide-y divide-slate-100">
+                {publishedFaq.map((item, i) => (
+                  <AccordionItem key={i} value={`faq-${i}`} className="border-none">
+                    <AccordionTrigger className="text-left font-semibold text-slate-900 hover:no-underline hover:text-[#0070b8] py-4 text-sm sm:text-base">
+                      {item.question}
+                    </AccordionTrigger>
+                    <AccordionContent className="text-slate-600 leading-relaxed text-sm sm:text-base pb-4">
+                      {item.answer}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </FadeIn>
+          </div>
+        </section>
+      )}
 
       {/* ── Новости ───────────────────────────────────────── */}
       {data.news && data.news.length > 0 && (
