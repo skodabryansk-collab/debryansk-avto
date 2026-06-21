@@ -87,7 +87,15 @@ router.get("/:slug", async (req, res) => {
       .select()
       .from(brandPageContentTable)
       .where(eq(brandPageContentTable.brandId, brand.id));
-    const content = contentRows[0] ?? null;
+    const rawContent = contentRows[0] ?? null;
+    const content = rawContent
+      ? {
+          ...rawContent,
+          faq: (rawContent.faq ?? []).filter(
+            (item: { is_published?: boolean }) => item.is_published !== false
+          ),
+        }
+      : null;
 
     // Locations for this brand
     const locationRows = await db.execute(sql`
