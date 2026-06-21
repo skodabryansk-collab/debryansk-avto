@@ -99,6 +99,16 @@ export interface BrandFaqItem {
   include_in_schema?: boolean;
   sort_order?: number;
 }
+export interface BrandPromotion {
+  title: string;
+  description: string;
+  image?: string;
+  badge?: string;
+  expiresAt?: string;
+  buttonText?: string;
+  buttonUrl?: string;
+  isActive?: boolean;
+}
 export interface BrandPageContent {
   id: number; brandId: number;
   description: string | null; serviceText: string | null; promoText: string | null;
@@ -106,6 +116,8 @@ export interface BrandPageContent {
   features: string[] | null;
   faq: BrandFaqItem[] | null;
   heroImageUrl: string | null;
+  heroImageMobileUrl: string | null;
+  promotions: BrandPromotion[] | null;
   metaTitle: string | null; metaDescription: string | null; updatedAt: string | null;
 }
 export function getBrandPageContent(brandId: number) {
