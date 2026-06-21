@@ -9,6 +9,29 @@ const router: IRouter = Router();
    Reads from the `reviews` table (populated by reviews-sync service).
    No live calls to GetLoyalty on the hot path.
    ─────────────────────────────────────────────────────────────────────────── */
+/* ── GET /api/reviews/aggregate ─────────────────────────────────────────── */
+router.get("/aggregate", async (_req, res) => {
+  try {
+    const [statsResult, metaResult] = await Promise.all([
+      db.execute(sql`
+        SELECT COUNT(*)::int AS total, COALESCE(AVG(rating)::float, 5) AS avg
+        FROM reviews
+      `),
+      db.execute(sql`SELECT overall_count FROM reviews_meta WHERE id = 1`),
+    ]);
+    const avg = Math.round(Number((statsResult.rows[0] as any)?.avg ?? 5) * 10) / 10;
+    const total = Number((statsResult.rows[0] as any)?.total ?? 0);
+    const overallCount = Number((metaResult.rows[0] as any)?.overall_count ?? total);
+    return res.json({ ok: true, avg, total, overallCount });
+  } catch {
+    return res.json({ ok: true, avg: 4.9, total: 0, overallCount: 0 });
+  }
+});
+
+/* ── GET /api/reviews ──────────────────────────────────────────────────────
+   Reads from the `reviews` table (populated by reviews-sync service).
+   No live calls to GetLoyalty on the hot path.
+   ─────────────────────────────────────────────────────────────────────────── */
 router.get("/", async (_req, res) => {
   try {
     const [reviewsResult, metaResult, statsResult] = await Promise.all([
