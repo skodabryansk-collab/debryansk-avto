@@ -25,6 +25,7 @@ export const brandPageContentTable = pgTable("brand_page_content", {
   advantages: jsonb("advantages").$type<{ icon: string; text: string }[]>().default([]),
   features: jsonb("features").$type<string[]>().default([]),
   faq: jsonb("faq").$type<{ question: string; answer: string; is_published?: boolean; include_in_schema?: boolean; sort_order?: number }[]>().default([]),
+  heroImageUrl: text("hero_image_url"),
   metaTitle: text("meta_title"),
   metaDescription: text("meta_description"),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
