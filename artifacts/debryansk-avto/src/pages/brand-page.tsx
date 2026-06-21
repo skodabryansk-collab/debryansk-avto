@@ -523,7 +523,6 @@ export default function BrandPage() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug ?? "";
   const [serviceModal, setServiceModal] = useState(false);
-  const [modelFilter, setModelFilter] = useState<string>("all");
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["brand-page", slug],
@@ -626,11 +625,20 @@ export default function BrandPage() {
     }));
   })();
 
-  const allModels = Array.from(new Set(cars.map((c) => cleanModelName(c.model))));
-  const filteredCars =
-    modelFilter === "all"
-      ? cars
-      : cars.filter((c) => cleanModelName(c.model) === modelFilter);
+  const featuredCars = (() => {
+    const withDiscount = cars.filter(c => c.max_discount > 0).sort((a, b) => b.max_discount - a.max_discount);
+    const withoutDiscount = cars.filter(c => c.max_discount === 0);
+    const seen = new Set<string>();
+    const result: typeof cars = [];
+    for (const car of [...withDiscount, ...withoutDiscount]) {
+      const model = cleanModelName(car.model);
+      if (seen.has(model)) continue;
+      seen.add(model);
+      result.push(car);
+      if (result.length >= 6) break;
+    }
+    return result;
+  })();
 
   const mapLink =
     loc?.map_x && loc?.map_y
@@ -826,61 +834,44 @@ export default function BrandPage() {
         </div>
       </section>
 
-      {/* ── В наличии ─────────────────────────────────────── */}
+      {/* ── Спецпредложения ───────────────────────────────── */}
       {cars.length > 0 ? (
         <section id="section-stock" className="scroll-mt-24 py-14 sm:py-20 bg-white border-b border-slate-100">
           <div className="container mx-auto px-4 sm:px-6">
             <FadeIn className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-3">
               <div>
-                <SectionLabel>В наличии</SectionLabel>
+                <SectionLabel>Спецпредложения</SectionLabel>
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-                  Новые {brandName}
-                  <span className="ml-3 text-base font-bold text-slate-400">
-                    {cars.length} авт.
-                  </span>
+                  Выгодные предложения
+                  {cars.filter(c => c.max_discount > 0).length > 0 && (
+                    <span className="ml-3 text-base font-bold text-[#87b63c]">
+                      со скидкой {cars.filter(c => c.max_discount > 0).length} авт.
+                    </span>
+                  )}
                 </h2>
               </div>
               <a
                 href={`/new-cars?dealer=${encodeURIComponent(brandName)}`}
                 className="flex items-center gap-2 text-[#0070b8] font-bold hover:gap-3 transition-all text-sm whitespace-nowrap"
               >
-                Весь каталог <ArrowRight className="w-4 h-4" />
+                Все {cars.length} авт. <ArrowRight className="w-4 h-4" />
               </a>
             </FadeIn>
 
-            {allModels.length >= 2 && (
-              <div className="flex gap-2 flex-wrap mb-6">
-                <button
-                  onClick={() => setModelFilter("all")}
-                  className={`px-4 py-1.5 rounded-full text-sm font-bold transition-colors ${
-                    modelFilter === "all"
-                      ? "bg-[#0070b8] text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  Все модели
-                </button>
-                {allModels.map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setModelFilter(m)}
-                    className={`px-4 py-1.5 rounded-full text-sm font-bold transition-colors ${
-                      modelFilter === m
-                        ? "bg-[#0070b8] text-white"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-              {filteredCars.map((car) => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-5">
+              {featuredCars.map((car) => (
                 <BrandCarCard key={car.id} car={car} />
               ))}
             </div>
+
+            <FadeIn className="text-center mt-8">
+              <a
+                href={`/new-cars?dealer=${encodeURIComponent(brandName)}`}
+                className="inline-flex items-center gap-2 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold px-7 py-3 rounded-xl text-sm transition-colors"
+              >
+                Смотреть все {cars.length} автомобилей <ArrowRight className="w-4 h-4" />
+              </a>
+            </FadeIn>
           </div>
         </section>
       ) : (
