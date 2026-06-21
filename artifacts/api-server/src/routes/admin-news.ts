@@ -31,10 +31,10 @@ router.get("/:id", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { title, excerpt, content, category, image, slug, publishedAt, readTime } = req.body as Record<string, string>;
+    const { title, excerpt, content, category, image, slug, publishedAt, readTime, brandId } = req.body as Record<string, string>;
     const rows = await db
       .insert(newsTable)
-      .values({ title, excerpt, content, category, image, slug, publishedAt: publishedAt ? new Date(publishedAt) : new Date(), readTime: readTime ? Number(readTime) : 3 })
+      .values({ title, excerpt, content, category, image, slug, publishedAt: publishedAt ? new Date(publishedAt) : new Date(), readTime: readTime ? Number(readTime) : 3, brandId: brandId ? Number(brandId) : null })
       .returning();
     if (slug) {
       pingIndexNow([`${SITE}/news/${slug}`]).catch(() => {});
@@ -48,10 +48,10 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const id = Number(req.params["id"]);
-    const { title, excerpt, content, category, image, slug, publishedAt, readTime } = req.body as Record<string, string>;
+    const { title, excerpt, content, category, image, slug, publishedAt, readTime, brandId } = req.body as Record<string, string>;
     const rows = await db
       .update(newsTable)
-      .set({ title, excerpt, content, category, image, slug, publishedAt: publishedAt ? new Date(publishedAt) : undefined, readTime: readTime ? Number(readTime) : undefined, updatedAt: new Date() })
+      .set({ title, excerpt, content, category, image, slug, publishedAt: publishedAt ? new Date(publishedAt) : undefined, readTime: readTime ? Number(readTime) : undefined, brandId: brandId !== undefined ? (brandId ? Number(brandId) : null) : undefined, updatedAt: new Date() })
       .where(eq(newsTable.id, id))
       .returning();
     if (!rows.length) return res.status(404).json({ ok: false, error: "Not found" });
