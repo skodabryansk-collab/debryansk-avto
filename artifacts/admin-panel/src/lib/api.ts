@@ -109,6 +109,23 @@ export interface BrandPromotion {
   buttonUrl?: string;
   isActive?: boolean;
 }
+export interface BrandModel {
+  id?: string;
+  feedDealer: string;
+  feedModel: string;
+  displayName: string;
+  image?: string;
+  description?: string;
+  badge?: string;
+  isActive?: boolean;
+  sort?: number;
+}
+export interface CatalogModel {
+  dealer: string;
+  model: string;
+  min_price: number;
+  count: number;
+}
 export interface BrandPageContent {
   id: number; brandId: number;
   description: string | null; serviceText: string | null; promoText: string | null;
@@ -118,11 +135,17 @@ export interface BrandPageContent {
   heroImageUrl: string | null;
   heroImageMobileUrl: string | null;
   promotions: BrandPromotion[] | null;
+  models: BrandModel[] | null;
   metaTitle: string | null; metaDescription: string | null; updatedAt: string | null;
 }
 export function getBrandPageContent(brandId: number) {
   return api<{ ok: true; data: { brand: Brand; content: BrandPageContent | null } }>(
     "GET", `/admin/brand-pages/${brandId}`
+  ).then(r => r.data);
+}
+export function getBrandCatalogModels(brandId: number) {
+  return api<{ ok: true; data: CatalogModel[] }>(
+    "GET", `/admin/brand-pages/${brandId}/catalog-models`
   ).then(r => r.data);
 }
 export function updateBrandPageContent(brandId: number, data: Omit<BrandPageContent, "id" | "brandId" | "updatedAt">) {
