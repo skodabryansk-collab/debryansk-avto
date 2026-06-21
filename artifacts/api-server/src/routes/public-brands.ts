@@ -91,9 +91,14 @@ router.get("/:slug", async (req, res) => {
     const content = rawContent
       ? {
           ...rawContent,
-          faq: (rawContent.faq ?? []).filter(
-            (item: { is_published?: boolean }) => item.is_published !== false
-          ),
+          faq: (rawContent.faq ?? [])
+            .filter((item: { is_published?: boolean }) => item.is_published !== false)
+            .sort((a: { sort_order?: number }, b: { sort_order?: number }) => {
+              if (a.sort_order == null && b.sort_order == null) return 0;
+              if (a.sort_order == null) return 1;
+              if (b.sort_order == null) return -1;
+              return a.sort_order - b.sort_order;
+            }),
         }
       : null;
 
