@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,6 +13,8 @@ import SEO from "@/components/SEO";
 import { CreditModal } from "@/components/modals/CreditModal";
 import { TradeInModal } from "@/components/modals/TradeInModal";
 import Layout from "@/components/Layout";
+import { PageCarProvider } from "@/context/PageCarContext";
+import PhotoLightbox from "@/components/PhotoLightbox";
 
 interface CarRecord {
   id: string;
@@ -111,6 +114,15 @@ async function fetchBrandLocations(): Promise<Record<string, { phone: string; lo
   return json.ok ? json.data : {};
 }
 
+async function fetchReviewsAggregate(): Promise<{ avg: number; total: number; overallCount: number }> {
+  try {
+    const r = await fetch("/api/reviews/aggregate");
+    if (!r.ok) return { avg: 4.9, total: 0, overallCount: 0 };
+    const json = await r.json();
+    return json.ok ? { avg: json.avg, total: json.total, overallCount: json.overallCount } : { avg: 4.9, total: 0, overallCount: 0 };
+  } catch { return { avg: 4.9, total: 0, overallCount: 0 }; }
+}
+
 function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -118,7 +130,7 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !phone.trim()) return;
+    if (!name.trim() || !isPhoneValid(phone)) return;
     setSubmitted(true);
   }
 
@@ -147,7 +159,11 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
         ) : (
           <div className="p-6">
             <h3 className="text-lg font-extrabold mb-1">{car.mark} {car.model}</h3>
-            <p className="text-[#0070b8] font-bold text-xl mb-5">{formatPrice(car.price)}</p>
+            {car.maxDiscount > 0 ? (
+              <p className="text-[#0070b8] font-bold text-xl mb-5">от {formatPrice(car.price - car.maxDiscount)}</p>
+            ) : (
+              <p className="text-[#0070b8] font-bold text-xl mb-5">{formatPrice(car.price)}</p>
+            )}
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -157,8 +173,8 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
               </div>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input value={phone} onChange={e => setPhone(e.target.value)}
-                  placeholder="+7 (___) ___-__-__" required type="tel"
+                <input value={phone} onChange={e => setPhone(formatPhone(e.target.value))}
+                  placeholder="+7 (___) ___-__-__" required type="tel" inputMode="tel" maxLength={18}
                   className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8]" />
               </div>
               <button type="submit"
@@ -184,6 +200,8 @@ function Gallery({
   setImgIdx: React.Dispatch<React.SetStateAction<number>>;
   availability?: string;
 }) {
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
   return (
     <>
       <div className="relative w-full bg-white overflow-hidden" style={{ aspectRatio: "16/9", maxHeight: "70vh" }}>
@@ -191,7 +209,8 @@ function Gallery({
           <img
             src={imgs[imgIdx]}
             alt="Фото автомобиля"
-            className="absolute inset-0 w-full h-full object-contain"
+            className="absolute inset-0 w-full h-full object-contain cursor-zoom-in"
+            onClick={() => setLightboxOpen(true)}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-slate-300">
@@ -228,7 +247,7 @@ function Gallery({
           {imgs.map((src, i) => (
             <button
               key={i}
-              onClick={() => setImgIdx(i)}
+              onClick={() => { setImgIdx(i); setLightboxOpen(true); }}
               className={`shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition-all ${
                 i === imgIdx ? "border-[#0070b8]" : "border-transparent opacity-55 hover:opacity-90"
               }`}
@@ -237,6 +256,13 @@ function Gallery({
             </button>
           ))}
         </div>
+      )}
+      {lightboxOpen && imgs.length > 0 && (
+        <PhotoLightbox
+          images={imgs}
+          initialIndex={imgIdx}
+          onClose={() => setLightboxOpen(false)}
+        />
       )}
     </>
   );
@@ -262,6 +288,12 @@ export default function UsedCarDetail() {
     queryKey: ["brand-locations"],
     queryFn: fetchBrandLocations,
     staleTime: 10 * 60 * 1000,
+  });
+
+  const { data: reviewStats } = useQuery<{ avg: number; total: number; overallCount: number }>({
+    queryKey: ["reviews-aggregate"],
+    queryFn: fetchReviewsAggregate,
+    staleTime: 60 * 60 * 1000,
   });
 
   const car = cars.find(c => c.id === id);
@@ -362,9 +394,31 @@ export default function UsedCarDetail() {
       {car.modification && (
         <p className="text-xs sm:text-sm text-slate-400 mb-3 leading-snug">{car.modification}</p>
       )}
-      <div className="mb-1">
-        <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{formatPrice(car.price)}</span>
-      </div>
+      {car.maxDiscount > 0 ? (
+        <div className="mb-1">
+          <div className="flex items-baseline gap-2 mb-0.5">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Цена от</span>
+            <span className="text-2xl sm:text-3xl font-extrabold text-[#0070b8]">{formatPrice(car.price - car.maxDiscount)}</span>
+          </div>
+          <p className="text-sm text-slate-400 line-through mb-1">{formatPrice(car.price)}</p>
+          <div className="flex flex-wrap gap-1.5 mb-1">
+            {car.creditDiscount > 0 && (
+              <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full border border-blue-100">
+                <CreditCard className="w-3 h-3" /> Кредит −{formatPrice(car.creditDiscount)}
+              </span>
+            )}
+            {car.tradeinDiscount > 0 && (
+              <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 text-xs font-bold px-2.5 py-1 rounded-full border border-green-100">
+                <ArrowLeftRight className="w-3 h-3" /> Trade-in −{formatPrice(car.tradeinDiscount)}
+              </span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="mb-1">
+          <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{formatPrice(car.price)}</span>
+        </div>
+      )}
       <p className="text-xs text-slate-400 mb-4">Цена окончательная, торг уместен</p>
       <div className="flex gap-2 mb-3">
         <button
@@ -443,9 +497,13 @@ export default function UsedCarDetail() {
     </div>
   );
 
+  const priceValidUntil = new Date(new Date().getFullYear(), 11, 31).toISOString().split("T")[0];
+  const carImages = car ? car.images.filter(Boolean).slice(0, 5) : [];
+
   const carJsonLd = car ? {
     "@type": "Car",
     "name": `${car.mark} ${car.model} ${car.year}`,
+    "description": car.description || `Автомобиль с пробегом ${car.mark} ${car.model} ${car.year} года, пробег ${formatRun(car.run)}, кузов ${car.bodyType}, цвет ${car.color}. Дебрянск Авто, Брянск.`,
     "brand": { "@type": "Brand", "name": car.mark },
     "model": car.model,
     "vehicleTransmission": parseTransmission(car.modification),
@@ -460,20 +518,37 @@ export default function UsedCarDetail() {
     "vehicleInteriorColor": car.color,
     "bodyType": car.bodyType,
     ...(car.vin ? { "vehicleIdentificationNumber": car.vin } : {}),
+    ...(car.doorsCount ? { "numberOfDoors": car.doorsCount } : {}),
     "offers": {
       "@type": "Offer",
       "price": car.price,
       "priceCurrency": "RUB",
-      "availability": "https://schema.org/InStock",
+      "priceValidUntil": priceValidUntil,
+      "availability": car.availability === "В наличии" ? "https://schema.org/InStock" : "https://schema.org/PreOrder",
       "itemCondition": "https://schema.org/UsedCondition",
-      "seller": { "@type": "AutoDealer", "name": "Дебрянск Авто", "url": "https://debryansk-auto.ru" }
+      "seller": {
+        "@type": "AutoDealer",
+        "name": "Дебрянск Авто",
+        "url": "https://debryansk-auto.ru",
+        "address": { "@type": "PostalAddress", "addressLocality": "Брянск", "addressCountry": "RU" }
+      }
     },
-    "image": car.images.filter(Boolean)[0],
+    ...(reviewStats && reviewStats.overallCount > 0 ? {
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": reviewStats.avg,
+        "reviewCount": reviewStats.overallCount,
+        "bestRating": 5,
+        "worstRating": 1
+      }
+    } : {}),
+    "image": carImages.length > 1 ? carImages : (carImages[0] ?? ""),
     "url": `https://debryansk-auto.ru/cars/${car.id}`,
     "productionDate": String(car.year)
   } : undefined;
 
   return (
+    <PageCarProvider car={{ carId: car.id, brand: car.mark, model: car.model, year: car.year, price: car.price, isNew: false, bodyType: car.bodyType, run: car.run }}>
     <Layout>
       {car && (
         <SEO
@@ -725,7 +800,14 @@ export default function UsedCarDetail() {
       <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-white border-t border-slate-200 px-4 py-3 flex items-center gap-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]">
         <div className="flex-1 min-w-0">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide truncate">{car.mark} {car.model}</p>
-          <p className="text-base font-extrabold text-slate-900 leading-tight">{formatPrice(car.price)}</p>
+          {car.maxDiscount > 0 ? (
+            <div className="flex items-baseline gap-1.5">
+              <p className="text-base font-extrabold text-[#0070b8] leading-tight">от {formatPrice(car.price - car.maxDiscount)}</p>
+              <p className="text-[11px] text-slate-400 line-through">{formatPrice(car.price)}</p>
+            </div>
+          ) : (
+            <p className="text-base font-extrabold text-slate-900 leading-tight">{formatPrice(car.price)}</p>
+          )}
         </div>
         <a href={locationPhoneTel}
           className="flex items-center justify-center w-11 h-11 rounded-xl border-2 border-slate-200 text-slate-600 shrink-0">
@@ -745,5 +827,6 @@ export default function UsedCarDetail() {
         {showTradeIn && <TradeInModal onClose={() => setShowTradeIn(false)} targetCar={{ mark: car.mark, model: car.model, year: car.year, price: car.price }} />}
       </AnimatePresence>
     </Layout>
+    </PageCarProvider>
   );
 }
