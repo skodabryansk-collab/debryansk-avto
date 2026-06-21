@@ -404,7 +404,8 @@ export default function NewCars() {
   });
   const [filterModel, setFilterModel] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("model") ?? "Все модели";
+    const raw = params.get("model");
+    return raw ? cleanModel(raw) : "Все модели";
   });
   const [filterAvailability, setFilterAvailability] = useState("Все");
   const [filterBodyType, setFilterBodyType] = useState("Все типы");
