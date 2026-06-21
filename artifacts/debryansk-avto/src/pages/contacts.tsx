@@ -197,20 +197,46 @@ export default function ContactsPage() {
       }));
   }, [locations]);
 
-  const dealersSchema = locations.map((loc) => ({
-    "@type": "AutoDealer",
-    "name": `Дебрянск Авто — ${loc.title}`,
-    "url": "https://debryansk-auto.ru/contacts",
-    "telephone": phoneHref(loc.phone ?? "+74832631000").replace("tel:", ""),
-    "address": {
-      "@type": "PostalAddress",
-      "streetAddress": loc.address,
-      "addressLocality": "Брянск",
-      "addressRegion": "Брянская область",
-      "addressCountry": "RU"
-    },
-    ...(loc.hours ? { "openingHours": loc.hours } : {}),
-  }));
+  function parseHoursSpec(raw: string | null | undefined): object[] | null {
+    if (!raw) return null;
+    const m = /ежедневно\s+(\d{1,2}:\d{2})[–\-](\d{1,2}:\d{2})/i.exec(raw);
+    if (m) {
+      const pad = (t: string) => t.length < 5 ? "0" + t : t;
+      return [{
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+        "opens": pad(m[1]),
+        "closes": pad(m[2]),
+      }];
+    }
+    return null;
+  }
+
+  const dealersSchema = locations.map((loc) => {
+    const hoursSpec = parseHoursSpec(loc.hours);
+    return {
+      "@type": "AutoDealer",
+      "name": `Дебрянск Авто — ${loc.title}`,
+      "url": "https://debryansk-auto.ru/contacts",
+      "telephone": phoneHref(loc.phone ?? "+74832631000").replace("tel:", ""),
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": loc.address,
+        "addressLocality": "Брянск",
+        "addressRegion": "Брянская область",
+        "addressCountry": "RU",
+      },
+      ...(loc.mapX != null && loc.mapY != null ? {
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": loc.mapX,
+          "longitude": loc.mapY,
+        },
+      } : {}),
+      ...(hoursSpec ? { "openingHoursSpecification": hoursSpec } : {}),
+      "openingHours": "Mo-Su 09:00-21:00",
+    };
+  });
 
   return (
     <Layout>
