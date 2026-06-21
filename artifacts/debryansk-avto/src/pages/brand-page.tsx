@@ -82,15 +82,15 @@ async function fetchBrandPage(slug: string): Promise<BrandPageData> {
 /* ─── Static HAVAL model catalog ────────────────────────── */
 const HAVAL_SLUGS = ["haval-city", "haval-pro"];
 
-const HAVAL_CATALOG: Array<{ name: string; bodyType: string; photo: string }> = [
+const HAVAL_CATALOG: Array<{ name: string; bodyType: string; photo: string; noBrand?: boolean }> = [
   { name: "M6",                bodyType: "Кроссовер",      photo: "/brands/haval/m6.png" },
   { name: "Jolion",            bodyType: "Кроссовер",      photo: "/brands/haval/jolion.png" },
   { name: "Dargo",             bodyType: "Внедорожник",    photo: "/brands/haval/dargo.png" },
   { name: "Dargo X",           bodyType: "Внедорожник",    photo: "/brands/haval/dargo_x.png" },
   { name: "F7",                bodyType: "Кроссовер",      photo: "/brands/haval/f7.png" },
   { name: "F7x",               bodyType: "Купе-кроссовер", photo: "/brands/haval/f7x.png" },
-  { name: "GWM Poer",          bodyType: "Пикап",          photo: "/brands/haval/gwm_poer.png" },
-  { name: "GWM Poer King Kong", bodyType: "Пикап",          photo: "/brands/haval/gwm_poer_kingkong.png" },
+  { name: "Poer",              bodyType: "Пикап",          photo: "/brands/haval/gwm_poer.png",          noBrand: true },
+  { name: "Poer King Kong",    bodyType: "Пикап",          photo: "/brands/haval/gwm_poer_kingkong.png", noBrand: true },
 ];
 
 /* ─── Model photo mapping (for non-HAVAL fallback) ──────── */
@@ -114,7 +114,7 @@ function fmtPrice(p: number) {
 }
 
 function cleanModelName(raw: string): string {
-  return raw.replace(/,\s*(I{1,3}V?|V?I{0,3})\s*$/, "").trim();
+  return raw.replace(/,\s*[IVX]+.*$/, "").trim();
 }
 
 function FadeIn({
@@ -351,6 +351,7 @@ function AnchorNav({
 function ModelCard({
   brandName,
   displayBrand,
+  noBrand,
   modelName,
   bodyType,
   minPrice,
@@ -359,6 +360,7 @@ function ModelCard({
 }: {
   brandName: string;
   displayBrand?: string;
+  noBrand?: boolean;
   modelName: string;
   bodyType: string;
   minPrice: number | null;
@@ -395,7 +397,7 @@ function ModelCard({
       </div>
       <div className="p-3 sm:p-4 flex flex-col flex-1">
         <h3 className="font-extrabold text-sm sm:text-base leading-tight mb-0.5 line-clamp-2">
-          {displayBrand ?? brandName} {modelName}
+          {noBrand ? "" : (displayBrand ?? brandName) + " "}{modelName}
         </h3>
         {bodyType && (
           <p className="text-[11px] text-slate-400 mb-2">{bodyType}</p>
@@ -600,6 +602,7 @@ export default function BrandPage() {
         name: m.name,
         bodyType: m.bodyType,
         photo: m.photo,
+        noBrand: m.noBrand ?? false,
         minPrice: priceByModel.get(m.name.toLowerCase()) ?? null,
       }));
     }
@@ -618,6 +621,7 @@ export default function BrandPage() {
       name,
       bodyType: v.bodyType,
       photo: getModelPhotoFromCars(slug, name, v.fallbackImg),
+      noBrand: false,
       minPrice: v.minPrice,
     }));
   })();
@@ -802,6 +806,7 @@ export default function BrandPage() {
                   key={m.name}
                   brandName={brandName}
                   displayBrand={HAVAL_SLUGS.includes(slug) ? "HAVAL" : undefined}
+                  noBrand={m.noBrand}
                   modelName={m.name}
                   bodyType={m.bodyType}
                   minPrice={m.minPrice}
