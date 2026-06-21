@@ -92,7 +92,12 @@ export function deleteBrand(id: number) { return api<{ ok: true }>("DELETE", `/a
 
 /* Brand page content */
 export interface BrandAdvantage { icon: string; text: string; }
-export interface BrandFaqItem { question: string; answer: string; }
+export interface BrandFaqItem {
+  question: string;
+  answer: string;
+  is_published?: boolean;
+  include_in_schema?: boolean;
+}
 export interface BrandPageContent {
   id: number; brandId: number;
   description: string | null; serviceText: string | null; promoText: string | null;
