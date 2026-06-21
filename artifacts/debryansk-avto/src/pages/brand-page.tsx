@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MapPin, Phone, Clock, ArrowRight, Car, Wrench,
-  ChevronLeft, ChevronRight, Calendar, Palette,
+  ChevronLeft, Calendar, Palette,
   Sparkles, CheckCircle, ExternalLink, X, User,
   Shield, Settings, Star, ChevronDown, Navigation,
 } from "lucide-react";
@@ -423,9 +423,8 @@ function ModelCard({
 /* ─── Car card ───────────────────────────────────────────── */
 function BrandCarCard({ car }: { car: BrandPageData["cars"][number] }) {
   const [, navigate] = useLocation();
-  const [imgIdx, setImgIdx] = useState(0);
   const imgs = (car.images ?? []).filter(Boolean);
-  const img = imgs[imgIdx] ?? "";
+  const img = imgs[0] ?? "";
 
   return (
     <motion.article
@@ -449,28 +448,6 @@ function BrandCarCard({ car }: { car: BrandPageData["cars"][number] }) {
           <div className="w-full h-full flex items-center justify-center text-slate-300">
             <Car className="w-12 h-12" />
           </div>
-        )}
-        {imgs.length > 1 && (
-          <>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setImgIdx((i) => (i - 1 + imgs.length) % imgs.length);
-              }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center"
-            >
-              <ChevronLeft className="w-4 h-4 text-white" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setImgIdx((i) => (i + 1) % imgs.length);
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center"
-            >
-              <ChevronRight className="w-4 h-4 text-white" />
-            </button>
-          </>
         )}
         <span className="absolute top-2 left-2 bg-[#0070b8] text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
           <Sparkles className="w-2.5 h-2.5" /> НОВЫЙ
