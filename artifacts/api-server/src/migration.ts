@@ -347,6 +347,7 @@ export async function runMigration() {
     await db.execute(sql`ALTER TABLE brand_page_content ADD COLUMN IF NOT EXISTS hero_image_url TEXT`);
     await db.execute(sql`ALTER TABLE brand_page_content ADD COLUMN IF NOT EXISTS hero_image_mobile_url TEXT`);
     await db.execute(sql`ALTER TABLE brand_page_content ADD COLUMN IF NOT EXISTS promotions JSONB DEFAULT '[]'`);
+    await db.execute(sql`ALTER TABLE brand_page_content ADD COLUMN IF NOT EXISTS models JSONB DEFAULT '[]'`);
 
     logger.info("brands.slug + brand_page_content schema ready (idempotent)");
 
