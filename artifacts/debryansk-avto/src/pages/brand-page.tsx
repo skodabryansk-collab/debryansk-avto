@@ -33,6 +33,7 @@ interface BrandPageData {
     promoText: string | null;
     metaTitle: string | null;
     metaDescription: string | null;
+    heroImageUrl: string | null;
     faq: Array<{ question: string; answer: string; include_in_schema?: boolean }> | null;
   } | null;
   locations: Array<{
@@ -655,6 +656,19 @@ export default function BrandPage() {
 
       {/* ── Hero ──────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 pt-20 pb-16 sm:pt-28 sm:pb-24">
+        {/* Hero cover image */}
+        {pageData.content?.heroImageUrl && (
+          <img
+            src={pageData.content.heroImageUrl}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover object-center"
+            loading="eager"
+            decoding="async"
+          />
+        )}
+        {/* Dark overlay (always present, stronger when image is set) */}
+        <div className={`absolute inset-0 ${pageData.content?.heroImageUrl ? "bg-black/60" : "bg-transparent"}`} />
         {/* Decorative gradients */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(0,112,184,0.2),transparent_55%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(135,182,60,0.12),transparent_55%)]" />
