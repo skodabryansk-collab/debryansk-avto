@@ -105,6 +105,7 @@ export interface BrandPageContent {
   advantages: BrandAdvantage[] | null;
   features: string[] | null;
   faq: BrandFaqItem[] | null;
+  heroImageUrl: string | null;
   metaTitle: string | null; metaDescription: string | null; updatedAt: string | null;
 }
 export function getBrandPageContent(brandId: number) {
