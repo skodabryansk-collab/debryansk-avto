@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getBrands, createBrand, updateBrand, deleteBrand, uploadFile,
   getBrandPageContent, updateBrandPageContent,
-  type Brand, type BrandPageContent,
+  type Brand, type BrandPageContent, type BrandAdvantage, type BrandFaqItem,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, ExternalLink, Upload, X, Globe, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, ExternalLink, Upload, X, Globe, Loader2, GripVertical, ChevronUp, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function BrandsPage() {
@@ -267,6 +267,206 @@ function BrandFormDialog({ item, onClose }: { item: Brand | null; onClose: () =>
   );
 }
 
+/* ── Advantages editor ───────────────────────────────────────── */
+function AdvantagesEditor({
+  value,
+  onChange,
+}: {
+  value: BrandAdvantage[];
+  onChange: (v: BrandAdvantage[]) => void;
+}) {
+  const add = () => onChange([...value, { icon: "✓", text: "" }]);
+  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
+  const update = (i: number, field: keyof BrandAdvantage, v: string) =>
+    onChange(value.map((item, idx) => idx === i ? { ...item, [field]: v } : item));
+
+  return (
+    <div className="space-y-2">
+      {value.map((adv, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <GripVertical className="w-4 h-4 text-slate-300 shrink-0" />
+          <Input
+            className="w-16 shrink-0 text-center font-medium"
+            value={adv.icon}
+            onChange={e => update(i, "icon", e.target.value)}
+            placeholder="✓"
+            title="Иконка (эмодзи или символ)"
+          />
+          <Input
+            className="flex-1"
+            value={adv.text}
+            onChange={e => update(i, "text", e.target.value)}
+            placeholder="Текст преимущества..."
+          />
+          <Button
+            variant="ghost" size="icon" className="w-8 h-8 shrink-0 text-red-500 hover:text-red-600"
+            onClick={() => remove(i)}
+            type="button"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      ))}
+      <Button variant="outline" size="sm" onClick={add} type="button" className="mt-1">
+        <Plus className="w-3.5 h-3.5 mr-1" /> Добавить преимущество
+      </Button>
+    </div>
+  );
+}
+
+/* ── Features editor ─────────────────────────────────────────── */
+function FeaturesEditor({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const add = () => onChange([...value, ""]);
+  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
+  const update = (i: number, v: string) =>
+    onChange(value.map((item, idx) => idx === i ? v : item));
+
+  return (
+    <div className="space-y-2">
+      {value.map((feat, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <GripVertical className="w-4 h-4 text-slate-300 shrink-0" />
+          <Input
+            className="flex-1"
+            value={feat}
+            onChange={e => update(i, e.target.value)}
+            placeholder="Особенность или характеристика бренда..."
+          />
+          <Button
+            variant="ghost" size="icon" className="w-8 h-8 shrink-0 text-red-500 hover:text-red-600"
+            onClick={() => remove(i)}
+            type="button"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      ))}
+      <Button variant="outline" size="sm" onClick={add} type="button" className="mt-1">
+        <Plus className="w-3.5 h-3.5 mr-1" /> Добавить особенность
+      </Button>
+    </div>
+  );
+}
+
+/* ── FAQ editor ──────────────────────────────────────────────── */
+function FaqEditor({
+  value,
+  onChange,
+}: {
+  value: BrandFaqItem[];
+  onChange: (v: BrandFaqItem[]) => void;
+}) {
+  const add = () => onChange([...value, { question: "", answer: "", is_published: true, include_in_schema: true }]);
+  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
+  const updateText = (i: number, field: "question" | "answer", v: string) =>
+    onChange(value.map((item, idx) => idx === i ? { ...item, [field]: v } : item));
+  const updateBool = (i: number, field: "is_published" | "include_in_schema", v: boolean) =>
+    onChange(value.map((item, idx) => idx === i ? { ...item, [field]: v } : item));
+  const moveUp = (i: number) => {
+    if (i === 0) return;
+    const next = [...value];
+    [next[i - 1], next[i]] = [next[i], next[i - 1]];
+    onChange(next);
+  };
+  const moveDown = (i: number) => {
+    if (i === value.length - 1) return;
+    const next = [...value];
+    [next[i], next[i + 1]] = [next[i + 1], next[i]];
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-3">
+      {value.map((item, i) => {
+        const isPublished = item.is_published !== false;
+        const inSchema = item.include_in_schema !== false;
+        return (
+          <div key={i} className={`border rounded-lg p-3 space-y-2 ${isPublished ? "border-slate-200 bg-slate-50/50" : "border-slate-200 bg-slate-100/60 opacity-70"}`}>
+            <div className="flex items-start gap-2">
+              <div className="flex flex-col gap-0.5 shrink-0 mt-1">
+                <Button
+                  variant="ghost" size="icon" className="w-6 h-6 text-slate-400 hover:text-slate-600"
+                  onClick={() => moveUp(i)} type="button" disabled={i === 0}
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  variant="ghost" size="icon" className="w-6 h-6 text-slate-400 hover:text-slate-600"
+                  onClick={() => moveDown(i)} type="button" disabled={i === value.length - 1}
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              <span className="text-xs text-slate-400 font-semibold mt-2.5 shrink-0 w-4">{i + 1}.</span>
+              <div className="flex-1 space-y-2">
+                <Input
+                  value={item.question}
+                  onChange={e => updateText(i, "question", e.target.value)}
+                  placeholder="Вопрос..."
+                  className="font-medium"
+                />
+                <Textarea
+                  rows={2}
+                  value={item.answer}
+                  onChange={e => updateText(i, "answer", e.target.value)}
+                  placeholder="Ответ..."
+                  className="text-sm resize-none"
+                />
+                <div className="flex items-center gap-5 pt-1">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id={`faq-pub-${i}`}
+                      checked={isPublished}
+                      onCheckedChange={v => updateBool(i, "is_published", v)}
+                    />
+                    <Label htmlFor={`faq-pub-${i}`} className="text-xs text-slate-500 cursor-pointer">
+                      Опубликован
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id={`faq-schema-${i}`}
+                      checked={inSchema}
+                      onCheckedChange={v => updateBool(i, "include_in_schema", v)}
+                      disabled={!isPublished}
+                    />
+                    <Label htmlFor={`faq-schema-${i}`} className="text-xs text-slate-500 cursor-pointer">
+                      В FAQPage JSON-LD
+                    </Label>
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="ghost" size="icon" className="w-8 h-8 shrink-0 text-red-500 hover:text-red-600 mt-0.5"
+                onClick={() => remove(i)}
+                type="button"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+      <Button variant="outline" size="sm" onClick={add} type="button" className="mt-1">
+        <Plus className="w-3.5 h-3.5 mr-1" /> Добавить вопрос
+      </Button>
+    </div>
+  );
+}
+
+/* ── Section heading helper ──────────────────────────────────── */
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{children}</p>
+  );
+}
+
 /* ── Brand page content dialog ──────────────────────────────── */
 function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void }) {
   const qc = useQueryClient();
@@ -281,12 +481,18 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     description: string;
     serviceText: string;
     promoText: string;
+    advantages: BrandAdvantage[];
+    features: string[];
+    faq: BrandFaqItem[];
     metaTitle: string;
     metaDescription: string;
   }>({
     description: "",
     serviceText: "",
     promoText: "",
+    advantages: [],
+    features: [],
+    faq: [],
     metaTitle: "",
     metaDescription: "",
   });
@@ -299,6 +505,9 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
         description: data.content.description ?? "",
         serviceText: data.content.serviceText ?? "",
         promoText: data.content.promoText ?? "",
+        advantages: data.content.advantages ?? [],
+        features: data.content.features ?? [],
+        faq: data.content.faq ?? [],
         metaTitle: data.content.metaTitle ?? "",
         metaDescription: data.content.metaDescription ?? "",
       });
@@ -313,9 +522,12 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
       description: form.description || null,
       serviceText: form.serviceText || null,
       promoText: form.promoText || null,
+      advantages: form.advantages,
+      features: form.features,
+      faq: form.faq,
       metaTitle: form.metaTitle || null,
       metaDescription: form.metaDescription || null,
-    } as Parameters<typeof updateBrandPageContent>[1]),
+    }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["brand-page-content", brand.id] });
       toast({ title: "Страница обновлена" });
@@ -358,7 +570,8 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
             <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
+            {/* Basic text fields */}
             <div>
               <Label className="mb-1.5 block">Описание бренда</Label>
               <Textarea
@@ -386,8 +599,46 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
                 placeholder="Акционное предложение или спецусловия покупки..."
               />
             </div>
+
+            {/* Advantages */}
             <div className="border-t pt-4">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">SEO</p>
+              <SectionHeading>Преимущества</SectionHeading>
+              <p className="text-xs text-slate-400 mb-3">
+                Иконка — эмодзи или символ (например: ✓ ★ 🚗). Отображаются в виде списка на странице бренда.
+              </p>
+              <AdvantagesEditor
+                value={form.advantages}
+                onChange={advantages => setForm(f => ({ ...f, advantages }))}
+              />
+            </div>
+
+            {/* Features */}
+            <div className="border-t pt-4">
+              <SectionHeading>Особенности бренда</SectionHeading>
+              <p className="text-xs text-slate-400 mb-3">
+                Краткие характеристики или ключевые факты о бренде.
+              </p>
+              <FeaturesEditor
+                value={form.features}
+                onChange={features => setForm(f => ({ ...f, features }))}
+              />
+            </div>
+
+            {/* FAQ */}
+            <div className="border-t pt-4">
+              <SectionHeading>FAQ — Вопросы и ответы</SectionHeading>
+              <p className="text-xs text-slate-400 mb-3">
+                Часто задаваемые вопросы о бренде и ответы на них.
+              </p>
+              <FaqEditor
+                value={form.faq}
+                onChange={faq => setForm(f => ({ ...f, faq }))}
+              />
+            </div>
+
+            {/* SEO */}
+            <div className="border-t pt-4">
+              <SectionHeading>SEO</SectionHeading>
               <div className="space-y-3">
                 <div>
                   <Label className="mb-1.5 block">Meta Title</Label>
