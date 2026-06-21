@@ -14,18 +14,18 @@ router.get("/", async (_req, res) => {
       .orderBy(asc(brandsTable.isServiceOnly), asc(brandsTable.name));
 
     const countRows = await db.execute(sql`
-      SELECT LOWER(brand) AS brand_key, type, COUNT(*)::int AS cnt
+      SELECT LOWER(dealer) AS dealer_key, type, COUNT(*)::int AS cnt
       FROM cars
-      GROUP BY LOWER(brand), type
+      GROUP BY LOWER(dealer), type
     `);
 
     const newCounts: Record<string, number> = {};
     let usedCount = 0;
-    for (const r of countRows.rows as { brand_key: string; type: string; cnt: number }[]) {
+    for (const r of countRows.rows as { dealer_key: string; type: string; cnt: number }[]) {
       if (r.type === "used") {
         usedCount += Number(r.cnt);
       } else {
-        newCounts[r.brand_key] = (newCounts[r.brand_key] ?? 0) + Number(r.cnt);
+        newCounts[r.dealer_key] = (newCounts[r.dealer_key] ?? 0) + Number(r.cnt);
       }
     }
 
@@ -38,12 +38,7 @@ router.get("/", async (_req, res) => {
         return { ...brand, carCount: usedCount };
       }
 
-      let count = 0;
-      for (const [markKey, cnt] of Object.entries(newCounts)) {
-        if (nameLower.includes(markKey) || markKey.includes(nameLower)) {
-          count += cnt;
-        }
-      }
+      const count = newCounts[nameLower] ?? 0;
       return { ...brand, carCount: count };
     });
 
