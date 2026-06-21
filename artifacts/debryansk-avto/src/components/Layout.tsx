@@ -15,29 +15,20 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import ChatWidget from "@/components/ChatWidget";
 
-const GLOBAL_DEALER_LD = JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "AutoDealer",
-  "name": "Дебрянск Авто",
-  "alternateName": "Территория Автомобилей",
-  "url": "https://debryansk-auto.ru",
-  "telephone": "+74832631000",
-  "description": "Группа автодилеров в Брянске. 6 брендов новых авто: OMODA, JAECOO, HAVAL, Tenet, Jetour. Автомобили с пробегом, сервис, выкуп.",
-  "address": {
-    "@type": "PostalAddress",
-    "addressLocality": "Брянск",
-    "addressRegion": "Брянская область",
-    "addressCountry": "RU"
-  },
-  "geo": {
-    "@type": "GeoCoordinates",
-    "latitude": 53.2434,
-    "longitude": 34.3647
-  },
-  "openingHours": "Mo-Su 09:00-21:00",
-  "sameAs": ["https://vk.com/debryansk_avto"],
-  "foundingDate": "2011"
-});
+function parseHoursSpec(raw: string | null | undefined): object[] | null {
+  if (!raw) return null;
+  const m = /ежедневно\s+(\d{1,2}:\d{2})[–\-](\d{1,2}:\d{2})/i.exec(raw);
+  if (m) {
+    const pad = (t: string) => t.length < 5 ? "0" + t : t;
+    return [{
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+      "opens": pad(m[1]),
+      "closes": pad(m[2]),
+    }];
+  }
+  return null;
+}
 
 /* ── Nav links ──────────────────────────────────────────── */
 const NAV_LINKS: [string, string, string][] = [
@@ -149,6 +140,75 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const headerPhone = normalizePhone(siteSettings?.header_phone) || "+7 (4832) 63-10-00";
   const headerPhoneTel = phoneHref(siteSettings?.header_phone) || "tel:+74832631000";
 
+  const { data: locationsData = [] } = useQuery<Array<{ id: number; title: string; address: string; phone: string | null; hours: string | null; mapX: number | null; mapY: number | null }>>({
+    queryKey: ["locations"],
+    queryFn: () => fetch("/api/locations").then(r => r.json()).then(d => d.ok ? d.data : []),
+    staleTime: 30 * 60 * 1000,
+    retry: 0,
+  });
+  const { data: reviewStats } = useQuery<{ avg: number; total: number; overallCount: number }>({
+    queryKey: ["reviews-aggregate"],
+    queryFn: () => fetch("/api/reviews/aggregate").then(r => r.json()),
+    staleTime: 60 * 60 * 1000,
+    retry: 0,
+  });
+
+  const globalDealerLd = React.useMemo(() => {
+    const departments = locationsData.map(loc => {
+      const hoursSpec = parseHoursSpec(loc.hours);
+      return {
+        "@type": "AutoDealer",
+        "name": `Дебрянск Авто — ${loc.title}`,
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": loc.address,
+          "addressLocality": "Брянск",
+          "addressRegion": "Брянская область",
+          "addressCountry": "RU",
+        },
+        ...(loc.mapX != null && loc.mapY != null ? { "geo": { "@type": "GeoCoordinates", "latitude": loc.mapX, "longitude": loc.mapY } } : {}),
+        ...(loc.phone ? { "telephone": phoneHref(loc.phone).replace("tel:", "") } : {}),
+        ...(hoursSpec ? { "openingHoursSpecification": hoursSpec } : { "openingHours": "Mo-Su 09:00-21:00" }),
+      };
+    });
+    return JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "AutoDealer",
+      "name": "Дебрянск Авто",
+      "alternateName": "Территория Автомобилей",
+      "url": "https://debryansk-auto.ru",
+      "telephone": "+74832631000",
+      "description": "Группа автодилеров в Брянске. 6 брендов новых авто: OMODA, JAECOO, HAVAL, Tenet, Jetour. Автомобили с пробегом, сервис, выкуп.",
+      "image": "https://debryansk-auto.ru/opengraph.jpg",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Брянск",
+        "addressRegion": "Брянская область",
+        "addressCountry": "RU",
+      },
+      "geo": { "@type": "GeoCoordinates", "latitude": 53.2434, "longitude": 34.3647 },
+      "openingHours": "Mo-Su 09:00-21:00",
+      "openingHoursSpecification": [{
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+        "opens": "09:00",
+        "closes": "21:00",
+      }],
+      "sameAs": ["https://vk.com/debryansk_avto"],
+      "foundingDate": "2011",
+      ...(departments.length > 0 ? { "department": departments } : {}),
+      ...(reviewStats && reviewStats.overallCount > 0 ? {
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": reviewStats.avg.toFixed(1),
+          "reviewCount": reviewStats.overallCount,
+          "bestRating": "5",
+          "worstRating": "1",
+        },
+      } : {}),
+    });
+  }, [locationsData, reviewStats]);
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 80);
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -175,7 +235,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50 font-[Manrope,sans-serif] flex flex-col">
       <Helmet>
-        <script type="application/ld+json">{GLOBAL_DEALER_LD}</script>
+        <script type="application/ld+json">{globalDealerLd}</script>
       </Helmet>
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#111317] text-white">
