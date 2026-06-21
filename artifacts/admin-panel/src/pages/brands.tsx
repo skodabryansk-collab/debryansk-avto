@@ -485,6 +485,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     advantages: BrandAdvantage[];
     features: string[];
     faq: BrandFaqItem[];
+    heroImageUrl: string;
     metaTitle: string;
     metaDescription: string;
   }>({
@@ -494,9 +495,25 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     advantages: [],
     features: [],
     faq: [],
+    heroImageUrl: "",
     metaTitle: "",
     metaDescription: "",
   });
+  const [heroUploading, setHeroUploading] = React.useState(false);
+  const heroFileRef = React.useRef<HTMLInputElement>(null);
+
+  const handleHeroUpload = async (file: File) => {
+    setHeroUploading(true);
+    try {
+      const url = await uploadFile(file);
+      setForm(f => ({ ...f, heroImageUrl: url }));
+      toast({ title: "Обложка загружена" });
+    } catch {
+      toast({ title: "Ошибка загрузки", variant: "destructive" });
+    } finally {
+      setHeroUploading(false);
+    }
+  };
 
   const [hydrated, setHydrated] = React.useState(false);
 
@@ -509,6 +526,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
         advantages: data.content.advantages ?? [],
         features: data.content.features ?? [],
         faq: data.content.faq ?? [],
+        heroImageUrl: data.content.heroImageUrl ?? "",
         metaTitle: data.content.metaTitle ?? "",
         metaDescription: data.content.metaDescription ?? "",
       });
@@ -526,6 +544,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
       advantages: form.advantages,
       features: form.features,
       faq: form.faq,
+      heroImageUrl: form.heroImageUrl || null,
       metaTitle: form.metaTitle || null,
       metaDescription: form.metaDescription || null,
     }),
@@ -572,6 +591,53 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
           </div>
         ) : (
           <div className="space-y-5">
+            {/* Hero cover image */}
+            <div className="border rounded-lg p-3 bg-slate-50 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">Обложка hero-секции</p>
+                  <p className="text-xs text-slate-400 mt-0.5">JPEG/WebP, 1920×600 px, до 300 КБ</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={heroFileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => e.target.files?.[0] && handleHeroUpload(e.target.files[0])}
+                  />
+                  <Button
+                    variant="outline" size="sm" type="button"
+                    disabled={heroUploading}
+                    onClick={() => heroFileRef.current?.click()}
+                  >
+                    {heroUploading
+                      ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Загрузка...</>
+                      : <><Upload className="w-4 h-4 mr-1" />Загрузить</>
+                    }
+                  </Button>
+                  {form.heroImageUrl && (
+                    <Button
+                      variant="ghost" size="icon" className="w-8 h-8 text-red-500 hover:text-red-600"
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, heroImageUrl: "" }))}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {form.heroImageUrl ? (
+                <div className="relative rounded-md overflow-hidden bg-slate-800" style={{ aspectRatio: "16/5" }}>
+                  <img src={form.heroImageUrl} alt="hero preview" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="rounded-md border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs" style={{ aspectRatio: "16/5" }}>
+                  Нет обложки — будет использован градиентный фон
+                </div>
+              )}
+            </div>
+
             {/* Basic text fields */}
             <div>
               <Label className="mb-1.5 block">Описание бренда</Label>
