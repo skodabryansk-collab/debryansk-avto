@@ -51,6 +51,10 @@ function parseDrive(mod: string): string {
   return mod.includes("4WD") ? "Полный" : "Передний";
 }
 
+function cleanModel(raw: string): string {
+  return raw.replace(/,\s*(I{1,3}V?|V?I{0,3})\s*$/, "").trim();
+}
+
 async function fetchNewCars(): Promise<NewCarRecord[]> {
   const r = await fetch("/api/cars/new");
   if (!r.ok) throw new Error(`API error: ${r.status}`);
@@ -398,7 +402,10 @@ export default function NewCars() {
     const fromUrl = params.get("dealer") ?? params.get("brand") ?? "";
     return DEALERS.includes(fromUrl) ? fromUrl : "Все дилеры";
   });
-  const [filterModel, setFilterModel] = useState("Все модели");
+  const [filterModel, setFilterModel] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("model") ?? "Все модели";
+  });
   const [filterAvailability, setFilterAvailability] = useState("Все");
   const [filterBodyType, setFilterBodyType] = useState("Все типы");
   const [filterTransmission, setFilterTransmission] = useState("Любая");
@@ -414,7 +421,7 @@ export default function NewCars() {
 
   const availableModels = useMemo(() => {
     const src = filterDealer === "Все дилеры" ? cars : cars.filter(c => c.dealer === filterDealer);
-    const found = [...new Set(src.map(c => c.model))].sort();
+    const found = [...new Set(src.map(c => cleanModel(c.model)))].sort();
     return ["Все модели", ...found];
   }, [cars, filterDealer]);
 
@@ -422,7 +429,7 @@ export default function NewCars() {
     let list = cars;
     if (filterMark) list = list.filter(c => c.mark.toLowerCase() === filterMark.toLowerCase());
     if (filterDealer !== "Все дилеры") list = list.filter(c => c.dealer === filterDealer);
-    if (filterModel !== "Все модели") list = list.filter(c => c.model === filterModel);
+    if (filterModel !== "Все модели") list = list.filter(c => cleanModel(c.model) === filterModel);
     if (filterAvailability !== "Все") list = list.filter(c => c.availability === filterAvailability);
     if (filterBodyType !== "Все типы") list = list.filter(c => c.bodyType === filterBodyType);
     if (filterTransmission !== "Любая") list = list.filter(c => parseTransmission(c.modification) === filterTransmission);
