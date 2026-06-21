@@ -350,6 +350,7 @@ function AnchorNav({
 /* ─── Model card ─────────────────────────────────────────── */
 function ModelCard({
   brandName,
+  displayBrand,
   modelName,
   bodyType,
   minPrice,
@@ -357,6 +358,7 @@ function ModelCard({
   index,
 }: {
   brandName: string;
+  displayBrand?: string;
   modelName: string;
   bodyType: string;
   minPrice: number | null;
@@ -393,7 +395,7 @@ function ModelCard({
       </div>
       <div className="p-3 sm:p-4 flex flex-col flex-1">
         <h3 className="font-extrabold text-sm sm:text-base leading-tight mb-0.5 line-clamp-2">
-          {brandName} {modelName}
+          {displayBrand ?? brandName} {modelName}
         </h3>
         {bodyType && (
           <p className="text-[11px] text-slate-400 mb-2">{bodyType}</p>
@@ -801,6 +803,7 @@ export default function BrandPage() {
                 <ModelCard
                   key={m.name}
                   brandName={brandName}
+                  displayBrand={HAVAL_SLUGS.includes(slug) ? "HAVAL" : undefined}
                   modelName={m.name}
                   bodyType={m.bodyType}
                   minPrice={m.minPrice}
