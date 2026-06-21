@@ -583,6 +583,7 @@ function ModelEditor({
   const valueRef = React.useRef(value);
   React.useEffect(() => { valueRef.current = value; }, [value]);
   const [uploadingIdx, setUploadingIdx] = React.useState<number | null>(null);
+  const [catalogSearch, setCatalogSearch] = React.useState("");
 
   const add = () => onChange([...value, {
     id: Math.random().toString(36).slice(2),
@@ -681,17 +682,26 @@ function ModelEditor({
           {/* Catalog selector */}
           <div>
             <p className="text-[10px] text-slate-400 mb-1 font-medium">Модель из каталога — для фильтров и цены «от»</p>
+            <Input
+              placeholder="Поиск по названию модели..."
+              value={catalogSearch}
+              onChange={e => setCatalogSearch(e.target.value)}
+              className="mb-1 text-sm"
+            />
             <select
               className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#0070b8]"
               value={item.feedDealer && item.feedModel ? `${item.feedDealer}::${item.feedModel}` : ""}
-              onChange={e => handleCatalogSelect(i, e.target.value)}
+              onChange={e => { handleCatalogSelect(i, e.target.value); setCatalogSearch(""); }}
+              size={catalogSearch ? Math.min(catalogModels.filter(cm => cm.model.toLowerCase().includes(catalogSearch.toLowerCase())).length + 1, 6) : 1}
             >
               <option value="">— Выберите модель из каталога —</option>
-              {catalogModels.map((cm, ci) => (
-                <option key={ci} value={`${cm.dealer}::${cm.model}`}>
-                  {cm.model} — от {Number(cm.min_price).toLocaleString("ru-RU")} ₽ ({cm.count} шт.)
-                </option>
-              ))}
+              {catalogModels
+                .filter(cm => !catalogSearch || cm.model.toLowerCase().includes(catalogSearch.toLowerCase()))
+                .map((cm, ci) => (
+                  <option key={ci} value={`${cm.dealer}::${cm.model}`}>
+                    {cm.model} — от {Number(cm.min_price).toLocaleString("ru-RU")} ₽ ({cm.count} шт.)
+                  </option>
+                ))}
               {item.feedDealer && item.feedModel && !catalogModels.some(cm => cm.dealer === item.feedDealer && cm.model === item.feedModel) && (
                 <option value={`${item.feedDealer}::${item.feedModel}`}>
                   {item.feedModel} — нет в наличии
