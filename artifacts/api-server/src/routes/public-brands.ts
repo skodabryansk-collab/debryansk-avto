@@ -107,7 +107,6 @@ router.get("/:slug", async (req, res) => {
     const brandCars = allNewCars
       .filter(c => c.mark.toLowerCase().includes(searchName) || searchName.includes(c.mark.toLowerCase()))
       .sort((a, b) => a.price - b.price)
-      .slice(0, 6)
       // Normalize camelCase NewCarRecord → snake_case DTO expected by frontend
       .map(c => ({
         id: c.id,
