@@ -37,6 +37,7 @@ interface BrandPageData {
     heroImageMobileUrl: string | null;
     faq: Array<{ question: string; answer: string; include_in_schema?: boolean }> | null;
     promotions: Array<{ title: string; description: string; image?: string; badge?: string; expiresAt?: string; buttonText?: string; buttonUrl?: string; isActive?: boolean }> | null;
+    models: Array<{ id?: string; feedDealer: string; feedModel: string; displayName: string; image?: string; description?: string; badge?: string; isActive?: boolean; sort?: number }> | null;
   } | null;
   locations: Array<{
     id: number;
@@ -83,35 +84,6 @@ async function fetchBrandPage(slug: string): Promise<BrandPageData> {
   const json = await r.json();
   if (!json.ok) throw new Error(json.error ?? "Error");
   return json.data as BrandPageData;
-}
-
-/* ─── Static HAVAL model catalog ────────────────────────── */
-const HAVAL_SLUGS = ["haval-city", "haval-pro"];
-
-const HAVAL_CATALOG: Array<{ name: string; bodyType: string; photo: string; noBrand?: boolean }> = [
-  { name: "M6",                bodyType: "Кроссовер",      photo: "/brands/haval/m6.png" },
-  { name: "Jolion",            bodyType: "Кроссовер",      photo: "/brands/haval/jolion.png" },
-  { name: "Dargo",             bodyType: "Внедорожник",    photo: "/brands/haval/dargo.png" },
-  { name: "Dargo X",           bodyType: "Внедорожник",    photo: "/brands/haval/dargo_x.png" },
-  { name: "F7",                bodyType: "Кроссовер",      photo: "/brands/haval/f7.png" },
-  { name: "F7x",               bodyType: "Купе-кроссовер", photo: "/brands/haval/f7x.png" },
-  { name: "Poer",              bodyType: "Пикап",          photo: "/brands/haval/gwm_poer.png",          noBrand: true },
-  { name: "Poer King Kong",    bodyType: "Пикап",          photo: "/brands/haval/gwm_poer_kingkong.png", noBrand: true },
-];
-
-/* ─── Model photo mapping (for non-HAVAL fallback) ──────── */
-function getModelPhotoFromCars(brandSlug: string, modelName: string, fallback: string): string {
-  if (!HAVAL_SLUGS.includes(brandSlug)) return fallback;
-  const m = modelName.toLowerCase();
-  if (m.includes("kingkong")) return "/brands/haval/gwm_poer_kingkong.png";
-  if (m.includes("dargo x") || m.includes("dargo_x")) return "/brands/haval/dargo_x.png";
-  if (m.includes("dargo")) return "/brands/haval/dargo.png";
-  if (m.includes("f7x")) return "/brands/haval/f7x.png";
-  if (m.includes("f7")) return "/brands/haval/f7.png";
-  if (m.includes("jolion")) return "/brands/haval/jolion.png";
-  if (m.includes("m6")) return "/brands/haval/m6.png";
-  if (m.includes("poer")) return "/brands/haval/gwm_poer.png";
-  return fallback;
 }
 
 /* ─── Helpers ────────────────────────────────────────────── */
@@ -423,11 +395,13 @@ function AnchorNav({
   hasAbout,
   hasService,
   hasPromotions,
+  hasModels,
 }: {
   hasCars: boolean;
   hasAbout: boolean;
   hasService: boolean;
   hasPromotions: boolean;
+  hasModels: boolean;
 }) {
   const [active, setActive] = useState("");
 
@@ -450,6 +424,7 @@ function AnchorNav({
 
   const visibleItems = NAV_ITEMS.filter(({ id }) => {
     if (id === "about" && !hasAbout) return false;
+    if (id === "models" && !hasModels) return false;
     if (id === "service" && !hasService) return false;
     if (id === "promotions" && !hasPromotions) return false;
     return true;
@@ -488,21 +463,25 @@ function AnchorNav({
 /* ─── Model card ─────────────────────────────────────────── */
 function ModelCard({
   brandName,
-  displayBrand,
-  noBrand,
   modelName,
   bodyType,
+  description,
+  badge,
   minPrice,
   photo,
+  feedDealer,
+  feedModel,
   index,
 }: {
   brandName: string;
-  displayBrand?: string;
-  noBrand?: boolean;
   modelName: string;
-  bodyType: string;
+  bodyType?: string;
+  description?: string;
+  badge?: string;
   minPrice: number | null;
   photo: string;
+  feedDealer: string;
+  feedModel: string;
   index: number;
 }) {
   const [, navigate] = useLocation();
@@ -515,7 +494,7 @@ function ModelCard({
       transition={{ duration: 0.45, delay: index * 0.07 }}
       className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer flex flex-col"
       onClick={() =>
-        navigate(`/new-cars?dealer=${encodeURIComponent(brandName)}&model=${encodeURIComponent(modelName)}`)
+        navigate(`/new-cars?dealer=${encodeURIComponent(feedDealer)}&model=${encodeURIComponent(feedModel)}`)
       }
     >
       <div className="relative bg-slate-50 overflow-hidden h-[120px] sm:h-[160px]">
@@ -532,13 +511,21 @@ function ModelCard({
             <Car className="w-12 h-12" />
           </div>
         )}
+        {badge && (
+          <span className="absolute top-2 right-2 bg-[#87b63c]/90 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-full leading-tight">
+            {badge}
+          </span>
+        )}
       </div>
       <div className="p-3 sm:p-4 flex flex-col flex-1">
         <h3 className="font-extrabold text-sm sm:text-base leading-tight mb-0.5 line-clamp-2">
-          {noBrand ? "" : (displayBrand ?? brandName) + " "}{modelName}
+          {brandName} {modelName}
         </h3>
         {bodyType && (
-          <p className="text-[11px] text-slate-400 mb-2">{bodyType}</p>
+          <p className="text-[11px] text-slate-400 mb-1">{bodyType}</p>
+        )}
+        {description && (
+          <p className="text-[10px] text-slate-500 line-clamp-2 mb-1 leading-snug">{description}</p>
         )}
         <div className="mt-auto">
           {minPrice ? (
@@ -712,7 +699,52 @@ export default function BrandPage() {
         })),
       }
     : null;
-  const jsonLd = faqPage ? [autoDealer, faqPage] : autoDealer;
+
+  const modelsWithPrice = hasCmsModels
+    ? cmsModels.filter(m => {
+        const matching = cars.filter(c =>
+          c.dealer.toLowerCase() === m.feedDealer.toLowerCase() &&
+          cleanModelName(c.model).toLowerCase() === cleanModelName(m.feedModel).toLowerCase()
+        );
+        return matching.length > 0;
+      })
+    : [];
+  const modelsItemList = modelsWithPrice.length > 0
+    ? {
+        "@type": "ItemList",
+        name: `Модельный ряд ${brandName}`,
+        numberOfItems: modelsWithPrice.length,
+        itemListElement: modelsWithPrice.map((m, idx) => {
+          const matching = cars.filter(c =>
+            c.dealer.toLowerCase() === m.feedDealer.toLowerCase() &&
+            cleanModelName(c.model).toLowerCase() === cleanModelName(m.feedModel).toLowerCase()
+          );
+          const minP = Math.min(...matching.map(c => c.max_discount > 0 ? c.price - c.max_discount : c.price));
+          return {
+            "@type": "ListItem",
+            position: idx + 1,
+            item: {
+              "@type": "Product",
+              name: `${brandName} ${m.displayName}`,
+              brand: { "@type": "Brand", name: brandName },
+              url: `https://debryansk-auto.ru/new-cars?dealer=${encodeURIComponent(m.feedDealer)}&model=${encodeURIComponent(m.feedModel)}`,
+              offers: {
+                "@type": "Offer",
+                priceCurrency: "RUB",
+                price: minP,
+                availability: "https://schema.org/InStock",
+                url: `https://debryansk-auto.ru/new-cars?dealer=${encodeURIComponent(m.feedDealer)}&model=${encodeURIComponent(m.feedModel)}`,
+              },
+            },
+          };
+        }),
+      }
+    : null;
+
+  const jsonLdItems: object[] = [autoDealer];
+  if (faqPage) jsonLdItems.push(faqPage);
+  if (modelsItemList) jsonLdItems.push(modelsItemList);
+  const jsonLd = jsonLdItems.length === 1 ? jsonLdItems[0] : jsonLdItems;
 
   const hasAbout = !!content?.description;
   const hasService = true;
@@ -723,22 +755,33 @@ export default function BrandPage() {
   const hasPromotions = activePromos.length > 0;
   const loc = locations[0];
 
+  const cmsModels = (content?.models ?? []).filter(m => m.isActive !== false);
+  const hasCmsModels = cmsModels.length > 0;
+
   const uniqueModels = (() => {
-    if (HAVAL_SLUGS.includes(slug)) {
-      const priceByModel = new Map<string, number>();
-      for (const car of cars) {
-        const key = cleanModelName(car.model).toLowerCase();
-        const carPrice = car.max_discount > 0 ? car.price - car.max_discount : car.price;
-        const existing = priceByModel.get(key);
-        if (!existing || carPrice < existing) priceByModel.set(key, carPrice);
-      }
-      return HAVAL_CATALOG.map((m) => ({
-        name: m.name,
-        bodyType: m.bodyType,
-        photo: m.photo,
-        noBrand: m.noBrand ?? false,
-        minPrice: priceByModel.get(m.name.toLowerCase()) ?? null,
-      }));
+    if (hasCmsModels) {
+      return [...cmsModels]
+        .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+        .map(m => {
+          const matchingCars = cars.filter(c =>
+            c.dealer.toLowerCase() === m.feedDealer.toLowerCase() &&
+            cleanModelName(c.model).toLowerCase() === cleanModelName(m.feedModel).toLowerCase()
+          );
+          const minPrice = matchingCars.length > 0
+            ? Math.min(...matchingCars.map(c => c.max_discount > 0 ? c.price - c.max_discount : c.price))
+            : null;
+          const bodyType = matchingCars[0]?.body_type ?? "";
+          return {
+            name: m.displayName,
+            bodyType: bodyType || undefined,
+            photo: m.image ?? "",
+            minPrice,
+            feedDealer: m.feedDealer,
+            feedModel: m.feedModel,
+            description: m.description,
+            badge: m.badge,
+          };
+        });
     }
     const seen = new Map<string, { bodyType: string; minPrice: number; fallbackImg: string }>();
     for (const car of cars) {
@@ -754,9 +797,12 @@ export default function BrandPage() {
     return Array.from(seen.entries()).map(([name, v]) => ({
       name,
       bodyType: v.bodyType,
-      photo: getModelPhotoFromCars(slug, name, v.fallbackImg),
-      noBrand: false,
+      photo: v.fallbackImg,
       minPrice: v.minPrice,
+      feedDealer: brandName,
+      feedModel: name,
+      description: undefined,
+      badge: undefined,
     }));
   })();
 
@@ -924,6 +970,7 @@ export default function BrandPage() {
         hasAbout={hasAbout}
         hasService={hasService}
         hasPromotions={hasPromotions}
+        hasModels={uniqueModels.length > 0}
       />
 
       {/* ── О бренде ──────────────────────────────────────── */}
@@ -967,14 +1014,16 @@ export default function BrandPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
               {uniqueModels.map((m, i) => (
                 <ModelCard
-                  key={m.name}
+                  key={m.name + i}
                   brandName={brandName}
-                  displayBrand={HAVAL_SLUGS.includes(slug) ? "HAVAL" : undefined}
-                  noBrand={m.noBrand}
                   modelName={m.name}
                   bodyType={m.bodyType}
+                  description={m.description}
+                  badge={m.badge}
                   minPrice={m.minPrice}
                   photo={m.photo}
+                  feedDealer={m.feedDealer}
+                  feedModel={m.feedModel}
                   index={i}
                 />
               ))}
