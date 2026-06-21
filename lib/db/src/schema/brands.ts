@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, boolean, integer } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, boolean, integer, jsonb } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
 export const brandsTable = pgTable("brands", {
@@ -22,6 +22,9 @@ export const brandPageContentTable = pgTable("brand_page_content", {
   description: text("description"),
   serviceText: text("service_text"),
   promoText: text("promo_text"),
+  advantages: jsonb("advantages").$type<{ icon: string; text: string }[]>().default([]),
+  features: jsonb("features").$type<string[]>().default([]),
+  faq: jsonb("faq").$type<{ question: string; answer: string; is_published?: boolean; include_in_schema?: boolean; sort_order?: number }[]>().default([]),
   metaTitle: text("meta_title"),
   metaDescription: text("meta_description"),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
