@@ -38,7 +38,7 @@ router.put("/:brandId", async (req, res) => {
     const brandId = Number(req.params["brandId"]);
     if (isNaN(brandId)) return res.status(400).json({ ok: false, error: "Invalid brand ID" });
 
-    const { description, serviceText, promoText, metaTitle, metaDescription, advantages, features, faq, heroImageUrl } = req.body as {
+    const { description, serviceText, promoText, metaTitle, metaDescription, advantages, features, faq, heroImageUrl, heroImageMobileUrl } = req.body as {
       description?: string | null;
       serviceText?: string | null;
       promoText?: string | null;
@@ -48,6 +48,7 @@ router.put("/:brandId", async (req, res) => {
       features?: string[] | null;
       faq?: { question: string; answer: string }[] | null;
       heroImageUrl?: string | null;
+      heroImageMobileUrl?: string | null;
     };
 
     const values = {
@@ -61,6 +62,7 @@ router.put("/:brandId", async (req, res) => {
       features: features ?? [],
       faq: faq ?? [],
       heroImageUrl: heroImageUrl ?? null,
+      heroImageMobileUrl: heroImageMobileUrl ?? null,
       updatedAt: new Date(),
     };
 
@@ -79,6 +81,7 @@ router.put("/:brandId", async (req, res) => {
           features: values.features,
           faq: values.faq,
           heroImageUrl: values.heroImageUrl,
+          heroImageMobileUrl: values.heroImageMobileUrl,
           updatedAt: values.updatedAt,
         },
       })
