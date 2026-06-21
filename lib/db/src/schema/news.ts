@@ -11,6 +11,7 @@ export const newsTable = pgTable("news", {
   slug: text("slug").unique().notNull(),
   publishedAt: timestamp("published_at", { withTimezone: true }).defaultNow(),
   readTime: integer("read_time").default(3),
+  brandId: integer("brand_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
