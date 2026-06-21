@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -79,7 +80,7 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !phone.trim()) return;
+    if (!name.trim() || !isPhoneValid(phone)) return;
     setSubmitted(true);
   }
 
@@ -160,8 +161,9 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
+                      type="tel" inputMode="tel" maxLength={18}
                       value={phone}
-                      onChange={e => setPhone(e.target.value)}
+                      onChange={e => setPhone(formatPhone(e.target.value))}
                       placeholder="+7 (___) ___-__-__"
                       required
                       className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors"
@@ -390,11 +392,12 @@ export default function NewCars() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const [filterMark, setFilterMark] = useState(() => {
+  const [filterMark, setFilterMark] = useState("");
+  const [filterDealer, setFilterDealer] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("brand") ?? "";
+    const fromUrl = params.get("dealer") ?? params.get("brand") ?? "";
+    return DEALERS.includes(fromUrl) ? fromUrl : "Все дилеры";
   });
-  const [filterDealer, setFilterDealer] = useState("Все дилеры");
   const [filterModel, setFilterModel] = useState("Все модели");
   const [filterAvailability, setFilterAvailability] = useState("Все");
   const [filterBodyType, setFilterBodyType] = useState("Все типы");
@@ -426,10 +429,10 @@ export default function NewCars() {
     if (filterDrive !== "Любой") list = list.filter(c => parseDrive(c.modification) === filterDrive);
     const pMin = priceMin ? parseInt(priceMin.replace(/\D/g, "")) : 0;
     const pMax = priceMax ? parseInt(priceMax.replace(/\D/g, "")) : Infinity;
-    if (pMin) list = list.filter(c => c.price >= pMin);
-    if (pMax !== Infinity) list = list.filter(c => c.price <= pMax);
-    if (sortBy === "price_asc") list = [...list].sort((a, b) => a.price - b.price);
-    if (sortBy === "price_desc") list = [...list].sort((a, b) => b.price - a.price);
+    if (pMin) list = list.filter(c => (c.price - (c.maxDiscount || 0)) >= pMin);
+    if (pMax !== Infinity) list = list.filter(c => (c.price - (c.maxDiscount || 0)) <= pMax);
+    if (sortBy === "price_asc") list = [...list].sort((a, b) => (a.price - (a.maxDiscount || 0)) - (b.price - (b.maxDiscount || 0)));
+    if (sortBy === "price_desc") list = [...list].sort((a, b) => (b.price - (b.maxDiscount || 0)) - (a.price - (a.maxDiscount || 0)));
     if (sortBy === "year_desc") list = [...list].sort((a, b) => b.year - a.year);
     return list;
   }, [cars, filterMark, filterDealer, filterModel, filterAvailability, filterBodyType, filterTransmission, filterDrive, priceMin, priceMax, sortBy]);
@@ -602,7 +605,7 @@ export default function NewCars() {
     <Layout>
       <SEO
         title="Новые автомобили в Брянске"
-        description="Новые автомобили 9 брендов в брендах Брянска. Выгодное кредитование, специальные программы, гарантия. Дебрянск Авто."
+        description="Новые автомобили 9 брендов у официальных дилеров Брянска. Выгодное кредитование, специальные программы, гарантия производителя. Дебрянск Авто."
         canonical="/new-cars"
         jsonLd={itemListJsonLd}
         breadcrumbs={[
@@ -615,7 +618,7 @@ export default function NewCars() {
         <div className="flex items-start justify-between mb-5 sm:mb-8 gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-1">В наличии</p>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Новые автомобили</h2>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Новые автомобили</h1>
             {!isLoading && (
               <p className="text-sm font-semibold text-slate-400 mt-1">{filtered.length} авто</p>
             )}
