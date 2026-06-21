@@ -98,15 +98,18 @@ router.get("/:slug", async (req, res) => {
       ORDER BY lb.sort_order, l.sort_order
     `);
 
-    // New cars for this brand (first 6) — from in-memory XML feed cache
+    // New cars for this brand — from in-memory XML feed cache
     const brandNameLower = brand.name.toLowerCase();
     // Build search key: strip city/dealer qualifiers (Haval City / Haval Pro / МБ-Брянск)
     const searchName = brandNameLower.replace(/ (city|pro|брянск)$/i, "").trim();
 
     const allNewCars = await getNewCars();
-    const brandCars = allNewCars
-      .filter(c => c.mark.toLowerCase().includes(searchName) || searchName.includes(c.mark.toLowerCase()))
-      .sort((a, b) => a.price - b.price)
+    // First try exact dealer match (e.g. "Haval City" only → not mixed with "Haval Pro")
+    const byDealer = allNewCars.filter(c => c.dealer.toLowerCase() === brandNameLower);
+    const brandCars = (byDealer.length > 0
+      ? byDealer
+      : allNewCars.filter(c => c.mark.toLowerCase().includes(searchName) || searchName.includes(c.mark.toLowerCase()))
+    ).sort((a, b) => a.price - b.price)
       // Normalize camelCase NewCarRecord → snake_case DTO expected by frontend
       .map(c => ({
         id: c.id,
