@@ -130,14 +130,17 @@ router.get("/:slug", async (req, res) => {
         tradein_discount: c.tradeinDiscount,
       }));
 
-    // News mentioning brand name
+    // News: first by brand_id, then by name mention (deduplicated)
     const newsRows = await db.execute(sql`
       SELECT id, title, excerpt, category, image, published_at, slug
       FROM news
-      WHERE LOWER(title) LIKE ${"%" + searchName + "%"}
+      WHERE brand_id = ${brand.id}
+         OR LOWER(title) LIKE ${"%" + searchName + "%"}
          OR LOWER(excerpt) LIKE ${"%" + searchName + "%"}
-      ORDER BY published_at DESC
-      LIMIT 3
+      ORDER BY
+        CASE WHEN brand_id = ${brand.id} THEN 0 ELSE 1 END,
+        published_at DESC
+      LIMIT 4
     `);
 
     return res.json({
