@@ -373,7 +373,7 @@ function ModelCard({
       transition={{ duration: 0.45, delay: index * 0.07 }}
       className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer flex flex-col"
       onClick={() =>
-        navigate(`/new-cars?brand=${encodeURIComponent(brandName)}`)
+        navigate(`/new-cars?dealer=${encodeURIComponent(brandName)}`)
       }
     >
       <div className="relative bg-slate-50 overflow-hidden h-[120px] sm:h-[160px]">
@@ -732,7 +732,7 @@ export default function BrandPage() {
               Смотреть модели <ChevronDown className="w-4 h-4" />
             </button>
             <a
-              href={`/new-cars?brand=${encodeURIComponent(brandName)}`}
+              href={`/new-cars?dealer=${encodeURIComponent(brandName)}`}
               className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-colors border border-white/20"
             >
               Все авто в наличии <ArrowRight className="w-4 h-4" />
@@ -787,7 +787,7 @@ export default function BrandPage() {
             </div>
             {uniqueModels.length > 0 && (
               <a
-                href={`/new-cars?brand=${encodeURIComponent(brandName)}`}
+                href={`/new-cars?dealer=${encodeURIComponent(brandName)}`}
                 className="flex items-center gap-2 text-[#0070b8] font-bold hover:gap-3 transition-all text-sm whitespace-nowrap"
               >
                 Все в каталоге <ArrowRight className="w-4 h-4" />
@@ -835,7 +835,7 @@ export default function BrandPage() {
                 </h2>
               </div>
               <a
-                href={`/new-cars?brand=${encodeURIComponent(brandName)}`}
+                href={`/new-cars?dealer=${encodeURIComponent(brandName)}`}
                 className="flex items-center gap-2 text-[#0070b8] font-bold hover:gap-3 transition-all text-sm whitespace-nowrap"
               >
                 Весь каталог <ArrowRight className="w-4 h-4" />
