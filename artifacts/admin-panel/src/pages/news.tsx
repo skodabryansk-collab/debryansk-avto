@@ -1,7 +1,7 @@
 import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { getNews, deleteNews, uploadFile, type NewsItem } from "@/lib/api";
+import { getNews, deleteNews, uploadFile, getBrands, type NewsItem, type Brand } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -124,6 +124,7 @@ export default function NewsPage() {
 }
 
 function NewsFormDialog({ item, onClose }: { item: NewsItem | null; onClose: () => void }) {
+  const { data: brands } = useQuery({ queryKey: ["brands"], queryFn: getBrands });
   const [form, setForm] = React.useState({
     title: item?.title ?? "",
     excerpt: item?.excerpt ?? "",
@@ -134,6 +135,7 @@ function NewsFormDialog({ item, onClose }: { item: NewsItem | null; onClose: () 
     slug: item?.slug ?? "",
     publishedAt: item?.publishedAt ?? "",
     readTime: item?.readTime ?? 3,
+    brandId: item?.brandId ?? null as number | null,
   });
   const [uploading, setUploading] = React.useState(false);
   const imageRef = React.useRef<HTMLInputElement>(null);
@@ -250,6 +252,19 @@ function NewsFormDialog({ item, onClose }: { item: NewsItem | null; onClose: () 
           <div>
             <Label>Время чтения (мин)</Label>
             <Input type="number" value={form.readTime} onChange={e => setForm(f => ({ ...f, readTime: Number(e.target.value) }))} />
+          </div>
+          <div>
+            <Label>Бренд (опционально)</Label>
+            <select
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={form.brandId ?? ""}
+              onChange={e => setForm(f => ({ ...f, brandId: e.target.value ? Number(e.target.value) : null }))}
+            >
+              <option value="">— Без бренда —</option>
+              {brands?.filter(b => !b.isServiceOnly).map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
           </div>
         </div>
         <DialogFooter>
