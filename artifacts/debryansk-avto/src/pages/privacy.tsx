@@ -183,10 +183,11 @@ export default function PrivacyPage() {
             </p>
           </section>
 
-          <section>
-            <h2 className="text-lg font-bold text-slate-900 mb-2">8. Передача данных третьим лицам (субпроцессоры)</h2>
+          <section id="dpa">
+            <h2 className="text-lg font-bold text-slate-900 mb-2">8. Субпроцессоры и соглашения об обработке данных (DPA)</h2>
+            <p className="text-xs text-slate-500 mb-2">Data Processing Agreement / Раскрытие субпроцессоров</p>
             <p>
-              Оператор не продаёт персональные данные третьим лицам. Передача данных возможна
+              Оператор не продаёт персональные данные третьим лицам. Передача данных субпроцессорам возможна
               только в следующих случаях:
             </p>
             <ul className="list-disc list-inside mt-2 space-y-1">
