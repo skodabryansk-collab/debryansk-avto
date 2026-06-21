@@ -148,22 +148,29 @@ function ServiceModal({
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
 
+  const [error, setError] = useState(false);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!isPhoneValid(phone)) return;
     setSending(true);
+    setError(false);
     try {
-      await fetch("/api/send-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subject: `Запись на ТО — ${brandName}`,
-          text: `Запись на ТО ${brandName}. Телефон: ${phone}`,
-        }),
-      });
-    } catch {}
+      const fd = new FormData();
+      fd.append("type", "service");
+      fd.append("phone", phone);
+      fd.append("source", `Брендовая страница ${brandName}`);
+      const r = await fetch("/api/send-email", { method: "POST", body: fd });
+      if (!r.ok) {
+        setError(true);
+        setSending(false);
+        return;
+      }
+      setSubmitted(true);
+    } catch {
+      setError(true);
+    }
     setSending(false);
-    setSubmitted(true);
   }
 
   return (
@@ -228,6 +235,11 @@ function ServiceModal({
                     />
                   </div>
                 </div>
+                {error && (
+                  <p className="text-xs text-red-500 text-center">
+                    Не удалось отправить заявку. Попробуйте ещё раз.
+                  </p>
+                )}
                 <button
                   type="submit"
                   disabled={sending}
