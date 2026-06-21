@@ -486,6 +486,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     features: string[];
     faq: BrandFaqItem[];
     heroImageUrl: string;
+    heroImageMobileUrl: string;
     metaTitle: string;
     metaDescription: string;
   }>({
@@ -496,11 +497,14 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     features: [],
     faq: [],
     heroImageUrl: "",
+    heroImageMobileUrl: "",
     metaTitle: "",
     metaDescription: "",
   });
   const [heroUploading, setHeroUploading] = React.useState(false);
+  const [heroMobileUploading, setHeroMobileUploading] = React.useState(false);
   const heroFileRef = React.useRef<HTMLInputElement>(null);
+  const heroMobileFileRef = React.useRef<HTMLInputElement>(null);
 
   const handleHeroUpload = async (file: File) => {
     setHeroUploading(true);
@@ -512,6 +516,19 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
       toast({ title: "Ошибка загрузки", variant: "destructive" });
     } finally {
       setHeroUploading(false);
+    }
+  };
+
+  const handleHeroMobileUpload = async (file: File) => {
+    setHeroMobileUploading(true);
+    try {
+      const url = await uploadFile(file);
+      setForm(f => ({ ...f, heroImageMobileUrl: url }));
+      toast({ title: "Мобильная обложка загружена" });
+    } catch {
+      toast({ title: "Ошибка загрузки", variant: "destructive" });
+    } finally {
+      setHeroMobileUploading(false);
     }
   };
 
@@ -527,6 +544,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
         features: data.content.features ?? [],
         faq: data.content.faq ?? [],
         heroImageUrl: data.content.heroImageUrl ?? "",
+        heroImageMobileUrl: data.content.heroImageMobileUrl ?? "",
         metaTitle: data.content.metaTitle ?? "",
         metaDescription: data.content.metaDescription ?? "",
       });
@@ -545,6 +563,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
       features: form.features,
       faq: form.faq,
       heroImageUrl: form.heroImageUrl || null,
+      heroImageMobileUrl: form.heroImageMobileUrl || null,
       metaTitle: form.metaTitle || null,
       metaDescription: form.metaDescription || null,
     }),
@@ -591,51 +610,75 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
           </div>
         ) : (
           <div className="space-y-5">
-            {/* Hero cover image */}
-            <div className="border rounded-lg p-3 bg-slate-50 space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-700">Обложка hero-секции</p>
-                  <p className="text-xs text-slate-400 mt-0.5">JPEG/WebP, 1920×600 px, до 300 КБ</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={heroFileRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={e => e.target.files?.[0] && handleHeroUpload(e.target.files[0])}
-                  />
-                  <Button
-                    variant="outline" size="sm" type="button"
-                    disabled={heroUploading}
-                    onClick={() => heroFileRef.current?.click()}
-                  >
-                    {heroUploading
-                      ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Загрузка...</>
-                      : <><Upload className="w-4 h-4 mr-1" />Загрузить</>
-                    }
-                  </Button>
-                  {form.heroImageUrl && (
-                    <Button
-                      variant="ghost" size="icon" className="w-8 h-8 text-red-500 hover:text-red-600"
-                      type="button"
-                      onClick={() => setForm(f => ({ ...f, heroImageUrl: "" }))}
-                    >
-                      <X className="w-4 h-4" />
+            {/* Hero cover images */}
+            <div className="border rounded-lg p-3 bg-slate-50 space-y-3">
+              <p className="text-sm font-semibold text-slate-700">Обложка hero-секции</p>
+
+              {/* Desktop */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-slate-500">Десктоп — 1920×600 px, JPEG/WebP, до 300 КБ</p>
+                  <div className="flex items-center gap-1.5">
+                    <input ref={heroFileRef} type="file" accept="image/*" className="hidden"
+                      onChange={e => e.target.files?.[0] && handleHeroUpload(e.target.files[0])} />
+                    <Button variant="outline" size="sm" type="button" disabled={heroUploading}
+                      onClick={() => heroFileRef.current?.click()}>
+                      {heroUploading
+                        ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Загрузка...</>
+                        : <><Upload className="w-4 h-4 mr-1" />Загрузить</>}
                     </Button>
-                  )}
+                    {form.heroImageUrl && (
+                      <Button variant="ghost" size="icon" className="w-8 h-8 text-red-500 hover:text-red-600" type="button"
+                        onClick={() => setForm(f => ({ ...f, heroImageUrl: "" }))}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
+                {form.heroImageUrl ? (
+                  <div className="relative rounded-md overflow-hidden bg-slate-800" style={{ aspectRatio: "16/5" }}>
+                    <img src={form.heroImageUrl} alt="hero desktop preview" className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="rounded-md border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs" style={{ aspectRatio: "16/5" }}>
+                    Нет обложки — градиентный фон
+                  </div>
+                )}
               </div>
-              {form.heroImageUrl ? (
-                <div className="relative rounded-md overflow-hidden bg-slate-800" style={{ aspectRatio: "16/5" }}>
-                  <img src={form.heroImageUrl} alt="hero preview" className="w-full h-full object-cover" />
+
+              {/* Mobile */}
+              <div className="space-y-1.5 border-t pt-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-slate-500">Моб — 750×960 px (portrait), JPEG/WebP, до 200 КБ</p>
+                  <div className="flex items-center gap-1.5">
+                    <input ref={heroMobileFileRef} type="file" accept="image/*" className="hidden"
+                      onChange={e => e.target.files?.[0] && handleHeroMobileUpload(e.target.files[0])} />
+                    <Button variant="outline" size="sm" type="button" disabled={heroMobileUploading}
+                      onClick={() => heroMobileFileRef.current?.click()}>
+                      {heroMobileUploading
+                        ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Загрузка...</>
+                        : <><Upload className="w-4 h-4 mr-1" />Загрузить</>}
+                    </Button>
+                    {form.heroImageMobileUrl && (
+                      <Button variant="ghost" size="icon" className="w-8 h-8 text-red-500 hover:text-red-600" type="button"
+                        onClick={() => setForm(f => ({ ...f, heroImageMobileUrl: "" }))}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              ) : (
-                <div className="rounded-md border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs" style={{ aspectRatio: "16/5" }}>
-                  Нет обложки — будет использован градиентный фон
-                </div>
-              )}
+                {form.heroImageMobileUrl ? (
+                  <div className="flex justify-center">
+                    <div className="relative rounded-md overflow-hidden bg-slate-800" style={{ width: 120, aspectRatio: "750/960" }}>
+                      <img src={form.heroImageMobileUrl} alt="hero mobile preview" className="w-full h-full object-cover" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-md border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs py-3">
+                    {form.heroImageUrl ? "Не задана — будет использоваться десктопная" : "Не задана"}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Basic text fields */}
