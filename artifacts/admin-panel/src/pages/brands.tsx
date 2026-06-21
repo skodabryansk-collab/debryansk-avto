@@ -362,8 +362,9 @@ function FaqEditor({
   value: BrandFaqItem[];
   onChange: (v: BrandFaqItem[]) => void;
 }) {
-  const add = () => onChange([...value, { question: "", answer: "", is_published: true, include_in_schema: true }]);
-  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
+  const reindex = (arr: BrandFaqItem[]) => arr.map((item, idx) => ({ ...item, sort_order: idx }));
+  const add = () => onChange(reindex([...value, { question: "", answer: "", is_published: true, include_in_schema: true }]));
+  const remove = (i: number) => onChange(reindex(value.filter((_, idx) => idx !== i)));
   const updateText = (i: number, field: "question" | "answer", v: string) =>
     onChange(value.map((item, idx) => idx === i ? { ...item, [field]: v } : item));
   const updateBool = (i: number, field: "is_published" | "include_in_schema", v: boolean) =>
@@ -372,13 +373,13 @@ function FaqEditor({
     if (i === 0) return;
     const next = [...value];
     [next[i - 1], next[i]] = [next[i], next[i - 1]];
-    onChange(next);
+    onChange(reindex(next));
   };
   const moveDown = (i: number) => {
     if (i === value.length - 1) return;
     const next = [...value];
     [next[i], next[i + 1]] = [next[i + 1], next[i]];
-    onChange(next);
+    onChange(reindex(next));
   };
 
   return (
