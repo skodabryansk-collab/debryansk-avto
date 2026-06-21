@@ -687,6 +687,9 @@ export default function BrandPage() {
     areaServed: "Брянск",
   };
 
+  const cmsModels = (content?.models ?? []).filter(m => m.isActive !== false);
+  const hasCmsModels = cmsModels.length > 0;
+
   const publishedFaq = content?.faq ?? [];
   const schemaFaq = publishedFaq.filter(item => item.include_in_schema !== false);
   const faqPage = schemaFaq.length > 0
@@ -741,9 +744,9 @@ export default function BrandPage() {
       }
     : null;
 
-  const jsonLdItems: object[] = [autoDealer];
-  if (faqPage) jsonLdItems.push(faqPage);
-  if (modelsItemList) jsonLdItems.push(modelsItemList);
+  const jsonLdItems: Record<string, unknown>[] = [autoDealer as Record<string, unknown>];
+  if (faqPage) jsonLdItems.push(faqPage as Record<string, unknown>);
+  if (modelsItemList) jsonLdItems.push(modelsItemList as Record<string, unknown>);
   const jsonLd = jsonLdItems.length === 1 ? jsonLdItems[0] : jsonLdItems;
 
   const hasAbout = !!content?.description;
@@ -755,12 +758,8 @@ export default function BrandPage() {
   const hasPromotions = activePromos.length > 0;
   const loc = locations[0];
 
-  const cmsModels = (content?.models ?? []).filter(m => m.isActive !== false);
-  const hasCmsModels = cmsModels.length > 0;
-
-  const uniqueModels = (() => {
-    if (hasCmsModels) {
-      return [...cmsModels]
+  const uniqueModels = hasCmsModels
+    ? [...cmsModels]
         .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
         .map(m => {
           const matchingCars = cars.filter(c =>
@@ -781,30 +780,8 @@ export default function BrandPage() {
             description: m.description,
             badge: m.badge,
           };
-        });
-    }
-    const seen = new Map<string, { bodyType: string; minPrice: number; fallbackImg: string }>();
-    for (const car of cars) {
-      const key = cleanModelName(car.model);
-      const existing = seen.get(key);
-      const carPrice = car.max_discount > 0 ? car.price - car.max_discount : car.price;
-      if (!existing) {
-        seen.set(key, { bodyType: car.body_type, minPrice: carPrice, fallbackImg: car.images?.[0] ?? "" });
-      } else if (carPrice < existing.minPrice) {
-        seen.set(key, { ...existing, minPrice: carPrice });
-      }
-    }
-    return Array.from(seen.entries()).map(([name, v]) => ({
-      name,
-      bodyType: v.bodyType,
-      photo: v.fallbackImg,
-      minPrice: v.minPrice,
-      feedDealer: brandName,
-      feedModel: name,
-      description: undefined,
-      badge: undefined,
-    }));
-  })();
+        })
+    : [];
 
   const featuredCars = (() => {
     const withDiscount = cars.filter(c => c.max_discount > 0).sort((a, b) => b.max_discount - a.max_discount);
@@ -970,7 +947,7 @@ export default function BrandPage() {
         hasAbout={hasAbout}
         hasService={hasService}
         hasPromotions={hasPromotions}
-        hasModels={uniqueModels.length > 0}
+        hasModels={hasCmsModels}
       />
 
       {/* ── О бренде ──────────────────────────────────────── */}
@@ -991,7 +968,7 @@ export default function BrandPage() {
       )}
 
       {/* ── Модельный ряд ─────────────────────────────────── */}
-      <section id="section-models" className="scroll-mt-24 py-14 sm:py-20 bg-slate-50 border-b border-slate-100">
+      {hasCmsModels && <section id="section-models" className="scroll-mt-24 py-14 sm:py-20 bg-slate-50 border-b border-slate-100">
         <div className="container mx-auto px-4 sm:px-6">
           <FadeIn className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-3">
             <div>
@@ -1010,34 +987,25 @@ export default function BrandPage() {
             )}
           </FadeIn>
 
-          {uniqueModels.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-              {uniqueModels.map((m, i) => (
-                <ModelCard
-                  key={m.name + i}
-                  brandName={brandName}
-                  modelName={m.name}
-                  bodyType={m.bodyType}
-                  description={m.description}
-                  badge={m.badge}
-                  minPrice={m.minPrice}
-                  photo={m.photo}
-                  feedDealer={m.feedDealer}
-                  feedModel={m.feedModel}
-                  index={i}
-                />
-              ))}
-            </div>
-          ) : (
-            <FadeIn className="text-center py-12">
-              <Car className="w-14 h-14 text-slate-200 mx-auto mb-4" />
-              <p className="text-slate-500 font-medium">
-                Информация о модельном ряде обновляется
-              </p>
-            </FadeIn>
-          )}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+            {uniqueModels.map((m, i) => (
+              <ModelCard
+                key={m.name + i}
+                brandName={brandName}
+                modelName={m.name}
+                bodyType={m.bodyType}
+                description={m.description}
+                badge={m.badge}
+                minPrice={m.minPrice}
+                photo={m.photo}
+                feedDealer={m.feedDealer}
+                feedModel={m.feedModel}
+                index={i}
+              />
+            ))}
+          </div>
         </div>
-      </section>
+      </section>}
 
       {/* ── Спецпредложения ───────────────────────────────── */}
       {cars.length > 0 ? (
