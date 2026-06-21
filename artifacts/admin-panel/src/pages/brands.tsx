@@ -2,8 +2,9 @@ import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getBrands, createBrand, updateBrand, deleteBrand, uploadFile,
-  getBrandPageContent, updateBrandPageContent,
+  getBrandPageContent, updateBrandPageContent, getBrandCatalogModels,
   type Brand, type BrandPageContent, type BrandAdvantage, type BrandFaqItem, type BrandPromotion,
+  type BrandModel, type CatalogModel,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -564,6 +565,193 @@ function PromotionEditor({
   );
 }
 
+/* ── Model editor ────────────────────────────────────────────── */
+function ModelEditor({
+  value,
+  onChange,
+  catalogModels,
+  catalogLoading,
+}: {
+  value: BrandModel[];
+  onChange: (v: BrandModel[]) => void;
+  catalogModels: CatalogModel[];
+  catalogLoading: boolean;
+}) {
+  const { toast } = useToast();
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const pendingIdxRef = React.useRef<number>(-1);
+  const valueRef = React.useRef(value);
+  React.useEffect(() => { valueRef.current = value; }, [value]);
+  const [uploadingIdx, setUploadingIdx] = React.useState<number | null>(null);
+
+  const add = () => onChange([...value, {
+    id: Math.random().toString(36).slice(2),
+    feedDealer: "",
+    feedModel: "",
+    displayName: "",
+    isActive: true,
+    sort: value.length,
+  }]);
+
+  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
+
+  const update = <K extends keyof BrandModel>(i: number, field: K, v: BrandModel[K]) =>
+    onChange(value.map((item, idx) => idx === i ? { ...item, [field]: v } : item));
+
+  const moveUp = (i: number) => {
+    if (i === 0) return;
+    const next = [...value];
+    [next[i - 1], next[i]] = [next[i], next[i - 1]];
+    onChange(next.map((m, idx) => ({ ...m, sort: idx })));
+  };
+
+  const moveDown = (i: number) => {
+    if (i === value.length - 1) return;
+    const next = [...value];
+    [next[i], next[i + 1]] = [next[i + 1], next[i]];
+    onChange(next.map((m, idx) => ({ ...m, sort: idx })));
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const idx = pendingIdxRef.current;
+    if (idx < 0) return;
+    setUploadingIdx(idx);
+    e.target.value = "";
+    try {
+      const url = await uploadFile(file);
+      onChange(valueRef.current.map((item, i) => i === idx ? { ...item, image: url } : item));
+      toast({ title: "Изображение загружено" });
+    } catch {
+      toast({ title: "Ошибка загрузки", variant: "destructive" });
+    } finally {
+      setUploadingIdx(null);
+    }
+  };
+
+  const handleCatalogSelect = (i: number, key: string) => {
+    if (!key) return;
+    const sep = key.indexOf("::");
+    const dealer = key.slice(0, sep);
+    const model = key.slice(sep + 2);
+    onChange(value.map((item, idx) => idx === i ? {
+      ...item,
+      feedDealer: dealer,
+      feedModel: model,
+      displayName: item.displayName || model,
+    } : item));
+  };
+
+  return (
+    <div className="space-y-3">
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+
+      {catalogLoading && (
+        <div className="flex items-center gap-2 text-xs text-slate-400 py-1">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Загружаем каталог...
+        </div>
+      )}
+
+      {value.map((item, i) => (
+        <div key={i} className={`border rounded-lg p-3 space-y-2 ${item.isActive !== false ? "border-slate-200 bg-slate-50/50" : "border-slate-200 bg-slate-100/60 opacity-60"}`}>
+          <div className="flex items-center gap-1">
+            <div className="flex flex-col gap-0 shrink-0">
+              <Button variant="ghost" size="icon" className="w-6 h-6 text-slate-400" type="button"
+                onClick={() => moveUp(i)} disabled={i === 0}>
+                <ChevronUp className="w-3 h-3" />
+              </Button>
+              <Button variant="ghost" size="icon" className="w-6 h-6 text-slate-400" type="button"
+                onClick={() => moveDown(i)} disabled={i === value.length - 1}>
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </div>
+            <span className="text-xs text-slate-400 font-semibold shrink-0">{i + 1}.</span>
+            <div className="flex items-center gap-2 ml-auto">
+              <Switch id={`model-active-${i}`} checked={item.isActive !== false}
+                onCheckedChange={v => update(i, "isActive", v)} />
+              <Label htmlFor={`model-active-${i}`} className="text-xs text-slate-500 cursor-pointer">Активна</Label>
+              <Button variant="ghost" size="icon" className="w-8 h-8 text-red-500 hover:text-red-600"
+                type="button" onClick={() => remove(i)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Catalog selector */}
+          <div>
+            <p className="text-[10px] text-slate-400 mb-1 font-medium">Модель из каталога — для фильтров и цены «от»</p>
+            <select
+              className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#0070b8]"
+              value={item.feedDealer && item.feedModel ? `${item.feedDealer}::${item.feedModel}` : ""}
+              onChange={e => handleCatalogSelect(i, e.target.value)}
+            >
+              <option value="">— Выберите модель из каталога —</option>
+              {catalogModels.map((cm, ci) => (
+                <option key={ci} value={`${cm.dealer}::${cm.model}`}>
+                  {cm.model} — от {Number(cm.min_price).toLocaleString("ru-RU")} ₽ ({cm.count} шт.)
+                </option>
+              ))}
+              {item.feedDealer && item.feedModel && !catalogModels.some(cm => cm.dealer === item.feedDealer && cm.model === item.feedModel) && (
+                <option value={`${item.feedDealer}::${item.feedModel}`}>
+                  {item.feedModel} — нет в наличии
+                </option>
+              )}
+            </select>
+            {item.feedDealer && (
+              <p className="text-[10px] text-slate-400 mt-0.5 pl-1">
+                Дилер: <span className="font-medium text-slate-600">{item.feedDealer}</span>
+                {" · "}Модель в фиде: <span className="font-medium text-slate-600">{item.feedModel}</span>
+              </p>
+            )}
+          </div>
+
+          {/* Display name */}
+          <Input value={item.displayName} onChange={e => update(i, "displayName", e.target.value)}
+            placeholder="Отображаемое название (напр: Jolion, F7, Dargo X...)"
+            className="font-medium" />
+
+          {/* Badge */}
+          <Input value={item.badge ?? ""} onChange={e => update(i, "badge", e.target.value)}
+            placeholder="Бейдж: Новинка / Хит продаж (необязательно)"
+            className="text-sm" />
+
+          {/* Description */}
+          <Textarea rows={2} value={item.description ?? ""}
+            onChange={e => update(i, "description", e.target.value)}
+            placeholder="Краткое описание модели (необязательно)..."
+            className="text-sm resize-none" />
+
+          {/* Image */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="sm" type="button" disabled={uploadingIdx === i}
+              onClick={() => { pendingIdxRef.current = i; fileRef.current?.click(); }}>
+              {uploadingIdx === i
+                ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />Загрузка...</>
+                : <><Upload className="w-3.5 h-3.5 mr-1" />Фото модели</>}
+            </Button>
+            {item.image ? (
+              <>
+                <img src={item.image} alt="" className="w-20 h-12 object-contain rounded border bg-slate-50" />
+                <Button variant="ghost" size="icon" className="w-7 h-7 text-red-500" type="button"
+                  onClick={() => update(i, "image", undefined)}>
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </>
+            ) : (
+              <span className="text-xs text-slate-400">PNG с прозрачным фоном, 800×500 px</span>
+            )}
+          </div>
+        </div>
+      ))}
+
+      <Button variant="outline" size="sm" onClick={add} type="button" className="mt-1">
+        <Plus className="w-3.5 h-3.5 mr-1" /> Добавить модель
+      </Button>
+    </div>
+  );
+}
+
 /* ── Section heading helper ──────────────────────────────────── */
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -581,6 +769,13 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     queryFn: () => getBrandPageContent(brand.id),
   });
 
+  const { data: catalogData, isLoading: catalogLoading } = useQuery({
+    queryKey: ["brand-catalog-models", brand.id],
+    queryFn: () => getBrandCatalogModels(brand.id),
+    staleTime: 5 * 60 * 1000,
+  });
+  const catalogModels = catalogData ?? [];
+
   const [form, setForm] = React.useState<{
     description: string;
     serviceText: string;
@@ -589,6 +784,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     features: string[];
     faq: BrandFaqItem[];
     promotions: BrandPromotion[];
+    models: BrandModel[];
     heroImageUrl: string;
     heroImageMobileUrl: string;
     metaTitle: string;
@@ -601,6 +797,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     features: [],
     faq: [],
     promotions: [],
+    models: [],
     heroImageUrl: "",
     heroImageMobileUrl: "",
     metaTitle: "",
@@ -649,6 +846,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
         features: data.content.features ?? [],
         faq: data.content.faq ?? [],
         promotions: data.content.promotions ?? [],
+        models: data.content.models ?? [],
         heroImageUrl: data.content.heroImageUrl ?? "",
         heroImageMobileUrl: data.content.heroImageMobileUrl ?? "",
         metaTitle: data.content.metaTitle ?? "",
@@ -669,6 +867,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
       features: form.features,
       faq: form.faq,
       promotions: form.promotions,
+      models: form.models,
       heroImageUrl: form.heroImageUrl || null,
       heroImageMobileUrl: form.heroImageMobileUrl || null,
       metaTitle: form.metaTitle || null,
@@ -850,6 +1049,20 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
               <FaqEditor
                 value={form.faq}
                 onChange={faq => setForm(f => ({ ...f, faq }))}
+              />
+            </div>
+
+            {/* Models */}
+            <div className="border-t pt-4">
+              <SectionHeading>Модельный ряд</SectionHeading>
+              <p className="text-xs text-slate-400 mb-3">
+                Модели, которые отображаются в секции «Модельный ряд» на странице бренда. Привяжите каждую модель к каталогу авто, чтобы автоматически показывать цену «от» и работали фильтры при переходе в каталог.
+              </p>
+              <ModelEditor
+                value={form.models}
+                onChange={models => setForm(f => ({ ...f, models }))}
+                catalogModels={catalogModels}
+                catalogLoading={catalogLoading}
               />
             </div>
 
