@@ -12,6 +12,7 @@ import Layout from "@/components/Layout";
 import SEO from "@/components/SEO";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
+import { YandexMap, type DealerLocation } from "@/components/YandexMap";
 
 /* ─── Types ──────────────────────────────────────────────── */
 interface BrandPageData {
@@ -934,6 +935,61 @@ export default function BrandPage() {
         </div>
       </section>
 
+      {/* ── Новости ───────────────────────────────────────── */}
+      {data.news && data.news.length > 0 && (
+        <section id="section-news" className="scroll-mt-24 py-14 sm:py-20 bg-slate-50 border-b border-slate-100">
+          <div className="container mx-auto px-4 sm:px-6">
+            <FadeIn>
+              <SectionLabel>Новости</SectionLabel>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-8">
+                Новости {brandName}
+              </h2>
+            </FadeIn>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {data.news.map((item, i) => (
+                <FadeIn key={item.id} delay={i * 0.07}>
+                  <Link href={`/news/${item.slug}`} className="group flex flex-col bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow">
+                    {item.image && (
+                      <div className="aspect-[16/9] overflow-hidden">
+                        <img
+                          src={item.image}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                        />
+                      </div>
+                    )}
+                    <div className="flex flex-col flex-1 p-4">
+                      {item.category && (
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#0070b8] mb-1.5">
+                          {item.category}
+                        </span>
+                      )}
+                      <h3 className="font-extrabold text-slate-900 text-sm leading-snug mb-2 line-clamp-2 group-hover:text-[#0070b8] transition-colors">
+                        {item.title}
+                      </h3>
+                      {item.excerpt && (
+                        <p className="text-slate-500 text-xs leading-relaxed line-clamp-2 mb-3">
+                          {item.excerpt}
+                        </p>
+                      )}
+                      <div className="mt-auto flex items-center justify-between">
+                        {item.published_at && (
+                          <span className="text-[11px] text-slate-400">
+                            {new Date(item.published_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                          </span>
+                        )}
+                        <ArrowRight className="w-4 h-4 text-[#0070b8] opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </div>
+                  </Link>
+                </FadeIn>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ── Контакты ──────────────────────────────────────── */}
       <section id="section-contacts" className="scroll-mt-24 py-14 sm:py-20 bg-white">
         <div className="container mx-auto px-4 sm:px-6 max-w-3xl">
@@ -946,6 +1002,25 @@ export default function BrandPage() {
 
           {loc ? (
             <FadeIn delay={0.1}>
+              {loc.map_x && loc.map_y && (
+                <div className="rounded-2xl overflow-hidden mb-6 border border-slate-100 h-[280px]">
+                  <YandexMap
+                    locations={[{
+                      id: loc.id,
+                      address: loc.address,
+                      short: loc.title,
+                      brands: [brandName],
+                      lat: loc.map_x,
+                      lng: loc.map_y,
+                      color: "#0070b8",
+                      phone: loc.phone ?? undefined,
+                      hours: loc.hours ?? undefined,
+                    } satisfies DealerLocation]}
+                    center={[loc.map_x, loc.map_y]}
+                    zoom={16}
+                  />
+                </div>
+              )}
               <div className="bg-slate-50 rounded-2xl border border-slate-100 p-6 sm:p-8">
                 <h3 className="font-extrabold text-lg mb-5 text-slate-900">
                   {loc.title}
