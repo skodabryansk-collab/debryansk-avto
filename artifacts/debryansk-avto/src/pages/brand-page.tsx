@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   MapPin, Phone, Clock, ArrowRight, Car, Wrench,
   ChevronLeft, ChevronRight, Calendar, Palette,
   Sparkles, CheckCircle, ExternalLink, X, User,
+  Shield, Settings, Star, ChevronDown, Navigation,
 } from "lucide-react";
 import Layout from "@/components/Layout";
 import SEO from "@/components/SEO";
@@ -78,12 +79,41 @@ async function fetchBrandPage(slug: string): Promise<BrandPageData> {
   return json.data as BrandPageData;
 }
 
+/* ─── Model photo mapping ────────────────────────────────── */
+function getModelPhoto(brandSlug: string, modelName: string, fallback: string): string {
+  const havalSlugs = ["haval-city", "haval-pro"];
+  if (!havalSlugs.includes(brandSlug)) return fallback;
+
+  const m = modelName.toLowerCase();
+  if (m.includes("kingkong")) return "/brands/haval/gwm_poer_kingkong.png";
+  if (m.includes("dargo x") || m.includes("dargo_x")) return "/brands/haval/dargo_x.png";
+  if (m.includes("dargo")) return "/brands/haval/dargo.png";
+  if (m.includes("f7x")) return "/brands/haval/f7x.png";
+  if (m.includes("f7")) return "/brands/haval/f7.png";
+  if (m.includes("jolion")) return "/brands/haval/jolion.png";
+  if (m.includes("m6")) return "/brands/haval/m6.png";
+  if (m.includes("poer")) return "/brands/haval/gwm_poer.png";
+  return fallback;
+}
+
 /* ─── Helpers ────────────────────────────────────────────── */
 function fmtPrice(p: number) {
   return p.toLocaleString("ru-RU") + " ₽";
 }
 
-function FadeIn({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
+function cleanModelName(raw: string): string {
+  return raw.replace(/,\s*(I{1,3}V?|V?I{0,3})\s*$/, "").trim();
+}
+
+function FadeIn({
+  children,
+  delay = 0,
+  className = "",
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -97,75 +127,273 @@ function FadeIn({ children, delay = 0, className = "" }: { children: React.React
   );
 }
 
-/* ─── CTA Modal ──────────────────────────────────────────── */
-function CTAModal({ title, brandName, onClose }: { title: string; brandName: string; onClose: () => void }) {
-  const [name, setName] = useState("");
+/* ─── Section label ──────────────────────────────────────── */
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-bold uppercase tracking-widest text-[#0070b8] mb-2">
+      {children}
+    </p>
+  );
+}
+
+/* ─── Service CTA Modal ──────────────────────────────────── */
+function ServiceModal({
+  brandName,
+  onClose,
+}: {
+  brandName: string;
+  onClose: () => void;
+}) {
   const [phone, setPhone] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !isPhoneValid(phone)) return;
+    if (!isPhoneValid(phone)) return;
+    setSending(true);
+    try {
+      await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: `Запись на ТО — ${brandName}`,
+          text: `Запись на ТО ${brandName}. Телефон: ${phone}`,
+        }),
+      });
+    } catch {}
+    setSending(false);
     setSubmitted(true);
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
       <motion.div
         initial={{ y: 60, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="h-1 bg-gradient-to-r from-[#0070b8] to-[#87b63c]" />
         <div className="flex justify-center pt-3 sm:hidden">
           <div className="w-10 h-1 bg-slate-200 rounded-full" />
         </div>
         <div className="p-6 sm:p-8">
-          <button onClick={onClose} className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+          <button
+            onClick={onClose}
+            className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors"
+          >
             <X className="w-4 h-4 text-slate-500" />
           </button>
           {submitted ? (
             <div className="text-center py-4">
               <CheckCircle className="w-14 h-14 text-[#87b63c] mx-auto mb-4" />
               <h3 className="text-xl font-extrabold mb-2">Заявка принята!</h3>
-              <p className="text-slate-500 text-sm">Менеджер перезвонит вам в ближайшее время.</p>
-              <button onClick={onClose} className="mt-6 w-full bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold rounded-xl py-3 text-sm hover:opacity-90">Закрыть</button>
+              <p className="text-slate-500 text-sm">
+                Мы перезвоним и согласуем удобное время.
+              </p>
+              <button
+                onClick={onClose}
+                className="mt-6 w-full bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold rounded-xl py-3 text-sm hover:opacity-90"
+              >
+                Закрыть
+              </button>
             </div>
           ) : (
             <>
-              <h2 className="text-xl font-extrabold mb-1">{title}</h2>
-              <p className="text-slate-500 text-sm mb-5">{brandName} — Дебрянск Авто, Брянск</p>
+              <h2 className="text-xl font-extrabold mb-1">Запись на ТО</h2>
+              <p className="text-slate-500 text-sm mb-5">
+                {brandName} — Дебрянск Авто, Брянск
+              </p>
               <form onSubmit={handleSubmit} className="space-y-3">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Ваше имя</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input value={name} onChange={e => setName(e.target.value)} placeholder="Иван Иванов" required
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors" />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Телефон</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">
+                    Ваш телефон
+                  </label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input type="tel" inputMode="tel" maxLength={18} value={phone}
-                      onChange={e => setPhone(formatPhone(e.target.value))}
-                      placeholder="+7 (___) ___-__-__" required
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors" />
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      maxLength={18}
+                      value={phone}
+                      onChange={(e) => setPhone(formatPhone(e.target.value))}
+                      placeholder="+7 (___) ___-__-__"
+                      required
+                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors"
+                    />
                   </div>
                 </div>
-                <button type="submit" className="w-full bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity mt-1">
-                  Отправить заявку
+                <button
+                  type="submit"
+                  disabled={sending}
+                  className="w-full bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity disabled:opacity-60"
+                >
+                  {sending ? "Отправляем…" : "Записаться на ТО"}
                 </button>
-                <p className="text-[10px] text-slate-400 text-center">Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности</p>
+                <p className="text-[10px] text-slate-400 text-center">
+                  Нажимая кнопку, вы соглашаетесь с{" "}
+                  <Link href="/privacy" className="underline">
+                    политикой конфиденциальности
+                  </Link>
+                </p>
               </form>
             </>
           )}
         </div>
       </motion.div>
     </div>
+  );
+}
+
+/* ─── Anchor nav ─────────────────────────────────────────── */
+const NAV_ITEMS = [
+  { id: "about", label: "О бренде" },
+  { id: "models", label: "Модельный ряд" },
+  { id: "stock", label: "В наличии" },
+  { id: "service", label: "Сервис" },
+  { id: "contacts", label: "Контакты" },
+] as const;
+
+function AnchorNav({
+  hasCars,
+  hasAbout,
+  hasService,
+}: {
+  hasCars: boolean;
+  hasAbout: boolean;
+  hasService: boolean;
+}) {
+  const [active, setActive] = useState("");
+
+  useEffect(() => {
+    const observers: IntersectionObserver[] = [];
+    NAV_ITEMS.forEach(({ id }) => {
+      const el = document.getElementById(`section-${id}`);
+      if (!el) return;
+      const obs = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) setActive(id);
+        },
+        { rootMargin: "-30% 0px -60% 0px", threshold: 0 }
+      );
+      obs.observe(el);
+      observers.push(obs);
+    });
+    return () => observers.forEach((o) => o.disconnect());
+  }, []);
+
+  const visibleItems = NAV_ITEMS.filter(({ id }) => {
+    if (id === "about" && !hasAbout) return false;
+    if (id === "stock" && !hasCars) return false;
+    if (id === "service" && !hasService) return false;
+    return true;
+  });
+
+  function scrollTo(id: string) {
+    document.getElementById(`section-${id}`)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
+  return (
+    <div className="sticky top-[64px] z-30 bg-white/95 backdrop-blur border-b border-slate-100 shadow-sm">
+      <div className="container mx-auto px-4 sm:px-6">
+        <div className="flex gap-0 overflow-x-auto scrollbar-hide -mx-1">
+          {visibleItems.map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => scrollTo(id)}
+              className={`shrink-0 px-4 py-3.5 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${
+                active === id
+                  ? "border-[#0070b8] text-[#0070b8]"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Model card ─────────────────────────────────────────── */
+function ModelCard({
+  brandSlug,
+  brandName,
+  modelName,
+  bodyType,
+  minPrice,
+  fallbackImg,
+  index,
+}: {
+  brandSlug: string;
+  brandName: string;
+  modelName: string;
+  bodyType: string;
+  minPrice: number;
+  fallbackImg: string;
+  index: number;
+}) {
+  const photo = getModelPhoto(brandSlug, modelName, fallbackImg);
+  const cleanName = cleanModelName(modelName);
+  const [, navigate] = useLocation();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.45, delay: index * 0.07 }}
+      className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer flex flex-col"
+      onClick={() =>
+        navigate(`/new-cars?brand=${encodeURIComponent(brandName)}`)
+      }
+    >
+      <div className="relative bg-slate-50 overflow-hidden" style={{ height: 180 }}>
+        {photo ? (
+          <img
+            src={photo}
+            alt={`${brandName} ${cleanName}`}
+            className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-slate-200">
+            <Car className="w-16 h-16" />
+          </div>
+        )}
+      </div>
+      <div className="p-4 flex flex-col flex-1">
+        <h3 className="font-extrabold text-base leading-tight mb-0.5">
+          {brandName} {cleanName}
+        </h3>
+        {bodyType && (
+          <p className="text-xs text-slate-400 mb-3">{bodyType}</p>
+        )}
+        <div className="mt-auto flex items-center justify-between">
+          <div>
+            <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">
+              от
+            </div>
+            <div className="text-base font-extrabold text-[#0070b8]">
+              {fmtPrice(minPrice)}
+            </div>
+          </div>
+          <span className="flex items-center gap-1 text-xs font-bold text-[#0070b8] group-hover:gap-2 transition-all">
+            Смотреть <ArrowRight className="w-3.5 h-3.5" />
+          </span>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -187,9 +415,13 @@ function BrandCarCard({ car }: { car: BrandPageData["cars"][number] }) {
     >
       <div className="relative h-44 bg-slate-100 overflow-hidden">
         {img ? (
-          <img src={img} alt={`${car.mark} ${car.model}`}
+          <img
+            src={img}
+            alt={`${car.mark} ${car.model}`}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            loading="lazy" decoding="async" />
+            loading="lazy"
+            decoding="async"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-slate-300">
             <Car className="w-12 h-12" />
@@ -197,12 +429,22 @@ function BrandCarCard({ car }: { car: BrandPageData["cars"][number] }) {
         )}
         {imgs.length > 1 && (
           <>
-            <button onClick={e => { e.stopPropagation(); setImgIdx(i => (i - 1 + imgs.length) % imgs.length); }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setImgIdx((i) => (i - 1 + imgs.length) % imgs.length);
+              }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center"
+            >
               <ChevronLeft className="w-4 h-4 text-white" />
             </button>
-            <button onClick={e => { e.stopPropagation(); setImgIdx(i => (i + 1) % imgs.length); }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setImgIdx((i) => (i + 1) % imgs.length);
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center"
+            >
               <ChevronRight className="w-4 h-4 text-white" />
             </button>
           </>
@@ -212,26 +454,40 @@ function BrandCarCard({ car }: { car: BrandPageData["cars"][number] }) {
         </span>
       </div>
       <div className="p-4 flex flex-col flex-1">
-        <h3 className="font-extrabold text-sm leading-snug mb-0.5">{car.mark} {car.model}</h3>
-        {car.modification && <p className="text-xs text-slate-400 mb-2 line-clamp-1">{car.modification}</p>}
+        <h3 className="font-extrabold text-sm leading-snug mb-0.5">
+          {car.mark} {car.model}
+        </h3>
+        {car.modification && (
+          <p className="text-xs text-slate-400 mb-2 line-clamp-1">
+            {car.modification}
+          </p>
+        )}
         <div className="flex gap-1.5 mb-2 flex-wrap">
           <span className="flex items-center gap-1 bg-slate-50 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700">
-            <Calendar className="w-3 h-3 text-[#0070b8]" />{car.year}
+            <Calendar className="w-3 h-3 text-[#0070b8]" />
+            {car.year}
           </span>
           {car.body_type && (
             <span className="flex items-center gap-1 bg-slate-50 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700">
-              <Palette className="w-3 h-3 text-[#87b63c]" />{car.body_type}
+              <Palette className="w-3 h-3 text-[#87b63c]" />
+              {car.body_type}
             </span>
           )}
         </div>
         <div className="mt-auto">
           {car.max_discount > 0 ? (
             <>
-              <div className="text-base font-extrabold text-[#0070b8]">{fmtPrice(car.price - car.max_discount)}</div>
-              <div className="text-xs text-slate-400 line-through">{fmtPrice(car.price)}</div>
+              <div className="text-base font-extrabold text-[#0070b8]">
+                {fmtPrice(car.price - car.max_discount)}
+              </div>
+              <div className="text-xs text-slate-400 line-through">
+                {fmtPrice(car.price)}
+              </div>
             </>
           ) : (
-            <div className="text-base font-extrabold text-slate-900">{fmtPrice(car.price)}</div>
+            <div className="text-base font-extrabold text-slate-900">
+              {fmtPrice(car.price)}
+            </div>
           )}
         </div>
       </div>
@@ -243,7 +499,8 @@ function BrandCarCard({ car }: { car: BrandPageData["cars"][number] }) {
 export default function BrandPage() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug ?? "";
-  const [modal, setModal] = useState<"testdrive" | "callback" | null>(null);
+  const [serviceModal, setServiceModal] = useState(false);
+  const [modelFilter, setModelFilter] = useState<string>("all");
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["brand-page", slug],
@@ -268,33 +525,76 @@ export default function BrandPage() {
         <SEO title="Бренд не найден" description="Страница бренда не существует" />
         <div className="min-h-screen flex flex-col items-center justify-center gap-4">
           <Car className="w-16 h-16 text-slate-300" />
-          <h1 className="text-2xl font-extrabold text-slate-700">Бренд не найден</h1>
-          <Link href="/" className="text-[#0070b8] font-bold hover:underline">← На главную</Link>
+          <h1 className="text-2xl font-extrabold text-slate-700">
+            Бренд не найден
+          </h1>
+          <Link href="/" className="text-[#0070b8] font-bold hover:underline">
+            ← На главную
+          </Link>
         </div>
       </Layout>
     );
   }
 
-  const { brand, content, locations, cars, news } = data;
+  const { brand, content, locations, cars } = data;
   const brandName = brand.name;
-  const metaTitle = content?.metaTitle ?? `${brandName} в Брянске — официальный дилер | Дебрянск Авто`;
-  const metaDesc = content?.metaDescription ?? `Купите ${brandName} у официального дилера в Брянске. Широкий выбор в наличии, кредит, trade-in, гарантийный сервис. Дебрянск Авто.`;
+  const territory = brand.subName?.trim() || `Территория ${brandName}`;
+  const metaTitle =
+    content?.metaTitle ??
+    `${brandName} в Брянске — официальный дилер | Дебрянск Авто`;
+  const metaDesc =
+    content?.metaDescription ??
+    `Купите ${brandName} у официального дилера в Брянске. Широкий выбор в наличии, кредит, trade-in, гарантийный сервис. Дебрянск Авто.`;
 
   const jsonLd = {
     "@type": "AutoDealer",
-    "name": `${brandName} — Дебрянск Авто`,
-    "description": metaDesc,
-    "url": `https://debryansk-auto.ru/brands/${slug}`,
-    "brand": { "@type": "Brand", "name": brandName },
-    "address": {
+    name: `${brandName} — Дебрянск Авто`,
+    description: metaDesc,
+    url: `https://debryansk-auto.ru/brands/${slug}`,
+    brand: { "@type": "Brand", name: brandName },
+    address: {
       "@type": "PostalAddress",
-      "addressLocality": "Брянск",
-      "addressRegion": "Брянская область",
-      "addressCountry": "RU",
+      addressLocality: "Брянск",
+      addressRegion: "Брянская область",
+      addressCountry: "RU",
     },
-    "telephone": "+74832631000",
-    "areaServed": "Брянск",
+    telephone: "+74832631000",
+    areaServed: "Брянск",
   };
+
+  const hasAbout = !!content?.description;
+  const hasService = true;
+  const loc = locations[0];
+
+  const uniqueModels = (() => {
+    const seen = new Map<string, { bodyType: string; minPrice: number; fallbackImg: string }>();
+    for (const car of cars) {
+      const key = cleanModelName(car.model);
+      const existing = seen.get(key);
+      const carPrice = car.max_discount > 0 ? car.price - car.max_discount : car.price;
+      if (!existing) {
+        seen.set(key, {
+          bodyType: car.body_type,
+          minPrice: carPrice,
+          fallbackImg: car.images?.[0] ?? "",
+        });
+      } else if (carPrice < existing.minPrice) {
+        seen.set(key, { ...existing, minPrice: carPrice });
+      }
+    }
+    return Array.from(seen.entries()).map(([name, v]) => ({ name, ...v }));
+  })();
+
+  const allModels = Array.from(new Set(cars.map((c) => cleanModelName(c.model))));
+  const filteredCars =
+    modelFilter === "all"
+      ? cars
+      : cars.filter((c) => cleanModelName(c.model) === modelFilter);
+
+  const mapLink =
+    loc?.map_x && loc?.map_y
+      ? `https://yandex.ru/maps/?ll=${loc.map_y},${loc.map_x}&pt=${loc.map_y},${loc.map_x}&z=16`
+      : null;
 
   return (
     <Layout>
@@ -311,274 +611,418 @@ export default function BrandPage() {
       />
 
       {/* ── Hero ──────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pt-20 pb-16 sm:pt-28 sm:pb-24">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(0,112,184,0.15),transparent_60%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(135,182,60,0.1),transparent_60%)]" />
+      <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 pt-20 pb-16 sm:pt-28 sm:pb-24">
+        {/* Decorative gradients */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(0,112,184,0.2),transparent_55%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(135,182,60,0.12),transparent_55%)]" />
+        {/* Subtle grid pattern */}
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.5) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.5) 1px,transparent 1px)",
+            backgroundSize: "60px 60px",
+          }}
+        />
+
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
-          <Link href="/#brands" className="inline-flex items-center gap-1.5 text-slate-400 hover:text-white text-sm mb-8 transition-colors">
+          <Link
+            href="/#brands"
+            className="inline-flex items-center gap-1.5 text-slate-400 hover:text-white text-sm mb-10 transition-colors"
+          >
             <ChevronLeft className="w-4 h-4" /> Все бренды
           </Link>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 sm:gap-10">
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-8 sm:gap-12">
             {brand.logoUrl && (
-              <div className="w-32 h-20 sm:w-40 sm:h-24 bg-white/10 rounded-2xl flex items-center justify-center p-4 border border-white/10 shrink-0">
-                <img src={brand.logoUrl} alt={brandName} className="w-full h-full object-contain" loading="eager" decoding="async" />
-              </div>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5 }}
+                className="w-28 h-20 sm:w-36 sm:h-24 bg-white/10 rounded-2xl flex items-center justify-center p-4 border border-white/10 shrink-0 backdrop-blur-sm"
+              >
+                <img
+                  src={brand.logoUrl}
+                  alt={brandName}
+                  className="w-full h-full object-contain"
+                  loading="eager"
+                  decoding="async"
+                />
+              </motion.div>
             )}
             <div>
-              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#87b63c] mb-2">
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#87b63c] mb-2"
+              >
                 Официальный дилер в Брянске
-              </p>
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white leading-tight mb-3">
+              </motion.p>
+              <motion.h1
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.08 }}
+                className="text-4xl sm:text-5xl md:text-6xl font-black text-white leading-none mb-3 tracking-tight"
+              >
                 {brandName}
-              </h1>
-              {brand.subName && (
-                <p className="text-slate-400 text-sm sm:text-base font-medium">{brand.subName}</p>
-              )}
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.16 }}
+                className="text-lg sm:text-xl font-bold text-[#0070b8]"
+              >
+                {territory}
+              </motion.p>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3 mt-8">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.28 }}
+            className="flex flex-wrap gap-3 mt-10"
+          >
             <button
-              onClick={() => setModal("testdrive")}
+              onClick={() =>
+                document
+                  .getElementById("section-models")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
               className="inline-flex items-center gap-2 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors shadow-lg shadow-[#0070b8]/30"
             >
-              <Car className="w-4 h-4" /> Тест-драйв
+              Смотреть модели <ChevronDown className="w-4 h-4" />
             </button>
-            <button
-              onClick={() => setModal("callback")}
+            <a
+              href={`/new-cars?brand=${encodeURIComponent(brandName)}`}
               className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors border border-white/20"
             >
-              <Phone className="w-4 h-4" /> Заказать звонок
-            </button>
+              Все авто в наличии <ArrowRight className="w-4 h-4" />
+            </a>
             {brand.websiteUrl && (
-              <a href={brand.websiteUrl} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors border border-white/10">
+              <a
+                href={brand.websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-bold px-5 py-3 rounded-xl text-sm transition-colors border border-white/10"
+              >
                 Сайт бренда <ExternalLink className="w-3.5 h-3.5" />
               </a>
             )}
-          </div>
+          </motion.div>
         </div>
       </section>
 
-      {/* ── Description ──────────────────────────────────── */}
-      {content?.description && (
-        <section className="py-12 sm:py-16 bg-white border-b border-slate-100">
+      {/* ── Anchor nav ────────────────────────────────────── */}
+      <AnchorNav
+        hasCars={cars.length > 0}
+        hasAbout={hasAbout}
+        hasService={hasService}
+      />
+
+      {/* ── О бренде ──────────────────────────────────────── */}
+      {hasAbout && (
+        <section id="section-about" className="scroll-mt-24 py-14 sm:py-20 bg-white border-b border-slate-100">
           <div className="container mx-auto px-4 sm:px-6 max-w-4xl">
             <FadeIn>
-              <p className="text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-3">О бренде</p>
-              <h2 className="text-2xl sm:text-3xl font-extrabold mb-5">{brandName} в Брянске</h2>
-              <p className="text-slate-600 leading-relaxed text-base sm:text-lg">{content.description}</p>
+              <SectionLabel>О бренде</SectionLabel>
+              <h2 className="text-2xl sm:text-3xl font-extrabold mb-5 text-slate-900">
+                {brandName} в Брянске
+              </h2>
+              <p className="text-slate-600 leading-relaxed text-base sm:text-lg whitespace-pre-line">
+                {content!.description}
+              </p>
             </FadeIn>
           </div>
         </section>
       )}
 
-      {/* ── Locations ────────────────────────────────────── */}
-      {locations.length > 0 && (
-        <section className="py-12 sm:py-16 bg-slate-50 border-b border-slate-100">
-          <div className="container mx-auto px-4 sm:px-6">
-            <FadeIn>
-              <p className="text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Где нас найти</p>
-              <h2 className="text-2xl sm:text-3xl font-extrabold mb-8">Дилерские центры {brandName}</h2>
-            </FadeIn>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {locations.map((loc, i) => (
-                <FadeIn key={loc.id} delay={i * 0.08}>
-                  <div className="bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-md transition-shadow">
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-xl bg-[#0070b8]/10 flex items-center justify-center shrink-0">
-                        <MapPin className="w-5 h-5 text-[#0070b8]" />
-                      </div>
-                      <div>
-                        <h3 className="font-extrabold text-sm leading-snug">{loc.title}</h3>
-                        {loc.is_service && (
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#87b63c] bg-[#87b63c]/10 rounded-md px-1.5 py-0.5">Сервис</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="space-y-2 text-sm text-slate-600">
-                      <div className="flex items-start gap-2">
-                        <MapPin className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-                        <span>{loc.address}</span>
-                      </div>
-                      {loc.phone && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-slate-400 shrink-0" />
-                          <a href={phoneHref(loc.phone)} className="font-bold text-[#0070b8] hover:underline">
-                            {normalizePhone(loc.phone)}
-                          </a>
-                        </div>
-                      )}
-                      {loc.hours && (
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span className="text-slate-500">{loc.hours}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </FadeIn>
-              ))}
+      {/* ── Модельный ряд ─────────────────────────────────── */}
+      <section id="section-models" className="scroll-mt-24 py-14 sm:py-20 bg-slate-50 border-b border-slate-100">
+        <div className="container mx-auto px-4 sm:px-6">
+          <FadeIn className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-3">
+            <div>
+              <SectionLabel>Модельный ряд</SectionLabel>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+                {territory}
+              </h2>
             </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── Cars in stock ────────────────────────────────── */}
-      {cars.length > 0 && (
-        <section className="py-12 sm:py-16 bg-white border-b border-slate-100">
-          <div className="container mx-auto px-4 sm:px-6">
-            <FadeIn className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">В наличии</p>
-                <h2 className="text-2xl sm:text-3xl font-extrabold">Новые {brandName}</h2>
-              </div>
-              <Link
+            {uniqueModels.length > 0 && (
+              <a
                 href={`/new-cars?brand=${encodeURIComponent(brandName)}`}
                 className="flex items-center gap-2 text-[#0070b8] font-bold hover:gap-3 transition-all text-sm whitespace-nowrap"
               >
-                Все автомобили <ArrowRight className="w-4 h-4" />
-              </Link>
+                Все в каталоге <ArrowRight className="w-4 h-4" />
+              </a>
+            )}
+          </FadeIn>
+
+          {uniqueModels.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+              {uniqueModels.map((m, i) => (
+                <ModelCard
+                  key={m.name}
+                  brandSlug={slug}
+                  brandName={brandName}
+                  modelName={m.name}
+                  bodyType={m.bodyType}
+                  minPrice={m.minPrice}
+                  fallbackImg={m.fallbackImg}
+                  index={i}
+                />
+              ))}
+            </div>
+          ) : (
+            <FadeIn className="text-center py-12">
+              <Car className="w-14 h-14 text-slate-200 mx-auto mb-4" />
+              <p className="text-slate-500 font-medium">
+                Информация о модельном ряде обновляется
+              </p>
             </FadeIn>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4 sm:gap-5">
-              {cars.map(car => (
+          )}
+        </div>
+      </section>
+
+      {/* ── В наличии ─────────────────────────────────────── */}
+      {cars.length > 0 ? (
+        <section id="section-stock" className="scroll-mt-24 py-14 sm:py-20 bg-white border-b border-slate-100">
+          <div className="container mx-auto px-4 sm:px-6">
+            <FadeIn className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-3">
+              <div>
+                <SectionLabel>В наличии</SectionLabel>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+                  Новые {brandName}
+                  <span className="ml-3 text-base font-bold text-slate-400">
+                    {cars.length} авт.
+                  </span>
+                </h2>
+              </div>
+              <a
+                href={`/new-cars?brand=${encodeURIComponent(brandName)}`}
+                className="flex items-center gap-2 text-[#0070b8] font-bold hover:gap-3 transition-all text-sm whitespace-nowrap"
+              >
+                Весь каталог <ArrowRight className="w-4 h-4" />
+              </a>
+            </FadeIn>
+
+            {allModels.length >= 2 && (
+              <div className="flex gap-2 flex-wrap mb-6">
+                <button
+                  onClick={() => setModelFilter("all")}
+                  className={`px-4 py-1.5 rounded-full text-sm font-bold transition-colors ${
+                    modelFilter === "all"
+                      ? "bg-[#0070b8] text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  Все модели
+                </button>
+                {allModels.map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setModelFilter(m)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-bold transition-colors ${
+                      modelFilter === m
+                        ? "bg-[#0070b8] text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+              {filteredCars.map((car) => (
                 <BrandCarCard key={car.id} car={car} />
               ))}
             </div>
           </div>
         </section>
-      )}
-
-      {cars.length === 0 && (
-        <section className="py-12 sm:py-16 bg-white border-b border-slate-100">
+      ) : (
+        <section id="section-stock" className="scroll-mt-24 py-14 sm:py-20 bg-white border-b border-slate-100">
           <div className="container mx-auto px-4 sm:px-6">
             <FadeIn className="text-center py-8">
               <Car className="w-14 h-14 text-slate-200 mx-auto mb-4" />
-              <h2 className="text-xl font-extrabold text-slate-700 mb-2">Уточните наличие</h2>
-              <p className="text-slate-500 mb-6">Актуальные предложения по {brandName} — свяжитесь с нами</p>
-              <button onClick={() => setModal("callback")}
-                className="inline-flex items-center gap-2 bg-[#0070b8] text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-[#005a94] transition-colors">
+              <SectionLabel>В наличии</SectionLabel>
+              <h2 className="text-xl font-extrabold text-slate-700 mb-2">
+                Уточните наличие
+              </h2>
+              <p className="text-slate-500 mb-6">
+                Актуальные предложения по {brandName} — свяжитесь с нами
+              </p>
+              <a
+                href={`tel:+74832631000`}
+                className="inline-flex items-center gap-2 bg-[#0070b8] text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-[#005a94] transition-colors"
+              >
                 <Phone className="w-4 h-4" /> Узнать наличие
-              </button>
+              </a>
             </FadeIn>
           </div>
         </section>
       )}
 
-      {/* ── Promo ────────────────────────────────────────── */}
-      {content?.promoText && (
-        <section className="py-12 sm:py-16 bg-gradient-to-br from-[#0070b8]/5 to-[#87b63c]/5 border-b border-slate-100">
-          <div className="container mx-auto px-4 sm:px-6 max-w-4xl">
-            <FadeIn>
-              <p className="text-xs font-bold uppercase tracking-widest text-[#87b63c] mb-3">Акции</p>
-              <h2 className="text-2xl sm:text-3xl font-extrabold mb-5">Специальные предложения</h2>
-              <p className="text-slate-600 leading-relaxed text-base">{content.promoText}</p>
-            </FadeIn>
-          </div>
-        </section>
-      )}
+      {/* ── Сервис ────────────────────────────────────────── */}
+      <section id="section-service" className="scroll-mt-24 py-14 sm:py-20 bg-slate-900 border-b border-slate-800">
+        <div className="container mx-auto px-4 sm:px-6">
+          <FadeIn>
+            <SectionLabel>Сервис</SectionLabel>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-3">
+              Гарантийное обслуживание {brandName}
+            </h2>
+            {content?.serviceText && (
+              <p className="text-slate-400 mb-8 leading-relaxed max-w-2xl">
+                {content.serviceText}
+              </p>
+            )}
+          </FadeIn>
 
-      {/* ── Service ──────────────────────────────────────── */}
-      {content?.serviceText && (
-        <section className="py-12 sm:py-16 bg-slate-900 border-b border-slate-800">
-          <div className="container mx-auto px-4 sm:px-6">
-            <div className="max-w-4xl mx-auto flex flex-col sm:flex-row gap-8 items-start">
-              <FadeIn className="shrink-0">
-                <div className="w-14 h-14 rounded-2xl bg-[#87b63c]/20 flex items-center justify-center">
-                  <Wrench className="w-7 h-7 text-[#87b63c]" />
+          <div className="grid sm:grid-cols-3 gap-4 mb-8">
+            {[
+              {
+                icon: <Shield className="w-6 h-6 text-[#87b63c]" />,
+                title: "Оригинальные запчасти",
+                desc: "Только сертифицированные детали от производителя",
+              },
+              {
+                icon: <Star className="w-6 h-6 text-[#87b63c]" />,
+                title: "Гарантия на работы",
+                desc: "Полная гарантия на все виды сервисных работ",
+              },
+              {
+                icon: <Settings className="w-6 h-6 text-[#87b63c]" />,
+                title: "Онлайн-запись",
+                desc: "Запишитесь на ТО в удобное время, без очередей",
+              },
+            ].map((item, i) => (
+              <FadeIn key={i} delay={i * 0.08}>
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                  <div className="w-11 h-11 rounded-xl bg-[#87b63c]/15 flex items-center justify-center mb-3">
+                    {item.icon}
+                  </div>
+                  <h3 className="font-extrabold text-white text-sm mb-1">
+                    {item.title}
+                  </h3>
+                  <p className="text-slate-400 text-xs leading-relaxed">
+                    {item.desc}
+                  </p>
                 </div>
               </FadeIn>
-              <FadeIn delay={0.1}>
-                <p className="text-xs font-bold uppercase tracking-widest text-[#87b63c] mb-3">Сервис</p>
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-5">Обслуживание {brandName}</h2>
-                <p className="text-slate-400 leading-relaxed text-base mb-6">{content.serviceText}</p>
-                <button onClick={() => setModal("callback")}
-                  className="inline-flex items-center gap-2 bg-[#87b63c] hover:bg-[#6d9a2e] text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors">
-                  <Wrench className="w-4 h-4" /> Записаться на сервис
-                </button>
-              </FadeIn>
-            </div>
+            ))}
           </div>
-        </section>
-      )}
 
-      {/* ── News ─────────────────────────────────────────── */}
-      {news.length > 0 && (
-        <section className="py-12 sm:py-16 bg-white border-b border-slate-100">
-          <div className="container mx-auto px-4 sm:px-6">
-            <FadeIn className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Актуально</p>
-                <h2 className="text-2xl sm:text-3xl font-extrabold">Новости {brandName}</h2>
-              </div>
-              <Link href="/news" className="flex items-center gap-2 text-[#0070b8] font-bold hover:gap-3 transition-all text-sm whitespace-nowrap">
-                Все новости <ArrowRight className="w-4 h-4" />
-              </Link>
-            </FadeIn>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {news.map((n, i) => (
-                <FadeIn key={n.id} delay={i * 0.1}>
-                  <Link href={`/news/${n.slug}`}
-                    className="block bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow group">
-                    {n.image && (
-                      <div className="h-44 overflow-hidden">
-                        <img src={n.image} alt={n.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
-                      </div>
-                    )}
-                    <div className="p-5">
-                      {n.published_at && (
-                        <p className="text-xs font-semibold text-slate-400 mb-2">
-                          {new Date(n.published_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
-                        </p>
-                      )}
-                      <h3 className="font-extrabold text-sm leading-snug group-hover:text-[#0070b8] transition-colors">{n.title}</h3>
-                      {n.excerpt && <p className="text-sm text-slate-500 mt-1 line-clamp-2">{n.excerpt}</p>}
-                    </div>
-                  </Link>
-                </FadeIn>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── CTA block ────────────────────────────────────── */}
-      <section className="py-14 sm:py-20 bg-gradient-to-br from-[#0070b8] to-[#005a94]">
-        <div className="container mx-auto px-4 sm:px-6 text-center">
           <FadeIn>
-            {brand.logoUrl && (
-              <div className="w-20 h-12 bg-white/20 rounded-xl flex items-center justify-center p-2 mx-auto mb-6">
-                <img src={brand.logoUrl} alt={brandName} className="w-full h-full object-contain" loading="lazy" decoding="async" />
-              </div>
-            )}
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-4">
-              Интересует {brandName}?
-            </h2>
-            <p className="text-white/80 text-base sm:text-lg max-w-xl mx-auto mb-8">
-              Оставьте заявку — менеджер подберёт автомобиль, рассчитает кредит и запишет на тест-драйв.
-            </p>
-            <div className="flex flex-wrap gap-3 justify-center">
-              <button onClick={() => setModal("testdrive")}
-                className="inline-flex items-center gap-2 bg-white text-[#0070b8] font-bold px-8 py-4 rounded-xl text-base hover:bg-slate-50 transition-colors shadow-xl">
-                <Car className="w-5 h-5" /> Тест-драйв
-              </button>
-              <button onClick={() => setModal("callback")}
-                className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold px-8 py-4 rounded-xl text-base transition-colors border border-white/30">
-                <Phone className="w-5 h-5" /> Перезвоните мне
-              </button>
-            </div>
+            <button
+              onClick={() => setServiceModal(true)}
+              className="inline-flex items-center gap-2 bg-[#87b63c] hover:bg-[#6a9a28] text-white font-bold px-7 py-3.5 rounded-xl text-sm transition-colors shadow-lg shadow-[#87b63c]/25"
+            >
+              <Wrench className="w-4 h-4" /> Записаться на ТО
+            </button>
           </FadeIn>
         </div>
       </section>
 
-      {/* ── Modal ────────────────────────────────────────── */}
-      {modal && (
-        <CTAModal
-          title={modal === "testdrive" ? "Записаться на тест-драйв" : "Заказать звонок"}
-          brandName={brandName}
-          onClose={() => setModal(null)}
-        />
-      )}
+      {/* ── Контакты ──────────────────────────────────────── */}
+      <section id="section-contacts" className="scroll-mt-24 py-14 sm:py-20 bg-white">
+        <div className="container mx-auto px-4 sm:px-6 max-w-3xl">
+          <FadeIn>
+            <SectionLabel>Контакты</SectionLabel>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-8">
+              Дилерский центр {brandName}
+            </h2>
+          </FadeIn>
+
+          {loc ? (
+            <FadeIn delay={0.1}>
+              <div className="bg-slate-50 rounded-2xl border border-slate-100 p-6 sm:p-8">
+                <h3 className="font-extrabold text-lg mb-5 text-slate-900">
+                  {loc.title}
+                </h3>
+                <div className="space-y-4 text-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-[#0070b8]/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <MapPin className="w-4 h-4 text-[#0070b8]" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
+                        Адрес
+                      </div>
+                      <span className="text-slate-700 font-medium">
+                        {loc.address}
+                      </span>
+                    </div>
+                  </div>
+
+                  {loc.phone && (
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-[#0070b8]/10 flex items-center justify-center shrink-0">
+                        <Phone className="w-4 h-4 text-[#0070b8]" />
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
+                          Телефон
+                        </div>
+                        <a
+                          href={phoneHref(loc.phone)}
+                          className="font-extrabold text-[#0070b8] hover:underline text-base"
+                        >
+                          {normalizePhone(loc.phone)}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {loc.hours && (
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-[#0070b8]/10 flex items-center justify-center shrink-0">
+                        <Clock className="w-4 h-4 text-[#0070b8]" />
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
+                          График работы
+                        </div>
+                        <span className="text-slate-700 font-medium">
+                          {loc.hours}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {mapLink && (
+                  <a
+                    href={mapLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-6 inline-flex items-center gap-2 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors"
+                  >
+                    <Navigation className="w-4 h-4" /> Построить маршрут
+                  </a>
+                )}
+              </div>
+            </FadeIn>
+          ) : (
+            <FadeIn delay={0.1}>
+              <div className="bg-slate-50 rounded-2xl border border-slate-100 p-6 text-center text-slate-400">
+                <MapPin className="w-10 h-10 mx-auto mb-2 text-slate-200" />
+                <p>Информация о дилерском центре обновляется</p>
+              </div>
+            </FadeIn>
+          )}
+        </div>
+      </section>
+
+      {/* ── Service modal ─────────────────────────────────── */}
+      <AnimatePresence>
+        {serviceModal && (
+          <ServiceModal
+            brandName={brandName}
+            onClose={() => setServiceModal(false)}
+          />
+        )}
+      </AnimatePresence>
     </Layout>
   );
 }
