@@ -52,7 +52,7 @@ function parseDrive(mod: string): string {
 }
 
 function cleanModel(raw: string): string {
-  return raw.replace(/,\s*(I{1,3}V?|V?I{0,3})\s*$/, "").trim();
+  return raw.replace(/,\s*[IVX]+.*$/, "").trim();
 }
 
 async function fetchNewCars(): Promise<NewCarRecord[]> {
