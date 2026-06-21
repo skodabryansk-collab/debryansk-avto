@@ -179,6 +179,12 @@ export default function ContactsPage() {
   const headerPhone = normalizePhone(siteSettings?.header_phone) || "+7 (4832) 63-10-00";
   const headerPhoneTel = phoneHref(siteSettings?.header_phone) || "tel:+74832631000";
 
+  const commonHours = React.useMemo(() => {
+    if (!locations.length) return "Ежедневно 9:00–21:00";
+    const unique = [...new Set(locations.map(l => l.hours).filter(Boolean))];
+    return unique.length === 1 ? unique[0] : "Ежедневно 9:00–21:00";
+  }, [locations]);
+
   const dealerMapLocations = React.useMemo(() => {
     if (locations.length === 0) return [];
     return locations
@@ -290,7 +296,7 @@ export default function ContactsPage() {
             </div>
             <div>
               <p className="text-xs text-slate-400 font-semibold uppercase">Режим работы</p>
-              <p className="text-sm font-bold text-slate-900">Ежедневно 9:00–21:00</p>
+              <p className="text-sm font-bold text-slate-900">{commonHours}</p>
             </div>
           </div>
           <div className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center gap-4">
