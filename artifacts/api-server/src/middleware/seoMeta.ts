@@ -232,12 +232,13 @@ function injectMeta(
     );
   }
 
-  // Inject schema.org JSON-LD before </head>
+  // Inject LCP image preload + schema.org JSON-LD before </head>
   const ldScripts = [
     `<script type="application/ld+json">${LOCAL_BUSINESS_SCHEMA}</script>`,
     extraJsonLd ? `<script type="application/ld+json">${extraJsonLd}</script>` : "",
   ].filter(Boolean).join("\n    ");
-  result = result.replace("</head>", `  ${ldScripts}\n  </head>`);
+  const lcpPreload = `<link rel="preload" as="image" href="${ogImage}" fetchpriority="high" />`;
+  result = result.replace("</head>", `  ${lcpPreload}\n  ${ldScripts}\n  </head>`);
 
   // Inject main landmark + static navigation for crawlers (visually hidden)
   result = result.replace(
@@ -254,6 +255,16 @@ function injectMeta(
         <a href="/news">Новости</a>
         <a href="/vacancies">Вакансии</a>
         <a href="/privacy">Политика конфиденциальности</a>
+        <a href="/brands/haval-pro">Haval Pro официальный дилер Брянск</a>
+        <a href="/brands/haval-city">Haval City официальный дилер Брянск</a>
+        <a href="/brands/jetour">Jetour официальный дилер Брянск</a>
+        <a href="/brands/omoda">OMODA официальный дилер Брянск</a>
+        <a href="/brands/jaecoo">JAECOO официальный дилер Брянск</a>
+        <a href="/brands/volkswagen">Volkswagen официальный дилер Брянск</a>
+        <a href="/brands/skoda">SKODA официальный дилер Брянск</a>
+        <a href="/brands/exeed">EXEED официальный дилер Брянск</a>
+        <a href="/brands/tenet">Tenet официальный дилер Брянск</a>
+        <a href="/brands/mercedes-benz">Mercedes-Benz официальный дилер Брянск</a>
       </nav>
       <address>
         <p>Дебрянск Авто — официальный дилер Haval, Jetour, OMODA в Брянске</p>
