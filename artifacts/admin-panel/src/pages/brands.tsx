@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getBrands, createBrand, updateBrand, deleteBrand, uploadFile,
   getBrandPageContent, updateBrandPageContent,
-  type Brand, type BrandPageContent, type BrandAdvantage, type BrandFaqItem,
+  type Brand, type BrandPageContent, type BrandAdvantage, type BrandFaqItem, type BrandPromotion,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -461,6 +461,109 @@ function FaqEditor({
   );
 }
 
+/* ── Promotions editor ───────────────────────────────────────── */
+function PromotionEditor({
+  value,
+  onChange,
+}: {
+  value: BrandPromotion[];
+  onChange: (v: BrandPromotion[]) => void;
+}) {
+  const { toast } = useToast();
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const pendingIdxRef = React.useRef<number>(-1);
+  const valueRef = React.useRef(value);
+  React.useEffect(() => { valueRef.current = value; }, [value]);
+  const [uploadingIdx, setUploadingIdx] = React.useState<number | null>(null);
+
+  const add = () => onChange([...value, { title: "", description: "", isActive: true }]);
+  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
+  const update = <K extends keyof BrandPromotion>(i: number, field: K, v: BrandPromotion[K]) =>
+    onChange(value.map((item, idx) => idx === i ? { ...item, [field]: v } : item));
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const idx = pendingIdxRef.current;
+    if (idx < 0) return;
+    setUploadingIdx(idx);
+    e.target.value = "";
+    try {
+      const url = await uploadFile(file);
+      onChange(valueRef.current.map((item, i) => i === idx ? { ...item, image: url } : item));
+      toast({ title: "Изображение загружено" });
+    } catch {
+      toast({ title: "Ошибка загрузки", variant: "destructive" });
+    } finally {
+      setUploadingIdx(null);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+      {value.map((item, i) => (
+        <div key={i} className={`border rounded-lg p-3 space-y-2 ${item.isActive !== false ? "border-slate-200 bg-slate-50/50" : "border-slate-200 bg-slate-100/60 opacity-60"}`}>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 font-semibold shrink-0">{i + 1}.</span>
+            <div className="flex items-center gap-3 ml-auto">
+              <div className="flex items-center gap-2">
+                <Switch id={`promo-active-${i}`} checked={item.isActive !== false}
+                  onCheckedChange={v => update(i, "isActive", v)} />
+                <Label htmlFor={`promo-active-${i}`} className="text-xs text-slate-500 cursor-pointer">Активна</Label>
+              </div>
+              <Button variant="ghost" size="icon" className="w-8 h-8 text-red-500 hover:text-red-600" type="button" onClick={() => remove(i)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+          <Input value={item.title} onChange={e => update(i, "title", e.target.value)}
+            placeholder="Заголовок акции..." className="font-medium" />
+          <Textarea rows={2} value={item.description} onChange={e => update(i, "description", e.target.value)}
+            placeholder="Описание акции..." className="text-sm resize-none" />
+          <div className="grid grid-cols-2 gap-2">
+            <Input value={item.badge ?? ""} onChange={e => update(i, "badge", e.target.value)}
+              placeholder="Бейдж: Выгода до 200 000 ₽" className="text-sm" />
+            <div className="space-y-0.5">
+              <Input type="date" value={item.expiresAt ?? ""}
+                onChange={e => update(i, "expiresAt", e.target.value)}
+                className="text-sm" />
+              <p className="text-[10px] text-slate-400 pl-1">Срок действия (до)</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Input value={item.buttonText ?? ""} onChange={e => update(i, "buttonText", e.target.value)}
+              placeholder='Кнопка: "Оставить заявку"' className="text-sm" />
+            <Input value={item.buttonUrl ?? ""} onChange={e => update(i, "buttonUrl", e.target.value)}
+              placeholder="Ссылка «Узнать подробнее»" className="text-sm" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" type="button"
+              disabled={uploadingIdx === i}
+              onClick={() => { pendingIdxRef.current = i; fileRef.current?.click(); }}>
+              {uploadingIdx === i
+                ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />Загрузка...</>
+                : <><Upload className="w-3.5 h-3.5 mr-1" />Фото</>}
+            </Button>
+            {item.image && (
+              <>
+                <img src={item.image} alt="" className="w-16 h-10 object-cover rounded border" />
+                <Button variant="ghost" size="icon" className="w-7 h-7 text-red-500" type="button"
+                  onClick={() => update(i, "image", "")}>
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+      <Button variant="outline" size="sm" onClick={add} type="button" className="mt-1">
+        <Plus className="w-3.5 h-3.5 mr-1" /> Добавить акцию
+      </Button>
+    </div>
+  );
+}
+
 /* ── Section heading helper ──────────────────────────────────── */
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -485,6 +588,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     advantages: BrandAdvantage[];
     features: string[];
     faq: BrandFaqItem[];
+    promotions: BrandPromotion[];
     heroImageUrl: string;
     heroImageMobileUrl: string;
     metaTitle: string;
@@ -496,6 +600,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     advantages: [],
     features: [],
     faq: [],
+    promotions: [],
     heroImageUrl: "",
     heroImageMobileUrl: "",
     metaTitle: "",
@@ -543,6 +648,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
         advantages: data.content.advantages ?? [],
         features: data.content.features ?? [],
         faq: data.content.faq ?? [],
+        promotions: data.content.promotions ?? [],
         heroImageUrl: data.content.heroImageUrl ?? "",
         heroImageMobileUrl: data.content.heroImageMobileUrl ?? "",
         metaTitle: data.content.metaTitle ?? "",
@@ -562,6 +668,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
       advantages: form.advantages,
       features: form.features,
       faq: form.faq,
+      promotions: form.promotions,
       heroImageUrl: form.heroImageUrl || null,
       heroImageMobileUrl: form.heroImageMobileUrl || null,
       metaTitle: form.metaTitle || null,
@@ -743,6 +850,18 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
               <FaqEditor
                 value={form.faq}
                 onChange={faq => setForm(f => ({ ...f, faq }))}
+              />
+            </div>
+
+            {/* Promotions */}
+            <div className="border-t pt-4">
+              <SectionHeading>Акции</SectionHeading>
+              <p className="text-xs text-slate-400 mb-3">
+                Специальные предложения и скидки бренда. Отображаются плитками на странице бренда. Истёкшие акции скрываются автоматически.
+              </p>
+              <PromotionEditor
+                value={form.promotions}
+                onChange={promotions => setForm(f => ({ ...f, promotions }))}
               />
             </div>
 
