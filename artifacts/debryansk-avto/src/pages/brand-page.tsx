@@ -380,6 +380,135 @@ function PromoModal({
   );
 }
 
+/* ─── Callback section ───────────────────────────────────── */
+function CallbackSection({ brandName }: { brandName: string }) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [comment, setComment] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isPhoneValid(phone)) return;
+    setSending(true);
+    setError(false);
+    try {
+      const fd = new FormData();
+      fd.append("type", "callback");
+      fd.append("name", name);
+      fd.append("phone", phone);
+      fd.append("comment", comment);
+      fd.append("source", `Форма обратной связи — ${brandName}`);
+      const r = await fetch("/api/send-email", { method: "POST", body: fd });
+      if (!r.ok) { setError(true); setSending(false); return; }
+      setSubmitted(true);
+    } catch { setError(true); }
+    setSending(false);
+  }
+
+  return (
+    <section id="section-callback" className="scroll-mt-24 py-16 sm:py-24 bg-gradient-to-br from-[#0070b8] via-[#005a94] to-[#004a7a]">
+      <div className="container mx-auto px-4 sm:px-6 max-w-2xl">
+        {submitted ? (
+          <div className="text-center py-8">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 15 }}
+            >
+              <CheckCircle className="w-16 h-16 text-[#87b63c] mx-auto mb-4" />
+            </motion.div>
+            <h2 className="text-2xl font-extrabold text-white mb-2">Заявка принята!</h2>
+            <p className="text-white/70 text-sm">Менеджер {brandName} свяжется с вами в ближайшее время</p>
+          </div>
+        ) : (
+          <>
+            <FadeIn>
+              <div className="text-center mb-8">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#87b63c] block mb-2">
+                  Бесплатная консультация
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-2">
+                  Остались вопросы?
+                </h2>
+                <p className="text-white/70 text-sm sm:text-base">
+                  Оставьте контакты — менеджер {brandName} перезвонит в течение 15 минут
+                </p>
+              </div>
+            </FadeIn>
+            <FadeIn delay={0.1}>
+              <form onSubmit={handleSubmit} className="bg-white/10 backdrop-blur rounded-2xl border border-white/20 p-6 sm:p-8 space-y-4">
+                <div>
+                  <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest block mb-1.5">
+                    Ваше имя
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="Иван Иванов"
+                    className="w-full px-4 py-2.5 rounded-xl bg-white/15 border border-white/20 text-white placeholder-white/40 text-sm focus:outline-none focus:border-white/50 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest block mb-1.5">
+                    Телефон *
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      value={phone}
+                      onChange={e => setPhone(formatPhone(e.target.value))}
+                      placeholder="+7 (___) ___-__-__"
+                      maxLength={18}
+                      required
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/15 border border-white/20 text-white placeholder-white/40 text-sm focus:outline-none focus:border-white/50 transition-colors"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest block mb-1.5">
+                    Комментарий
+                  </label>
+                  <textarea
+                    value={comment}
+                    onChange={e => setComment(e.target.value)}
+                    placeholder="Какой автомобиль вас интересует, какие вопросы..."
+                    rows={3}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white/15 border border-white/20 text-white placeholder-white/40 text-sm focus:outline-none focus:border-white/50 transition-colors resize-none"
+                  />
+                </div>
+                {error && (
+                  <p className="text-red-300 text-xs text-center">
+                    Не удалось отправить заявку. Попробуйте ещё раз.
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={sending}
+                  className="w-full bg-[#87b63c] hover:bg-[#6a9a28] text-white font-bold py-3.5 rounded-xl text-sm transition-colors shadow-lg shadow-[#87b63c]/30 disabled:opacity-60"
+                >
+                  {sending ? "Отправляем…" : "Перезвоните мне"}
+                </button>
+                <p className="text-[10px] text-white/40 text-center">
+                  Нажимая кнопку, вы соглашаетесь с{" "}
+                  <Link href="/privacy" className="underline hover:text-white/60">
+                    политикой конфиденциальности
+                  </Link>
+                </p>
+              </form>
+            </FadeIn>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
 /* ─── Anchor nav ─────────────────────────────────────────── */
 const NAV_ITEMS = [
   { id: "about", label: "О бренде" },
@@ -387,6 +516,7 @@ const NAV_ITEMS = [
   { id: "stock", label: "В наличии" },
   { id: "promotions", label: "Акции" },
   { id: "service", label: "Сервис" },
+  { id: "callback", label: "Консультация" },
   { id: "contacts", label: "Контакты" },
 ] as const;
 
@@ -1215,6 +1345,9 @@ export default function BrandPage() {
           </div>
         </section>
       )}
+
+      {/* ── Обратная связь ────────────────────────────────── */}
+      <CallbackSection brandName={brandName} />
 
       {/* ── Новости ───────────────────────────────────────── */}
       {data.news && data.news.length > 0 && (
