@@ -341,6 +341,12 @@ export async function runMigration() {
         AND NOT EXISTS (SELECT 1 FROM brand_page_content bpc WHERE bpc.brand_id = b.id)
     `);
 
+    await db.execute(sql`ALTER TABLE brand_page_content ADD COLUMN IF NOT EXISTS advantages JSONB DEFAULT '[]'`);
+    await db.execute(sql`ALTER TABLE brand_page_content ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'`);
+    await db.execute(sql`ALTER TABLE brand_page_content ADD COLUMN IF NOT EXISTS faq JSONB DEFAULT '[]'`);
+    await db.execute(sql`ALTER TABLE brand_page_content ADD COLUMN IF NOT EXISTS hero_image_url TEXT`);
+    await db.execute(sql`ALTER TABLE brand_page_content ADD COLUMN IF NOT EXISTS hero_image_mobile_url TEXT`);
+
     logger.info("brands.slug + brand_page_content schema ready (idempotent)");
 
   } catch (err) {
