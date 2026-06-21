@@ -79,11 +79,23 @@ async function fetchBrandPage(slug: string): Promise<BrandPageData> {
   return json.data as BrandPageData;
 }
 
-/* ─── Model photo mapping ────────────────────────────────── */
-function getModelPhoto(brandSlug: string, modelName: string, fallback: string): string {
-  const havalSlugs = ["haval-city", "haval-pro"];
-  if (!havalSlugs.includes(brandSlug)) return fallback;
+/* ─── Static HAVAL model catalog ────────────────────────── */
+const HAVAL_SLUGS = ["haval-city", "haval-pro"];
 
+const HAVAL_CATALOG: Array<{ name: string; bodyType: string; photo: string }> = [
+  { name: "M6",                bodyType: "Кроссовер",      photo: "/brands/haval/m6.png" },
+  { name: "Jolion",            bodyType: "Кроссовер",      photo: "/brands/haval/jolion.png" },
+  { name: "Dargo",             bodyType: "Внедорожник",    photo: "/brands/haval/dargo.png" },
+  { name: "Dargo X",           bodyType: "Внедорожник",    photo: "/brands/haval/dargo_x.png" },
+  { name: "F7",                bodyType: "Кроссовер",      photo: "/brands/haval/f7.png" },
+  { name: "F7x",               bodyType: "Купе-кроссовер", photo: "/brands/haval/f7x.png" },
+  { name: "GWM Poer",          bodyType: "Пикап",          photo: "/brands/haval/gwm_poer.png" },
+  { name: "GWM Poer King Kong", bodyType: "Пикап",          photo: "/brands/haval/gwm_poer_kingkong.png" },
+];
+
+/* ─── Model photo mapping (for non-HAVAL fallback) ──────── */
+function getModelPhotoFromCars(brandSlug: string, modelName: string, fallback: string): string {
+  if (!HAVAL_SLUGS.includes(brandSlug)) return fallback;
   const m = modelName.toLowerCase();
   if (m.includes("kingkong")) return "/brands/haval/gwm_poer_kingkong.png";
   if (m.includes("dargo x") || m.includes("dargo_x")) return "/brands/haval/dargo_x.png";
@@ -301,7 +313,6 @@ function AnchorNav({
 
   const visibleItems = NAV_ITEMS.filter(({ id }) => {
     if (id === "about" && !hasAbout) return false;
-    if (id === "stock" && !hasCars) return false;
     if (id === "service" && !hasService) return false;
     return true;
   });
@@ -338,24 +349,20 @@ function AnchorNav({
 
 /* ─── Model card ─────────────────────────────────────────── */
 function ModelCard({
-  brandSlug,
   brandName,
   modelName,
   bodyType,
   minPrice,
-  fallbackImg,
+  photo,
   index,
 }: {
-  brandSlug: string;
   brandName: string;
   modelName: string;
   bodyType: string;
-  minPrice: number;
-  fallbackImg: string;
+  minPrice: number | null;
+  photo: string;
   index: number;
 }) {
-  const photo = getModelPhoto(brandSlug, modelName, fallbackImg);
-  const cleanName = cleanModelName(modelName);
   const [, navigate] = useLocation();
 
   return (
@@ -369,39 +376,41 @@ function ModelCard({
         navigate(`/new-cars?brand=${encodeURIComponent(brandName)}`)
       }
     >
-      <div className="relative bg-slate-50 overflow-hidden" style={{ height: 180 }}>
+      <div className="relative bg-slate-50 overflow-hidden h-[120px] sm:h-[160px]">
         {photo ? (
           <img
             src={photo}
-            alt={`${brandName} ${cleanName}`}
-            className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500"
+            alt={`${brandName} ${modelName}`}
+            className="w-full h-full object-contain p-3 sm:p-4 group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
             decoding="async"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-slate-200">
-            <Car className="w-16 h-16" />
+            <Car className="w-12 h-12" />
           </div>
         )}
       </div>
-      <div className="p-4 flex flex-col flex-1">
-        <h3 className="font-extrabold text-base leading-tight mb-0.5">
-          {brandName} {cleanName}
+      <div className="p-3 sm:p-4 flex flex-col flex-1">
+        <h3 className="font-extrabold text-sm sm:text-base leading-tight mb-0.5 line-clamp-2">
+          {brandName} {modelName}
         </h3>
         {bodyType && (
-          <p className="text-xs text-slate-400 mb-3">{bodyType}</p>
+          <p className="text-[11px] text-slate-400 mb-2">{bodyType}</p>
         )}
         <div className="mt-auto flex items-center justify-between">
           <div>
-            <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">
-              от
-            </div>
-            <div className="text-base font-extrabold text-[#0070b8]">
-              {fmtPrice(minPrice)}
-            </div>
+            {minPrice ? (
+              <>
+                <div className="text-[9px] sm:text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">от</div>
+                <div className="text-sm sm:text-base font-extrabold text-[#0070b8]">{fmtPrice(minPrice)}</div>
+              </>
+            ) : (
+              <div className="text-[11px] text-slate-400 font-medium">Уточнить цену</div>
+            )}
           </div>
-          <span className="flex items-center gap-1 text-xs font-bold text-[#0070b8] group-hover:gap-2 transition-all">
-            Смотреть <ArrowRight className="w-3.5 h-3.5" />
+          <span className="flex items-center gap-1 text-[11px] font-bold text-[#0070b8] group-hover:gap-2 transition-all shrink-0 ml-1">
+            Смотреть <ArrowRight className="w-3 h-3" />
           </span>
         </div>
       </div>
@@ -579,22 +588,38 @@ export default function BrandPage() {
   const loc = locations[0];
 
   const uniqueModels = (() => {
+    if (HAVAL_SLUGS.includes(slug)) {
+      const priceByModel = new Map<string, number>();
+      for (const car of cars) {
+        const key = cleanModelName(car.model).toLowerCase();
+        const carPrice = car.max_discount > 0 ? car.price - car.max_discount : car.price;
+        const existing = priceByModel.get(key);
+        if (!existing || carPrice < existing) priceByModel.set(key, carPrice);
+      }
+      return HAVAL_CATALOG.map((m) => ({
+        name: m.name,
+        bodyType: m.bodyType,
+        photo: m.photo,
+        minPrice: priceByModel.get(m.name.toLowerCase()) ?? null,
+      }));
+    }
     const seen = new Map<string, { bodyType: string; minPrice: number; fallbackImg: string }>();
     for (const car of cars) {
       const key = cleanModelName(car.model);
       const existing = seen.get(key);
       const carPrice = car.max_discount > 0 ? car.price - car.max_discount : car.price;
       if (!existing) {
-        seen.set(key, {
-          bodyType: car.body_type,
-          minPrice: carPrice,
-          fallbackImg: car.images?.[0] ?? "",
-        });
+        seen.set(key, { bodyType: car.body_type, minPrice: carPrice, fallbackImg: car.images?.[0] ?? "" });
       } else if (carPrice < existing.minPrice) {
         seen.set(key, { ...existing, minPrice: carPrice });
       }
     }
-    return Array.from(seen.entries()).map(([name, v]) => ({ name, ...v }));
+    return Array.from(seen.entries()).map(([name, v]) => ({
+      name,
+      bodyType: v.bodyType,
+      photo: getModelPhotoFromCars(slug, name, v.fallbackImg),
+      minPrice: v.minPrice,
+    }));
   })();
 
   const allModels = Array.from(new Set(cars.map((c) => cleanModelName(c.model))));
@@ -694,7 +719,7 @@ export default function BrandPage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.28 }}
-            className="flex flex-wrap gap-3 mt-10"
+            className="flex flex-col sm:flex-row flex-wrap gap-3 mt-10"
           >
             <button
               onClick={() =>
@@ -702,13 +727,13 @@ export default function BrandPage() {
                   .getElementById("section-models")
                   ?.scrollIntoView({ behavior: "smooth", block: "start" })
               }
-              className="inline-flex items-center gap-2 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors shadow-lg shadow-[#0070b8]/30"
+              className="inline-flex items-center justify-center gap-2 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-colors shadow-lg shadow-[#0070b8]/30"
             >
               Смотреть модели <ChevronDown className="w-4 h-4" />
             </button>
             <a
               href={`/new-cars?brand=${encodeURIComponent(brandName)}`}
-              className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors border border-white/20"
+              className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-colors border border-white/20"
             >
               Все авто в наличии <ArrowRight className="w-4 h-4" />
             </a>
@@ -717,7 +742,7 @@ export default function BrandPage() {
                 href={brand.websiteUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-bold px-5 py-3 rounded-xl text-sm transition-colors border border-white/10"
+                className="inline-flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-bold px-5 py-3.5 rounded-xl text-sm transition-colors border border-white/10"
               >
                 Сайт бренда <ExternalLink className="w-3.5 h-3.5" />
               </a>
@@ -775,12 +800,11 @@ export default function BrandPage() {
               {uniqueModels.map((m, i) => (
                 <ModelCard
                   key={m.name}
-                  brandSlug={slug}
                   brandName={brandName}
                   modelName={m.name}
                   bodyType={m.bodyType}
                   minPrice={m.minPrice}
-                  fallbackImg={m.fallbackImg}
+                  photo={m.photo}
                   index={i}
                 />
               ))}
