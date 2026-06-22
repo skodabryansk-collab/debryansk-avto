@@ -29,6 +29,7 @@ export const brandPageContentTable = pgTable("brand_page_content", {
   heroImageMobileUrl: text("hero_image_mobile_url"),
   promotions: jsonb("promotions").$type<{ title: string; description: string; image?: string; badge?: string; expiresAt?: string; buttonText?: string; buttonUrl?: string; isActive?: boolean }[]>().default([]),
   models: jsonb("models").$type<{ id?: string; feedDealer: string; feedModel: string; displayName: string; image?: string; description?: string; badge?: string; isActive?: boolean; sort?: number }[]>().default([]),
+  services: jsonb("services").$type<{ id?: string; icon: string; title: string; description?: string; sort?: number }[]>().default([]),
   metaTitle: text("meta_title"),
   metaDescription: text("meta_description"),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
