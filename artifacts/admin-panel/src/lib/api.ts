@@ -261,12 +261,31 @@ export function getSyncStatus() {
 /* Upload - Object Storage (GCS) */
 export async function uploadFile(file: File): Promise<string> {
   const token = getToken();
-  // 1. Request presigned URL from API
+  const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
+
+  // Images go through the server-side optimisation pipeline (sharp → WebP → GCS)
+  if (file.type.startsWith("image/")) {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`${API_BASE}/storage/uploads/image`, {
+      method: "POST",
+      headers: authHeader,
+      body: fd,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Upload failed" }));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const { url } = await res.json();
+    return url;
+  }
+
+  // Non-image files (PDF, etc.) — direct GCS presigned upload
   const metaRes = await fetch(`${API_BASE}/storage/uploads/request-url`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...authHeader,
     },
     body: JSON.stringify({
       name: file.name,
@@ -277,7 +296,6 @@ export async function uploadFile(file: File): Promise<string> {
   if (!metaRes.ok) throw new Error("Failed to get upload URL");
   const { uploadURL, objectPath } = await metaRes.json();
 
-  // 2. Upload directly to GCS presigned URL
   const uploadRes = await fetch(uploadURL, {
     method: "PUT",
     headers: { "Content-Type": file.type || "application/octet-stream" },
@@ -285,6 +303,5 @@ export async function uploadFile(file: File): Promise<string> {
   });
   if (!uploadRes.ok) throw new Error("Upload to storage failed");
 
-  // 3. Return serving URL
   return `${API_BASE}/storage${objectPath}`;
 }
