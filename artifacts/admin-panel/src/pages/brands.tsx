@@ -4,7 +4,7 @@ import {
   getBrands, createBrand, updateBrand, deleteBrand, uploadFile,
   getBrandPageContent, updateBrandPageContent, getBrandCatalogModels,
   type Brand, type BrandPageContent, type BrandAdvantage, type BrandFaqItem, type BrandPromotion,
-  type BrandModel, type CatalogModel,
+  type BrandModel, type BrandService, type CatalogModel,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, ExternalLink, Upload, X, Globe, Loader2, GripVertical, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Trash2, ExternalLink, Upload, X, Globe, Loader2, GripVertical, ChevronUp, ChevronDown, Wrench, Settings, Shield, Car, Gauge, Zap, Clock, Star, FileText, Package, CheckCircle, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function BrandsPage() {
@@ -762,6 +762,113 @@ function ModelEditor({
   );
 }
 
+/* ── Service editor ──────────────────────────────────────────── */
+const SERVICE_ICON_OPTIONS = [
+  { value: "Wrench",       label: "🔧 Ремонт / ТО",       Icon: Wrench },
+  { value: "Settings",     label: "⚙️ Настройка",          Icon: Settings },
+  { value: "Shield",       label: "🛡️ Гарантия",           Icon: Shield },
+  { value: "Car",          label: "🚗 Кузовной",           Icon: Car },
+  { value: "Gauge",        label: "📊 Диагностика",        Icon: Gauge },
+  { value: "Zap",          label: "⚡ Электрика",          Icon: Zap },
+  { value: "Clock",        label: "⏰ Срочный ремонт",     Icon: Clock },
+  { value: "Star",         label: "⭐ Сервис качества",    Icon: Star },
+  { value: "FileText",     label: "📋 Акт / Документы",   Icon: FileText },
+  { value: "Package",      label: "📦 Запчасти",           Icon: Package },
+  { value: "CheckCircle",  label: "✅ Постгарантийный",    Icon: CheckCircle },
+  { value: "RefreshCw",    label: "🔄 Шиномонтаж",         Icon: RefreshCw },
+];
+
+function ServicesEditor({ value, onChange }: { value: BrandService[]; onChange: (v: BrandService[]) => void }) {
+  const add = () => onChange([...value, {
+    id: Math.random().toString(36).slice(2),
+    icon: "Wrench",
+    title: "",
+    description: "",
+    sort: value.length,
+  }]);
+
+  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
+
+  const update = <K extends keyof BrandService>(i: number, field: K, v: BrandService[K]) =>
+    onChange(value.map((item, idx) => idx === i ? { ...item, [field]: v } : item));
+
+  const moveUp = (i: number) => {
+    if (i === 0) return;
+    const next = [...value];
+    [next[i - 1], next[i]] = [next[i], next[i - 1]];
+    onChange(next.map((s, idx) => ({ ...s, sort: idx })));
+  };
+
+  const moveDown = (i: number) => {
+    if (i === value.length - 1) return;
+    const next = [...value];
+    [next[i], next[i + 1]] = [next[i + 1], next[i]];
+    onChange(next.map((s, idx) => ({ ...s, sort: idx })));
+  };
+
+  return (
+    <div className="space-y-3">
+      {value.map((item, i) => {
+        const selectedIcon = SERVICE_ICON_OPTIONS.find(o => o.value === item.icon) ?? SERVICE_ICON_OPTIONS[0];
+        const PreviewIcon = selectedIcon.Icon;
+        return (
+          <div key={i} className="border border-slate-200 rounded-lg p-3 space-y-2 bg-slate-50/50">
+            <div className="flex items-center gap-1">
+              <div className="flex flex-col gap-0 shrink-0">
+                <Button variant="ghost" size="icon" className="w-6 h-6 text-slate-400" type="button"
+                  onClick={() => moveUp(i)} disabled={i === 0}>
+                  <ChevronUp className="w-3 h-3" />
+                </Button>
+                <Button variant="ghost" size="icon" className="w-6 h-6 text-slate-400" type="button"
+                  onClick={() => moveDown(i)} disabled={i === value.length - 1}>
+                  <ChevronDown className="w-3 h-3" />
+                </Button>
+              </div>
+              <span className="text-xs text-slate-400 font-semibold shrink-0">{i + 1}.</span>
+              <Button variant="ghost" size="icon" className="w-8 h-8 text-red-500 hover:text-red-600 ml-auto" type="button"
+                onClick={() => remove(i)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-lg bg-[#0070b8]/10 flex items-center justify-center shrink-0">
+                <PreviewIcon className="w-4 h-4 text-[#0070b8]" />
+              </div>
+              <select
+                className="flex-1 border border-slate-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#0070b8]"
+                value={item.icon}
+                onChange={e => update(i, "icon", e.target.value)}
+              >
+                {SERVICE_ICON_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <Input
+              value={item.title}
+              onChange={e => update(i, "title", e.target.value)}
+              placeholder="Название услуги (напр: Техническое обслуживание)"
+              className="font-medium"
+            />
+            <Textarea
+              rows={2}
+              value={item.description ?? ""}
+              onChange={e => update(i, "description", e.target.value)}
+              placeholder="Краткое описание услуги (необязательно)..."
+              className="text-sm resize-none"
+            />
+          </div>
+        );
+      })}
+      <Button variant="outline" size="sm" onClick={add} type="button" className="mt-1">
+        <Plus className="w-3.5 h-3.5 mr-1" /> Добавить услугу
+      </Button>
+    </div>
+  );
+}
+
 /* ── Section heading helper ──────────────────────────────────── */
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -795,6 +902,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     faq: BrandFaqItem[];
     promotions: BrandPromotion[];
     models: BrandModel[];
+    services: BrandService[];
     heroImageUrl: string;
     heroImageMobileUrl: string;
     metaTitle: string;
@@ -808,6 +916,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     faq: [],
     promotions: [],
     models: [],
+    services: [],
     heroImageUrl: "",
     heroImageMobileUrl: "",
     metaTitle: "",
@@ -857,6 +966,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
         faq: data.content.faq ?? [],
         promotions: data.content.promotions ?? [],
         models: data.content.models ?? [],
+        services: data.content.services ?? [],
         heroImageUrl: data.content.heroImageUrl ?? "",
         heroImageMobileUrl: data.content.heroImageMobileUrl ?? "",
         metaTitle: data.content.metaTitle ?? "",
@@ -878,6 +988,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
       faq: form.faq,
       promotions: form.promotions,
       models: form.models,
+      services: form.services,
       heroImageUrl: form.heroImageUrl || null,
       heroImageMobileUrl: form.heroImageMobileUrl || null,
       metaTitle: form.metaTitle || null,
@@ -1059,6 +1170,18 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
               <FaqEditor
                 value={form.faq}
                 onChange={faq => setForm(f => ({ ...f, faq }))}
+              />
+            </div>
+
+            {/* Services */}
+            <div className="border-t pt-4">
+              <SectionHeading>Услуги сервиса</SectionHeading>
+              <p className="text-xs text-slate-400 mb-3">
+                Отображаются на странице бренда в секции «Услуги». Актуально для сервисных брендов (SKODA, VW, MB, Exeed). Добавьте услуги с иконкой и описанием.
+              </p>
+              <ServicesEditor
+                value={form.services}
+                onChange={services => setForm(f => ({ ...f, services }))}
               />
             </div>
 
