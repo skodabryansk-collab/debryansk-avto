@@ -7,6 +7,7 @@ import {
   ChevronLeft, Calendar, Palette,
   Sparkles, CheckCircle, ExternalLink, X, User,
   Shield, Settings, Star, ChevronDown, Navigation, Tag,
+  Gauge, FileText, Package, Zap, RefreshCw,
 } from "lucide-react";
 import Layout from "@/components/Layout";
 import SEO from "@/components/SEO";
@@ -14,6 +15,12 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
 import { YandexMap, type DealerLocation } from "@/components/YandexMap";
+
+/* ─── Service icon map ───────────────────────────────────── */
+const SERVICE_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  Wrench, Settings, Shield, Car, Gauge, Zap, Clock, Star,
+  FileText, Package, CheckCircle, RefreshCw,
+};
 
 /* ─── Types ──────────────────────────────────────────────── */
 interface BrandPageData {
@@ -38,6 +45,7 @@ interface BrandPageData {
     faq: Array<{ question: string; answer: string; include_in_schema?: boolean }> | null;
     promotions: Array<{ title: string; description: string; image?: string; badge?: string; expiresAt?: string; buttonText?: string; buttonUrl?: string; isActive?: boolean }> | null;
     models: Array<{ id?: string; feedDealer: string; feedModel: string; displayName: string; image?: string; description?: string; badge?: string; isActive?: boolean; sort?: number }> | null;
+    services: Array<{ id?: string; icon: string; title: string; description?: string; sort?: number }> | null;
   } | null;
   locations: Array<{
     id: number;
@@ -512,6 +520,7 @@ function CallbackSection({ brandName }: { brandName: string }) {
 /* ─── Anchor nav ─────────────────────────────────────────── */
 const NAV_ITEMS = [
   { id: "about", label: "О бренде" },
+  { id: "services", label: "Услуги" },
   { id: "models", label: "Модельный ряд" },
   { id: "stock", label: "В наличии" },
   { id: "promotions", label: "Акции" },
@@ -526,12 +535,14 @@ function AnchorNav({
   hasService,
   hasPromotions,
   hasModels,
+  hasServices,
 }: {
   hasCars: boolean;
   hasAbout: boolean;
   hasService: boolean;
   hasPromotions: boolean;
   hasModels: boolean;
+  hasServices: boolean;
 }) {
   const [active, setActive] = useState("");
 
@@ -554,6 +565,7 @@ function AnchorNav({
 
   const visibleItems = NAV_ITEMS.filter(({ id }) => {
     if (id === "about" && !hasAbout) return false;
+    if (id === "services" && !hasServices) return false;
     if (id === "models" && !hasModels) return false;
     if (id === "service" && !hasService) return false;
     if (id === "promotions" && !hasPromotions) return false;
@@ -817,6 +829,10 @@ export default function BrandPage() {
     areaServed: "Брянск",
   };
 
+  const isServiceOnly = brand.isServiceOnly;
+  const services = content?.services ?? [];
+  const hasServices = isServiceOnly && services.length > 0;
+
   const cmsModels = (content?.models ?? []).filter(m => m.isActive !== false);
   const hasCmsModels = cmsModels.length > 0;
 
@@ -1014,7 +1030,7 @@ export default function BrandPage() {
                 transition={{ duration: 0.4 }}
                 className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#87b63c] mb-2"
               >
-                Официальный дилер в Брянске
+                {isServiceOnly ? "Авторизованный сервис в Брянске" : "Официальный дилер в Брянске"}
               </motion.p>
               <motion.h1
                 initial={{ opacity: 0, y: 14 }}
@@ -1041,22 +1057,43 @@ export default function BrandPage() {
             transition={{ duration: 0.4, delay: 0.28 }}
             className="flex flex-col sm:flex-row flex-wrap gap-3 mt-10"
           >
-            <button
-              onClick={() =>
-                document
-                  .getElementById("section-models")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
-              }
-              className="inline-flex items-center justify-center gap-2 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-colors shadow-lg shadow-[#0070b8]/30"
-            >
-              Смотреть модели <ChevronDown className="w-4 h-4" />
-            </button>
-            <a
-              href={`/new-cars?dealer=${encodeURIComponent(brandName)}`}
-              className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-colors border border-white/20"
-            >
-              Все авто в наличии <ArrowRight className="w-4 h-4" />
-            </a>
+            {isServiceOnly ? (
+              <>
+                <button
+                  onClick={() => setServiceModal(true)}
+                  className="inline-flex items-center justify-center gap-2 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-colors shadow-lg shadow-[#0070b8]/30"
+                >
+                  <Wrench className="w-4 h-4" /> Записаться на ТО
+                </button>
+                {locations[0]?.phone && (
+                  <a
+                    href={phoneHref(locations[0].phone)}
+                    className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-colors border border-white/20"
+                  >
+                    <Phone className="w-4 h-4" /> Позвонить
+                  </a>
+                )}
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() =>
+                    document
+                      .getElementById("section-models")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
+                  className="inline-flex items-center justify-center gap-2 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-colors shadow-lg shadow-[#0070b8]/30"
+                >
+                  Смотреть модели <ChevronDown className="w-4 h-4" />
+                </button>
+                <a
+                  href={`/new-cars?dealer=${encodeURIComponent(brandName)}`}
+                  className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-colors border border-white/20"
+                >
+                  Все авто в наличии <ArrowRight className="w-4 h-4" />
+                </a>
+              </>
+            )}
             {brand.websiteUrl && (
               <a
                 href={brand.websiteUrl}
@@ -1078,6 +1115,7 @@ export default function BrandPage() {
         hasService={hasService}
         hasPromotions={hasPromotions}
         hasModels={hasCmsModels}
+        hasServices={hasServices}
       />
 
       {/* ── О бренде ──────────────────────────────────────── */}
@@ -1097,8 +1135,48 @@ export default function BrandPage() {
         </section>
       )}
 
+      {/* ── Услуги ────────────────────────────────────────── */}
+      {hasServices && (
+        <section id="section-services" className="scroll-mt-24 py-14 sm:py-20 bg-slate-50 border-b border-slate-100">
+          <div className="container mx-auto px-4 sm:px-6">
+            <FadeIn>
+              <SectionLabel>Услуги</SectionLabel>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-10">
+                Услуги {brandName}
+              </h2>
+            </FadeIn>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              {services.map((svc, i) => {
+                const IconComponent = SERVICE_ICON_MAP[svc.icon] ?? Wrench;
+                return (
+                  <FadeIn key={i} delay={i * 0.06}>
+                    <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow h-full">
+                      <div className="w-11 h-11 rounded-xl bg-[#0070b8]/10 flex items-center justify-center mb-3">
+                        <IconComponent className="w-5 h-5 text-[#0070b8]" />
+                      </div>
+                      <h3 className="font-extrabold text-slate-900 text-sm mb-1.5">{svc.title}</h3>
+                      {svc.description && (
+                        <p className="text-slate-500 text-xs leading-relaxed">{svc.description}</p>
+                      )}
+                    </div>
+                  </FadeIn>
+                );
+              })}
+            </div>
+            <FadeIn className="mt-10">
+              <button
+                onClick={() => setServiceModal(true)}
+                className="inline-flex items-center gap-2 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold px-7 py-3.5 rounded-xl text-sm transition-colors shadow-lg shadow-[#0070b8]/30"
+              >
+                <Phone className="w-4 h-4" /> Записаться на обслуживание
+              </button>
+            </FadeIn>
+          </div>
+        </section>
+      )}
+
       {/* ── Модельный ряд ─────────────────────────────────── */}
-      {hasCmsModels && <section id="section-models" className="scroll-mt-24 py-14 sm:py-20 bg-slate-50 border-b border-slate-100">
+      {hasCmsModels && !isServiceOnly && <section id="section-models" className="scroll-mt-24 py-14 sm:py-20 bg-slate-50 border-b border-slate-100">
         <div className="container mx-auto px-4 sm:px-6">
           <FadeIn className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-3">
             <div>
@@ -1138,7 +1216,7 @@ export default function BrandPage() {
       </section>}
 
       {/* ── Спецпредложения ───────────────────────────────── */}
-      {cars.length > 0 ? (
+      {!isServiceOnly && (cars.length > 0 ? (
         <section id="section-stock" className="scroll-mt-24 py-14 sm:py-20 bg-white border-b border-slate-100">
           <div className="container mx-auto px-4 sm:px-6">
             <FadeIn className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-3">
@@ -1198,7 +1276,7 @@ export default function BrandPage() {
             </FadeIn>
           </div>
         </section>
-      )}
+      ))}
 
       {/* ── Акции ─────────────────────────────────────────── */}
       {hasPromotions && (
