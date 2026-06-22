@@ -120,6 +120,13 @@ export interface BrandModel {
   isActive?: boolean;
   sort?: number;
 }
+export interface BrandService {
+  id?: string;
+  icon: string;
+  title: string;
+  description?: string;
+  sort?: number;
+}
 export interface CatalogModel {
   dealer: string;
   model: string;
@@ -136,6 +143,7 @@ export interface BrandPageContent {
   heroImageMobileUrl: string | null;
   promotions: BrandPromotion[] | null;
   models: BrandModel[] | null;
+  services: BrandService[] | null;
   metaTitle: string | null; metaDescription: string | null; updatedAt: string | null;
 }
 export function getBrandPageContent(brandId: number) {
