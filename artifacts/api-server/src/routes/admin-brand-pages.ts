@@ -71,7 +71,7 @@ router.put("/:brandId", async (req, res) => {
 
     const {
       description, serviceText, promoText, metaTitle, metaDescription,
-      advantages, features, faq, heroImageUrl, heroImageMobileUrl, promotions, models,
+      advantages, features, faq, heroImageUrl, heroImageMobileUrl, promotions, models, services,
     } = req.body as {
       description?: string | null;
       serviceText?: string | null;
@@ -85,6 +85,7 @@ router.put("/:brandId", async (req, res) => {
       heroImageMobileUrl?: string | null;
       promotions?: { title: string; description: string; image?: string; badge?: string; expiresAt?: string; buttonText?: string; buttonUrl?: string; isActive?: boolean }[] | null;
       models?: { id?: string; feedDealer: string; feedModel: string; displayName: string; image?: string; description?: string; badge?: string; isActive?: boolean; sort?: number }[] | null;
+      services?: { id?: string; icon: string; title: string; description?: string; sort?: number }[] | null;
     };
 
     const values = {
@@ -101,6 +102,7 @@ router.put("/:brandId", async (req, res) => {
       heroImageMobileUrl: heroImageMobileUrl ?? null,
       promotions: promotions ?? [],
       models: models ?? [],
+      services: services ?? [],
       updatedAt: new Date(),
     };
 
@@ -122,6 +124,7 @@ router.put("/:brandId", async (req, res) => {
           heroImageMobileUrl: values.heroImageMobileUrl,
           promotions: values.promotions,
           models: values.models,
+          services: values.services,
           updatedAt: values.updatedAt,
         },
       })
