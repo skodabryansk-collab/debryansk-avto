@@ -536,6 +536,7 @@ function AnchorNav({
   hasPromotions,
   hasModels,
   hasServices,
+  isServiceOnly,
 }: {
   hasCars: boolean;
   hasAbout: boolean;
@@ -543,6 +544,7 @@ function AnchorNav({
   hasPromotions: boolean;
   hasModels: boolean;
   hasServices: boolean;
+  isServiceOnly: boolean;
 }) {
   const [active, setActive] = useState("");
 
@@ -566,7 +568,8 @@ function AnchorNav({
   const visibleItems = NAV_ITEMS.filter(({ id }) => {
     if (id === "about" && !hasAbout) return false;
     if (id === "services" && !hasServices) return false;
-    if (id === "models" && !hasModels) return false;
+    if (id === "models" && (!hasModels || isServiceOnly)) return false;
+    if (id === "stock" && (!hasCars || isServiceOnly)) return false;
     if (id === "service" && !hasService) return false;
     if (id === "promotions" && !hasPromotions) return false;
     return true;
@@ -1116,6 +1119,7 @@ export default function BrandPage() {
         hasPromotions={hasPromotions}
         hasModels={hasCmsModels}
         hasServices={hasServices}
+        isServiceOnly={isServiceOnly}
       />
 
       {/* ── О бренде ──────────────────────────────────────── */}
