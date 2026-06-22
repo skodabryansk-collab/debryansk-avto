@@ -1,10 +1,63 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
+import multer from "multer";
+import sharp from "sharp";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
+
+const memUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
+
+const IMAGE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+
+/**
+ * POST /storage/uploads/image
+ *
+ * Accepts a multipart image upload, compresses + converts to WebP via sharp,
+ * uploads the result to GCS, and returns the serving objectPath.
+ * GIF files pass through unmodified.
+ * Non-image files are rejected — use /storage/uploads/request-url instead.
+ */
+router.post("/storage/uploads/image", memUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+
+    const mime = req.file.mimetype;
+    if (!mime.startsWith("image/")) {
+      res.status(400).json({ error: "Only image files are accepted by this endpoint" });
+      return;
+    }
+
+    let buffer: Buffer;
+    let contentType: string;
+
+    if (IMAGE_TYPES.has(mime)) {
+      buffer = await sharp(req.file.buffer)
+        .resize({ width: 2000, height: 2000, fit: "inside", withoutEnlargement: true })
+        .webp({ quality: 82 })
+        .toBuffer();
+      contentType = "image/webp";
+    } else {
+      buffer = req.file.buffer;
+      contentType = mime;
+    }
+
+    const objectPath = await objectStorageService.uploadBuffer(buffer, contentType);
+    const url = `/api/storage${objectPath}`;
+    res.json({ objectPath, url });
+  } catch (error) {
+    req.log.error({ err: error }, "Error processing image upload");
+    res.status(500).json({ error: "Failed to process and upload image" });
+  }
+});
 
 interface UploadRequestBody {
   name: string;
