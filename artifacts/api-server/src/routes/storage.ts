@@ -39,18 +39,20 @@ router.post("/storage/uploads/image", memUpload.single("file"), async (req: Requ
     let buffer: Buffer;
     let contentType: string;
 
+    let extension = "";
     if (IMAGE_TYPES.has(mime)) {
       buffer = await sharp(req.file.buffer)
         .resize({ width: 2000, height: 2000, fit: "inside", withoutEnlargement: true })
         .webp({ quality: 82 })
         .toBuffer();
       contentType = "image/webp";
+      extension = ".webp";
     } else {
       buffer = req.file.buffer;
       contentType = mime;
     }
 
-    const objectPath = await objectStorageService.uploadBuffer(buffer, contentType);
+    const objectPath = await objectStorageService.uploadBuffer(buffer, contentType, extension);
     const url = `/api/storage${objectPath}`;
     res.json({ objectPath, url });
   } catch (error) {
