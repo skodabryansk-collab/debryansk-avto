@@ -94,15 +94,15 @@ const LOCAL_BUSINESS_SCHEMA = JSON.stringify({
   "url": "https://debryansk-auto.ru",
   "logo": "https://debryansk-auto.ru/logo.svg",
   "image": "https://debryansk-auto.ru/og-image.jpg",
-  "telephone": "+7-4832-63-10-00",
+  "telephone": "+7-4832-77-77-70",
   "email": "info@debryansk-auto.ru",
   "openingHours": "Mo-Su 09:00-21:00",
   "address": {
     "@type": "PostalAddress",
-    "streetAddress": "ул. Литейная, 3/2",
+    "streetAddress": "ул. Советская, д. 77",
     "addressLocality": "Брянск",
     "addressRegion": "Брянская область",
-    "postalCode": "241019",
+    "postalCode": "241050",
     "addressCountry": "RU"
   },
   "geo": {
@@ -123,11 +123,12 @@ const CONTACT_PAGE_SCHEMA = JSON.stringify({
   "mainEntity": {
     "@type": "AutoDealer",
     "name": "Дебрянск Авто",
-    "telephone": "+7-4832-63-10-00",
+    "telephone": "+7-4832-77-77-70",
     "openingHours": "Mo-Su 09:00-21:00",
     "address": {
       "@type": "PostalAddress",
-      "streetAddress": "ул. Литейная, 3/2",
+      "streetAddress": "ул. Советская, д. 77",
+      "postalCode": "241050",
       "addressLocality": "Брянск",
       "addressCountry": "RU"
     }
