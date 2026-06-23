@@ -1,8 +1,9 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import CookieBanner from "@/components/CookieBanner";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import UsedCars from "@/pages/cars";
@@ -23,12 +24,37 @@ import PrivacyPage from "@/pages/privacy";
 import LegalPage from "@/pages/legal";
 
 const queryClient = new QueryClient();
+const METRIKA_ID = 109748190;
 
 function ScrollToTop() {
   const [location] = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location]);
+  return null;
+}
+
+function MetrikaTracker() {
+  const [location] = useLocation();
+  const prevLocation = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (prevLocation.current === null) {
+      prevLocation.current = location;
+      return;
+    }
+    if (prevLocation.current !== location) {
+      const ym = (window as any).ym;
+      if (typeof ym === "function") {
+        ym(METRIKA_ID, "hit", window.location.href, {
+          title: document.title,
+          referer: window.location.origin + prevLocation.current,
+        });
+      }
+      prevLocation.current = location;
+    }
+  }, [location]);
+
   return null;
 }
 
@@ -63,7 +89,9 @@ function App() {
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
           <ScrollToTop />
+          <MetrikaTracker />
           <Router />
+          <CookieBanner />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
