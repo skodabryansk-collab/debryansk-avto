@@ -19,7 +19,7 @@ app.use((_req, res, next) => {
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader(
     "Content-Security-Policy",
-    "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; img-src 'self' data: https: http:; frame-ancestors 'self';"
+    "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; connect-src 'self' https: wss://mc.yandex.ru wss://*.yandex.ru; img-src 'self' data: https: http:; frame-ancestors 'self';"
   );
   next();
 });
