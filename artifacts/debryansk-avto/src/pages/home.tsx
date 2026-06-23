@@ -708,7 +708,7 @@ export default function Home() {
     "description": "Группа компаний по продаже, сервису и финансированию автомобилей в Брянске.",
     "address": {
       "@type": "PostalAddress",
-      "streetAddress": "ул. Курганская, 10",
+      "streetAddress": "ул. Советская, д. 77",
       "postalCode": "241050",
       "addressLocality": "Брянск",
       "addressRegion": "Брянская область",
@@ -716,7 +716,7 @@ export default function Home() {
     },
     "contactPoint": {
       "@type": "ContactPoint",
-      "telephone": "+7-4832-63-10-00",
+      "telephone": "+7-4832-77-77-70",
       "contactType": "sales"
     },
     "sameAs": [
@@ -742,7 +742,7 @@ export default function Home() {
       "latitude": "53.243562",
       "longitude": "34.363408"
     },
-    "telephone": "+7-4832-63-10-00",
+    "telephone": "+7-4832-77-77-70",
     "openingHoursSpecification": [
       {
         "@type": "OpeningHoursSpecification",
