@@ -19,6 +19,11 @@ function esc(str: string | null | undefined): string {
     .replace(/'/g, "&apos;");
 }
 
+function param(name: string, value: string | number | null | undefined): string {
+  if (value == null || value === "") return "";
+  return `      <param name="${name}">${esc(String(value))}</param>`;
+}
+
 function carUrl(type: "new" | "used", id: string): string {
   return type === "new"
     ? `${SITE_URL}/new-cars/${id}`
@@ -50,6 +55,18 @@ router.get("/feed/yml", async (_req, res) => {
         .slice(0, 10)
         .map((img) => `      <picture>${esc(img)}</picture>`)
         .join("\n");
+
+      const params = [
+        param("Год выпуска", c.year),
+        param("Цвет", c.color),
+        param("Тип кузова", c.bodyType),
+        param("Комплектация", c.complectation),
+        param("Состояние", "новый"),
+        param("VIN", c.vin),
+        param("Дилер", c.dealer),
+        c.maxDiscount ? param("Максимальная скидка", c.maxDiscount) : "",
+      ].filter(Boolean).join("\n");
+
       offerLines.push(`    <offer id="${esc(c.id)}" available="true">
       <url>${esc(carUrl("new", c.id))}</url>
       <price>${c.price}</price>
@@ -58,16 +75,11 @@ router.get("/feed/yml", async (_req, res) => {
 ${pictures}
       <vendor>${esc(c.mark)}</vendor>
       <model>${esc(c.model)}</model>
+      <typePrefix>Легковой автомобиль</typePrefix>
       <name>${esc(c.mark)} ${esc(c.model)}${c.modification ? " " + esc(c.modification) : ""} ${c.year}</name>
-      <year>${c.year}</year>
-      <color>${esc(c.color)}</color>
-      <body_type>${esc(c.bodyType)}</body_type>
-      <complectation>${esc(c.complectation)}</complectation>
       <description>${esc(c.description || `${c.mark} ${c.model} ${c.year} года в наличии у официального дилера Дебрянск Авто. Цена ${c.price.toLocaleString("ru")} руб.`)}</description>
-      <condition>new</condition>
-      <dealer>${esc(c.dealer)}</dealer>
-      ${c.vin ? `<vin>${esc(c.vin)}</vin>` : ""}
-      ${c.maxDiscount ? `<max_discount>${c.maxDiscount}</max_discount>` : ""}
+      <конверсия>заявка</конверсия>
+${params}
     </offer>`);
     }
 
@@ -77,6 +89,18 @@ ${pictures}
         .slice(0, 10)
         .map((img) => `      <picture>${esc(img)}</picture>`)
         .join("\n");
+
+      const params = [
+        param("Год выпуска", c.year),
+        param("Цвет", c.color),
+        param("Тип кузова", c.bodyType),
+        param("Пробег", c.run ? `${c.run} км` : null),
+        param("Комплектация", c.complectation),
+        param("Состояние", "с пробегом"),
+        param("VIN", c.vin),
+        c.maxDiscount ? param("Максимальная скидка", c.maxDiscount) : "",
+      ].filter(Boolean).join("\n");
+
       offerLines.push(`    <offer id="${esc(c.id)}" available="true">
       <url>${esc(carUrl("used", c.id))}</url>
       <price>${c.price}</price>
@@ -85,16 +109,11 @@ ${pictures}
 ${pictures}
       <vendor>${esc(c.mark)}</vendor>
       <model>${esc(c.model)}</model>
+      <typePrefix>Легковой автомобиль</typePrefix>
       <name>${esc(c.mark)} ${esc(c.model)}${c.modification ? " " + esc(c.modification) : ""} ${c.year}</name>
-      <year>${c.year}</year>
-      <color>${esc(c.color)}</color>
-      <body_type>${esc(c.bodyType)}</body_type>
-      <mileage>${c.run}</mileage>
-      <complectation>${esc(c.complectation)}</complectation>
       <description>${esc(c.description || `${c.mark} ${c.model} ${c.year} года с пробегом у дилера Дебрянск Авто. Цена ${c.price.toLocaleString("ru")} руб.`)}</description>
-      <condition>used</condition>
-      ${c.vin ? `<vin>${esc(c.vin)}</vin>` : ""}
-      ${c.maxDiscount ? `<max_discount>${c.maxDiscount}</max_discount>` : ""}
+      <конверсия>заявка</конверсия>
+${params}
     </offer>`);
     }
 
