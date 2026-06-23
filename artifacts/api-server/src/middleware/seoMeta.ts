@@ -51,7 +51,7 @@ const STATIC_META: Record<string, { title: string; description: string; h1: stri
   },
   "/contacts": {
     title: "Контакты дилерских центров Дебрянск Авто в Брянске",
-    description: "Адреса и телефоны всех дилерских центров «Дебрянск Авто» в Брянске. Звоните: +7 (4832) 63-10-00. Ежедневно с 9:00 до 21:00.",
+    description: "Адреса и телефоны всех дилерских центров «Дебрянск Авто» в Брянске. Звоните: +7 (4832) 77-77-70. Ежедневно с 9:00 до 21:00.",
     h1: "Контакты дилерских центров Дебрянск Авто",
   },
   "/vacancies": {
@@ -146,92 +146,37 @@ function injectMeta(
 ): string {
   let result = html;
 
-  result = result.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
-  result = result.replace(
-    /<meta name="description" content="[^"]*"\s*\/>/,
-    `<meta name="description" content="${description}" />`
-  );
-  result = result.replace(
-    /<meta property="og:title" content="[^"]*"\s*\/>/,
-    `<meta property="og:title" content="${title}" />`
-  );
-  result = result.replace(
-    /<meta property="og:description" content="[^"]*"\s*\/>/,
-    `<meta property="og:description" content="${description}" />`
-  );
-  result = result.replace(
-    /<meta name="twitter:title" content="[^"]*"\s*\/>/,
-    `<meta name="twitter:title" content="${title}" />`
-  );
-  result = result.replace(
-    /<meta name="twitter:description" content="[^"]*"\s*\/>/,
-    `<meta name="twitter:description" content="${description}" />`
-  );
+  // Strip ALL existing title/canonical/description/og/twitter tags to avoid duplicates
+  // (React Helmet may have injected its own set into Puppeteer-rendered HTML)
+  result = result.replace(/<title>[^<]*<\/title>\n?/g, "");
+  result = result.replace(/<link rel="canonical"[^>]*\/?>\n?/gi, "");
+  result = result.replace(/<meta name="description"[^>]*\/?>\n?/gi, "");
+  result = result.replace(/<meta name="robots"[^>]*\/?>\n?/gi, "");
+  result = result.replace(/<meta property="og:[^"]*"[^>]*\/?>\n?/gi, "");
+  result = result.replace(/<meta name="twitter:[^"]*"[^>]*\/?>\n?/gi, "");
 
-  // Inject or replace og:url
-  if (/<meta property="og:url" content="[^"]*"\s*\/>/.test(result)) {
-    result = result.replace(
-      /<meta property="og:url" content="[^"]*"\s*\/>/,
-      `<meta property="og:url" content="${canonical}" />`
-    );
-  } else {
-    result = result.replace(
-      /<meta property="og:type"/,
-      `<meta property="og:url" content="${canonical}" />\n    <meta property="og:type"`
-    );
-  }
+  // Insert clean, deduplicated meta block right after <meta name="viewport"...>
+  const metaBlock = [
+    `<title>${title}</title>`,
+    `<link rel="canonical" href="${canonical}" />`,
+    `<meta name="description" content="${description}" />`,
+    `<meta name="robots" content="index, follow" />`,
+    `<meta property="og:title" content="${title}" />`,
+    `<meta property="og:description" content="${description}" />`,
+    `<meta property="og:url" content="${canonical}" />`,
+    `<meta property="og:image" content="${ogImage}" />`,
+    `<meta property="og:site_name" content="Дебрянск Авто" />`,
+    `<meta property="og:type" content="website" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${title}" />`,
+    `<meta name="twitter:description" content="${description}" />`,
+    `<meta name="twitter:image" content="${ogImage}" />`,
+  ].join("\n    ");
 
-  // Inject or replace og:image
-  if (/<meta property="og:image" content="[^"]*"\s*\/>/.test(result)) {
-    result = result.replace(
-      /<meta property="og:image" content="[^"]*"\s*\/>/,
-      `<meta property="og:image" content="${ogImage}" />`
-    );
-  } else {
-    result = result.replace(
-      /<meta property="og:type"/,
-      `<meta property="og:image" content="${ogImage}" />\n    <meta property="og:type"`
-    );
-  }
-
-  // Inject or replace og:site_name
-  if (/<meta property="og:site_name" content="[^"]*"\s*\/>/.test(result)) {
-    result = result.replace(
-      /<meta property="og:site_name" content="[^"]*"\s*\/>/,
-      `<meta property="og:site_name" content="Дебрянск Авто" />`
-    );
-  } else {
-    result = result.replace(
-      /<meta property="og:type"/,
-      `<meta property="og:site_name" content="Дебрянск Авто" />\n    <meta property="og:type"`
-    );
-  }
-
-  // twitter:image
-  if (/<meta name="twitter:image" content="[^"]*"\s*\/>/.test(result)) {
-    result = result.replace(
-      /<meta name="twitter:image" content="[^"]*"\s*\/>/,
-      `<meta name="twitter:image" content="${ogImage}" />`
-    );
-  } else {
-    result = result.replace(
-      /<meta name="twitter:card"/,
-      `<meta name="twitter:image" content="${ogImage}" />\n    <meta name="twitter:card"`
-    );
-  }
-
-  // Ensure canonical link exists
-  if (/<link rel="canonical" href="[^"]*"\s*\/>/.test(result)) {
-    result = result.replace(
-      /<link rel="canonical" href="[^"]*"\s*\/>/,
-      `<link rel="canonical" href="${canonical}" />`
-    );
-  } else {
-    result = result.replace(
-      /<meta name="description"[^>]*\/>/,
-      `<meta name="description" content="${description}" />\n    <link rel="canonical" href="${canonical}" />`
-    );
-  }
+  result = result.replace(
+    /(<meta name="viewport"[^>]*\/>)/,
+    `$1\n    ${metaBlock}`
+  );
 
   // Inject LCP image preload + schema.org JSON-LD before </head>
   const ldScripts = [
@@ -268,9 +213,9 @@ function injectMeta(
         <a href="/brands/mercedes-benz">Mercedes-Benz официальный дилер Брянск</a>
       </nav>
       <address>
-        <p>Дебрянск Авто — официальный дилер Haval, Jetour, OMODA в Брянске</p>
-        <p>Телефон: <a href="tel:+74832631000">+7 (4832) 63-10-00</a></p>
-        <p>Адрес: г. Брянск, ул. Литейная, 3/2 | ул. Советская, 77 | пр. Московский, 2Г | с. Супонево, ул. Шоссейная, 12Г</p>
+        <p>Дебрянск Авто — официальный дилер Haval, Jetour, OMODA, Volkswagen в Брянске</p>
+        <p>Телефон: <a href="tel:+74832777770">+7 (4832) 77-77-70</a></p>
+        <p>Адрес: г. Брянск, ул. Советская, д. 77 | ул. Литейная, 3/2 | пр. Московский, 2Г | с. Супонево, ул. Шоссейная, 12Г</p>
         <p>Режим работы: ежедневно 9:00–21:00</p>
         <p>Email: <a href="mailto:info@debryansk-auto.ru">info@debryansk-auto.ru</a></p>
       </address>
