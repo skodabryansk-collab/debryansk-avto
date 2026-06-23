@@ -29,12 +29,14 @@ import brandLocationsRouter from "./brand-locations";
 import adminNavigatorRouter from "./admin-navigator";
 import adminReviewsRouter from "./admin-reviews";
 import adminBrandPagesRouter from "./admin-brand-pages";
+import feedYmlRouter from "./feed-yml";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(chatRouter);
 router.use(carsRouter);
+router.use(feedYmlRouter);
 router.use(newCarsRouter);
 router.use(featuredRouter);
 router.use(hhVacanciesRouter);
