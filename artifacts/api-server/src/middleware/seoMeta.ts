@@ -30,7 +30,7 @@ const STATIC_META: Record<string, { title: string; description: string; h1: stri
     h1: "Автомобили с пробегом в Брянске",
   },
   "/service": {
-    title: "Сервис Haval, Jetour, OMODA, Volkswagen в Брянске — официальный дилер",
+    title: "Сервисное обслуживание автомобилей в Брянске — ТО, ремонт, запчасти | Дебрянск Авто",
     description: "Официальный сервис Haval, Jetour, OMODA, JAECOO, Volkswagen, SKODA, EXEED и других брендов в Брянске. Онлайн-запись, оригинальные запчасти, гарантийный ремонт.",
     h1: "Сервисное обслуживание автомобилей в Брянске",
   },
