@@ -12,7 +12,7 @@ const SITE = "https://debryansk-auto.ru";
 const DEFAULT_OG_IMAGE = `${SITE}/opengraph.jpg`;
 
 const DEFAULT_META = {
-  title: "Дебрянск Авто — официальный дилер Haval, Jetour, OMODA, Volkswagen в Брянске",
+  title: "Дебрянск Авто — официальный автосалон в Брянске | Продажа, сервис, кредит",
   description: "Официальный дилер Haval, Jetour, OMODA, JAECOO, Volkswagen, SKODA, EXEED, Tenet и Mercedes-Benz в Брянске. 4 дилерских центра. Продажа, сервис и финансирование с 2011 года.",
   h1: "Дебрянск Авто — официальный дилер автомобилей в Брянске",
 };
