@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -93,7 +94,7 @@ const advantages = [
 const serviceSchema = {
   "@type": "AutoRepair",
   name: "Дебрянск Авто — Официальный сервис",
-  description: "Официальный сервисный центр Haval, Omoda, Jaecoo, Jetour, Tenet, Volkswagen, Skoda, Exeed, Mercedes-Benz в Брянске.",
+  description: "Официальный сервисный центр Haval, Omoda, Jaecoo, Jetour, Tenet, Soueast, Volkswagen, Skoda, Exeed, Mercedes-Benz в Брянске.",
   url: "https://debryansk-auto.ru/service",
   telephone: "+7 (4832) 77 77 70",
   areaServed: { "@type": "City", name: "Брянск" },
@@ -140,7 +141,7 @@ function BookingForm({ locations }: { locations: ApiLocation[] }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.phone || !form.service) {
+    if (!form.name || !isPhoneValid(form.phone) || !form.service) {
       toast({ title: "Заполните обязательные поля", variant: "destructive" });
       return;
     }
@@ -181,8 +182,9 @@ function BookingForm({ locations }: { locations: ApiLocation[] }) {
         <div>
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Телефон *</label>
           <input
+            type="tel" inputMode="tel" maxLength={18}
             value={form.phone}
-            onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+            onChange={e => setForm(f => ({ ...f, phone: formatPhone(e.target.value) }))}
             placeholder="+7 (___) ___-__-__"
             className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#0070b8] focus:ring-1 focus:ring-[#0070b8] outline-none text-sm"
           />
@@ -301,7 +303,7 @@ export default function ServicePage() {
     <Layout>
       <SEO
         title="Официальный сервис — Дебрянск Авто"
-        description="Официальный сервис Haval, Omoda, Jaecoo, Jetour, Tenet, Volkswagen, Skoda, Exeed, Mercedes-Benz в Брянске. ТО, ремонт, кузовной, детейлинг, диагностика. Онлайн-запись."
+        description="Официальный сервис Haval, Omoda, Jaecoo, Jetour, Tenet, Soueast, Volkswagen, Skoda, Exeed, Mercedes-Benz в Брянске. ТО, ремонт, кузовной, детейлинг, диагностика. Онлайн-запись."
         canonical="/service"
         jsonLd={serviceSchema}
         breadcrumbs={[
