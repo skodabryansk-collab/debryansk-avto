@@ -178,7 +178,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       "alternateName": "Территория Автомобилей",
       "url": "https://debryansk-auto.ru",
       "telephone": "+74832631000",
-      "description": "Группа автодилеров в Брянске. 6 брендов новых авто: OMODA, JAECOO, HAVAL, Tenet, Jetour. Автомобили с пробегом, сервис, выкуп.",
+      "description": "Группа автодилеров в Брянске. 7 брендов новых авто: OMODA, JAECOO, HAVAL, Tenet, Jetour, Soueast. Автомобили с пробегом, сервис, выкуп.",
       "image": "https://debryansk-auto.ru/opengraph.jpg",
       "address": {
         "@type": "PostalAddress",
@@ -500,6 +500,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <li><Link href="/brands/jaecoo" className="hover:text-[#0070b8] transition-colors">JAECOO</Link></li>
                 <li><Link href="/brands/tenet" className="hover:text-[#0070b8] transition-colors">Tenet</Link></li>
                 <li><Link href="/brands/jetour" className="hover:text-[#0070b8] transition-colors">Jetour</Link></li>
+                <li><Link href="/brands/soueast" className="hover:text-[#0070b8] transition-colors">Soueast</Link></li>
                 <li><Link href="/brands/haval-city" className="hover:text-[#0070b8] transition-colors">HAVAL City</Link></li>
                 <li><Link href="/brands/haval-pro" className="hover:text-[#0070b8] transition-colors">HAVAL Pro</Link></li>
               </ul>
