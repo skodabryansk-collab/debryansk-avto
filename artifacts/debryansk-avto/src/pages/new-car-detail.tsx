@@ -51,6 +51,7 @@ const DEALER_COLORS: Record<string, string> = {
   "Haval Pro":  "#eef2ff",
   "Haval City": "#e8f4ff",
   "Jetour":     "#f4f0ff",
+  "Soueast":    "#fff8f0",
 };
 
 function parseTransmission(mod: string): string {
