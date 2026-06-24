@@ -1809,7 +1809,7 @@ export default function Home() {
               <ul className="space-y-2 text-sm">
                 <li><a href="/service" className="hover:text-[#0070b8] transition-colors">Сервис и ТО</a></li>
                 <li><a href="/about" className="hover:text-[#0070b8] transition-colors">О группе</a></li>
-                {["CHERY", "OMODA", "JAECOO", "HAVAL"].map(b => (
+                {["CHERY", "OMODA", "JAECOO", "HAVAL", "SOUEAST"].map(b => (
                   <li key={b}>
                     <a href={`/new-cars?brand=${encodeURIComponent(b)}`} className="hover:text-[#0070b8] transition-colors">{b}</a>
                   </li>
