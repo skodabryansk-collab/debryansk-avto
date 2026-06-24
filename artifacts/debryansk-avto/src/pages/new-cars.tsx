@@ -74,6 +74,7 @@ const DEALER_COLORS: Record<string, string> = {
   "Haval Pro":  "#eef2ff",
   "Haval City": "#e8f4ff",
   "Jetour":     "#f4f0ff",
+  "Soueast":    "#fff8f0",
 };
 
 function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void }) {
@@ -386,7 +387,7 @@ const BODY_TYPES = [
 ];
 const TRANSMISSIONS = ["Любая", "Робот", "Автомат", "Механика", "Вариатор"];
 const DRIVES = ["Любой", "Полный", "Передний"];
-const DEALERS = ["Все дилеры", "Jaecoo", "Omoda", "Tenet", "Haval City", "Haval Pro", "Jetour"];
+const DEALERS = ["Все дилеры", "Jaecoo", "Omoda", "Tenet", "Haval City", "Haval Pro", "Jetour", "Soueast"];
 
 export default function NewCars() {
   const { favorites, compare } = useCarStorage();
