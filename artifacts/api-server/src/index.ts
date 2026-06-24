@@ -29,6 +29,7 @@ const CANONICAL_BRANDS = [
   { name: "Haval Pro",     websiteUrl: "https://debryansk-haval.pro",   logoUrl: "/uploads/logo-haval.svg",     isServiceOnly: false },
   { name: "Tenet",         websiteUrl: "https://tenet-debryansk.ru",    logoUrl: "/uploads/logo-tenet.webp",    isServiceOnly: false },
   { name: "Jetour",        websiteUrl: "https://jetour-mbbryansky.ru",  logoUrl: "/uploads/logo-jetour.svg",    isServiceOnly: false },
+  { name: "Soueast",       websiteUrl: "https://soueast-debryansk.ru",  logoUrl: null,                          isServiceOnly: false },
   { name: "МБ-Брянск",     websiteUrl: "https://mb-debryansk.ru",       logoUrl: "/uploads/logo-mercedes.webp", isServiceOnly: false },
   { name: "С пробегом",    websiteUrl: "https://debryansk-avto.ru",     logoUrl: null,                          isServiceOnly: false },
   { name: "Volkswagen",    websiteUrl: null,                            logoUrl: null,                          isServiceOnly: true  },
