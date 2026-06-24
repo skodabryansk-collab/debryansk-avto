@@ -89,7 +89,7 @@ interface NewCarRecord {
   images: string[];
 }
 
-const DEALER_BRANDS = ["Jaecoo", "OMODA", "Tenet", "Haval", "Jetour"];
+const DEALER_BRANDS = ["Jaecoo", "OMODA", "Tenet", "Haval", "Jetour", "Soueast"];
 
 async function fetchCars(): Promise<CarRecord[]> {
   const r = await fetch("/api/cars/used");
