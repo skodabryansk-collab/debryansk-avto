@@ -13,7 +13,7 @@ const DEFAULT_OG_IMAGE = `${SITE}/opengraph.jpg`;
 
 const DEFAULT_META = {
   title: "Дебрянск Авто — официальный автосалон в Брянске | Продажа, сервис, кредит",
-  description: "Официальный дилер Haval, Jetour, OMODA, JAECOO, Volkswagen, SKODA, EXEED, Tenet и Mercedes-Benz в Брянске. 4 дилерских центра. Продажа, сервис и финансирование с 2011 года.",
+  description: "Официальный дилер Haval, Jetour, OMODA, JAECOO, Soueast, Volkswagen, SKODA, EXEED, Tenet и Mercedes-Benz в Брянске. 4 дилерских центра. Продажа, сервис и финансирование с 2011 года.",
   h1: "Дебрянск Авто — официальный дилер автомобилей в Брянске",
 };
 
@@ -31,7 +31,7 @@ const STATIC_META: Record<string, { title: string; description: string; h1: stri
   },
   "/service": {
     title: "Сервисное обслуживание автомобилей в Брянске — ТО, ремонт, запчасти | Дебрянск Авто",
-    description: "Официальный сервис Haval, Jetour, OMODA, JAECOO, Volkswagen, SKODA, EXEED и других брендов в Брянске. Онлайн-запись, оригинальные запчасти, гарантийный ремонт.",
+    description: "Официальный сервис Haval, Jetour, OMODA, JAECOO, Soueast, Volkswagen, SKODA, EXEED и других брендов в Брянске. Онлайн-запись, оригинальные запчасти, гарантийный ремонт.",
     h1: "Сервисное обслуживание автомобилей в Брянске",
   },
   "/buyout": {
@@ -46,7 +46,7 @@ const STATIC_META: Record<string, { title: string; description: string; h1: stri
   },
   "/about": {
     title: "О компании Дебрянск Авто — группа компаний 9 БР",
-    description: "«Дебрянск Авто» — официальный мультибрендовый дилер в Брянске с 2011 года. 9 брендов: Haval, Jetour, OMODA, Jaecoo. 4 дилерских центра.",
+    description: "«Дебрянск Авто» — официальный мультибрендовый дилер в Брянске с 2011 года. 10 брендов: Haval, Jetour, OMODA, Jaecoo, Soueast. 4 дилерских центра.",
     h1: "О компании Дебрянск Авто",
   },
   "/contacts": {
