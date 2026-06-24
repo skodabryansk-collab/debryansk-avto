@@ -11,6 +11,7 @@ const FEEDS = [
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/f8056db2c70dba547744e2e4aaa20556.xml", dealer: "Haval Pro" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/53fe918374eb87e8f6536b8c3bb21937.xml", dealer: "Haval City" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/913211584f8ad577ee76a703f2f13186.xml", dealer: "Jetour" },
+  { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/86abbe9a79571a2757b583e323b27564.xml", dealer: "Soueast" },
 ];
 
 export interface NewCarRecord {
@@ -80,6 +81,7 @@ const BRAND_CANONICAL: Record<string, string> = {
   "EXEED": "Exeed",
   "TANK": "Tank",
   "BYD": "BYD",
+  "SOUEAST": "Soueast",
 };
 
 function normalizeBrand(raw: string): string {
