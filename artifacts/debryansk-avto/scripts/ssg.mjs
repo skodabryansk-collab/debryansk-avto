@@ -16,7 +16,7 @@ const STATIC_ROUTES = {
   "/": {
     title: "Дебрянск Авто — официальный автосалон в Брянске | Продажа, сервис, кредит",
     description:
-      "Официальный дилер Haval, Jetour, OMODA, JAECOO, Volkswagen, SKODA, EXEED, Tenet и Mercedes-Benz в Брянске. 4 дилерских центра. Продажа, сервис и финансирование с 2011 года.",
+      "Официальный дилер Haval, Jetour, OMODA, JAECOO, Soueast, Volkswagen, SKODA, EXEED, Tenet и Mercedes-Benz в Брянске. 4 дилерских центра. Продажа, сервис и финансирование с 2011 года.",
     h1: "Дебрянск Авто — официальный дилер автомобилей в Брянске",
   },
   "/new-cars": {
@@ -34,7 +34,7 @@ const STATIC_ROUTES = {
   "/service": {
     title: "Сервисное обслуживание автомобилей в Брянске — ТО, ремонт, запчасти | Дебрянск Авто",
     description:
-      "Официальный сервис Haval, Jetour, OMODA, JAECOO, Volkswagen, SKODA, EXEED и других брендов в Брянске. Онлайн-запись, оригинальные запчасти, гарантийный ремонт.",
+      "Официальный сервис Haval, Jetour, OMODA, JAECOO, Soueast, Volkswagen, SKODA, EXEED и других брендов в Брянске. Онлайн-запись, оригинальные запчасти, гарантийный ремонт.",
     h1: "Сервисное обслуживание автомобилей в Брянске",
   },
   "/buyout": {
@@ -52,7 +52,7 @@ const STATIC_ROUTES = {
   "/about": {
     title: "О компании Дебрянск Авто — группа компаний 9 БР",
     description:
-      "Группа компаний «Дебрянск Авто» — официальный мультибрендовый дилер в Брянске. 9 брендов, 4 дилерских центра с 2011 года.",
+      "Группа компаний «Дебрянск Авто» — официальный мультибрендовый дилер в Брянске. 10 брендов, 4 дилерских центра с 2011 года.",
     h1: "О компании Дебрянск Авто",
   },
   "/contacts": {
@@ -79,7 +79,7 @@ function esc(s) {
   return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
 
-function injectMeta(html, title, description, canonical, ogImage, h1) {
+function injectMeta(html, title, description, canonical, ogImage, h1, jsonLd) {
   let result = html;
   const t = esc(title);
   const d = esc(description);
@@ -173,6 +173,25 @@ function injectMeta(html, title, description, canonical, ogImage, h1) {
     );
   }
 
+  // Inject JSON-LD if provided
+  if (jsonLd) {
+    const ld = esc(JSON.stringify({ "@context": "https://schema.org", ...jsonLd }));
+    const ldTag = `<script type="application/ld+json">${ld}</script>`;
+    if (result.includes('type="application/ld+json"')) {
+      // replace existing first ld+json block
+      result = result.replace(
+        /<script type="application\/ld\+json">[^]*?<\/script>/,
+        ldTag
+      );
+    } else {
+      // insert before closing </head>
+      result = result.replace(
+        /<\/head>/,
+        `    ${ldTag}\n  </head>`
+      );
+    }
+  }
+
   // Inject H1 as screen-reader-only element for search engines
   result = result.replace(
     /<div id="root"><\/div>/,
@@ -197,10 +216,10 @@ function getTemplate() {
   }
 }
 
-function writeRoute(routePath, title, description, h1, ogImage) {
+function writeRoute(routePath, title, description, h1, ogImage, jsonLd) {
   const canonical = `${SITE}${routePath}`;
   const template = getTemplate();
-  const html = injectMeta(template, title, description, canonical, ogImage || DEFAULT_OG_IMAGE, h1);
+  const html = injectMeta(template, title, description, canonical, ogImage || DEFAULT_OG_IMAGE, h1, jsonLd);
 
   let filePath;
   if (routePath === "/") {
@@ -232,15 +251,34 @@ async function main() {
     }
 
     const brandsResult = await pool.query(
-      "SELECT name, slug FROM brands WHERE slug IS NOT NULL AND slug != ''"
+      "SELECT b.id, b.name, b.slug, bpc.faq FROM brands b LEFT JOIN brand_page_content bpc ON bpc.brand_id = b.id WHERE b.slug IS NOT NULL AND b.slug != ''"
     );
     for (const row of brandsResult.rows) {
+      let faqLd = null;
+      let faq = row.faq;
+      if (typeof faq === 'string') { try { faq = JSON.parse(faq); } catch { faq = null; } }
+      if (faq && Array.isArray(faq)) {
+        const schemaItems = faq
+          .filter(item => item.is_published !== false && item.include_in_schema !== false)
+          .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+        if (schemaItems.length > 0) {
+          faqLd = {
+            "@type": "FAQPage",
+            mainEntity: schemaItems.map(item => ({
+              "@type": "Question",
+              name: item.question,
+              acceptedAnswer: { "@type": "Answer", text: item.answer },
+            })),
+          };
+        }
+      }
       writeRoute(
         `/brands/${row.slug}`,
         `${row.name} в Брянске — официальный дилер | Дебрянск Авто`,
         `Купите ${row.name} у официального дилера в Брянске. Широкий выбор в наличии, кредит, trade-in, гарантийный сервис. Дебрянск Авто.`,
         `${row.name} в Брянске — официальный дилер`,
-        DEFAULT_OG_IMAGE
+        DEFAULT_OG_IMAGE,
+        faqLd
       );
     }
 
