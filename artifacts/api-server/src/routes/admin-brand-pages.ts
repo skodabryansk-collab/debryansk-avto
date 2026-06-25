@@ -171,34 +171,49 @@ router.put("/:brandId", async (req, res) => {
       })
       .returning();
 
-    // Bidirectional sync: ID-based upsert for promotions exclusively owned by this brand
+    // Bidirectional sync: ID-based upsert for promotions linked to this brand
     if (promotions !== undefined) {
-      // Fetch IDs of promotions exclusively owned by this brand
-      const existingRows = await db.execute(sql`
+      // Track exclusively-owned ids (for deletion when removed from the form)
+      const exclusiveRows = await db.execute(sql`
         SELECT id FROM promotions WHERE brand_ids = ARRAY[${brandId}]::integer[]
       `);
-      const existingIds = new Set((existingRows.rows as { id: number }[]).map(r => r.id));
+      const exclusiveIds = new Set((exclusiveRows.rows as { id: number }[]).map(r => r.id));
 
-      const keepIds = new Set<number>();
+      const keepExclusiveIds = new Set<number>();
 
       for (const p of (promotions ?? [])) {
         const dbp = promoToDb(p);
         const pid = (p as { id?: number }).id;
 
-        if (pid && existingIds.has(pid)) {
-          // Update existing exclusively-owned row
-          await db.execute(sql`
-            UPDATE promotions SET
-              title = ${dbp.title}, description = ${dbp.description},
-              image = ${dbp.image}, badge = ${dbp.badge},
-              expires_at = ${dbp.expires_at}, is_active = ${dbp.is_active},
-              button_text = ${dbp.button_text}, button_url = ${dbp.button_url},
-              updated_at = NOW()
-            WHERE id = ${pid}
+        if (pid) {
+          // Has id — update if this brand is linked (exclusive or shared)
+          const linkedRows = await db.execute(sql`
+            SELECT id FROM promotions WHERE id = ${pid} AND ${brandId} = ANY(brand_ids)
           `);
-          keepIds.add(pid);
+          if (linkedRows.rows.length > 0) {
+            await db.execute(sql`
+              UPDATE promotions SET
+                title = ${dbp.title}, description = ${dbp.description},
+                image = ${dbp.image}, badge = ${dbp.badge},
+                expires_at = ${dbp.expires_at}, is_active = ${dbp.is_active},
+                button_text = ${dbp.button_text}, button_url = ${dbp.button_url},
+                updated_at = NOW()
+              WHERE id = ${pid}
+            `);
+            if (exclusiveIds.has(pid)) keepExclusiveIds.add(pid);
+          } else {
+            // Stale id not linked to this brand — insert as new exclusive row
+            await db.execute(sql`
+              INSERT INTO promotions
+                (title, description, image, badge, expires_at, is_active, button_text, button_url, brand_ids, created_at, updated_at)
+              VALUES
+                (${dbp.title}, ${dbp.description}, ${dbp.image}, ${dbp.badge},
+                 ${dbp.expires_at}, ${dbp.is_active}, ${dbp.button_text}, ${dbp.button_url},
+                 ARRAY[${brandId}]::integer[], NOW(), NOW())
+            `);
+          }
         } else {
-          // New promotion — insert as exclusively owned by this brand
+          // No id — insert as new exclusively-owned promotion
           await db.execute(sql`
             INSERT INTO promotions
               (title, description, image, badge, expires_at, is_active, button_text, button_url, brand_ids, created_at, updated_at)
@@ -210,9 +225,9 @@ router.put("/:brandId", async (req, res) => {
         }
       }
 
-      // Delete exclusively-owned rows that are no longer present
-      for (const eid of existingIds) {
-        if (!keepIds.has(eid)) {
+      // Delete exclusively-owned rows that were removed from the inline editor
+      for (const eid of exclusiveIds) {
+        if (!keepExclusiveIds.has(eid)) {
           await db.execute(sql`DELETE FROM promotions WHERE id = ${eid}`);
         }
       }
