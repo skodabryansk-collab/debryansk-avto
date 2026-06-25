@@ -113,8 +113,9 @@ router.post("/", async (req, res) => {
     `);
 
     return res.status(201).json({ ok: true, data: mapRow(rows.rows[0] as Record<string, unknown>) });
-  } catch (err) {
-    return res.status(500).json({ ok: false, error: String(err) });
+  } catch (err: unknown) {
+    const status = (err as { status?: number }).status ?? 500;
+    return res.status(status).json({ ok: false, error: String(err) });
   }
 });
 
@@ -161,8 +162,9 @@ router.put("/:id", async (req, res) => {
     if (!rows.rows.length) return res.status(404).json({ ok: false, error: "Not found" });
 
     return res.json({ ok: true, data: mapRow(rows.rows[0] as Record<string, unknown>) });
-  } catch (err) {
-    return res.status(500).json({ ok: false, error: String(err) });
+  } catch (err: unknown) {
+    const status = (err as { status?: number }).status ?? 500;
+    return res.status(status).json({ ok: false, error: String(err) });
   }
 });
 
