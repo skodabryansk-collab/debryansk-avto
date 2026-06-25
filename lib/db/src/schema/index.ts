@@ -9,3 +9,4 @@ export * from "./messages";
 export * from "./cars";
 export * from "./reviews";
 export * from "./site-settings";
+export * from "./promotions";
