@@ -414,9 +414,12 @@ function PromotionFormDialog({
               <button
                 type="button"
                 onClick={() =>
-                  setSelectedBrandIds(prev =>
-                    prev.length === brands.length ? [] : brands.map(b => b.id)
-                  )
+                  setForm(f => ({
+                    ...f,
+                    brandIds: (f.brandIds as number[]).length === brands.length
+                      ? []
+                      : brands.map(b => b.id),
+                  }))
                 }
                 className="text-xs text-[#0070b8] hover:underline"
               >
