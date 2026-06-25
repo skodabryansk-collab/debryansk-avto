@@ -3,6 +3,32 @@ import { db, brandsTable, brandPageContentTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/requireAdmin";
 
+function promoToDb(p: { title: string; description?: string; image?: string; badge?: string; expiresAt?: string; buttonText?: string; buttonUrl?: string; isActive?: boolean }) {
+  return {
+    title: p.title,
+    description: p.description ?? "",
+    image: p.image ?? null,
+    badge: p.badge ?? null,
+    expires_at: p.expiresAt ? new Date(p.expiresAt) : null,
+    is_active: p.isActive !== false,
+    button_text: p.buttonText ?? null,
+    button_url: p.buttonUrl ?? null,
+  };
+}
+
+function promoFromDb(row: Record<string, unknown>) {
+  return {
+    title: row["title"] as string,
+    description: row["description"] as string,
+    image: row["image"] as string | null,
+    badge: row["badge"] as string | null,
+    expiresAt: row["expires_at"] as string | null,
+    isActive: row["is_active"] as boolean,
+    buttonText: row["button_text"] as string | null,
+    buttonUrl: row["button_url"] as string | null,
+  };
+}
+
 const router: IRouter = Router();
 router.use(requireAdmin);
 
@@ -20,11 +46,25 @@ router.get("/:brandId", async (req, res) => {
       .from(brandPageContentTable)
       .where(eq(brandPageContentTable.brandId, brandId));
 
+    // Inject global promotions for this brand into the content object
+    const promoRows = await db.execute(sql`
+      SELECT title, description, image, badge, expires_at, is_active, button_text, button_url
+      FROM promotions
+      WHERE ${brandId} = ANY(brand_ids)
+      ORDER BY created_at DESC
+    `);
+    const globalPromos = (promoRows.rows as Record<string, unknown>[]).map(promoFromDb);
+
+    const rawContent = contentRows[0] ?? null;
+    const content = rawContent
+      ? { ...rawContent, promotions: globalPromos }
+      : globalPromos.length > 0 ? { promotions: globalPromos } : null;
+
     return res.json({
       ok: true,
       data: {
         brand: brandRows[0],
-        content: contentRows[0] ?? null,
+        content,
       },
     });
   } catch (err) {
@@ -129,6 +169,27 @@ router.put("/:brandId", async (req, res) => {
         },
       })
       .returning();
+
+    // Bidirectional sync: replace global promotions exclusively owned by this brand
+    if (promotions !== undefined) {
+      // Delete promotions that belong only to this brand (not shared with others)
+      await db.execute(sql`
+        DELETE FROM promotions
+        WHERE brand_ids = ARRAY[${brandId}]::integer[]
+      `);
+      // Insert each inline promotion as a global promotion row
+      for (const p of (promotions ?? [])) {
+        const dbp = promoToDb(p);
+        await db.execute(sql`
+          INSERT INTO promotions
+            (title, description, image, badge, expires_at, is_active, button_text, button_url, brand_ids, created_at, updated_at)
+          VALUES
+            (${dbp.title}, ${dbp.description}, ${dbp.image}, ${dbp.badge},
+             ${dbp.expires_at}, ${dbp.is_active}, ${dbp.button_text}, ${dbp.button_url},
+             ARRAY[${brandId}]::integer[], NOW(), NOW())
+        `);
+      }
+    }
 
     return res.json({ ok: true, data: rows[0] });
   } catch (err) {
