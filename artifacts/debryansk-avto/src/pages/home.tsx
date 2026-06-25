@@ -1749,6 +1749,40 @@ export default function Home() {
       {/* ── Reviews ─────────────────────────────────────────── */}
       <ReviewsSection />
 
+      {/* ── Navigator AI teaser ─────────────────────────────── */}
+      <section className="py-8 sm:py-10 bg-white border-t border-slate-100">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div
+            className="relative overflow-hidden rounded-2xl px-6 py-5 sm:px-8 sm:py-6 flex flex-col sm:flex-row items-start sm:items-center gap-4"
+            style={{ background: "linear-gradient(135deg, #0070b8 0%, #005a96 60%, #004880 100%)" }}
+          >
+            {/* Subtle decorative ring */}
+            <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full border-[20px] border-white/5 pointer-events-none" />
+            <div className="absolute right-16 bottom-[-24px] w-24 h-24 rounded-full border-[12px] border-white/5 pointer-events-none" />
+
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center">
+                <Navigation className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-extrabold text-base sm:text-lg leading-tight">Навигатор — AI‑помощник по выбору авто</p>
+              <p className="text-white/70 text-xs sm:text-sm mt-0.5">Подберёт автомобиль по бюджету, расскажет об условиях кредита и трейд-ин, запишет на тест-драйв</p>
+            </div>
+            <button
+              onClick={() => {
+                const event = new CustomEvent("navigator:open");
+                window.dispatchEvent(event);
+              }}
+              className="shrink-0 bg-white text-[#0070b8] font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-white/90 transition-colors whitespace-nowrap flex items-center gap-2"
+            >
+              <Navigation className="w-4 h-4" />
+              Спросить Навигатора
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* ── News ───────────────────────────────────────────── */}
       <HomeNewsSection />
 
