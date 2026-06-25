@@ -135,7 +135,7 @@ function NewsFormDialog({ item, onClose }: { item: NewsItem | null; onClose: () 
     slug: item?.slug ?? "",
     publishedAt: item?.publishedAt ?? "",
     readTime: item?.readTime ?? 3,
-    brandId: item?.brandId ?? null as number | null,
+    brandIds: item?.brandIds ?? [] as number[],
   });
   const [uploading, setUploading] = React.useState(false);
   const imageRef = React.useRef<HTMLInputElement>(null);
@@ -254,17 +254,56 @@ function NewsFormDialog({ item, onClose }: { item: NewsItem | null; onClose: () 
             <Input type="number" value={form.readTime} onChange={e => setForm(f => ({ ...f, readTime: Number(e.target.value) }))} />
           </div>
           <div>
-            <Label>Бренд (опционально)</Label>
-            <select
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              value={form.brandId ?? ""}
-              onChange={e => setForm(f => ({ ...f, brandId: e.target.value ? Number(e.target.value) : null }))}
-            >
-              <option value="">— Без бренда —</option>
-              {brands?.filter(b => !b.isServiceOnly).map(b => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
+            <div className="flex items-center justify-between mb-1">
+              <Label>Бренды (опционально)</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="text-xs text-[#0070b8] hover:underline"
+                  onClick={() => setForm(f => ({ ...f, brandIds: (brands ?? []).map(b => b.id) }))}
+                >
+                  Выбрать все
+                </button>
+                <span className="text-xs text-slate-300">|</span>
+                <button
+                  type="button"
+                  className="text-xs text-slate-500 hover:underline"
+                  onClick={() => setForm(f => ({ ...f, brandIds: [] }))}
+                >
+                  Снять все
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 mb-2">Новость появится на странице каждого выбранного бренда. Без выбора — только на главной.</p>
+            <div className="border rounded-md p-2 max-h-48 overflow-y-auto space-y-1 bg-slate-50">
+              {(brands ?? []).map(b => {
+                const checked = form.brandIds.includes(b.id);
+                return (
+                  <label key={b.id} className="flex items-center gap-2 cursor-pointer px-1 py-0.5 rounded hover:bg-slate-100">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={e => {
+                        setForm(f => ({
+                          ...f,
+                          brandIds: e.target.checked
+                            ? [...f.brandIds, b.id]
+                            : f.brandIds.filter(id => id !== b.id),
+                        }));
+                      }}
+                      className="accent-[#0070b8]"
+                    />
+                    <span className="text-sm text-slate-700">
+                      {b.name}
+                      {b.isServiceOnly && <span className="ml-1 text-xs text-slate-400">(сервис)</span>}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            {form.brandIds.length > 0 && (
+              <p className="text-xs text-slate-500 mt-1">Выбрано: {form.brandIds.length}</p>
+            )}
           </div>
         </div>
         <DialogFooter>
