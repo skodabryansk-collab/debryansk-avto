@@ -1,4 +1,11 @@
 import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { customType } from "drizzle-orm/pg-core";
+
+const integerArray = customType<{ data: number[]; driverData: number[] }>({
+  dataType() { return "integer[]"; },
+  fromDriver(val) { return val as number[]; },
+  toDriver(val) { return val; },
+});
 
 export const newsTable = pgTable("news", {
   id: serial("id").primaryKey(),
@@ -12,6 +19,7 @@ export const newsTable = pgTable("news", {
   publishedAt: timestamp("published_at", { withTimezone: true }).defaultNow(),
   readTime: integer("read_time").default(3),
   brandId: integer("brand_id"),
+  brandIds: integerArray("brand_ids").default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
