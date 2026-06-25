@@ -41,6 +41,7 @@ export interface NewsItem {
   id: number; title: string; excerpt: string; content: string; category: string;
   image: string; imageMobile: string | null; slug: string; publishedAt: string; readTime: number;
   brandId: number | null;
+  brandIds: number[];
   createdAt: string; updatedAt: string;
 }
 export function getNews() { return api<{ data: NewsItem[] }>("GET", "/admin/news").then(r => r.data); }
