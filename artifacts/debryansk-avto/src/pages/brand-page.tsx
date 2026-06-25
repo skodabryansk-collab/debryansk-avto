@@ -315,17 +315,8 @@ function PromoModal({
           <X className="w-4 h-4 text-slate-600" />
         </button>
         {promo.image && (
-          <div className="relative w-full h-48 sm:h-56 shrink-0 overflow-hidden">
+          <div className="w-full h-48 sm:h-56 shrink-0 overflow-hidden">
             <img src={promo.image} alt={promo.title} className="w-full h-full object-cover" loading="lazy" />
-            {locationPhone && (
-              <a
-                href={phoneHref(locationPhone)}
-                className="absolute top-3 right-3 z-20 inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-sm text-[#0070b8] font-bold px-3 py-1.5 rounded-full text-xs shadow-md hover:bg-white transition-colors"
-              >
-                <Phone className="w-3 h-3" />
-                {normalizePhone(locationPhone)}
-              </a>
-            )}
           </div>
         )}
         <div className="p-6 sm:p-8 overflow-y-auto">
@@ -340,6 +331,15 @@ function PromoModal({
                 <Calendar className="w-3 h-3" />
                 до {new Date(promo.expiresAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
               </span>
+            )}
+            {locationPhone && (
+              <a
+                href={phoneHref(locationPhone)}
+                className="ml-auto inline-flex items-center gap-1.5 bg-[#0070b8]/10 text-[#0070b8] font-bold px-3 py-1 rounded-full text-xs hover:bg-[#0070b8]/20 transition-colors"
+              >
+                <Phone className="w-3 h-3" />
+                {normalizePhone(locationPhone)}
+              </a>
             )}
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mb-3 leading-tight">
