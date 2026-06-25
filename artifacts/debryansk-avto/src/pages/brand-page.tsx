@@ -264,10 +264,12 @@ function ServiceModal({
 function PromoModal({
   promo,
   brandName,
+  locationPhone,
   onClose,
 }: {
   promo: { title: string; description: string; image?: string; badge?: string; expiresAt?: string; buttonText?: string; buttonUrl?: string };
   brandName: string;
+  locationPhone?: string | null;
   onClose: () => void;
 }) {
   const [showForm, setShowForm] = useState(false);
@@ -337,6 +339,24 @@ function PromoModal({
           <p className="text-slate-600 leading-relaxed whitespace-pre-line mb-6 text-sm sm:text-base">
             {promo.description}
           </p>
+
+          {locationPhone && (
+            <div className="mb-6 rounded-xl bg-[#0070b8]/5 border border-[#0070b8]/10 p-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#0070b8]/10 flex items-center justify-center shrink-0">
+                <Phone className="w-4 h-4 text-[#0070b8]" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Позвоните напрямую</p>
+                <a
+                  href={phoneHref(locationPhone)}
+                  className="font-extrabold text-[#0070b8] hover:underline text-sm sm:text-base"
+                >
+                  {normalizePhone(locationPhone)}
+                </a>
+              </div>
+            </div>
+          )}
+
           {submitted ? (
             <div className="bg-[#87b63c]/10 border border-[#87b63c]/30 rounded-2xl p-5 text-center">
               <CheckCircle className="w-10 h-10 text-[#87b63c] mx-auto mb-2" />
@@ -1611,6 +1631,7 @@ export default function BrandPage() {
           <PromoModal
             promo={selectedPromo}
             brandName={brandName}
+            locationPhone={loc?.phone}
             onClose={() => setSelectedPromo(null)}
           />
         )}
