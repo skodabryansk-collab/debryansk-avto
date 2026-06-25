@@ -315,8 +315,17 @@ function PromoModal({
           <X className="w-4 h-4 text-slate-600" />
         </button>
         {promo.image && (
-          <div className="w-full h-48 sm:h-56 shrink-0 overflow-hidden">
+          <div className="relative w-full h-48 sm:h-56 shrink-0 overflow-hidden">
             <img src={promo.image} alt={promo.title} className="w-full h-full object-cover" loading="lazy" />
+            {locationPhone && (
+              <a
+                href={phoneHref(locationPhone)}
+                className="absolute top-3 right-3 z-20 inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-sm text-[#0070b8] font-bold px-3 py-1.5 rounded-full text-xs shadow-md hover:bg-white transition-colors"
+              >
+                <Phone className="w-3 h-3" />
+                {normalizePhone(locationPhone)}
+              </a>
+            )}
           </div>
         )}
         <div className="p-6 sm:p-8 overflow-y-auto">
@@ -339,23 +348,6 @@ function PromoModal({
           <p className="text-slate-600 leading-relaxed whitespace-pre-line mb-6 text-sm sm:text-base">
             {promo.description}
           </p>
-
-          {locationPhone && (
-            <div className="mb-6 rounded-xl bg-[#0070b8]/5 border border-[#0070b8]/10 p-3 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#0070b8]/10 flex items-center justify-center shrink-0">
-                <Phone className="w-4 h-4 text-[#0070b8]" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Позвоните напрямую</p>
-                <a
-                  href={phoneHref(locationPhone)}
-                  className="font-extrabold text-[#0070b8] hover:underline text-sm sm:text-base"
-                >
-                  {normalizePhone(locationPhone)}
-                </a>
-              </div>
-            </div>
-          )}
 
           {submitted ? (
             <div className="bg-[#87b63c]/10 border border-[#87b63c]/30 rounded-2xl p-5 text-center">
