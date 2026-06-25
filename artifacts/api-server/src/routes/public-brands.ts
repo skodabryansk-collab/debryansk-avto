@@ -179,9 +179,10 @@ router.get("/:slug", async (req, res) => {
     }));
 
     // Always use global promotions table; no JSONB fallback
+    // Return promotions even when no brand_page_content row exists
     const finalContent = content
       ? { ...content, promotions: globalPromos }
-      : null;
+      : globalPromos.length > 0 ? { promotions: globalPromos } : null;
 
     return res.json({
       ok: true,
