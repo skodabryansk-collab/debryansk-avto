@@ -204,6 +204,14 @@ export async function runMigration() {
       )
     `);
 
+    // Add brand_ids array column to news (multi-brand support)
+    await db.execute(sql`ALTER TABLE news ADD COLUMN IF NOT EXISTS brand_ids integer[] NOT NULL DEFAULT '{}'`);
+    // Migrate existing brand_id → brand_ids (one-time, idempotent)
+    await db.execute(sql`
+      UPDATE news SET brand_ids = ARRAY[brand_id]
+      WHERE brand_id IS NOT NULL AND (brand_ids IS NULL OR brand_ids = '{}')
+    `);
+
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS owners_number integer`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS max_discount integer NOT NULL DEFAULT 0`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS credit_discount integer NOT NULL DEFAULT 0`);
