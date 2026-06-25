@@ -267,6 +267,46 @@ export function getSyncStatus() {
   return api<{ ok: true; total: number; lastSynced: string | null; byDealer?: { dealer: string; type: string; cnt: number }[] }>("GET", "/admin/navigator/sync-status");
 }
 
+/* Promotions */
+export interface Promotion {
+  id: number;
+  title: string;
+  description: string;
+  image: string | null;
+  badge: string | null;
+  expiresAt: string | null;
+  isActive: boolean;
+  buttonText: string | null;
+  buttonUrl: string | null;
+  brandIds: number[];
+  createdAt: string;
+  updatedAt: string;
+}
+export type PromotionInput = {
+  title: string;
+  description?: string;
+  image?: string | null;
+  badge?: string | null;
+  expiresAt?: string | null;
+  isActive?: boolean;
+  buttonText?: string | null;
+  buttonUrl?: string | null;
+  brandIds?: number[];
+};
+export function getPromotions(brandId?: number) {
+  const q = brandId ? `?brandId=${brandId}` : "";
+  return api<{ ok: true; data: Promotion[] }>("GET", `/admin/promotions${q}`).then(r => r.data);
+}
+export function createPromotion(data: PromotionInput) {
+  return api<{ ok: true; data: Promotion }>("POST", "/admin/promotions", data).then(r => r.data);
+}
+export function updatePromotion(id: number, data: PromotionInput) {
+  return api<{ ok: true; data: Promotion }>("PUT", `/admin/promotions/${id}`, data).then(r => r.data);
+}
+export function deletePromotion(id: number) {
+  return api<{ ok: true }>("DELETE", `/admin/promotions/${id}`);
+}
+
 /* Upload - Object Storage (GCS) */
 export async function uploadFile(file: File): Promise<string> {
   const token = getToken();
