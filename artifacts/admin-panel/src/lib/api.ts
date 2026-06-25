@@ -101,6 +101,7 @@ export interface BrandFaqItem {
   sort_order?: number;
 }
 export interface BrandPromotion {
+  id?: number;
   title: string;
   description: string;
   image?: string;
