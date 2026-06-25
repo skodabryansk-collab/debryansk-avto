@@ -409,7 +409,20 @@ function PromotionFormDialog({
 
           {/* Brand multi-select */}
           <div>
-            <Label className="mb-2 block">Бренды</Label>
+            <div className="flex items-center justify-between mb-2">
+              <Label>Бренды</Label>
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedBrandIds(prev =>
+                    prev.length === brands.length ? [] : brands.map(b => b.id)
+                  )
+                }
+                className="text-xs text-[#0070b8] hover:underline"
+              >
+                {selectedBrandIds.length === brands.length ? "Снять все" : "Выбрать все"}
+              </button>
+            </div>
             <p className="text-xs text-slate-400 mb-2">
               Акция отображается на страницах выбранных брендов
             </p>
