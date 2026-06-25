@@ -23,6 +23,20 @@ function mapRow(row: Record<string, unknown>) {
   };
 }
 
+function parseBrandIds(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(id => {
+    const n = parseInt(String(id), 10);
+    if (isNaN(n) || n <= 0) throw Object.assign(new Error(`Invalid brand ID: ${id}`), { status: 400 });
+    return n;
+  });
+}
+
+function brandIdsLiteral(ids: number[]): string {
+  if (ids.length === 0) return "'{}'::integer[]";
+  return `ARRAY[${ids.join(",")}]::integer[]`;
+}
+
 /* ── GET /api/admin/promotions?brandId=X ────────────────────── */
 router.get("/", async (req, res) => {
   try {
@@ -85,7 +99,7 @@ router.post("/", async (req, res) => {
 
     const expires = expiresAt ? new Date(expiresAt) : null;
     const active = isActive !== false;
-    const ids = Array.isArray(brandIds) ? brandIds : [];
+    const ids = parseBrandIds(brandIds);
 
     const rows = await db.execute(sql`
       INSERT INTO promotions
@@ -93,7 +107,7 @@ router.post("/", async (req, res) => {
       VALUES
         (${title.trim()}, ${description ?? ""}, ${image ?? null}, ${badge ?? null},
          ${expires}, ${active}, ${buttonText ?? null}, ${buttonUrl ?? null},
-         ${sql.raw("ARRAY[" + (ids.length ? ids.join(",") : "") + "]::integer[]")},
+         ${sql.raw(brandIdsLiteral(ids))},
          NOW(), NOW())
       RETURNING *
     `);
@@ -126,7 +140,7 @@ router.put("/:id", async (req, res) => {
     };
 
     const expires = expiresAt ? new Date(expiresAt) : null;
-    const ids = Array.isArray(brandIds) ? brandIds : [];
+    const ids = parseBrandIds(brandIds);
 
     const rows = await db.execute(sql`
       UPDATE promotions SET
@@ -138,7 +152,7 @@ router.put("/:id", async (req, res) => {
         is_active = COALESCE(${isActive ?? null}, is_active),
         button_text = ${buttonText ?? null},
         button_url = ${buttonUrl ?? null},
-        brand_ids = ${sql.raw("ARRAY[" + (ids.length ? ids.join(",") : "") + "]::integer[]")},
+        brand_ids = ${sql.raw(brandIdsLiteral(ids))},
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
