@@ -1199,16 +1199,25 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
               />
             </div>
 
-            {/* Promotions */}
+            {/* Promotions — managed globally */}
             <div className="border-t pt-4">
               <SectionHeading>Акции</SectionHeading>
-              <p className="text-xs text-slate-400 mb-3">
-                Специальные предложения и скидки бренда. Отображаются плитками на странице бренда. Истёкшие акции скрываются автоматически.
-              </p>
-              <PromotionEditor
-                value={form.promotions}
-                onChange={promotions => setForm(f => ({ ...f, promotions }))}
-              />
+              <div className="flex items-start gap-3 rounded-lg border border-[#0070b8]/20 bg-[#0070b8]/5 px-4 py-3">
+                <div className="text-2xl shrink-0">🏷️</div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-slate-800 mb-0.5">Акции управляются глобально</p>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Создавайте акции в разделе «Акции» и привязывайте их к нужным брендам через мультиселект.
+                    Акции с привязкой к этому бренду автоматически появятся на его странице.
+                  </p>
+                  <a
+                    href="/promotions"
+                    className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold text-[#0070b8] hover:underline"
+                  >
+                    Перейти к управлению акциями →
+                  </a>
+                </div>
+              </div>
             </div>
 
             {/* SEO */}
