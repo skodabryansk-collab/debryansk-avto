@@ -18,6 +18,7 @@ function promoToDb(p: { title: string; description?: string; image?: string; bad
 
 function promoFromDb(row: Record<string, unknown>) {
   return {
+    id: row["id"] as number,
     title: row["title"] as string,
     description: row["description"] as string,
     image: row["image"] as string | null,
@@ -48,7 +49,7 @@ router.get("/:brandId", async (req, res) => {
 
     // Inject global promotions for this brand into the content object
     const promoRows = await db.execute(sql`
-      SELECT title, description, image, badge, expires_at, is_active, button_text, button_url
+      SELECT id, title, description, image, badge, expires_at, is_active, button_text, button_url
       FROM promotions
       WHERE ${brandId} = ANY(brand_ids)
       ORDER BY created_at DESC
@@ -170,24 +171,50 @@ router.put("/:brandId", async (req, res) => {
       })
       .returning();
 
-    // Bidirectional sync: replace global promotions exclusively owned by this brand
+    // Bidirectional sync: ID-based upsert for promotions exclusively owned by this brand
     if (promotions !== undefined) {
-      // Delete promotions that belong only to this brand (not shared with others)
-      await db.execute(sql`
-        DELETE FROM promotions
-        WHERE brand_ids = ARRAY[${brandId}]::integer[]
+      // Fetch IDs of promotions exclusively owned by this brand
+      const existingRows = await db.execute(sql`
+        SELECT id FROM promotions WHERE brand_ids = ARRAY[${brandId}]::integer[]
       `);
-      // Insert each inline promotion as a global promotion row
+      const existingIds = new Set((existingRows.rows as { id: number }[]).map(r => r.id));
+
+      const keepIds = new Set<number>();
+
       for (const p of (promotions ?? [])) {
         const dbp = promoToDb(p);
-        await db.execute(sql`
-          INSERT INTO promotions
-            (title, description, image, badge, expires_at, is_active, button_text, button_url, brand_ids, created_at, updated_at)
-          VALUES
-            (${dbp.title}, ${dbp.description}, ${dbp.image}, ${dbp.badge},
-             ${dbp.expires_at}, ${dbp.is_active}, ${dbp.button_text}, ${dbp.button_url},
-             ARRAY[${brandId}]::integer[], NOW(), NOW())
-        `);
+        const pid = (p as { id?: number }).id;
+
+        if (pid && existingIds.has(pid)) {
+          // Update existing exclusively-owned row
+          await db.execute(sql`
+            UPDATE promotions SET
+              title = ${dbp.title}, description = ${dbp.description},
+              image = ${dbp.image}, badge = ${dbp.badge},
+              expires_at = ${dbp.expires_at}, is_active = ${dbp.is_active},
+              button_text = ${dbp.button_text}, button_url = ${dbp.button_url},
+              updated_at = NOW()
+            WHERE id = ${pid}
+          `);
+          keepIds.add(pid);
+        } else {
+          // New promotion — insert as exclusively owned by this brand
+          await db.execute(sql`
+            INSERT INTO promotions
+              (title, description, image, badge, expires_at, is_active, button_text, button_url, brand_ids, created_at, updated_at)
+            VALUES
+              (${dbp.title}, ${dbp.description}, ${dbp.image}, ${dbp.badge},
+               ${dbp.expires_at}, ${dbp.is_active}, ${dbp.button_text}, ${dbp.button_url},
+               ARRAY[${brandId}]::integer[], NOW(), NOW())
+          `);
+        }
+      }
+
+      // Delete exclusively-owned rows that are no longer present
+      for (const eid of existingIds) {
+        if (!keepIds.has(eid)) {
+          await db.execute(sql`DELETE FROM promotions WHERE id = ${eid}`);
+        }
       }
     }
 
