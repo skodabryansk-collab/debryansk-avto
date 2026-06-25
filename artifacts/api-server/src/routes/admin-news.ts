@@ -31,10 +31,23 @@ router.get("/:id", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { title, excerpt, content, category, image, slug, publishedAt, readTime, brandId } = req.body as Record<string, string>;
+    const { title, excerpt, content, category, image, imageMobile, slug, publishedAt, readTime, brandIds } =
+      req.body as Record<string, unknown>;
+    const parsedBrandIds = Array.isArray(brandIds) ? (brandIds as unknown[]).map(Number).filter(Boolean) : [];
     const rows = await db
       .insert(newsTable)
-      .values({ title, excerpt, content, category, image, slug, publishedAt: publishedAt ? new Date(publishedAt) : new Date(), readTime: readTime ? Number(readTime) : 3, brandId: brandId ? Number(brandId) : null })
+      .values({
+        title: title as string,
+        excerpt: excerpt as string | undefined,
+        content: content as string | undefined,
+        category: category as string | undefined,
+        image: image as string | undefined,
+        imageMobile: imageMobile as string | undefined,
+        slug: slug as string,
+        publishedAt: publishedAt ? new Date(publishedAt as string) : new Date(),
+        readTime: readTime ? Number(readTime) : 3,
+        brandIds: parsedBrandIds,
+      })
       .returning();
     if (slug) {
       pingIndexNow([`${SITE}/news/${slug}`]).catch(() => {});
@@ -48,10 +61,24 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const id = Number(req.params["id"]);
-    const { title, excerpt, content, category, image, slug, publishedAt, readTime, brandId } = req.body as Record<string, string>;
+    const { title, excerpt, content, category, image, imageMobile, slug, publishedAt, readTime, brandIds } =
+      req.body as Record<string, unknown>;
+    const parsedBrandIds = Array.isArray(brandIds) ? (brandIds as unknown[]).map(Number).filter(Boolean) : [];
     const rows = await db
       .update(newsTable)
-      .set({ title, excerpt, content, category, image, slug, publishedAt: publishedAt ? new Date(publishedAt) : undefined, readTime: readTime ? Number(readTime) : undefined, brandId: brandId !== undefined ? (brandId ? Number(brandId) : null) : undefined, updatedAt: new Date() })
+      .set({
+        ...(title !== undefined && { title: title as string }),
+        ...(excerpt !== undefined && { excerpt: excerpt as string }),
+        ...(content !== undefined && { content: content as string }),
+        ...(category !== undefined && { category: category as string }),
+        ...(image !== undefined && { image: image as string }),
+        ...(imageMobile !== undefined && { imageMobile: imageMobile as string }),
+        ...(slug !== undefined && { slug: slug as string }),
+        ...(publishedAt !== undefined && { publishedAt: new Date(publishedAt as string) }),
+        ...(readTime !== undefined && { readTime: Number(readTime) }),
+        brandIds: parsedBrandIds,
+        updatedAt: new Date(),
+      })
       .where(eq(newsTable.id, id))
       .returning();
     if (!rows.length) return res.status(404).json({ ok: false, error: "Not found" });
