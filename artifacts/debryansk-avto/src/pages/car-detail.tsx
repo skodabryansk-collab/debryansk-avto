@@ -420,7 +420,7 @@ export default function UsedCarDetail() {
         </div>
       )}
       <p className="text-xs text-slate-400 mb-4">Цена окончательная, торг уместен</p>
-      <div className="flex gap-2 mb-3">
+      <div className="hidden lg:flex gap-2 mb-3">
         <button
           onClick={() => toggleFavorite({
             id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
@@ -475,7 +475,7 @@ export default function UsedCarDetail() {
           </button>
         </div>
         <a href={locationPhoneTel}
-          className="w-full flex items-center justify-center gap-2 border-2 border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8] text-slate-700 font-bold rounded-xl py-3 text-sm transition-colors">
+          className="hidden lg:flex w-full items-center justify-center gap-2 border-2 border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8] text-slate-700 font-bold rounded-xl py-3 text-sm transition-colors">
           <Phone className="w-4 h-4" />
           {locationPhone}
         </a>
