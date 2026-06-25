@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
-  LayoutDashboard, Newspaper, Phone, MapPin, LogOut,
-  ChevronRight, Menu, X, Tag, Users, Building2, Settings, Bot, Star
+  LayoutDashboard, Newspaper, Phone, LogOut,
+  ChevronRight, Menu, X, Tag, Users, Building2, Settings, Bot, Star, Megaphone
 } from "lucide-react";
 
 const navItems = [
   { path: "/", label: "Дашборд", icon: LayoutDashboard },
   { path: "/news", label: "Новости", icon: Newspaper },
+  { path: "/promotions", label: "Акции", icon: Megaphone },
   { path: "/leads", label: "Заявки", icon: Phone },
   { path: "/reviews", label: "Отзывы", icon: Star },
   { path: "/locations", label: "Локации", icon: Building2 },
