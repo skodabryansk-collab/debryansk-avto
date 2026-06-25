@@ -4,6 +4,41 @@ import { usePageCar } from "@/context/PageCarContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Send, Compass, Phone, Car, Loader2, ChevronDown, ExternalLink, ThumbsUp, ThumbsDown, Shield, Sparkles } from "lucide-react";
 import { SearchableSelect } from "@/components/SearchableSelect";
+import { useLocation } from "wouter";
+
+/* ── Page-context promo messages ─────────────────────────────── */
+interface PagePromo { text: string; quickPrompt?: string }
+
+function getPagePromo(pathname: string, carContext?: ReturnType<typeof usePageCar> | null): PagePromo | null {
+  // On car detail pages — proactive message is handled via AI context, skip bubble
+  if (/^\/(cars|new-cars)\/[^/]+/.test(pathname)) return null;
+
+  if (pathname === "/" || pathname === "") {
+    return { text: "Помочь подобрать авто по бюджету? 🧭", quickPrompt: "Подобрать авто по бюджету" };
+  }
+  if (pathname.startsWith("/new-cars")) {
+    return { text: "Помочь выбрать новый автомобиль? 🚗", quickPrompt: "Подобрать новый автомобиль" };
+  }
+  if (pathname.startsWith("/cars")) {
+    return { text: "Ищете авто с пробегом? Подберём! 🚗", quickPrompt: "Подобрать авто с пробегом" };
+  }
+  if (pathname.startsWith("/service")) {
+    return { text: "Записаться на ТО или ремонт? 🔧", quickPrompt: "Записаться на сервис" };
+  }
+  if (pathname.startsWith("/buyout")) {
+    return { text: "Узнать стоимость выкупа вашего авто? 💰", quickPrompt: "Оценить моё авто" };
+  }
+  if (pathname.startsWith("/brands/")) {
+    return { text: "Хотите узнать о наличии и ценах? 🧭", quickPrompt: "Что есть в наличии?" };
+  }
+  if (pathname.startsWith("/news")) {
+    return { text: "Интересуетесь покупкой авто? 🚗", quickPrompt: "Подобрать авто" };
+  }
+  if (pathname.startsWith("/about") || pathname.startsWith("/contacts")) {
+    return { text: "Остались вопросы? Спросите Навигатора 🧭" };
+  }
+  return { text: "Есть вопросы? Навигатор поможет 🧭" };
+}
 
 export interface ChatCarItem {
   id: string;
@@ -1145,11 +1180,13 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
   const [loading, setLoading] = useState(false);
   const [unread, setUnread] = useState(0);
   const [showConsent, setShowConsent] = useState(false);
+  const [promoVisible, setPromoVisible] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const base = useMemo(() => import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "", []);
   const pageCarContext = usePageCar();
   const proactiveSentRef = useRef(false);
+  const [location] = useLocation();
 
   const sessionId = useMemo(() => {
     let id = localStorage.getItem("nav_session_id");
@@ -1308,6 +1345,28 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
       );
     } catch { /* ignore */ }
   }, [messages, sessionId]);
+
+  // Proactive promo bubble — once per session, after 12 seconds, context-aware
+  useEffect(() => {
+    if (open) return; // don't show if chat already open
+    const promo = getPagePromo(location, pageCarContext);
+    if (!promo) return;
+    const key = `nav_promo_shown_${location}`;
+    if (sessionStorage.getItem(key)) return;
+    const t = setTimeout(() => {
+      setPromoVisible(true);
+      sessionStorage.setItem(key, "1");
+      // auto-hide after 7 seconds
+      setTimeout(() => setPromoVisible(false), 7000);
+    }, 12000);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location]);
+
+  // Hide bubble when chat opens
+  useEffect(() => {
+    if (open) setPromoVisible(false);
+  }, [open]);
 
   const handleConsent = useCallback(() => {
     const ts = new Date().toISOString();
@@ -1738,34 +1797,74 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
       </AnimatePresence>
 
       {/* Floating button with pulse rings */}
-      <div className="fixed bottom-4 right-4 z-[55]">
-        {/* Pulse rings — only when closed */}
-        {!open && (
-          <>
-            <span className="absolute inset-0 rounded-2xl bg-[#0070b8]/30 animate-ping" style={{ animationDuration: "2.5s" }} />
-            <span className="absolute inset-[-4px] rounded-2xl bg-[#0070b8]/15 animate-ping" style={{ animationDuration: "2.5s", animationDelay: "0.4s" }} />
-          </>
-        )}
+      <div className="fixed bottom-4 right-4 z-[55] flex flex-col items-end gap-2">
+        {/* Proactive context bubble */}
+        <AnimatePresence>
+          {promoVisible && !open && (() => {
+            const promo = getPagePromo(location, pageCarContext);
+            if (!promo) return null;
+            return (
+              <motion.button
+                key="promo-bubble"
+                initial={{ opacity: 0, y: 8, scale: 0.92 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.94 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                onClick={() => {
+                  setPromoVisible(false);
+                  setOpen(true);
+                  if (promo.quickPrompt) {
+                    if (consented) {
+                      setTimeout(() => sendMessage(promo.quickPrompt!), 450);
+                    } else {
+                      setTimeout(() => setInput(promo.quickPrompt!), 450);
+                    }
+                  }
+                }}
+                className="relative max-w-[220px] bg-white text-slate-800 text-xs font-semibold px-4 py-2.5 rounded-2xl rounded-br-sm shadow-lg border border-slate-200 hover:border-[#0070b8]/40 hover:shadow-xl transition-all text-left leading-snug"
+              >
+                {promo.text}
+                <button
+                  onClick={e => { e.stopPropagation(); setPromoVisible(false); }}
+                  className="absolute -top-1.5 -left-1.5 w-4 h-4 bg-slate-400 hover:bg-slate-500 rounded-full flex items-center justify-center"
+                  aria-label="Закрыть"
+                >
+                  <X className="w-2.5 h-2.5 text-white" />
+                </button>
+              </motion.button>
+            );
+          })()}
+        </AnimatePresence>
 
-        <motion.button
-          onClick={() => setOpen(o => !o)}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="relative flex items-center gap-2.5 text-white font-bold text-sm px-4 py-3 rounded-2xl shadow-xl transition-colors"
-          style={{ background: open ? "#005fa0" : "linear-gradient(135deg, #0070b8 0%, #005a96 100%)" }}
-          aria-label="Открыть чат Навигатор"
-        >
-          <Compass className="w-5 h-5 shrink-0" />
-          <span className="hidden sm:inline">Навигатор</span>
-          {unread > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full text-[10px] font-black flex items-center justify-center shadow-sm">
-              {unread}
-            </span>
-          )}
+        {/* Pulse rings — only when closed */}
+        <div className="relative">
           {!open && (
-            <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-[#87b63c] rounded-full border-2 border-white" />
+            <>
+              <span className="absolute inset-0 rounded-2xl bg-[#0070b8]/30 animate-ping" style={{ animationDuration: "2.5s" }} />
+              <span className="absolute inset-[-4px] rounded-2xl bg-[#0070b8]/15 animate-ping" style={{ animationDuration: "2.5s", animationDelay: "0.4s" }} />
+            </>
           )}
-        </motion.button>
+
+          <motion.button
+            onClick={() => setOpen(o => !o)}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="relative flex items-center gap-2.5 text-white font-bold text-sm px-4 py-3 rounded-2xl shadow-xl transition-colors"
+            style={{ background: open ? "#005fa0" : "linear-gradient(135deg, #0070b8 0%, #005a96 100%)" }}
+            aria-label="Открыть чат Навигатор"
+          >
+            <Compass className="w-5 h-5 shrink-0" />
+            <span>Навигатор</span>
+            {unread > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full text-[10px] font-black flex items-center justify-center shadow-sm">
+                {unread}
+              </span>
+            )}
+            {!open && (
+              <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-[#87b63c] rounded-full border-2 border-white" />
+            )}
+          </motion.button>
+        </div>
       </div>
     </>
   );
