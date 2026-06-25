@@ -151,11 +151,43 @@ router.get("/:slug", async (req, res) => {
       LIMIT 4
     `);
 
+    // Global promotions: prefer over JSONB field in brand_page_content
+    const promoRows = await db.execute(sql`
+      SELECT id, title, description, image, badge, expires_at, is_active, button_text, button_url
+      FROM promotions
+      WHERE ${brand.id} = ANY(brand_ids)
+        AND is_active = true
+        AND (expires_at IS NULL OR expires_at > NOW())
+      ORDER BY created_at DESC
+    `);
+
+    type PromoRow = {
+      id: number; title: string; description: string; image: string | null;
+      badge: string | null; expires_at: string | null; is_active: boolean;
+      button_text: string | null; button_url: string | null;
+    };
+
+    const globalPromos = (promoRows.rows as PromoRow[]).map(p => ({
+      title: p.title,
+      description: p.description,
+      image: p.image ?? undefined,
+      badge: p.badge ?? undefined,
+      expiresAt: p.expires_at ?? undefined,
+      isActive: p.is_active,
+      buttonText: p.button_text ?? undefined,
+      buttonUrl: p.button_url ?? undefined,
+    }));
+
+    // If global promotions exist — use them; otherwise fall back to JSONB
+    const finalContent = content
+      ? { ...content, promotions: globalPromos.length > 0 ? globalPromos : (content.promotions ?? []) }
+      : null;
+
     return res.json({
       ok: true,
       data: {
         brand,
-        content,
+        content: finalContent,
         locations: locationRows.rows,
         cars: brandCars,
         news: newsRows.rows,
