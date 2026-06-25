@@ -178,9 +178,9 @@ router.get("/:slug", async (req, res) => {
       buttonUrl: p.button_url ?? undefined,
     }));
 
-    // If global promotions exist — use them; otherwise fall back to JSONB
+    // Always use global promotions table; no JSONB fallback
     const finalContent = content
-      ? { ...content, promotions: globalPromos.length > 0 ? globalPromos : (content.promotions ?? []) }
+      ? { ...content, promotions: globalPromos }
       : null;
 
     return res.json({
