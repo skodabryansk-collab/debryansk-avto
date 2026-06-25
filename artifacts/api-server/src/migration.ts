@@ -358,6 +358,24 @@ export async function runMigration() {
     await db.execute(sql`ALTER TABLE brand_page_content ADD COLUMN IF NOT EXISTS models JSONB DEFAULT '[]'`);
     await db.execute(sql`ALTER TABLE brand_page_content ADD COLUMN IF NOT EXISTS services JSONB DEFAULT '[]'`);
 
+    // Global promotions table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS promotions (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        image TEXT,
+        badge TEXT,
+        expires_at TIMESTAMP WITH TIME ZONE,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        button_text TEXT,
+        button_url TEXT,
+        brand_ids INTEGER[] NOT NULL DEFAULT '{}',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+
     logger.info("brands.slug + brand_page_content schema ready (idempotent)");
 
   } catch (err) {
