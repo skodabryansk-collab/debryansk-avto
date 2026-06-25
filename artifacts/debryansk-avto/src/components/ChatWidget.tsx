@@ -1368,6 +1368,13 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
     if (open) setPromoVisible(false);
   }, [open]);
 
+  // Listen for external open event (e.g. from home page teaser)
+  useEffect(() => {
+    const handler = () => setOpen(true);
+    window.addEventListener("navigator:open", handler);
+    return () => window.removeEventListener("navigator:open", handler);
+  }, []);
+
   const handleConsent = useCallback(() => {
     const ts = new Date().toISOString();
     localStorage.setItem("nav_consented", "1");
@@ -1797,7 +1804,7 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
       </AnimatePresence>
 
       {/* Floating button with pulse rings */}
-      <div className="fixed bottom-4 right-4 z-[55] flex flex-col items-end gap-2">
+      <div className={`fixed ${/^\/(cars|new-cars)\/[^/]+/.test(location) ? "bottom-[84px] lg:bottom-4" : "bottom-4"} right-4 z-[55] flex flex-col items-end gap-2`}>
         {/* Proactive context bubble */}
         <AnimatePresence>
           {promoVisible && !open && (() => {
