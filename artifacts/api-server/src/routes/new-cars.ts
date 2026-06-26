@@ -230,9 +230,24 @@ router.get("/debug/feeds", async (_req, res) => {
   });
 });
 
-router.get("/cars/new", async (_req, res) => {
+router.get("/cars/new", async (req, res) => {
   try {
-    const data = await getNewCars();
+    const sort = (req.query.sort as string) || "popularity";
+    let data = await getNewCars();
+
+    if (sort === "popularity") {
+      const { getViewCounts } = await import("./car-views");
+      const ids = data.map(c => c.id);
+      const views = await getViewCounts(ids);
+      data = [...data].sort((a, b) => (views[b.id] ?? 0) - (views[a.id] ?? 0));
+    } else if (sort === "price_asc") {
+      data = [...data].sort((a, b) => (a.price - (a.maxDiscount || 0)) - (b.price - (b.maxDiscount || 0)));
+    } else if (sort === "price_desc") {
+      data = [...data].sort((a, b) => (b.price - (b.maxDiscount || 0)) - (a.price - (a.maxDiscount || 0)));
+    } else if (sort === "newest") {
+      data = [...data].sort((a, b) => b.year - a.year);
+    }
+
     return res.json({ ok: true, data, total: data.length });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
