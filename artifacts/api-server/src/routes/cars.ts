@@ -5,7 +5,7 @@ const router: IRouter = Router();
 const XML_URL =
   "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/used/55c50e2b8b4277d96c5dde95c3c16421.xml";
 
-interface CarRecord {
+export interface CarRecord {
   id: string;
   mark: string;
   model: string;
@@ -35,7 +35,7 @@ interface CarRecord {
 }
 
 let cache: { data: CarRecord[]; ts: number } | null = null;
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 30 * 60 * 1000;
 
 function getField(xml: string, field: string): string {
   const m = xml.match(new RegExp(`<${field}[^>]*>([\\s\\S]*?)<\\/${field}>`));
@@ -84,16 +84,42 @@ function parseXml(text: string): CarRecord[] {
   return cars;
 }
 
-router.get("/cars/used", async (_req, res) => {
+export async function getUsedCars(): Promise<CarRecord[]> {
+  if (cache && Date.now() - cache.ts < CACHE_TTL) return cache.data;
+  const r = await fetch(XML_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
+  if (!r.ok) throw new Error(`XML fetch failed: ${r.status}`);
+  const text = await r.text();
+  const data = parseXml(text);
+  cache = { data, ts: Date.now() };
+  return data;
+}
+
+router.get("/cars/used", async (req, res) => {
   try {
-    if (cache && Date.now() - cache.ts < CACHE_TTL) {
-      return res.json({ ok: true, data: cache.data, total: cache.data.length });
+    const sort = (req.query.sort as string) || "popularity";
+    if (!cache || Date.now() - cache.ts >= CACHE_TTL) {
+      const r = await fetch(XML_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
+      if (!r.ok) throw new Error(`XML fetch failed: ${r.status}`);
+      const text = await r.text();
+      const data = parseXml(text);
+      cache = { data, ts: Date.now() };
     }
-    const r = await fetch(XML_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
-    if (!r.ok) throw new Error(`XML fetch failed: ${r.status}`);
-    const text = await r.text();
-    const data = parseXml(text);
-    cache = { data, ts: Date.now() };
+
+    let data = cache!.data;
+
+    if (sort === "popularity") {
+      const { getViewCounts } = await import("./car-views");
+      const ids = data.map(c => c.id);
+      const views = await getViewCounts(ids);
+      data = [...data].sort((a, b) => (views[b.id] ?? 0) - (views[a.id] ?? 0));
+    } else if (sort === "price_asc") {
+      data = [...data].sort((a, b) => (a.price - (a.maxDiscount || 0)) - (b.price - (b.maxDiscount || 0)));
+    } else if (sort === "price_desc") {
+      data = [...data].sort((a, b) => (b.price - (b.maxDiscount || 0)) - (a.price - (a.maxDiscount || 0)));
+    } else if (sort === "newest") {
+      data = [...data].sort((a, b) => b.year - a.year);
+    }
+
     return res.json({ ok: true, data, total: data.length });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
