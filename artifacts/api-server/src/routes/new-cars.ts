@@ -238,7 +238,7 @@ router.get("/cars/new", async (_req, res) => {
     const data = await getNewCars();
     const ids = data.map(c => c.id);
     const rows = ids.length
-      ? await db.execute(sql`SELECT external_id, popularity_score FROM cars WHERE external_id = ANY(${ids})`)
+      ? await db.execute(sql`SELECT external_id, popularity_score FROM cars WHERE external_id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`)
       : { rows: [] };
     const scoreMap = new Map(
       (rows.rows as { external_id: string; popularity_score: number }[]).map(r => [r.external_id, r.popularity_score ?? 0])
