@@ -94,32 +94,16 @@ export async function getUsedCars(): Promise<CarRecord[]> {
   return data;
 }
 
-router.get("/cars/used", async (req, res) => {
+router.get("/cars/used", async (_req, res) => {
   try {
-    const sort = (req.query.sort as string) || "popularity";
-    if (!cache || Date.now() - cache.ts >= CACHE_TTL) {
-      const r = await fetch(XML_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
-      if (!r.ok) throw new Error(`XML fetch failed: ${r.status}`);
-      const text = await r.text();
-      const data = parseXml(text);
-      cache = { data, ts: Date.now() };
+    if (cache && Date.now() - cache.ts < CACHE_TTL) {
+      return res.json({ ok: true, data: cache.data, total: cache.data.length });
     }
-
-    let data = cache!.data;
-
-    if (sort === "popularity") {
-      const { getViewCounts } = await import("./car-views");
-      const ids = data.map(c => c.id);
-      const views = await getViewCounts(ids);
-      data = [...data].sort((a, b) => (views[b.id] ?? 0) - (views[a.id] ?? 0));
-    } else if (sort === "price_asc") {
-      data = [...data].sort((a, b) => (a.price - (a.maxDiscount || 0)) - (b.price - (b.maxDiscount || 0)));
-    } else if (sort === "price_desc") {
-      data = [...data].sort((a, b) => (b.price - (b.maxDiscount || 0)) - (a.price - (a.maxDiscount || 0)));
-    } else if (sort === "newest") {
-      data = [...data].sort((a, b) => b.year - a.year);
-    }
-
+    const r = await fetch(XML_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
+    if (!r.ok) throw new Error(`XML fetch failed: ${r.status}`);
+    const text = await r.text();
+    const data = parseXml(text);
+    cache = { data, ts: Date.now() };
     return res.json({ ok: true, data, total: data.length });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
