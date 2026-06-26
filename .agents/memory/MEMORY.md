@@ -17,3 +17,4 @@
 - [Car sync outage guard](car-sync-outage-guard.md) — delete per-type (new/used separately); skip delete if feed returns 0 (outage guard). Promise.allSettled silently swallows feed errors — always log rejected results. Don't cache empty results from getNewCars. Debug endpoint: GET /api/debug/feeds. Force-sync: POST /api/admin/navigator/force-sync.
 - [SEO audit progress](seo-audit-progress.md) — 7 раундов squirrelscan: 42→79/100. Что сделано, что осталось (thin content, author byline, orphan links, LCP preload), ключевые файлы и архитектура seoMeta.
 - [Brand page rules](brand-page-rules.md) — роут /brands/:slug, порядок секций, карта (map_x=lat/map_y=lng), новости по brand_id, HAVAL_CATALOG, как добавить новый бренд.
+- [Catalog refactor approach](catalog-refactor-approach.md) — CarCard+FilterPanel вынос + CarModelGroup + URL-sync — реализован, откатан (не понравился). DB-схема (car_views, popularity_score) уже создана.
