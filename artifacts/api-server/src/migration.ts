@@ -229,6 +229,8 @@ export async function runMigration() {
     await db.execute(sql`UPDATE cars SET brand = 'Exeed'      WHERE brand = 'EXEED'`);
     await db.execute(sql`UPDATE cars SET brand = 'Tank'       WHERE brand = 'TANK'`);
 
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS popularity_score integer NOT NULL DEFAULT 0`);
+
     logger.info("Navigator schema ready (conversations, messages, cars — idempotent)");
 
     // Reviews persistent cache — survives server restarts / redeploys
