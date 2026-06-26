@@ -418,7 +418,7 @@ export default function NewCars() {
   const [filterDrive, setFilterDrive] = useState("Любой");
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
-  const [sortBy, setSortBy] = useState<"price_asc" | "price_desc" | "year_desc" | "popular">("price_asc");
+  const [sortBy, setSortBy] = useState<"price_asc" | "price_desc" | "year_desc" | "popular">("popular");
   const [page, setPage] = useState(1);
   const [testDriveCar, setTestDriveCar] = useState<NewCarRecord | null>(null);
   const [creditCar, setCreditCar] = useState<NewCarRecord | null>(null);
