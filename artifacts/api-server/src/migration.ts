@@ -378,6 +378,80 @@ export async function runMigration() {
 
     logger.info("brands.slug + brand_page_content schema ready (idempotent)");
 
+    // Migrate JSONB promotions from brand_page_content → global promotions table (idempotent)
+    // Only process rows that still have non-empty promotions JSONB array
+    const legacyPromoRows = await db.execute(sql`
+      SELECT bpc.brand_id, bpc.promotions
+      FROM brand_page_content bpc
+      WHERE bpc.promotions IS NOT NULL
+        AND jsonb_array_length(bpc.promotions) > 0
+    `);
+
+    if (legacyPromoRows.rows.length > 0) {
+      logger.info({ count: legacyPromoRows.rows.length }, "Migrating legacy JSONB promotions to global promotions table");
+
+      for (const row of legacyPromoRows.rows as { brand_id: number; promotions: Array<{
+        title?: string; description?: string; image?: string; badge?: string;
+        expiresAt?: string; buttonText?: string; buttonUrl?: string; isActive?: boolean;
+      }> }[]) {
+        const brandId = row.brand_id;
+        const items = Array.isArray(row.promotions) ? row.promotions : [];
+
+        for (const promo of items) {
+          if (!promo.title) continue;
+
+          // Idempotent: skip if a promotion with same title already exists for this brand
+          const existing = await db.execute(sql`
+            SELECT id FROM promotions
+            WHERE title = ${promo.title}
+              AND ${brandId} = ANY(brand_ids)
+            LIMIT 1
+          `);
+          if (existing.rows.length > 0) continue;
+
+          const expiresAt = promo.expiresAt ? new Date(promo.expiresAt) : null;
+
+          await db.execute(sql`
+            INSERT INTO promotions (title, description, image, badge, expires_at, is_active, button_text, button_url, brand_ids)
+            VALUES (
+              ${promo.title},
+              ${promo.description ?? ""},
+              ${promo.image ?? null},
+              ${promo.badge ?? null},
+              ${expiresAt},
+              ${promo.isActive !== false},
+              ${promo.buttonText ?? null},
+              ${promo.buttonUrl ?? null},
+              ${sql`ARRAY[${brandId}]::integer[]`}
+            )
+          `);
+        }
+
+        // Clear the JSONB field after migration
+        await db.execute(sql`
+          UPDATE brand_page_content
+          SET promotions = '[]'::jsonb
+          WHERE brand_id = ${brandId}
+        `);
+      }
+
+      logger.info("Legacy JSONB promotions migration complete");
+    } else {
+      logger.info("No legacy JSONB promotions to migrate");
+    }
+
+    // Car views tracking — works for both new (XML) and used (XML) cars
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS car_views (
+        car_id TEXT PRIMARY KEY,
+        view_count INTEGER NOT NULL DEFAULT 0,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    // popularity_score on cars table (for Navigator AI context)
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS popularity_score INTEGER NOT NULL DEFAULT 0`);
+    logger.info("car_views + cars.popularity_score schema ready (idempotent)");
+
   } catch (err) {
     logger.error({ err }, "Migration error");
   }
