@@ -1,12 +1,9 @@
-import React, { useState, useMemo } from "react";
-import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation, Link } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
+import { useLocation } from "wouter";
 import {
-  Car, Filter, ChevronLeft, ChevronRight, ArrowLeft, X,
-  Calendar, Palette, Phone, User, CheckCircle, SlidersHorizontal, Sparkles,
-  Heart, Scale
+  Car, ChevronLeft, ChevronRight, SearchX, LayoutGrid, LayoutList,
+  SlidersHorizontal, Clock, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import SEO from "@/components/SEO";
@@ -14,584 +11,367 @@ import { TestDriveModal } from "@/components/modals/TestDriveModal";
 import { CreditModal } from "@/components/modals/CreditModal";
 import { TradeInModal } from "@/components/modals/TradeInModal";
 import Layout from "@/components/Layout";
+import { CarCard, CarCardSkeleton, type CarCardData } from "@/components/CarCard";
+import FilterPanel, {
+  type FilterValues, type PriceRange,
+  DEFAULT_FILTER_VALUES, filterCars, countActiveFilters,
+} from "@/components/FilterPanel";
 
 interface NewCarRecord {
-  id: string;
-  mark: string;
-  model: string;
-  modification: string;
-  complectation: string;
-  year: number;
-  price: number;
-  color: string;
-  bodyType: string;
-  availability: string;
-  url: string;
-  images: string[];
-  dealer: string;
-  maxDiscount: number;
-  creditDiscount: number;
-  tradeinDiscount: number;
-  extras: string;
-  description: string;
-  vin: string;
+  id: string; mark: string; model: string; modification: string; complectation: string;
+  year: number; price: number; color: string; bodyType: string; availability: string;
+  url: string; images: string[]; dealer: string; maxDiscount: number;
+  creditDiscount: number; tradeinDiscount: number; extras: string;
+  description: string; vin: string;
 }
 
-function parseTransmission(mod: string): string {
-  if (!mod) return "";
-  if (mod.includes("AMT")) return "Робот";
-  if (mod.includes("CVT")) return "Вариатор";
-  if (mod.includes(" AT")) return "Автомат";
-  if (mod.includes("MT")) return "Механика";
-  return "";
-}
+const PRICE_RANGES: PriceRange[] = [
+  { label: "до 2 млн", min: 0, max: 2_000_000 },
+  { label: "2–3 млн", min: 2_000_000, max: 3_000_000 },
+  { label: "3–5 млн", min: 3_000_000, max: 5_000_000 },
+  { label: "от 5 млн", min: 5_000_000, max: null },
+];
 
-function parseDrive(mod: string): string {
-  if (!mod) return "";
-  return mod.includes("4WD") ? "Полный" : "Передний";
-}
+const PAGE_SIZE = 12;
 
-function cleanModel(raw: string): string {
-  return raw.replace(/,\s*[IVX]+.*$/, "").trim();
+const DEALERS = ["Все бренды", "Jaecoo", "Omoda", "Tenet", "Haval City", "Haval Pro", "Jetour", "Soueast"];
+
+function toCardData(c: NewCarRecord, rank: number): CarCardData {
+  return {
+    id: c.id, mark: c.mark, model: c.model, modification: c.modification,
+    complectation: c.complectation, year: c.year, price: c.price, color: c.color,
+    bodyType: c.bodyType, availability: c.availability, images: c.images,
+    maxDiscount: c.maxDiscount, creditDiscount: c.creditDiscount,
+    tradeinDiscount: c.tradeinDiscount, dealer: c.dealer, type: "new",
+    popularityRank: rank,
+  };
 }
 
 async function fetchNewCars(): Promise<NewCarRecord[]> {
-  const r = await fetch("/api/cars/new");
+  const r = await fetch("/api/cars/new?sort=popularity");
   if (!r.ok) throw new Error(`API error: ${r.status}`);
   const json = await r.json();
   if (!json.ok) throw new Error(json.error ?? "Unknown error");
   return json.data as NewCarRecord[];
 }
 
-function formatPrice(p: number) {
-  return p.toLocaleString("ru-RU") + " ₽";
+function parseFiltersFromUrl(): Partial<FilterValues> {
+  const p = new URLSearchParams(window.location.search);
+  const get = (k: string) => p.get(k) ?? "";
+  return {
+    availability: p.get("av") ? p.get("av")!.split(",") : [],
+    priceMin: get("pmin"), priceMax: get("pmax"),
+    priceRange: p.has("pr") ? parseInt(p.get("pr")!) : null,
+    bodyTypes: p.get("bt") ? p.get("bt")!.split(",") : [],
+    drive: get("dr") || "Любой",
+    transmission: get("tx") || "Любая",
+    colors: p.get("cl") ? p.get("cl")!.split(",") : [],
+    brand: get("brand"), model: get("model"),
+  };
 }
 
-const DEALER_COLORS: Record<string, string> = {
-  "Jaecoo":     "#f0f4ff",
-  "Omoda":      "#fff5ee",
-  "Tenet":      "#edfbf3",
-  "Haval Pro":  "#eef2ff",
-  "Haval City": "#e8f4ff",
-  "Jetour":     "#f4f0ff",
-  "Soueast":    "#fff8f0",
-};
+function syncFiltersToUrl(f: FilterValues) {
+  const p = new URLSearchParams();
+  if (f.availability.length) p.set("av", f.availability.join(","));
+  if (f.priceMin) p.set("pmin", f.priceMin);
+  if (f.priceMax) p.set("pmax", f.priceMax);
+  if (f.priceRange !== null) p.set("pr", String(f.priceRange));
+  if (f.bodyTypes.length) p.set("bt", f.bodyTypes.join(","));
+  if (f.drive !== "Любой") p.set("dr", f.drive);
+  if (f.transmission !== "Любая") p.set("tx", f.transmission);
+  if (f.colors.length) p.set("cl", f.colors.join(","));
+  if (f.brand) p.set("brand", f.brand);
+  if (f.model) p.set("model", f.model);
+  const qs = p.toString();
+  history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+}
 
-function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void }) {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const img = car.images.filter(Boolean)[0] ?? "";
+// ─── CarModelGroup ────────────────────────────────────────────────
+interface CarModelGroupProps {
+  cars: CarCardData[];
+  filteredColors: string[];
+  totalCount: number;
+  onTestDrive: (car: CarCardData) => void;
+  onOrder: (car: CarCardData) => void;
+}
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim() || !isPhoneValid(phone)) return;
-    setSubmitted(true);
-  }
+function CarModelGroup({ cars, filteredColors, totalCount, onTestDrive, onOrder }: CarModelGroupProps) {
+  const first = cars[0];
+  const groupKey = `group_${first.mark}_${first.model}_${first.year}_${first.modification}`;
+
+  const [expanded, setExpanded] = useState(() => {
+    try { return sessionStorage.getItem(groupKey) === "1"; } catch { return false; }
+  });
+
+  const toggleExpand = useCallback(() => {
+    setExpanded(v => {
+      const next = !v;
+      try { sessionStorage.setItem(groupKey, next ? "1" : "0"); } catch {}
+      return next;
+    });
+  }, [groupKey]);
+
+  const allColors = [...new Set(cars.map(c => c.color).filter(Boolean))];
+  const sorted = [...cars].sort((a, b) => (a.price - (a.maxDiscount || 0)) - (b.price - (b.maxDiscount || 0)));
+  const minPrice = sorted[0].price - (sorted[0].maxDiscount || 0);
+  const img = first.images.filter(Boolean)[0] ?? "";
+  const MAX_COLORS = 6;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        transition={{ duration: 0.2 }}
-        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
-      >
+    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow">
+      {/* Photo strip */}
+      {img && (
+        <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
+          <img src={img} alt={`${first.mark} ${first.model}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+          <span className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+            {cars.length} вариантов
+          </span>
+        </div>
+      )}
+      <div className="p-3">
+        <p className="text-xs text-muted-foreground">{first.mark}</p>
+        <h3 className="text-sm font-medium leading-snug">{first.model}</h3>
+        <p className="text-xs text-muted-foreground mt-0.5 truncate">{first.modification}</p>
+
+        {/* Color circles */}
+        <div className="flex gap-1.5 mt-2 flex-wrap">
+          {allColors.slice(0, MAX_COLORS).map(color => {
+            const dimmed = filteredColors.length > 0 && !filteredColors.includes(color);
+            return (
+              <span
+                key={color}
+                title={color}
+                className={`w-4 h-4 rounded-full border border-black/10 transition-opacity ${dimmed ? "opacity-25" : ""}`}
+                style={{ background: color }}
+              />
+            );
+          })}
+          {allColors.length > MAX_COLORS && (
+            <span className="text-[10px] text-muted-foreground self-center">+{allColors.length - MAX_COLORS}</span>
+          )}
+        </div>
+
+        <hr className="my-2 border-border/50" />
+
+        <p className="text-base font-medium text-slate-900">
+          от {minPrice.toLocaleString("ru-RU")}&nbsp;₽
+        </p>
+        <p className="text-xs text-muted-foreground">{cars.length} вариантов</p>
+
         <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
+          onClick={toggleExpand}
+          className="mt-3 w-full flex items-center justify-center gap-1.5 h-9 border border-[#0070b8] text-[#0070b8] rounded-xl text-xs font-bold hover:bg-[#0070b8]/5 transition-colors"
         >
-          <X className="w-4 h-4 text-slate-600" />
+          {expanded ? <><ChevronUp className="w-3.5 h-3.5" /> Скрыть</> : <><ChevronDown className="w-3.5 h-3.5" /> Все варианты</>}
         </button>
+      </div>
 
-        {submitted ? (
-          <div className="p-10 text-center">
-            <CheckCircle className="w-14 h-14 text-[#87b63c] mx-auto mb-4" />
-            <h3 className="text-xl font-extrabold mb-2">Заявка принята!</h3>
-            <p className="text-slate-500 text-sm leading-relaxed">
-              Менеджер свяжется с вами в ближайшее время для уточнения деталей.
-            </p>
-            <button
-              onClick={onClose}
-              className="mt-6 w-full brand-gradient text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity"
-            >
-              Закрыть
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="relative h-44 bg-slate-100 overflow-hidden">
-              {img ? (
-                <img src={img} alt={`${car.mark} ${car.model}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-300">
-                  <Car className="w-16 h-16" />
-                </div>
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-4">
-                <div className="font-extrabold text-white text-lg leading-tight">
-                  {car.mark} {car.model}
-                </div>
-                <div className="text-white/70 text-xs mt-0.5">
-                  {car.year} · {car.complectation || car.modification}
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-base font-extrabold">Оставить заявку</h3>
-                <span className="text-lg font-extrabold text-[#0070b8]">{formatPrice(car.price)}</span>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-3">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Ваше имя</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      placeholder="Иван Иванов"
-                      required
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Телефон</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type="tel" inputMode="tel" maxLength={18}
-                      value={phone}
-                      onChange={e => setPhone(formatPhone(e.target.value))}
-                      placeholder="+7 (___) ___-__-__"
-                      required
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors"
-                    />
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  className="w-full brand-gradient text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity mt-1"
-                >
-                  Отправить заявку
-                </button>
-                <p className="text-[10px] text-slate-400 text-center leading-snug">
-                  Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности
-                </p>
-              </form>
-            </div>
-          </>
-        )}
-      </motion.div>
+      {expanded && (
+        <div className="border-t border-slate-100 p-3 grid gap-3 sm:grid-cols-2">
+          {sorted.map(car => (
+            <CarCard key={car.id} car={car} mode="grid" onTestDrive={onTestDrive} onOrder={onOrder} totalCount={totalCount} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function NewCarCard({ car, onTestDrive }: { car: NewCarRecord; onTestDrive: (car: NewCarRecord) => void }) {
-  const [, navigate] = useLocation();
-  const [imgIdx, setImgIdx] = useState(0);
-  const imgs = car.images.filter(Boolean);
-  const img = imgs[imgIdx] ?? "";
-  const transmission = parseTransmission(car.modification);
-  const drive = parseDrive(car.modification);
-  const { favorites, compare, isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
-  const fav = isFavorite(car.id);
-  const comp = isInCompare(car.id);
+// ─── Recently viewed ──────────────────────────────────────────────
+function RecentlyViewed() {
+  const [items, setItems] = useState<Array<{ id: string; name: string; price: number; timestamp: number }>>([]);
 
-  const storedCar = {
-    id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
-    run: 0, color: car.color, bodyType: car.bodyType, modification: car.modification,
-    images: car.images, availability: car.availability, url: car.url, type: "new" as const,
-    extras: car.extras, complectation: car.complectation, vin: car.vin,
-  };
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("catalog_recently_viewed");
+      if (raw) setItems(JSON.parse(raw).slice(0, 3));
+    } catch {}
+  }, []);
+
+  if (!items.length) return null;
 
   return (
-    <motion.article
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.4 }}
-      className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow group flex flex-col cursor-pointer"
-      onClick={() => navigate(`/new-cars/${encodeURIComponent(car.id)}`)}
-    >
-      <div className="relative h-48 bg-slate-100 overflow-hidden">
-        {img ? (
-          <img
-            src={img}
-            alt={`${car.mark} ${car.model}`}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-300">
-            <Car className="w-16 h-16" />
-          </div>
-        )}
-        {imgs.length > 1 && (
-          <>
-            <button
-              onClick={e => { e.stopPropagation(); setImgIdx(i => (i - 1 + imgs.length) % imgs.length); }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4 text-white" />
-            </button>
-            <button
-              onClick={e => { e.stopPropagation(); setImgIdx(i => (i + 1) % imgs.length); }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center transition-colors"
-            >
-              <ChevronRight className="w-4 h-4 text-white" />
-            </button>
-            <span className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-              {imgIdx + 1}/{imgs.length}
-            </span>
-          </>
-        )}
-        {/* Action buttons */}
-        <div className="absolute top-2 right-2 flex flex-col gap-1.5 z-10">
-          <button
-            onClick={e => { e.stopPropagation(); toggleFavorite(storedCar); }}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
-              fav
-                ? "bg-red-500 text-white shadow-md shadow-red-500/20"
-                : "bg-black/30 text-white hover:bg-black/50 backdrop-blur-sm"
-            }`}
-            title={fav ? "\u0423\u0431\u0440\u0430\u0442\u044c \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0433\u043e" : "\u0412 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435"}
-          >
-            <Heart className={`w-4 h-4 ${fav ? "fill-current" : ""}`} />
-          </button>
-          <button
-            onClick={e => { e.stopPropagation(); toggleCompare(storedCar); }}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
-              comp
-                ? "bg-[#0070b8] text-white shadow-md shadow-[#0070b8]/20"
-                : "bg-black/30 text-white hover:bg-black/50 backdrop-blur-sm"
-            }`}
-            title={comp ? "\u0423\u0431\u0440\u0430\u0442\u044c \u0438\u0437 \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f" : "\u0421\u0440\u0430\u0432\u043d\u0438\u0442\u044c"}
-          >
-            <Scale className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="absolute top-2 left-2 flex flex-wrap gap-1 z-0">
-          <span className="bg-[#0070b8] text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
-            <Sparkles className="w-2.5 h-2.5" /> НОВЫЙ
-          </span>
-          <span
-            className="text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-wide"
-            style={{ background: DEALER_COLORS[car.dealer] ?? "#f0f4ff", color: "#334155" }}
-          >
-            {car.dealer}
-          </span>
-        </div>
+    <div className="flex items-center gap-3 flex-wrap mb-4 text-xs text-slate-500">
+      <div className="flex items-center gap-1 shrink-0">
+        <Clock className="w-3.5 h-3.5" />
+        <span className="font-semibold">Вы смотрели:</span>
       </div>
-
-      <div className="p-4 flex flex-col flex-1">
-        <h3 className="font-extrabold text-base leading-snug mb-0.5">
-          {car.mark} {car.model}
-        </h3>
-        {car.modification && (
-          <p className="text-xs text-slate-400 mb-3 leading-snug line-clamp-1">{car.modification}</p>
-        )}
-
-        <div className="grid grid-cols-2 gap-1.5 mb-3">
-          <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg px-2 py-1.5">
-            <Calendar className="w-3 h-3 text-[#0070b8] shrink-0" />
-            <span className="text-[11px] font-bold text-slate-700">{car.year}</span>
-          </div>
-          {car.complectation && (
-            <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg px-2 py-1.5 col-span-1">
-              <Sparkles className="w-3 h-3 text-[#87b63c] shrink-0" />
-              <span className="text-[11px] font-bold text-slate-700 truncate">{car.complectation}</span>
-            </div>
-          )}
-          {transmission && (
-            <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg px-2 py-1.5">
-              <span className="text-[9px] font-black text-[#0070b8] shrink-0">КП</span>
-              <span className="text-[11px] font-bold text-slate-700">{transmission}</span>
-            </div>
-          )}
-          {drive && (
-            <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg px-2 py-1.5">
-              <span className="text-[9px] font-black text-[#0070b8] shrink-0">4×</span>
-              <span className="text-[11px] font-bold text-slate-700">{drive}</span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5 mb-3">
-          <Palette className="w-3 h-3 text-slate-400 shrink-0" />
-          <span className="text-xs text-slate-500">{car.color}</span>
-          {car.bodyType && (
-            <>
-              <span className="text-slate-200 text-sm">·</span>
-              <span className="text-xs text-slate-500 truncate">{car.bodyType}</span>
-            </>
-          )}
-        </div>
-
-        <div className="mt-auto">
-          {car.maxDiscount > 0 ? (
-            <>
-              <div className="flex items-baseline gap-2 mb-0.5">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Цена от</span>
-                <span className="text-xl font-extrabold text-[#0070b8]">
-                  {formatPrice(car.price - car.maxDiscount)}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 line-through mb-2">{formatPrice(car.price)}</p>
-              <div className="flex flex-wrap gap-1 mb-3">
-                {car.creditDiscount > 0 && (
-                  <span className="inline-flex items-center gap-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-100">
-                    Кредит −{formatPrice(car.creditDiscount)}
-                  </span>
-                )}
-                {car.tradeinDiscount > 0 && (
-                  <span className="inline-flex items-center gap-0.5 bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-100">
-                    Trade-in −{formatPrice(car.tradeinDiscount)}
-                  </span>
-                )}
-              </div>
-            </>
-          ) : (
-            <p className="text-xl font-extrabold text-slate-900 mb-3">{formatPrice(car.price)}</p>
-          )}
-          <button
-            onClick={e => { e.stopPropagation(); onTestDrive(car); }}
-            className="w-full bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold rounded-xl py-2.5 text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-          >
-            <Car className="w-4 h-4" />
-            Запись на тест-драйв
-          </button>
-        </div>
-      </div>
-    </motion.article>
+      {items.map(item => (
+        <a key={item.id} href={`/new-cars/${encodeURIComponent(item.id)}`}
+          className="text-[#0070b8] font-semibold hover:underline shrink-0">
+          {item.name}
+        </a>
+      ))}
+    </div>
   );
 }
 
-const PAGE_SIZE = 12;
+// ─── Pagination ───────────────────────────────────────────────────
+function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (p: number) => void }) {
+  if (total <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-2 mt-10">
+      <button disabled={page === 1} onClick={() => onChange(page - 1)}
+        className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:border-[#0070b8] transition-colors">
+        <ChevronLeft className="w-4 h-4" />
+      </button>
+      {Array.from({ length: total }).map((_, i) => {
+        const p = i + 1;
+        if (p !== 1 && p !== total && Math.abs(p - page) > 1) {
+          if (p === page - 2 || p === page + 2) return <span key={p} className="text-slate-400 text-sm">…</span>;
+          return null;
+        }
+        return (
+          <button key={p} onClick={() => onChange(p)}
+            className={`w-9 h-9 rounded-full text-sm font-bold transition-all ${p === page ? "bg-[#0070b8] text-white" : "border border-slate-200 text-slate-600 hover:border-[#0070b8]"}`}>
+            {p}
+          </button>
+        );
+      })}
+      <button disabled={page === total} onClick={() => onChange(page + 1)}
+        className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:border-[#0070b8] transition-colors">
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
 
-const BODY_TYPES = [
-  "Все типы",
-  "Внедорожник 5 дв.",
-  "Внедорожник 3 дв.",
-  "Седан",
-  "Хэтчбек 5 дв.",
-  "Универсал 5 дв.",
-  "Лифтбек",
-  "Минивэн",
-  "Пикап",
-];
-const TRANSMISSIONS = ["Любая", "Робот", "Автомат", "Механика", "Вариатор"];
-const DRIVES = ["Любой", "Полный", "Передний"];
-const DEALERS = ["Все дилеры", "Jaecoo", "Omoda", "Tenet", "Haval City", "Haval Pro", "Jetour", "Soueast"];
-
+// ─── Main page ────────────────────────────────────────────────────
 export default function NewCars() {
-  const { favorites, compare } = useCarStorage();
-  const { data: cars = [], isLoading, isError } = useQuery<NewCarRecord[]>({
+  const [, navigate] = useLocation();
+  useCarStorage();
+
+  const { data: rawCars = [], isLoading, isError } = useQuery<NewCarRecord[]>({
     queryKey: ["new-cars"],
     queryFn: fetchNewCars,
     staleTime: 5 * 60 * 1000,
   });
 
-  const [filterMark, setFilterMark] = useState("");
-  const [filterDealer, setFilterDealer] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const fromUrl = params.get("dealer") ?? params.get("brand") ?? "";
-    return DEALERS.includes(fromUrl) ? fromUrl : "Все дилеры";
+  const cars: CarCardData[] = useMemo(
+    () => rawCars.map((c, i) => toCardData(c, i)),
+    [rawCars],
+  );
+
+  const [filters, setFilters] = useState<FilterValues>(() => ({
+    ...DEFAULT_FILTER_VALUES,
+    ...parseFiltersFromUrl(),
+  }));
+  const [sortBy, setSortBy] = useState<"popularity" | "price_asc" | "price_desc" | "newest">("popularity");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [dealer, setDealer] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    return p.get("dealer") || "Все бренды";
   });
-  const [filterModel, setFilterModel] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const raw = params.get("model");
-    return raw ? cleanModel(raw) : "Все модели";
-  });
-  const [filterAvailability, setFilterAvailability] = useState("Все");
-  const [filterBodyType, setFilterBodyType] = useState("Все типы");
-  const [filterTransmission, setFilterTransmission] = useState("Любая");
-  const [filterDrive, setFilterDrive] = useState("Любой");
-  const [priceMin, setPriceMin] = useState("");
-  const [priceMax, setPriceMax] = useState("");
-  const [sortBy, setSortBy] = useState<"price_asc" | "price_desc" | "year_desc">("price_asc");
   const [page, setPage] = useState(1);
-  const [testDriveCar, setTestDriveCar] = useState<NewCarRecord | null>(null);
-  const [creditCar, setCreditCar] = useState<NewCarRecord | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [testDriveCar, setTestDriveCar] = useState<CarCardData | null>(null);
+  const [orderCar, setOrderCar] = useState<CarCardData | null>(null);
   const [showTradeIn, setShowTradeIn] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const availableModels = useMemo(() => {
-    const src = filterDealer === "Все дилеры" ? cars : cars.filter(c => c.dealer === filterDealer);
-    const found = [...new Set(src.map(c => cleanModel(c.model)))].sort();
-    return ["Все модели", ...found];
-  }, [cars, filterDealer]);
+  // Scroll restore
+  useEffect(() => {
+    if (sessionStorage.getItem("catalog_from_detail") === "1") {
+      sessionStorage.removeItem("catalog_from_detail");
+      const y = parseInt(sessionStorage.getItem("catalog_scroll") ?? "0");
+      if (y) setTimeout(() => window.scrollTo({ top: y }), 100);
+    }
+  }, []);
 
-  const filtered = useMemo(() => {
-    let list = cars;
-    if (filterMark) list = list.filter(c => c.mark.toLowerCase() === filterMark.toLowerCase());
-    if (filterDealer !== "Все дилеры") list = list.filter(c => c.dealer === filterDealer);
-    if (filterModel !== "Все модели") list = list.filter(c => cleanModel(c.model) === filterModel);
-    if (filterAvailability !== "Все") list = list.filter(c => c.availability === filterAvailability);
-    if (filterBodyType !== "Все типы") list = list.filter(c => c.bodyType === filterBodyType);
-    if (filterTransmission !== "Любая") list = list.filter(c => parseTransmission(c.modification) === filterTransmission);
-    if (filterDrive !== "Любой") list = list.filter(c => parseDrive(c.modification) === filterDrive);
-    const pMin = priceMin ? parseInt(priceMin.replace(/\D/g, "")) : 0;
-    const pMax = priceMax ? parseInt(priceMax.replace(/\D/g, "")) : Infinity;
-    if (pMin) list = list.filter(c => (c.price - (c.maxDiscount || 0)) >= pMin);
-    if (pMax !== Infinity) list = list.filter(c => (c.price - (c.maxDiscount || 0)) <= pMax);
-    if (sortBy === "price_asc") list = [...list].sort((a, b) => (a.price - (a.maxDiscount || 0)) - (b.price - (b.maxDiscount || 0)));
-    if (sortBy === "price_desc") list = [...list].sort((a, b) => (b.price - (b.maxDiscount || 0)) - (a.price - (a.maxDiscount || 0)));
-    if (sortBy === "year_desc") list = [...list].sort((a, b) => b.year - a.year);
-    return list;
-  }, [cars, filterMark, filterDealer, filterModel, filterAvailability, filterBodyType, filterTransmission, filterDrive, priceMin, priceMax, sortBy]);
-
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  function go(fn: () => void) { fn(); setPage(1); }
-
-  function resetFilters() {
-    setFilterMark("");
-    setFilterDealer("Все дилеры");
-    setFilterModel("Все модели");
-    setFilterAvailability("Все");
-    setFilterBodyType("Все типы");
-    setFilterTransmission("Любая");
-    setFilterDrive("Любой");
-    setPriceMin("");
-    setPriceMax("");
+  const handleFilterChange = useCallback((patch: Partial<FilterValues>) => {
+    setFilters(prev => {
+      const next = { ...prev, ...patch };
+      syncFiltersToUrl(next);
+      return next;
+    });
     setPage(1);
-  }
+  }, []);
+
+  const resetFilters = useCallback(() => {
+    const next = { ...DEFAULT_FILTER_VALUES };
+    setFilters(next);
+    syncFiltersToUrl(next);
+    setDealer("Все бренды");
+    setPage(1);
+  }, []);
+
+  const handleDealerChange = useCallback((d: string) => {
+    setDealer(d);
+    setFilters(prev => {
+      const next = { ...prev, brand: d === "Все бренды" ? "" : d, model: "" };
+      syncFiltersToUrl(next);
+      return next;
+    });
+    setPage(1);
+  }, []);
 
   const brandCounts = useMemo(() => {
-    const counts: Record<string, number> = { "Все дилеры": cars.length };
+    const counts: Record<string, number> = { "Все бренды": cars.length };
     for (const d of DEALERS.slice(1)) counts[d] = cars.filter(c => c.dealer === d).length;
     return counts;
   }, [cars]);
 
-  const activeCount = [
-    !!filterMark,
-    filterDealer !== "Все дилеры",
-    filterModel !== "Все модели",
-    filterAvailability !== "Все",
-    filterBodyType !== "Все типы",
-    filterTransmission !== "Любая",
-    filterDrive !== "Любой",
-    !!priceMin,
-    !!priceMax,
-  ].filter(Boolean).length;
+  const availableColors = useMemo(() => {
+    const src = dealer === "Все бренды" ? cars : cars.filter(c => c.dealer === dealer);
+    return [...new Set(src.map(c => c.color).filter(Boolean))].sort();
+  }, [cars, dealer]);
 
-  const FilterContent = () => (
-    <div className="space-y-6">
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Наличие</div>
-        <div className="flex flex-wrap gap-1.5">
-          {["Все", "В наличии", "На заказ"].map(a => (
-            <button key={a} onClick={() => go(() => setFilterAvailability(a))}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterAvailability === a ? "bg-[#87b63c] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{a}</button>
-          ))}
-        </div>
-      </div>
+  const filtered = useMemo(() => {
+    let list = filterCars(cars, filters);
+    if (dealer !== "Все бренды") list = list.filter(c => c.dealer === dealer);
+    return list;
+  }, [cars, filters, dealer]);
 
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Дилер / Бренд</div>
-        <div className="flex flex-wrap gap-1.5">
-          {DEALERS.map(d => (
-            <button key={d} onClick={() => go(() => { setFilterDealer(d); setFilterModel("Все модели"); })}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterDealer === d ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{d}</button>
-          ))}
-        </div>
-      </div>
+  const sorted = useMemo(() => {
+    if (sortBy === "popularity") return filtered; // pre-sorted by API (rank idx)
+    const copy = [...filtered];
+    if (sortBy === "price_asc") copy.sort((a, b) => (a.price - (a.maxDiscount || 0)) - (b.price - (b.maxDiscount || 0)));
+    if (sortBy === "price_desc") copy.sort((a, b) => (b.price - (b.maxDiscount || 0)) - (a.price - (a.maxDiscount || 0)));
+    if (sortBy === "newest") copy.sort((a, b) => b.year - a.year);
+    return copy;
+  }, [filtered, sortBy]);
 
-      {availableModels.length > 2 && (
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Модель</div>
-          <div className="flex flex-wrap gap-1.5">
-            {availableModels.map(m => (
-              <button key={m} onClick={() => go(() => setFilterModel(m))}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                  filterModel === m ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >{m}</button>
-            ))}
-          </div>
-        </div>
-      )}
+  // Grouping: only when sort=popularity
+  const displayItems = useMemo(() => {
+    if (sortBy !== "popularity") {
+      return sorted.map(car => ({ type: "card" as const, car }));
+    }
+    const groups = new Map<string, CarCardData[]>();
+    for (const car of sorted) {
+      const key = `${car.mark}|${car.model}|${car.year}|${car.modification}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(car);
+    }
+    const items: Array<{ type: "card"; car: CarCardData } | { type: "group"; cars: CarCardData[] }> = [];
+    const seen = new Set<string>();
+    for (const car of sorted) {
+      const key = `${car.mark}|${car.model}|${car.year}|${car.modification}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const group = groups.get(key)!;
+      if (group.length >= 3) {
+        items.push({ type: "group", cars: group });
+      } else {
+        for (const c of group) items.push({ type: "card", car: c });
+      }
+    }
+    return items;
+  }, [sorted, sortBy]);
 
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Цена, ₽</div>
-        <div className="flex gap-2 items-center">
-          <input type="number" value={priceMin} onChange={e => go(() => setPriceMin(e.target.value))}
-            placeholder="от"
-            className="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#0070b8] transition-colors" />
-          <span className="text-slate-300 shrink-0">—</span>
-          <input type="number" value={priceMax} onChange={e => go(() => setPriceMax(e.target.value))}
-            placeholder="до"
-            className="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#0070b8] transition-colors" />
-        </div>
-      </div>
+  const totalPages = Math.ceil(displayItems.length / PAGE_SIZE);
+  const paginated = displayItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Тип кузова</div>
-        <div className="flex flex-wrap gap-1.5">
-          {BODY_TYPES.map(t => (
-            <button key={t} onClick={() => go(() => setFilterBodyType(t))}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterBodyType === t ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{t}</button>
-          ))}
-        </div>
-      </div>
+  const activeFilterCount = countActiveFilters(filters) + (dealer !== "Все бренды" ? 1 : 0);
 
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Коробка передач</div>
-        <div className="flex flex-wrap gap-1.5">
-          {TRANSMISSIONS.map(t => (
-            <button key={t} onClick={() => go(() => setFilterTransmission(t))}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterTransmission === t ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{t}</button>
-          ))}
-        </div>
-      </div>
+  // Top-popularity suggestions for empty state
+  const topPopular = useMemo(() => cars.slice(0, 4), [cars]);
 
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Привод</div>
-        <div className="flex flex-wrap gap-1.5">
-          {DRIVES.map(d => (
-            <button key={d} onClick={() => go(() => setFilterDrive(d))}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterDrive === d ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{d}</button>
-          ))}
-        </div>
-      </div>
-
-      {activeCount > 0 && (
-        <button onClick={resetFilters}
-          className="flex items-center gap-1.5 text-sm font-bold text-rose-500 hover:text-rose-600 transition-colors">
-          <X className="w-3.5 h-3.5" /> Сбросить ({activeCount})
-        </button>
-      )}
-    </div>
-  );
-
-  const itemListJsonLd = !isLoading && filtered.length > 0 ? {
+  const itemListJsonLd = !isLoading && sorted.length > 0 ? {
     "@type": "ItemList",
     "name": "Новые автомобили — Дебрянск Авто",
     "url": "https://debryansk-auto.ru/new-cars",
-    "numberOfItems": filtered.length,
-    "itemListElement": filtered.slice(0, 50).map((car, idx) => ({
+    "numberOfItems": sorted.length,
+    "itemListElement": sorted.slice(0, 50).map((car, idx) => ({
       "@type": "ListItem",
       "position": idx + 1,
       "name": `${car.mark} ${car.model} ${car.year}`,
@@ -624,145 +404,122 @@ export default function NewCars() {
       />
 
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-10">
-        <div className="flex items-start justify-between mb-5 sm:mb-8 gap-4">
+        {/* ── Header row 1 ── */}
+        <div className="flex items-start justify-between mb-4 gap-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-1">В наличии</p>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Новые автомобили</h1>
             {!isLoading && (
-              <p className="text-sm font-semibold text-slate-400 mt-1">{filtered.length} авто</p>
+              <p className="text-sm text-slate-400 mt-0.5">{sorted.length} авто</p>
             )}
           </div>
-          <button
-            onClick={() => setFiltersOpen(v => !v)}
-            className={`lg:hidden flex items-center gap-2 px-3.5 py-2 rounded-xl border text-sm font-bold transition-all shrink-0 ${
-              filtersOpen || activeCount > 0 ? "bg-[#0070b8] text-white border-[#0070b8]" : "bg-white text-slate-700 border-slate-200"
-            }`}
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-            Фильтры
-            {activeCount > 0 && (
-              <span className="w-5 h-5 rounded-full bg-white/30 text-white text-[10px] font-black flex items-center justify-center">
-                {activeCount}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Sort select — desktop */}
+            <select
+              value={sortBy}
+              onChange={e => { setSortBy(e.target.value as typeof sortBy); setPage(1); }}
+              className="hidden sm:block border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 bg-white focus:outline-none focus:border-[#0070b8]"
+            >
+              <option value="popularity">Популярные</option>
+              <option value="price_asc">Цена: по возрастанию</option>
+              <option value="price_desc">Цена: по убыванию</option>
+              <option value="newest">Год: сначала новее</option>
+            </select>
+            {/* View mode icons */}
+            <div className="hidden sm:flex border border-slate-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`w-9 h-9 flex items-center justify-center transition-colors ${viewMode === "grid" ? "bg-[#0070b8] text-white" : "text-slate-500 hover:text-[#0070b8]"}`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`w-9 h-9 flex items-center justify-center transition-colors ${viewMode === "list" ? "bg-[#0070b8] text-white" : "text-slate-500 hover:text-[#0070b8]"}`}
+              >
+                <LayoutList className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Mobile: filter button */}
+            <button
+              onClick={() => setFilterOpen(true)}
+              className={`lg:hidden flex items-center gap-2 px-3.5 py-2 rounded-xl border text-sm font-bold transition-all ${
+                activeFilterCount > 0 ? "bg-[#0070b8] text-white border-[#0070b8]" : "bg-white text-slate-700 border-slate-200"
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              Фильтры
+              {activeFilterCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-white/30 text-[10px] font-black flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
-        {/* ── Quick brand filter chips ── */}
-        <div
-          className="flex gap-2 overflow-x-auto pb-2 mb-5 -mx-4 px-4 sm:mx-0 sm:px-0"
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-        >
+        {/* ── Brand pills ── */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-4 px-4 sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
           {DEALERS.map(d => {
-            const isAll = d === "Все дилеры";
-            const label = isAll ? "Все бренды" : d;
             const count = brandCounts[d] ?? 0;
-            const active = filterDealer === d;
+            const active = dealer === d;
             return (
               <button
                 key={d}
-                onClick={() => go(() => { setFilterDealer(d); setFilterModel("Все модели"); })}
-                className={`shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold transition-all border whitespace-nowrap ${
-                  active
-                    ? "bg-[#0070b8] text-white border-[#0070b8] shadow-sm"
-                    : "bg-white text-slate-700 border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8]"
+                onClick={() => handleDealerChange(d)}
+                className={`shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold border whitespace-nowrap transition-all ${
+                  active ? "bg-[#0070b8] text-white border-[#0070b8] shadow-sm" : "bg-white text-slate-700 border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8]"
                 }`}
               >
-                {label}
+                {d}
                 {count > 0 && (
-                  <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
-                    active ? "bg-white/25 text-white" : "bg-slate-100 text-slate-500"
-                  }`}>{count}</span>
+                  <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold leading-none ${active ? "bg-white/25 text-white" : "bg-slate-100 text-slate-500"}`}>
+                    {count}
+                  </span>
                 )}
               </button>
             );
           })}
         </div>
 
-        {/* Mobile filter drawer */}
-        <AnimatePresence>
-          {filtersOpen && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="lg:hidden fixed inset-0 bg-black/40 z-40"
-                onClick={() => setFiltersOpen(false)}
-              />
-              <motion.div
-                initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col"
-              >
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
-                  <div className="flex items-center gap-2">
-                    <Filter className="w-4 h-4 text-[#0070b8]" />
-                    <span className="font-extrabold text-sm">Фильтры</span>
-                    {activeCount > 0 && (
-                      <span className="text-[10px] font-black text-white bg-[#0070b8] rounded-full w-5 h-5 flex items-center justify-center">{activeCount}</span>
-                    )}
-                  </div>
-                  <button onClick={() => setFiltersOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
-                    <X className="w-4 h-4 text-slate-600" />
-                  </button>
-                </div>
-                <div className="overflow-y-auto flex-1 p-5">
-                  <FilterContent />
-                </div>
-                <div className="p-4 border-t border-slate-100 shrink-0">
-                  <button onClick={() => setFiltersOpen(false)}
-                    className="w-full brand-gradient text-white font-bold rounded-xl py-3 text-sm">
-                    Показать {filtered.length} авто
-                  </button>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
+        {/* ── Recently viewed ── */}
+        <RecentlyViewed />
 
+        {/* ── Main content ── */}
         <div className="flex gap-7 items-start">
-          <aside className="hidden lg:block w-60 xl:w-64 shrink-0">
-            <div className="bg-white rounded-2xl border border-slate-100 p-5 sticky top-[72px]">
-              <div className="flex items-center gap-2 mb-5 pb-4 border-b border-slate-100">
-                <Filter className="w-4 h-4 text-[#0070b8]" />
-                <span className="font-extrabold text-sm text-slate-800">Фильтры</span>
-                {activeCount > 0 && (
-                  <span className="ml-auto text-[10px] font-black text-white bg-[#0070b8] rounded-full w-5 h-5 flex items-center justify-center">
-                    {activeCount}
-                  </span>
-                )}
-              </div>
-              <FilterContent />
-            </div>
-          </aside>
+          {/* FilterPanel (sidebar desktop + bottom sheet mobile) */}
+          <FilterPanel
+            values={filters}
+            onChange={handleFilterChange}
+            onReset={resetFilters}
+            priceRanges={PRICE_RANGES}
+            showAvailability
+            showMileage={false}
+            showYear={false}
+            availableColors={availableColors}
+            filteredCount={sorted.length}
+            open={filterOpen}
+            onOpenChange={setFilterOpen}
+          />
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-5 gap-3">
-              <span className="text-sm text-slate-500 font-medium">
-                {isLoading ? "Загрузка..." : `${filtered.length} авто`}
-              </span>
+          <div className="flex-1 min-w-0" id="catalog-grid">
+            {/* Sort (mobile) */}
+            <div className="flex items-center justify-between mb-4 gap-3 sm:hidden">
+              <span className="text-sm text-slate-500">{isLoading ? "Загрузка…" : `${sorted.length} авто`}</span>
               <select
                 value={sortBy}
                 onChange={e => { setSortBy(e.target.value as typeof sortBy); setPage(1); }}
-                className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 bg-white focus:outline-none focus:border-[#0070b8] shrink-0"
+                className="border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white focus:outline-none"
               >
-                <option value="price_asc">Цена: по возрастанию</option>
-                <option value="price_desc">Цена: по убыванию</option>
-                <option value="year_desc">Год: сначала новее</option>
+                <option value="popularity">Популярные</option>
+                <option value="price_asc">Цена ↑</option>
+                <option value="price_desc">Цена ↓</option>
+                <option value="newest">Год ↓</option>
               </select>
             </div>
 
             {isLoading && (
-              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="bg-white rounded-2xl border border-slate-100 overflow-hidden animate-pulse">
-                    <div className="h-48 bg-slate-200" />
-                    <div className="p-4 space-y-3">
-                      <div className="h-4 bg-slate-200 rounded w-3/4" />
-                      <div className="h-3 bg-slate-200 rounded w-1/2" />
-                      <div className="h-8 bg-slate-200 rounded" />
-                    </div>
-                  </div>
-                ))}
+              <div className={viewMode === "grid" ? "grid sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5" : "flex flex-col gap-3"}>
+                {Array.from({ length: 6 }).map((_, i) => <CarCardSkeleton key={i} mode={viewMode} />)}
               </div>
             )}
 
@@ -774,68 +531,65 @@ export default function NewCars() {
               </div>
             )}
 
-            {!isLoading && !isError && (
-              <>
-                {paginated.length === 0 ? (
-                  <div className="text-center py-20 text-slate-400">
-                    <Car className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                    <p className="font-semibold">Ничего не найдено</p>
-                    <button onClick={resetFilters} className="mt-3 text-sm font-bold text-[#0070b8] hover:underline">
-                      Сбросить фильтры
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-                    {paginated.map(car => (
-                      <NewCarCard key={car.id} car={car} onTestDrive={setTestDriveCar} />
-                    ))}
+            {!isLoading && !isError && sorted.length === 0 && (
+              <div className="text-center py-16">
+                <SearchX className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                <p className="font-semibold text-slate-600">Нет авто по вашим фильтрам</p>
+                <button onClick={resetFilters} className="mt-3 text-sm font-bold text-[#0070b8] hover:underline">
+                  Сбросить фильтры
+                </button>
+                {topPopular.length > 0 && (
+                  <div className="mt-8 text-left">
+                    <p className="text-sm font-bold text-slate-500 mb-4">Возможно, понравится:</p>
+                    <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                      {topPopular.map(car => (
+                        <CarCard key={car.id} car={car} onTestDrive={setTestDriveCar} onOrder={setOrderCar} totalCount={cars.length} />
+                      ))}
+                    </div>
                   </div>
                 )}
+              </div>
+            )}
 
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-2 mt-10">
-                    <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-                      className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:border-[#0070b8] transition-colors">
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    {Array.from({ length: totalPages }).map((_, i) => {
-                      const p = i + 1;
-                      if (p === 1 || p === totalPages || Math.abs(p - page) <= 1) {
-                        return (
-                          <button key={p} onClick={() => setPage(p)}
-                            className={`w-9 h-9 rounded-full text-sm font-bold transition-all ${
-                              page === p ? "bg-[#0070b8] text-white" : "border border-slate-200 text-slate-600 hover:border-[#0070b8]"
-                            }`}
-                          >{p}</button>
-                        );
-                      }
-                      if (p === 2 && page > 3) return <span key="el" className="text-slate-400 text-sm">…</span>;
-                      if (p === totalPages - 1 && page < totalPages - 2) return <span key="er" className="text-slate-400 text-sm">…</span>;
-                      return null;
-                    })}
-                    <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)}
-                      className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:border-[#0070b8] transition-colors">
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
+            {!isLoading && !isError && sorted.length > 0 && (
+              <>
+                <div className={viewMode === "grid" ? "grid sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5" : "flex flex-col gap-3"}>
+                  {paginated.map((item, i) =>
+                    item.type === "group" ? (
+                      <CarModelGroup
+                        key={item.cars[0].id}
+                        cars={item.cars}
+                        filteredColors={filters.colors}
+                        totalCount={cars.length}
+                        onTestDrive={setTestDriveCar}
+                        onOrder={setOrderCar}
+                      />
+                    ) : (
+                      <CarCard
+                        key={item.car.id}
+                        car={item.car}
+                        mode={viewMode}
+                        onTestDrive={setTestDriveCar}
+                        onOrder={setOrderCar}
+                        totalCount={cars.length}
+                      />
+                    )
+                  )}
+                </div>
+                <Pagination page={page} total={totalPages} onChange={p => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
               </>
             )}
           </div>
         </div>
       </div>
 
-      <AnimatePresence>
-        {testDriveCar && (
-          <TestDriveModal car={testDriveCar} onClose={() => setTestDriveCar(null)} />
-        )}
-        {creditCar && (
-          <CreditModal car={creditCar} onClose={() => setCreditCar(null)} />
-        )}
-        {showTradeIn && (
-          <TradeInModal onClose={() => setShowTradeIn(false)} />
-        )}
-      </AnimatePresence>
+      {testDriveCar && (
+        <TestDriveModal car={testDriveCar as never} onClose={() => setTestDriveCar(null)} />
+      )}
+      {orderCar && (
+        <TestDriveModal car={orderCar as never} onClose={() => setOrderCar(null)} />
+      )}
+      {showTradeIn && <TradeInModal onClose={() => setShowTradeIn(false)} />}
     </Layout>
   );
 }
