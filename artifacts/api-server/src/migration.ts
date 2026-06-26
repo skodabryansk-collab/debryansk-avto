@@ -440,18 +440,6 @@ export async function runMigration() {
       logger.info("No legacy JSONB promotions to migrate");
     }
 
-    // Car views tracking — works for both new (XML) and used (XML) cars
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS car_views (
-        car_id TEXT PRIMARY KEY,
-        view_count INTEGER NOT NULL DEFAULT 0,
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `);
-    // popularity_score on cars table (for Navigator AI context)
-    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS popularity_score INTEGER NOT NULL DEFAULT 0`);
-    logger.info("car_views + cars.popularity_score schema ready (idempotent)");
-
   } catch (err) {
     logger.error({ err }, "Migration error");
   }
