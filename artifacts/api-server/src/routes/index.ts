@@ -31,14 +31,12 @@ import adminReviewsRouter from "./admin-reviews";
 import adminBrandPagesRouter from "./admin-brand-pages";
 import adminPromotionsRouter from "./admin-promotions";
 import feedYmlRouter from "./feed-yml";
-import carViewsRouter from "./car-views";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(chatRouter);
 router.use(carsRouter);
-router.use(carViewsRouter);
 router.use(feedYmlRouter);
 router.use(newCarsRouter);
 router.use(featuredRouter);
