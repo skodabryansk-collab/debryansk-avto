@@ -127,7 +127,11 @@ async function processRoute(page, route) {
       console.warn(`[prerender] WARN: possibly empty content at ${route} (len=${html.length})`);
     }
 
-    await saveToGCS(route, html);
+    const cleanHtml = html
+      .replaceAll("http://localhost:8080", "https://debryansk-auto.ru")
+      .replaceAll("localhost:8080", "https://debryansk-auto.ru");
+
+    await saveToGCS(route, cleanHtml);
 
     // Notify Express server to update in-memory cache immediately (don't wait for script exit)
     if (INTERNAL_SECRET) {
