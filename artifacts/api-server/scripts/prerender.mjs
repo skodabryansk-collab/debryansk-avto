@@ -103,11 +103,18 @@ async function processRoute(page, route) {
       timeout: PAGE_TIMEOUT_MS,
     });
 
-    await page
-      .waitForNetworkIdle({ idleTime: NETWORK_IDLE_MS, timeout: PAGE_TIMEOUT_MS })
-      .catch(() => {});
-
-    await page.waitForSelector("main", { timeout: 3_000 }).catch(() => {});
+    if (route.startsWith("/brands/")) {
+      await page
+        .waitForSelector("[data-prerender-ready]", { timeout: 12_000 })
+        .catch(() => {
+          console.warn(`[prerender] WARN: [data-prerender-ready] not found at ${route} — using fallback`);
+        });
+    } else {
+      await page
+        .waitForNetworkIdle({ idleTime: NETWORK_IDLE_MS, timeout: PAGE_TIMEOUT_MS })
+        .catch(() => {});
+      await page.waitForSelector("main", { timeout: 3_000 }).catch(() => {});
+    }
 
     const html = await page.content();
 
