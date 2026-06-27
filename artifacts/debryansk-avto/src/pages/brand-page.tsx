@@ -966,6 +966,7 @@ export default function BrandPage() {
 
   return (
     <Layout>
+      <div data-prerender-ready="true" style={{ display: "none" }} />
       <SEO
         title={metaTitle}
         description={metaDesc}
