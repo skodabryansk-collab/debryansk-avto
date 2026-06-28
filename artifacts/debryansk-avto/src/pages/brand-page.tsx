@@ -826,7 +826,10 @@ export default function BrandPage() {
     `${brandName} в Брянске — официальный дилер | Дебрянск Авто`;
   const metaDesc =
     content?.metaDescription ??
-    `Купите ${brandName} у официального дилера в Брянске. Широкий выбор в наличии, кредит, trade-in, гарантийный сервис. Дебрянск Авто.`;
+    (brand.isServiceOnly
+      ? `Официальный сервис ${brandName} в Брянске — гарантийное и постгарантийное обслуживание, оригинальные запчасти. Дебрянск Авто${locations[0]?.address ? `, ${locations[0].address}` : ""}.`
+      : `${brandName} в Брянске${cars.length > 0 ? ` — ${cars.length} автомобилей в наличии` : ""}. Официальный дилер Дебрянск Авто. Тест-драйв, trade-in, сервис.`
+    );
 
   const autoDealer = {
     "@type": "AutoDealer",
@@ -978,6 +981,14 @@ export default function BrandPage() {
           { name: brandName, url: `/brands/${slug}` },
         ]}
       />
+
+      {/* ── Hidden SEO H1 ─────────────────────────────────────── */}
+      <h1 className="sr-only">
+        {isServiceOnly
+          ? `Официальный сервис ${brandName} в Брянске — Дебрянск Авто`
+          : `Официальный дилер ${brandName} в Брянске — Дебрянск Авто`
+        }
+      </h1>
 
       {/* ── Hero ──────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 pt-20 pb-16 sm:pt-28 sm:pb-24">
