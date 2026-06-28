@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import pg from "pg";
@@ -201,6 +201,46 @@ function injectMeta(html, title, description, canonical, ogImage, h1, jsonLd) {
   return result;
 }
 
+function buildNewsGridHtml(articles) {
+  if (!articles || articles.length === 0) return "";
+  const cards = articles.map(a => {
+    const cat = esc(a.category || "\u041d\u043e\u0432\u043e\u0441\u0442\u0438");
+    const title = esc(a.title);
+    const excerpt = esc((a.excerpt || "").substring(0, 140));
+    const slug = esc(a.slug);
+    const img = esc(a.image || "");
+    const dateStr = a.published_at
+      ? new Date(a.published_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })
+      : "";
+    const readTime = a.read_time ?? 3;
+    return `
+      <article class="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+        <a href="/news/${slug}">
+          <div class="h-40 overflow-hidden">
+            <img src="${img}" alt="${title}" class="w-full h-full object-cover" loading="lazy" decoding="async" />
+          </div>
+        </a>
+        <div class="p-4">
+          <span class="inline-flex items-center bg-[#0070b8]/90 text-white text-[10px] font-bold px-2.5 py-1 rounded-full">${cat}</span>
+          <div class="flex items-center gap-2 text-[11px] text-slate-400 mt-2 mb-2">
+            <span>${dateStr}</span>
+            <span class="w-0.5 h-0.5 rounded-full bg-slate-300"></span>
+            <span>${readTime} \u043c\u0438\u043d</span>
+          </div>
+          <a href="/news/${slug}">
+            <h3 class="font-bold text-slate-900 text-sm leading-snug hover:text-[#0070b8] transition-colors mb-1">${title}</h3>
+          </a>
+          <p class="text-slate-500 text-xs leading-relaxed">${excerpt}</p>
+          <a href="/news/${slug}" class="inline-flex items-center gap-1 text-[#0070b8] text-xs font-bold mt-2 hover:underline">
+            \u0427\u0438\u0442\u0430\u0442\u044c \u0434\u0430\u043b\u044c\u0448\u0435 <span aria-hidden="true">\u2192</span>
+          </a>
+        </div>
+      </article>`;
+  }).join("");
+
+  return `<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 container mx-auto px-4 sm:px-6 py-6 sm:py-8">${cards}</div>`;
+}
+
 let _template = null;
 function getTemplate() {
   if (_template) return _template;
@@ -299,9 +339,10 @@ async function main() {
     }
 
     const newsResult = await pool.query(
-      "SELECT title, slug, excerpt FROM news WHERE published_at IS NOT NULL AND slug IS NOT NULL AND slug != ''"
+      "SELECT title, slug, excerpt, category, image, published_at, read_time FROM news WHERE published_at IS NOT NULL AND slug IS NOT NULL AND slug != '' ORDER BY published_at DESC"
     );
-    for (const row of newsResult.rows) {
+    const newsArticles = newsResult.rows;
+    for (const row of newsArticles) {
       writeRoute(
         `/news/${row.slug}`,
         `${row.title} | Дебрянск Авто`,
@@ -310,6 +351,17 @@ async function main() {
         row.title,
         DEFAULT_OG_IMAGE
       );
+    }
+    // ——— Inject news grid into /news page for server-side article links ———
+    if (newsArticles.length > 0) {
+      const newsGridHtml = buildNewsGridHtml(newsArticles);
+      const newsFile = join(distDir, "news", "index.html");
+      if (existsSync(newsFile)) {
+        let newsHtml = readFileSync(newsFile, "utf-8");
+        newsHtml = newsHtml.replace(/<\/body>/, `${newsGridHtml}\n  </body>`);
+        writeFileSync(newsFile, newsHtml);
+        console.log("SSG: /news  → injected article grid (", newsArticles.length, "articles)");
+      }
     }
 
     const fmt = new Intl.NumberFormat("ru-RU", {
