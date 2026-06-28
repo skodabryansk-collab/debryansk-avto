@@ -395,6 +395,13 @@ export default function UsedCars() {
     queryFn: fetchCarsXml,
     staleTime: 5 * 60 * 1000,
   });
+  const { data: brandsData = [] } = useQuery<Array<{ id: number }>>({
+    queryKey: ["public-brands"],
+    queryFn: () => fetch("/api/brands").then(r => r.json()),
+    staleTime: 60 * 60 * 1000,
+    retry: 0,
+  });
+  const brandsCount = brandsData.length || 13;
 
   const [filterMark, setFilterMark] = useState("Все марки");
   const [filterBodyType, setFilterBodyType] = useState("Все типы кузова");
@@ -559,7 +566,7 @@ export default function UsedCars() {
     <Layout>
       <SEO
         title="Автомобили с пробегом в Брянске"
-        description="Купить авто с пробегом в Брянске. Выгодные цены, проверенные автомобили, кредит, трейд-ин. Дебрянск Авто — 9 брендов."
+        description={`Купить авто с пробегом в Брянске. Выгодные цены, проверенные автомобили, кредит, трейд-ин. Дебрянск Авто — ${brandsCount} брендов.`}
         canonical="/cars"
         jsonLd={itemListJsonLd}
         breadcrumbs={[
