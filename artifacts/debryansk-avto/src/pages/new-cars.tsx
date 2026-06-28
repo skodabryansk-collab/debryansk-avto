@@ -400,6 +400,13 @@ export default function NewCars() {
     queryFn: fetchNewCars,
     staleTime: 5 * 60 * 1000,
   });
+  const { data: brandsData = [] } = useQuery<Array<{ id: number }>>({
+    queryKey: ["public-brands"],
+    queryFn: () => fetch("/api/brands").then(r => r.json()),
+    staleTime: 60 * 60 * 1000,
+    retry: 0,
+  });
+  const brandsCount = brandsData.length || 13;
 
   const [filterMark, setFilterMark] = useState("");
   const [filterDealer, setFilterDealer] = useState(() => {
@@ -631,7 +638,7 @@ export default function NewCars() {
     <Layout>
       <SEO
         title="Новые автомобили в Брянске"
-        description="Новые автомобили 9 брендов у официальных дилеров Брянска. Выгодное кредитование, специальные программы, гарантия производителя. Дебрянск Авто."
+        description={`Новые автомобили ${brandsCount} брендов у официальных дилеров Брянска. Выгодное кредитование, специальные программы, гарантия производителя. Дебрянск Авто.`}
         canonical="/new-cars"
         jsonLd={itemListJsonLd}
         breadcrumbs={[
