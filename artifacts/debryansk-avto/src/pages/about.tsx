@@ -94,7 +94,7 @@ export default function AboutPage() {
   return (
     <Layout>
       <SEO
-        title="О группе компаний Дебрянск Авто — территория автомобилей"
+        title={`О группе — Дебрянск Авто | ${totalBrands || 13} брендов, 4 центра в Брянске`}
         description={`Дебрянск Авто — крупнейший автодилер Брянска. ${totalBrands} брендов, 4 дилерских центра, 15 лет на рынке. Продажа, сервис, финансирование.`}
         canonical="/about"
         jsonLd={organizationSchema}
