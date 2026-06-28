@@ -30,6 +30,7 @@ import adminNavigatorRouter from "./admin-navigator";
 import adminReviewsRouter from "./admin-reviews";
 import adminBrandPagesRouter from "./admin-brand-pages";
 import adminPromotionsRouter from "./admin-promotions";
+import adminCacheRouter from "./admin-cache";
 import feedYmlRouter from "./feed-yml";
 
 const router: IRouter = Router();
@@ -71,6 +72,7 @@ router.use("/admin/navigator", adminNavigatorRouter);
 router.use("/admin/reviews", adminReviewsRouter);
 router.use("/admin/brand-pages", adminBrandPagesRouter);
 router.use("/admin/promotions", adminPromotionsRouter);
+router.use("/admin/cache", adminCacheRouter);
 
 // Public settings
 router.use("/settings", publicSettingsRouter);
