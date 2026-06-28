@@ -323,7 +323,7 @@ export default function ServicePage() {
                 Техническое обслуживание и ремонт в Брянске
               </h1>
               <p className="text-slate-400 text-sm sm:text-base max-w-xl mb-8">
-                {totalBrands > 0 ? `${totalBrands} брендов` : "9 брендов"}, 4 сервисных центра, гарантия производителя.
+                {totalBrands || 13} брендов, 4 сервисных центра, гарантия производителя.
                 Сертифицированные мастера, оригинальные запчасти, современное оборудование.
               </p>
               <div className="flex flex-wrap gap-2 sm:gap-3">
