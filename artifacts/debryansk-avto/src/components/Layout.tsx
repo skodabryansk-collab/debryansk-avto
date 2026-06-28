@@ -152,6 +152,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     staleTime: 60 * 60 * 1000,
     retry: 0,
   });
+  const { data: brandsData = [] } = useQuery<Array<{ id: number }>>({
+    queryKey: ["public-brands"],
+    queryFn: () => fetch("/api/brands").then(r => r.json()),
+    staleTime: 60 * 60 * 1000,
+    retry: 0,
+  });
+  const brandsCount = brandsData.length || 13;
 
   const globalDealerLd = React.useMemo(() => {
     const departments = locationsData.map(loc => {
@@ -178,7 +185,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       "alternateName": "Территория Автомобилей",
       "url": "https://debryansk-auto.ru",
       "telephone": "+74832631000",
-      "description": "Группа автодилеров в Брянске. 7 брендов новых авто: OMODA, JAECOO, HAVAL, Tenet, Jetour, Soueast. Автомобили с пробегом, сервис, выкуп.",
+      "description": `Группа автодилеров в Брянске. ${brandsCount} брендов новых авто: OMODA, JAECOO, HAVAL, Tenet, Jetour, Soueast и другие. Автомобили с пробегом, сервис, выкуп.`,
       "image": "https://debryansk-auto.ru/opengraph.jpg",
       "address": {
         "@type": "PostalAddress",
@@ -207,7 +214,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         },
       } : {}),
     });
-  }, [locationsData, reviewStats]);
+  }, [locationsData, reviewStats, brandsCount]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 80);
