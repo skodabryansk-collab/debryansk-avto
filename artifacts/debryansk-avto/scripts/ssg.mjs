@@ -251,7 +251,7 @@ async function main() {
     }
 
     const brandsResult = await pool.query(
-      "SELECT b.id, b.name, b.slug, bpc.faq FROM brands b LEFT JOIN brand_page_content bpc ON bpc.brand_id = b.id WHERE b.slug IS NOT NULL AND b.slug != ''"
+      "SELECT b.id, b.name, b.slug, b.is_service_only, bpc.meta_description, bpc.meta_title, bpc.faq FROM brands b LEFT JOIN brand_page_content bpc ON bpc.brand_id = b.id WHERE b.slug IS NOT NULL AND b.slug != ''"
     );
     for (const row of brandsResult.rows) {
       let faqLd = null;
@@ -272,11 +272,27 @@ async function main() {
           };
         }
       }
+      const isService = row.is_service_only === true;
+      const metaDesc = row.meta_description;
+      const metaTitle = row.meta_title;
+      const brandName = row.name;
+      const title = metaTitle
+        ? `${metaTitle} | Дебрянск Авто`
+        : `${brandName} в Брянске — ${isService ? "официальный сервис" : "официальный дилер"} | Дебрянск Авто`;
+      const description = metaDesc
+        ? metaDesc
+        : (isService
+            ? `Официальный сервис ${brandName} в Брянске — гарантийное и постгарантийное обслуживание, оригинальные запчасти. Дебрянск Авто.`
+            : `Купите ${brandName} у официального дилера в Брянске. Широкий выбор в наличии, кредит, trade-in, гарантийный сервис. Дебрянск Авто.`
+          );
+      const h1 = isService
+        ? `Официальный сервис ${brandName} в Брянске — Дебрянск Авто`
+        : `Официальный дилер ${brandName} в Брянске — Дебрянск Авто`;
       writeRoute(
         `/brands/${row.slug}`,
-        `${row.name} в Брянске — официальный дилер | Дебрянск Авто`,
-        `Купите ${row.name} у официального дилера в Брянске. Широкий выбор в наличии, кредит, trade-in, гарантийный сервис. Дебрянск Авто.`,
-        `${row.name} в Брянске — официальный дилер`,
+        title,
+        description,
+        h1,
         DEFAULT_OG_IMAGE,
         faqLd
       );
