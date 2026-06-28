@@ -405,7 +405,7 @@ const offers = [
 ];
 
 /* ── Services data (split by category) ──────────────────── */
-const serviceCategories = [
+const makeServiceCategories = (brandsCount: number) => [
   {
     key: "sale",
     label: "Продажа",
@@ -415,7 +415,7 @@ const serviceCategories = [
     icon: Car,
     color: "#0070b8",
     items: [
-      { icon: Car,            title: "Новые автомобили",       desc: "Официальные дилеры 9 брендов. Широкий выбор в наличии и под заказ.",          modal: "buy" as ModalType },
+      { icon: Car,            title: "Новые автомобили",       desc: `Официальные дилеры ${brandsCount} брендов. Широкий выбор в наличии и под заказ.`,          modal: "buy" as ModalType },
       { icon: RotateCcw,      title: "Автомобили с пробегом",  desc: "Проверенные авто с юридической чистотой и историей обслуживания.",             modal: "buy" as ModalType },
       { icon: ArrowLeftRight, title: "Trade-in",               desc: "Оценим ваш автомобиль за 30 минут и зачтём стоимость в счёт новой машины.",    modal: "tradein" as ModalType },
       { icon: Building2,      title: "Корпоративным клиентам", desc: "Специальные условия для юридических лиц, ИП и корпоративных автопарков.",      modal: "callback" as ModalType },
@@ -668,6 +668,10 @@ export default function Home() {
     queryFn: fetchBrands,
     staleTime: 5 * 60 * 1000,
   });
+  const serviceCategories = React.useMemo(
+    () => makeServiceCategories(apiBrands.length || 13),
+    [apiBrands.length]
+  );
 
   /* ── 4 unique locations on Yandex map ── */
   const dealerMapLocations = React.useMemo(() => {
@@ -810,7 +814,7 @@ export default function Home() {
 
       <SEO
         title="Дебрянск Авто — Территория Автомобилей"
-        description="Группа компаний 9 брендов в Брянске. Продажа, сервис и финансирование с 2011 года. Новые автомобили и авто с пробегом."
+        description={`Группа компаний ${apiBrands.length || 13} брендов в Брянске. Продажа, сервис и финансирование с 2011 года. Новые автомобили и авто с пробегом.`}
         canonical="/"
         jsonLd={[
           organizationSchema,
@@ -1818,7 +1822,7 @@ export default function Home() {
             <div className="col-span-2 sm:col-span-1 lg:col-span-1">
               <img src={logoPng} alt="Дебрянск Авто" className="h-8 sm:h-9 w-auto mb-4 sm:mb-5 opacity-50 hover:opacity-100 transition-opacity" />
               <p className="text-sm text-slate-500 mb-4 sm:mb-5 leading-relaxed">
-                Территория Автомобилей. Группа компаний с 9 брендами в Брянске с 2011 года.
+                Территория Автомобилей. Группа компаний с {apiBrands.length || 13} брендами в Брянске с 2011 года.
               </p>
               <div className="flex gap-2.5">
                 <a href="#" aria-label="ВКонтакте" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#0070b8] transition-colors group">
