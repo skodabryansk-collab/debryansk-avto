@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { usePageCar } from "@/context/PageCarContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -1184,6 +1185,13 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const base = useMemo(() => import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "", []);
+  const { data: widgetBrands = [] } = useQuery<Array<{ id: number }>>({
+    queryKey: ["public-brands"],
+    queryFn: () => fetch("/api/brands").then(r => r.json()),
+    staleTime: 60 * 60 * 1000,
+    retry: 0,
+  });
+  const widgetBrandsCount = widgetBrands.length || 13;
   const pageCarContext = usePageCar();
   const proactiveSentRef = useRef(false);
   const [location] = useLocation();
@@ -1619,7 +1627,7 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
               </div>
               {/* Trust badges */}
               <div className="px-4 pb-2.5 flex items-center gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-                {["9 брендов", "10+ лет", "Ответим за 30 сек"].map(b => (
+                {[`${widgetBrandsCount} брендов`, "10+ лет", "Ответим за 30 сек"].map(b => (
                   <span key={b} className="text-[9px] font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded-full whitespace-nowrap shrink-0">{b}</span>
                 ))}
               </div>
