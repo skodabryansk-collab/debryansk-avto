@@ -6,8 +6,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
   LayoutDashboard, Newspaper, Phone, LogOut,
-  ChevronRight, Menu, X, Tag, Users, Building2, Settings, Bot, Star, Megaphone
+  ChevronRight, Menu, X, Tag, Users, Building2, Settings, Bot, Star, Megaphone, RefreshCw
 } from "lucide-react";
+import { rebuildCache, getRebuildStatus } from "@/lib/api";
 
 const navItems = [
   { path: "/", label: "Дашборд", icon: LayoutDashboard },
@@ -21,6 +22,83 @@ const navItems = [
   { path: "/settings", label: "Настройки", icon: Settings },
   { path: "/navigator", label: "Навигатор", icon: Bot },
 ];
+
+type RebuildState = "idle" | "running" | "success" | "error";
+
+function RebuildCacheButton() {
+  const [state, setState] = React.useState<RebuildState>("idle");
+  const pollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopPolling = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
+  };
+
+  const handleClick = async () => {
+    if (state === "running") return;
+    try {
+      await rebuildCache();
+      setState("running");
+
+      pollRef.current = setInterval(async () => {
+        try {
+          const { status } = await getRebuildStatus();
+          if (status === "idle") {
+            stopPolling();
+            setState("success");
+            setTimeout(() => setState("idle"), 3000);
+          }
+        } catch {
+          stopPolling();
+          setState("error");
+          setTimeout(() => setState("idle"), 3000);
+        }
+      }, 3000);
+
+      timeoutRef.current = setTimeout(() => {
+        stopPolling();
+        setState("error");
+        setTimeout(() => setState("idle"), 3000);
+      }, 10 * 60 * 1000);
+    } catch {
+      setState("error");
+      setTimeout(() => setState("idle"), 3000);
+    }
+  };
+
+  React.useEffect(() => () => stopPolling(), []);
+
+  if (state === "success") {
+    return (
+      <div className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-green-600">
+        <RefreshCw className="w-4 h-4" />
+        Кэш обновлён ✓
+      </div>
+    );
+  }
+
+  if (state === "error") {
+    return (
+      <div className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-500">
+        <RefreshCw className="w-4 h-4" />
+        Ошибка обновления
+      </div>
+    );
+  }
+
+  return (
+    <Button
+      variant="outline"
+      className="w-full justify-start text-slate-600"
+      onClick={handleClick}
+      disabled={state === "running"}
+    >
+      <RefreshCw className={`w-4 h-4 mr-2 ${state === "running" ? "animate-spin" : ""}`} />
+      {state === "running" ? "Обновляется..." : "Обновить кэш сайта"}
+    </Button>
+  );
+}
 
 function SidebarItem({ path, label, icon: Icon }: typeof navItems[0]) {
   const [location] = useLocation();
@@ -61,7 +139,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </nav>
         </ScrollArea>
         <Separator />
-        <div className="p-3">
+        <div className="p-3 space-y-1">
+          <RebuildCacheButton />
           <Button variant="ghost" className="w-full justify-start text-slate-500 hover:text-slate-900" onClick={logout}>
             <LogOut className="w-4 h-4 mr-2" />
             Выйти
@@ -90,7 +169,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               {navItems.map(item => <SidebarItem key={item.path} {...item} />)}
             </nav>
             <Separator className="my-2" />
-            <div className="px-3">
+            <div className="px-3 space-y-1">
+              <RebuildCacheButton />
               <Button variant="ghost" className="w-full justify-start text-slate-500 hover:text-slate-900" onClick={logout}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Выйти
