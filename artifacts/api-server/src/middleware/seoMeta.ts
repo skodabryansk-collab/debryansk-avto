@@ -239,16 +239,31 @@ async function resolveMeta(
   if (brandMatch) {
     const slug = brandMatch[1];
     const result = await db.execute(
-      sql`SELECT name, slug FROM brands WHERE slug = ${slug} AND slug IS NOT NULL LIMIT 1`
+      sql`SELECT b.name, b.slug, b.is_service_only, bpc.meta_description, bpc.meta_title FROM brands b LEFT JOIN brand_page_content bpc ON bpc.brand_id = b.id WHERE b.slug = ${slug} AND b.slug IS NOT NULL LIMIT 1`
     );
-    const row = result.rows[0] as { name: string; slug: string } | undefined;
+    const row = result.rows[0] as { name: string; slug: string; is_service_only: boolean; meta_description: string | null; meta_title: string | null } | undefined;
     if (row) {
+      const isService = row.is_service_only;
+      const metaDesc = row.meta_description;
+      const metaTitle = row.meta_title;
+      const title = metaTitle
+        ? `${metaTitle} | Дебрянск Авто`
+        : `${row.name} в Брянске — ${isService ? "официальный сервис" : "официальный дилер"} | Дебрянск Авто`;
+      const description = metaDesc
+        ? metaDesc
+        : (isService
+            ? `Официальный сервис ${row.name} в Брянске — гарантийное и постгарантийное обслуживание, оригинальные запчасти. Дебрянск Авто.`
+            : `Купите ${row.name} у официального дилера в Брянске. Широкий выбор в наличии, кредит, trade-in, гарантийный сервис. Дебрянск Авто.`
+          );
+      const h1 = isService
+        ? `Официальный сервис ${row.name} в Брянске — Дебрянск Авто`
+        : `Официальный дилер ${row.name} в Брянске — Дебрянск Авто`;
       return {
-        title: `${row.name} в Брянске — официальный дилер | Дебрянск Авто`,
-        description: `Купите ${row.name} у официального дилера в Брянске. Широкий выбор в наличии, кредит, trade-in, гарантийный сервис. Дебрянск Авто.`,
+        title,
+        description,
         canonical: `${SITE}/brands/${slug}`,
         ogImage: DEFAULT_OG_IMAGE,
-        h1: `${row.name} в Брянске — официальный дилер`,
+        h1,
       };
     }
   }
