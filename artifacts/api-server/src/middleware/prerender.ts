@@ -56,14 +56,23 @@ export function prerenderMiddleware(
     return;
   }
 
+  const PRERENDER_ALL = process.env.PRERENDER_ALL === "true";
+
   const ua = (req.headers["user-agent"] ?? "") as string;
   logger.info(`[bot-check] path=${req.path} raw_ua="${ua}" matched=${BOT_UA.test(ua)}`);
-  if (!BOT_UA.test(ua)) {
+  if (!PRERENDER_ALL && !BOT_UA.test(ua)) {
     next();
     return;
   }
 
   if (/\.\w{2,10}$/.test(req.path)) {
+    next();
+    return;
+  }
+
+  // Skip cache when Puppeteer is rendering fresh (X-Prerender-Bot header)
+  // so that prerender.mjs captures the latest SSG HTML instead of stale cache
+  if (req.headers["x-prerender-bot"] === "1") {
     next();
     return;
   }
