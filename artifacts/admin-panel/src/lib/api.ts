@@ -268,6 +268,14 @@ export function getSyncStatus() {
   return api<{ ok: true; total: number; lastSynced: string | null; byDealer?: { dealer: string; type: string; cnt: number }[] }>("GET", "/admin/navigator/sync-status");
 }
 
+/* Cache rebuild */
+export function rebuildCache() {
+  return api<{ status: string; message: string }>("POST", "/admin/cache/rebuild");
+}
+export function getRebuildStatus() {
+  return api<{ status: "idle" | "running" }>("GET", "/admin/cache/rebuild/status");
+}
+
 /* Promotions */
 export interface Promotion {
   id: number;
