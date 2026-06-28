@@ -154,6 +154,11 @@ function injectMeta(
   result = result.replace(/<meta name="robots"[^>]*\/?>\n?/gi, "");
   result = result.replace(/<meta property="og:[^"]*"[^>]*\/?>\n?/gi, "");
   result = result.replace(/<meta name="twitter:[^"]*"[^>]*\/?>\n?/gi, "");
+  // Replace static root H1 with dynamic brand H1
+  result = result.replace(
+    /<h1 class="sr-only">[^<]*<\/h1>/,
+    `<h1 class="sr-only">${h1}</h1>`,
+  );
 
   // Insert clean, deduplicated meta block right after <meta name="viewport"...>
   const metaBlock = [
