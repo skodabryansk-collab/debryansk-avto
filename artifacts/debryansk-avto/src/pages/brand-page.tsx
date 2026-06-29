@@ -843,7 +843,7 @@ export default function BrandPage() {
       addressRegion: "Брянская область",
       addressCountry: "RU",
     },
-    telephone: "+74832631000",
+    telephone: "+74832777770",
     areaServed: "Брянск",
   };
 
