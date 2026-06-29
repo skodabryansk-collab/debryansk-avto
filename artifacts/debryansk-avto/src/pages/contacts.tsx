@@ -176,8 +176,8 @@ export default function ContactsPage() {
     staleTime: 10 * 60 * 1000,
   });
 
-  const headerPhone = normalizePhone(siteSettings?.header_phone) || "+7 (4832) 63-10-00";
-  const headerPhoneTel = phoneHref(siteSettings?.header_phone) || "tel:+74832631000";
+  const headerPhone = normalizePhone(siteSettings?.header_phone) || "+7 (4832) 77-77-70";
+  const headerPhoneTel = phoneHref(siteSettings?.header_phone) || "tel:+74832777770";
 
   const commonHours = React.useMemo(() => {
     if (!locations.length) return "Ежедневно 9:00–21:00";
@@ -224,7 +224,7 @@ export default function ContactsPage() {
       "@type": "AutoDealer",
       "name": `Дебрянск Авто — ${loc.title}`,
       "url": "https://debryansk-auto.ru/contacts",
-      "telephone": phoneHref(loc.phone ?? "+74832631000").replace("tel:", ""),
+      "telephone": phoneHref(loc.phone ?? "+74832777770").replace("tel:", ""),
       "address": {
         "@type": "PostalAddress",
         "streetAddress": loc.address,
