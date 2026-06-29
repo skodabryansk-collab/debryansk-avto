@@ -173,23 +173,45 @@ function injectMeta(html, title, description, canonical, ogImage, h1, jsonLd) {
     );
   }
 
-  // Inject JSON-LD if provided
-  if (jsonLd) {
-    const ld = esc(JSON.stringify({ "@context": "https://schema.org", ...jsonLd }));
-    const ldTag = `<script type="application/ld+json">${ld}</script>`;
+  // Inject or remove JSON-LD (jsonLd can be a single object or array of objects)
+  const ldList = Array.isArray(jsonLd) ? jsonLd : (jsonLd ? [jsonLd] : []);
+  if (ldList.length > 0) {
+    const ldTags = ldList.map(ld => {
+      const payload = JSON.stringify({ "@context": "https://schema.org", ...ld });
+      return `<script type="application/ld+json">${payload}</script>`;
+    }).join("\n    ");
     if (result.includes('type="application/ld+json"')) {
-      // replace existing first ld+json block
+      // replace existing first ld+json block, append the rest after it
+      const first = ldList[0];
+      const firstPayload = JSON.stringify({ "@context": "https://schema.org", ...first });
       result = result.replace(
         /<script type="application\/ld\+json">[^]*?<\/script>/,
-        ldTag
+        `<script type="application/ld+json">${firstPayload}</script>`
       );
+      // If there are more, insert them after the first one
+      if (ldList.length > 1) {
+        const rest = ldList.slice(1).map(ld => {
+          const payload = JSON.stringify({ "@context": "https://schema.org", ...ld });
+          return `<script type="application/ld+json">${payload}</script>`;
+        }).join("\n    ");
+        result = result.replace(
+          /<script type="application\/ld\+json">[^]*?<\/script>/,
+          (match) => `${match}\n    ${rest}`
+        );
+      }
     } else {
       // insert before closing </head>
       result = result.replace(
         /<\/head>/,
-        `    ${ldTag}\n  </head>`
+        `    ${ldTags}\n  </head>`
       );
     }
+  } else {
+    // Remove stale JSON-LD from index.html template (it has wrong FAQ for this route)
+    result = result.replace(
+      /<script type="application\/ld\+json">[^]*?<\/script>\n?/,
+      ""
+    );
   }
 
   // Inject H1 as screen-reader-only element for search engines
@@ -274,6 +296,62 @@ function writeRoute(routePath, title, description, h1, ogImage, jsonLd) {
   console.log(`SSG: ${routePath}`);
 }
 
+function buildFaqLd(faqItems) {
+  if (!faqItems || faqItems.length === 0) return null;
+  return {
+    "@type": "FAQPage",
+    mainEntity: faqItems.map(item => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer },
+    })),
+  };
+}
+
+// Build BreadcrumbList schema.org markup for any route
+function buildBreadcrumbList(routePath, title) {
+  const items = [];
+  items.push({ "@type": "ListItem", position: 1, name: "Главная", item: `${SITE}/` });
+
+  const segments = routePath.split("/").filter(Boolean);
+  let currentPath = "";
+  let position = 2;
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    currentPath += `/${seg}`;
+    let name;
+    if (i === segments.length - 1) {
+      // Last segment = current page title (shortened)
+      name = title.split(" | ")[0].split(" — ")[0].slice(0, 60);
+    } else {
+      // Parent segment = section name
+      name = segmentName(seg);
+    }
+    items.push({ "@type": "ListItem", position, name, item: `${SITE}${currentPath}` });
+    position++;
+  }
+
+  return { "@type": "BreadcrumbList", itemListElement: items };
+}
+
+function segmentName(seg) {
+  const map = {
+    brands: "Бренды",
+    news: "Новости",
+    service: "Сервис",
+    buyout: "Выкуп",
+    vacancies: "Вакансии",
+    contacts: "Контакты",
+    about: "О компании",
+    "new-cars": "Новые авто",
+    cars: "Авто с пробегом",
+    legal: "Юридическая информация",
+    privacy: "Политика конфиденциальности",
+  };
+  return map[seg] || seg;
+}
+
 async function main() {
   if (!process.env.DATABASE_URL) {
     console.warn("SSG: DATABASE_URL not set — skipping dynamic routes");
@@ -286,32 +364,39 @@ async function main() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
   try {
+    // Load all FAQs from the new faqs table
+    const faqsResult = await pool.query(
+      "SELECT page_slug, question, answer, include_in_schema, sort_order FROM faqs WHERE include_in_schema = true ORDER BY page_slug, sort_order, id"
+    );
+    const faqsByPage = {};
+    for (const row of faqsResult.rows) {
+      const slug = row.page_slug;
+      if (!faqsByPage[slug]) faqsByPage[slug] = [];
+      faqsByPage[slug].push(row);
+    }
+
+    // Map static route paths to faqs page_slug keys
+    const staticRouteSlugMap = {
+      "/": "main",
+      "/service": "service",
+      "/buyout": "buyout",
+      "/vacancies": "vacancies",
+    };
+
     for (const [route, meta] of Object.entries(STATIC_ROUTES)) {
-      writeRoute(route, meta.title, meta.description, meta.h1, DEFAULT_OG_IMAGE);
+      const faqSlug = staticRouteSlugMap[route];
+      const faqLd = faqSlug ? buildFaqLd(faqsByPage[faqSlug]) : null;
+      const breadcrumbLd = buildBreadcrumbList(route, meta.title);
+      const jsonLd = faqLd ? [faqLd, breadcrumbLd] : [breadcrumbLd];
+      writeRoute(route, meta.title, meta.description, meta.h1, DEFAULT_OG_IMAGE, jsonLd);
     }
 
     const brandsResult = await pool.query(
-      "SELECT b.id, b.name, b.slug, b.is_service_only, bpc.meta_description, bpc.meta_title, bpc.faq FROM brands b LEFT JOIN brand_page_content bpc ON bpc.brand_id = b.id WHERE b.slug IS NOT NULL AND b.slug != ''"
+      "SELECT b.id, b.name, b.slug, b.is_service_only, bpc.meta_description, bpc.meta_title FROM brands b LEFT JOIN brand_page_content bpc ON bpc.brand_id = b.id WHERE b.slug IS NOT NULL AND b.slug != ''"
     );
     for (const row of brandsResult.rows) {
-      let faqLd = null;
-      let faq = row.faq;
-      if (typeof faq === 'string') { try { faq = JSON.parse(faq); } catch { faq = null; } }
-      if (faq && Array.isArray(faq)) {
-        const schemaItems = faq
-          .filter(item => item.is_published !== false && item.include_in_schema !== false)
-          .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-        if (schemaItems.length > 0) {
-          faqLd = {
-            "@type": "FAQPage",
-            mainEntity: schemaItems.map(item => ({
-              "@type": "Question",
-              name: item.question,
-              acceptedAnswer: { "@type": "Answer", text: item.answer },
-            })),
-          };
-        }
-      }
+      const faqSlug = `brands/${row.slug}`;
+      const faqLd = buildFaqLd(faqsByPage[faqSlug]);
       const isService = row.is_service_only === true;
       const metaDesc = row.meta_description;
       const metaTitle = row.meta_title;
@@ -328,13 +413,15 @@ async function main() {
       const h1 = isService
         ? `Официальный сервис ${brandName} в Брянске — Дебрянск Авто`
         : `Официальный дилер ${brandName} в Брянске — Дебрянск Авто`;
+      const breadcrumbLd = buildBreadcrumbList(`/brands/${row.slug}`, title);
+      const jsonLd = faqLd ? [faqLd, breadcrumbLd] : [breadcrumbLd];
       writeRoute(
         `/brands/${row.slug}`,
         title,
         description,
         h1,
         DEFAULT_OG_IMAGE,
-        faqLd
+        jsonLd
       );
     }
 
@@ -343,13 +430,16 @@ async function main() {
     );
     const newsArticles = newsResult.rows;
     for (const row of newsArticles) {
+      const newsTitle = `${row.title} | Дебрянск Авто`;
+      const breadcrumbLd = buildBreadcrumbList(`/news/${row.slug}`, newsTitle);
       writeRoute(
         `/news/${row.slug}`,
-        `${row.title} | Дебрянск Авто`,
+        newsTitle,
         row.excerpt ||
           "Актуальная новость автомобильного рынка от дилерского центра «Дебрянск Авто».",
         row.title,
-        DEFAULT_OG_IMAGE
+        DEFAULT_OG_IMAGE,
+        breadcrumbLd
       );
     }
     // ——— Inject news grid into /news page for server-side article links ———
@@ -371,24 +461,44 @@ async function main() {
     });
 
     const carsResult = await pool.query(
-      "SELECT external_id, brand, model, year, price, type, image_url FROM cars WHERE external_id IS NOT NULL"
+      "SELECT external_id, brand, model, year, price, max_discount, type, image_url, modification, mileage, color FROM cars WHERE external_id IS NOT NULL"
     );
     for (const row of carsResult.rows) {
-      const priceStr = fmt.format(row.price);
       const isNew = row.type === "new";
+      const rawPrice = Number(row.price);
+      const maxDiscount = isNew ? (Number(row.max_discount) || 0) : 0;
+      const salePrice = isNew ? Math.max(0, rawPrice - maxDiscount) : rawPrice;
+      const priceStr = fmt.format(salePrice);
       const prefix = isNew ? "new-cars" : "cars";
-      const title = isNew
-        ? `Купить ${row.brand} ${row.model} ${row.year} в Брянске — цена ${priceStr} | Дебрянск Авто`
-        : `${row.brand} ${row.model} ${row.year} б/у — ${priceStr} | Дебрянск Авто`;
+      const modShort = row.modification ? String(row.modification).replace(/\s*\([^)]+\)/, "").trim() : null;
+      const stockNum = String(row.external_id).replace(/^.*?(\d+)$/, "$1").slice(-6);
+      const color = row.color || null;
+      const runKm = row.mileage ? Math.round(row.mileage / 1000) + " тыс. км" : null;
+      let title;
+      if (isNew) {
+        const full = `Купить ${row.brand} ${row.model} ${row.year} в Брянске${modShort ? `, ${modShort}` : ""}${color ? `, ${color}` : ""} | Дебрянск Авто`;
+        const noColor = `Купить ${row.brand} ${row.model} ${row.year} в Брянске${modShort ? `, ${modShort}` : ""} | Дебрянск Авто`;
+        const noMod = `Купить ${row.brand} ${row.model} ${row.year} в Брянске | Дебрянск Авто`;
+        title = full.length <= 70 ? full : (noColor.length <= 70 ? noColor : noMod);
+      } else {
+        const full = `${row.brand} ${row.model} ${row.year} б/у в Брянске${runKm ? `, ${runKm}` : ""}${color ? `, ${color}` : ""} | Дебрянск Авто`;
+        const noColor = `${row.brand} ${row.model} ${row.year} б/у в Брянске${runKm ? `, ${runKm}` : ""} | Дебрянск Авто`;
+        const noRun = `${row.brand} ${row.model} ${row.year} б/у в Брянске | Дебрянск Авто`;
+        title = full.length <= 70 ? full : (noColor.length <= 70 ? noColor : noRun);
+      }
       const h1 = isNew
         ? `Купить ${row.brand} ${row.model} ${row.year} в Брянске`
         : `${row.brand} ${row.model} ${row.year} с пробегом`;
+      const priceLabel = isNew && maxDiscount > 0 ? `от ${priceStr}` : priceStr;
+      const description = `Купите ${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} в Брянске. Цена ${priceLabel}. Арт. №${stockNum}. Официальный дилер «Дебрянск Авто» — +7 (4832) 77-77-70.`;
+      const breadcrumbLd = buildBreadcrumbList(`/${prefix}/${row.external_id}`, title);
       writeRoute(
         `/${prefix}/${row.external_id}`,
         title,
-        `${isNew ? "Купите" : "Купите"} ${row.brand} ${row.model} ${row.year} в Брянске. Цена ${priceStr}. Официальный дилер «Дебрянск Авто».`,
+        description,
         h1,
-        row.image_url || DEFAULT_OG_IMAGE
+        row.image_url || DEFAULT_OG_IMAGE,
+        breadcrumbLd
       );
     }
   } finally {
