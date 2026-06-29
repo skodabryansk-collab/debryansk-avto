@@ -26,7 +26,7 @@ const STATIC_META: Record<string, { title: string; description: string; h1: stri
   },
   "/cars": {
     title: "Автомобили с пробегом в Брянске — каталог | Дебрянск Авто",
-    description: "Проверенные авто с пробегом у официального дилера «Дебрянск Авто» в Брянске. Более 200 машин в наличии. Кредит, трейд-ин, гарантия качества.",
+    description: "Проверенные автомобили с пробегом у официального дилера «Дебрянск Авто» в Брянске. Кредит, трейд-ин, гарантия качества.",
     h1: "Автомобили с пробегом в Брянске",
   },
   "/service": {
@@ -71,19 +71,32 @@ const STATIC_META: Record<string, { title: string; description: string; h1: stri
   },
 };
 
-let indexHtml: string | null = null;
+const distPath =
+  process.env.FRONTEND_DIST_PATH ||
+  path.resolve(__dirname, "../../debryansk-avto/dist/public");
 
-function getIndexHtml(): string | null {
-  if (indexHtml) return indexHtml;
+const ssgCache: Map<string, string> = new Map();
+
+function getSsgHtml(route: string): string | null {
+  if (ssgCache.has(route)) return ssgCache.get(route)!;
   try {
-    const distPath =
-      process.env.FRONTEND_DIST_PATH ||
-      path.resolve(__dirname, "../../debryansk-avto/dist/public");
-    const filePath = path.join(distPath, "index.html");
-    indexHtml = readFileSync(filePath, "utf-8");
-    return indexHtml;
+    // Map route to SSG file path: /service -> dist/public/service/index.html
+    const filePath = route === "/"
+      ? path.join(distPath, "index.html")
+      : path.join(distPath, route.replace(/^\//, ""), "index.html");
+    const html = readFileSync(filePath, "utf-8");
+    ssgCache.set(route, html);
+    return html;
   } catch {
-    return null;
+    // Fallback to root index.html for routes without SSG
+    try {
+      const rootPath = path.join(distPath, "index.html");
+      const html = readFileSync(rootPath, "utf-8");
+      ssgCache.set(route, html);
+      return html;
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -135,6 +148,51 @@ const CONTACT_PAGE_SCHEMA = JSON.stringify({
   }
 });
 
+function buildBreadcrumbList(routePath: string, title: string): string {
+  const items: Array<{"@type": "ListItem"; position: number; name: string; item: string}> = [];
+  items.push({ "@type": "ListItem", position: 1, name: "Главная", item: `${SITE}/` });
+
+  const segments = routePath.split("/").filter(Boolean);
+  let currentPath = "";
+  let position = 2;
+
+  const segmentName = (seg: string): string => {
+    const map: Record<string, string> = {
+      brands: "Бренды",
+      news: "Новости",
+      service: "Сервис",
+      buyout: "Выкуп",
+      vacancies: "Вакансии",
+      contacts: "Контакты",
+      about: "О компании",
+      "new-cars": "Новые авто",
+      cars: "Авто с пробегом",
+      legal: "Юридическая информация",
+      privacy: "Политика конфиденциальности",
+    };
+    return map[seg] || seg;
+  };
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    currentPath += `/${seg}`;
+    let name: string;
+    if (i === segments.length - 1) {
+      name = title.split(" | ")[0].split(" — ")[0].slice(0, 60);
+    } else {
+      name = segmentName(seg);
+    }
+    items.push({ "@type": "ListItem", position, name, item: `${SITE}${currentPath}` });
+    position++;
+  }
+
+  return JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items,
+  });
+}
+
 function injectMeta(
   html: string,
   title: string,
@@ -143,6 +201,8 @@ function injectMeta(
   ogImage: string,
   h1: string,
   extraJsonLd?: string,
+  robots?: string,
+  breadcrumbLd?: string,
 ): string {
   let result = html;
 
@@ -154,6 +214,28 @@ function injectMeta(
   result = result.replace(/<meta name="robots"[^>]*\/?>\n?/gi, "");
   result = result.replace(/<meta property="og:[^"]*"[^>]*\/?>\n?/gi, "");
   result = result.replace(/<meta name="twitter:[^"]*"[^>]*\/?>\n?/gi, "");
+  // Strip existing BreadcrumbList ld+json (we rebuild it dynamically) but preserve FAQPage/NewsArticle/other schemas from SSG
+  // Use a more robust approach: find all ld+json blocks, keep non-BreadcrumbList ones
+  const preservedLd: string[] = [];
+  let ldMatch: RegExpExecArray | null;
+  const ldRegex = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/g;
+  while ((ldMatch = ldRegex.exec(result)) !== null) {
+    try {
+      const parsed = JSON.parse(ldMatch[1].trim());
+      if (parsed["@type"] !== "BreadcrumbList" && parsed["@type"] !== ["AutoDealer", "LocalBusiness"]) {
+        preservedLd.push(ldMatch[0]);
+      }
+    } catch {
+      // If can't parse, preserve as-is (safety)
+      preservedLd.push(ldMatch[0]);
+    }
+  }
+  // Remove all ld+json blocks, then re-insert preserved ones
+  result = result.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>\n?/g, "");
+  // Re-insert preserved ld+json blocks before </head>
+  if (preservedLd.length > 0) {
+    result = result.replace("</head>", `  ${preservedLd.join("\n  ")}\n  </head>`);
+  }
   // Replace static root H1 with dynamic brand H1
   result = result.replace(
     /<h1 class="sr-only">[^<]*<\/h1>/,
@@ -165,7 +247,7 @@ function injectMeta(
     `<title>${title}</title>`,
     `<link rel="canonical" href="${canonical}" />`,
     `<meta name="description" content="${description}" />`,
-    `<meta name="robots" content="index, follow" />`,
+    `<meta name="robots" content="${robots || "index, follow"}" />`,
     `<meta property="og:title" content="${title}" />`,
     `<meta property="og:description" content="${description}" />`,
     `<meta property="og:url" content="${canonical}" />`,
@@ -186,6 +268,7 @@ function injectMeta(
   // Inject LCP image preload + schema.org JSON-LD before </head>
   const ldScripts = [
     `<script type="application/ld+json">${LOCAL_BUSINESS_SCHEMA}</script>`,
+    breadcrumbLd ? `<script type="application/ld+json">${breadcrumbLd}</script>` : "",
     extraJsonLd ? `<script type="application/ld+json">${extraJsonLd}</script>` : "",
   ].filter(Boolean).join("\n    ");
   const lcpPreload = `<link rel="preload" as="image" href="${ogImage}" fetchpriority="high" />`;
@@ -232,11 +315,13 @@ function injectMeta(
 
 async function resolveMeta(
   pathStr: string,
-): Promise<{ title: string; description: string; canonical: string; ogImage: string; h1: string; jsonLd?: string } | null> {
+): Promise<{ title: string; description: string; canonical: string; ogImage: string; h1: string; jsonLd?: string; robots?: string; breadcrumbLd?: string } | null> {
   const meta = STATIC_META[pathStr];
   if (meta) {
-    const extra = pathStr === "/contacts" ? { jsonLd: CONTACT_PAGE_SCHEMA } : {};
-    return { ...meta, canonical: `${SITE}${pathStr}`, ogImage: DEFAULT_OG_IMAGE, ...extra };
+    const extra: Record<string, string> = {};
+    if (pathStr === "/contacts") extra.jsonLd = CONTACT_PAGE_SCHEMA;
+    const breadcrumbLd = buildBreadcrumbList(pathStr, meta.title);
+    return { ...meta, canonical: `${SITE}${pathStr}`, ogImage: DEFAULT_OG_IMAGE, breadcrumbLd, ...extra };
   }
 
   // Brand pages: /brands/:slug
@@ -263,12 +348,14 @@ async function resolveMeta(
       const h1 = isService
         ? `Официальный сервис ${row.name} в Брянске — Дебрянск Авто`
         : `Официальный дилер ${row.name} в Брянске — Дебрянск Авто`;
+      const breadcrumbLd = buildBreadcrumbList(pathStr, title);
       return {
         title,
         description,
         canonical: `${SITE}/brands/${slug}`,
         ogImage: DEFAULT_OG_IMAGE,
         h1,
+        breadcrumbLd,
       };
     }
   }
@@ -304,6 +391,7 @@ async function resolveMeta(
         "datePublished": new Date().toISOString().split("T")[0],
         "inLanguage": "ru"
       });
+      const breadcrumbLd = buildBreadcrumbList(pathStr, row.title);
       return {
         title: `${row.title} | Дебрянск Авто`,
         description: newsDesc,
@@ -311,6 +399,7 @@ async function resolveMeta(
         ogImage: DEFAULT_OG_IMAGE,
         h1: row.title,
         jsonLd: newsArticleSchema,
+        breadcrumbLd,
       };
     }
   }
@@ -321,35 +410,47 @@ async function resolveMeta(
     const type = carMatch[1] === "new-cars" ? "new" : "used";
     const id = decodeURIComponent(carMatch[2]);
     const result = await db.execute(
-      sql`SELECT brand, model, modification, year, price, description, image_url, external_id FROM cars WHERE external_id = ${id} AND type = ${type} LIMIT 1`
+      sql`SELECT brand, model, modification, year, price, max_discount, description, image_url, external_id, color, mileage FROM cars WHERE external_id = ${id} AND type = ${type} LIMIT 1`
     );
-    const row = result.rows[0] as { brand: string; model: string; modification: string | null; year: number; price: number; description: string | null; image_url: string | null; external_id: string } | undefined;
+    const row = result.rows[0] as { brand: string; model: string; modification: string | null; year: number; price: number; max_discount: number | null; description: string | null; image_url: string | null; external_id: string; color: string | null; mileage: number | null } | undefined;
     if (row) {
-      const priceStr = new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 }).format(row.price);
       const isNew = type === "new";
-      // Short modification suffix for title uniqueness (e.g. "1.5 AMT" from "1.5 AMT (143 л.с.)")
+      const rawPrice = Number(row.price);
+      const maxDiscount = isNew ? (Number(row.max_discount) || 0) : 0;
+      const salePrice = isNew ? Math.max(0, rawPrice - maxDiscount) : rawPrice;
+      const priceStr = new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 }).format(salePrice);
       const modShort = row.modification ? row.modification.replace(/\s*\([^)]+\)/, "").trim() : null;
-      // Stock number from external_id for guaranteed uniqueness
       const stockNum = row.external_id.replace(/^.*?(\d+)$/, "$1").slice(-6);
-      // Build title — drop modification if full title >70 chars
-      const titleWithMod = isNew
-        ? `Купить ${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} — №${stockNum} | Дебрянск Авто`
-        : `${row.brand} ${row.model} ${row.year} б/у — ${priceStr} №${stockNum} | Дебрянск Авто`;
-      const titleNoMod = isNew
-        ? `Купить ${row.brand} ${row.model} ${row.year} — №${stockNum} | Дебрянск Авто`
-        : `${row.brand} ${row.model} ${row.year} б/у №${stockNum} | Дебрянск Авто`;
-      const title = titleWithMod.length > 70 ? titleNoMod : titleWithMod;
+      const color = row.color || null;
+      const runKm = row.mileage ? Math.round(row.mileage / 1000) + " тыс. км" : null;
+      // Build title: regional anchor "в Брянске" + differentiator (color/mod/run)
+      let title;
+      if (isNew) {
+        const full = `Купить ${row.brand} ${row.model} ${row.year} в Брянске${modShort ? `, ${modShort}` : ""}${color ? `, ${color}` : ""} | Дебрянск Авто`;
+        const noColor = `Купить ${row.brand} ${row.model} ${row.year} в Брянске${modShort ? `, ${modShort}` : ""} | Дебрянск Авто`;
+        const noMod = `Купить ${row.brand} ${row.model} ${row.year} в Брянске | Дебрянск Авто`;
+        title = full.length <= 70 ? full : (noColor.length <= 70 ? noColor : noMod);
+      } else {
+        const full = `${row.brand} ${row.model} ${row.year} б/у в Брянске${runKm ? `, ${runKm}` : ""}${color ? `, ${color}` : ""} | Дебрянск Авто`;
+        const noColor = `${row.brand} ${row.model} ${row.year} б/у в Брянске${runKm ? `, ${runKm}` : ""} | Дебрянск Авто`;
+        const noRun = `${row.brand} ${row.model} ${row.year} б/у в Брянске | Дебрянск Авто`;
+        title = full.length <= 70 ? full : (noColor.length <= 70 ? noColor : noRun);
+      }
       const h1 = isNew
         ? `Купить ${row.brand} ${row.model} ${row.year} в Брянске`
         : `${row.brand} ${row.model} ${row.year} с пробегом`;
-      // Unique description: include stock# to differentiate identical brand+model+year+mod+price
-      const description = `Купите ${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} в Брянске. Цена ${priceStr}. Арт. №${stockNum}. Официальный дилер «Дебрянск Авто» — +7 (4832) 63-10-00.`;
+      const priceLabel = isNew && maxDiscount > 0 ? `от ${priceStr}` : priceStr;
+      const description = `Купите ${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} в Брянске. Цена ${priceLabel}. Арт. №${stockNum}. Официальный дилер «Дебрянск Авто» — +7 (4832) 77-77-70.`;
+      const robots = "index, follow, max-snippet:-1, max-image-preview:large";
+      const breadcrumbLd = buildBreadcrumbList(pathStr, title);
       return {
         title,
         description,
         canonical: `${SITE}${pathStr}`,
         ogImage: row.image_url || DEFAULT_OG_IMAGE,
         h1,
+        robots,
+        breadcrumbLd,
       };
     }
   }
@@ -378,12 +479,12 @@ export function seoMetaMiddleware(
         next();
         return;
       }
-      const html = getIndexHtml();
+      const html = getSsgHtml(route);
       if (!html) {
         next();
         return;
       }
-      const enriched = injectMeta(html, meta.title, meta.description, meta.canonical, meta.ogImage, meta.h1, meta.jsonLd);
+      const enriched = injectMeta(html, meta.title, meta.description, meta.canonical, meta.ogImage, meta.h1, meta.jsonLd, meta.robots, meta.breadcrumbLd);
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader("X-SeoMeta", "1");
       res.setHeader("Cache-Control", "public, max-age=300");
