@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getBrands, createBrand, updateBrand, deleteBrand, uploadFile,
   getBrandPageContent, updateBrandPageContent, getBrandCatalogModels,
-  type Brand, type BrandPageContent, type BrandAdvantage, type BrandFaqItem, type BrandPromotion,
+  type Brand, type BrandPageContent, type BrandAdvantage, type BrandPromotion,
   type BrandModel, type BrandService, type CatalogModel,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, ExternalLink, Upload, X, Globe, Loader2, GripVertical, ChevronUp, ChevronDown, Wrench, Settings, Shield, Car, Gauge, Zap, Clock, Star, FileText, Package, CheckCircle, RefreshCw } from "lucide-react";
+/* Примечание: FAQ управляется в разделе FAQ (Централизованная система) */
 import { useToast } from "@/hooks/use-toast";
 
 export default function BrandsPage() {
@@ -350,113 +351,6 @@ function FeaturesEditor({
       ))}
       <Button variant="outline" size="sm" onClick={add} type="button" className="mt-1">
         <Plus className="w-3.5 h-3.5 mr-1" /> Добавить особенность
-      </Button>
-    </div>
-  );
-}
-
-/* ── FAQ editor ──────────────────────────────────────────────── */
-function FaqEditor({
-  value,
-  onChange,
-}: {
-  value: BrandFaqItem[];
-  onChange: (v: BrandFaqItem[]) => void;
-}) {
-  const reindex = (arr: BrandFaqItem[]) => arr.map((item, idx) => ({ ...item, sort_order: idx }));
-  const add = () => onChange(reindex([...value, { question: "", answer: "", is_published: true, include_in_schema: true }]));
-  const remove = (i: number) => onChange(reindex(value.filter((_, idx) => idx !== i)));
-  const updateText = (i: number, field: "question" | "answer", v: string) =>
-    onChange(value.map((item, idx) => idx === i ? { ...item, [field]: v } : item));
-  const updateBool = (i: number, field: "is_published" | "include_in_schema", v: boolean) =>
-    onChange(value.map((item, idx) => idx === i ? { ...item, [field]: v } : item));
-  const moveUp = (i: number) => {
-    if (i === 0) return;
-    const next = [...value];
-    [next[i - 1], next[i]] = [next[i], next[i - 1]];
-    onChange(reindex(next));
-  };
-  const moveDown = (i: number) => {
-    if (i === value.length - 1) return;
-    const next = [...value];
-    [next[i], next[i + 1]] = [next[i + 1], next[i]];
-    onChange(reindex(next));
-  };
-
-  return (
-    <div className="space-y-3">
-      {value.map((item, i) => {
-        const isPublished = item.is_published !== false;
-        const inSchema = item.include_in_schema !== false;
-        return (
-          <div key={i} className={`border rounded-lg p-3 space-y-2 ${isPublished ? "border-slate-200 bg-slate-50/50" : "border-slate-200 bg-slate-100/60 opacity-70"}`}>
-            <div className="flex items-start gap-2">
-              <div className="flex flex-col gap-0.5 shrink-0 mt-1">
-                <Button
-                  variant="ghost" size="icon" className="w-6 h-6 text-slate-400 hover:text-slate-600"
-                  onClick={() => moveUp(i)} type="button" disabled={i === 0}
-                >
-                  <ChevronUp className="w-3.5 h-3.5" />
-                </Button>
-                <Button
-                  variant="ghost" size="icon" className="w-6 h-6 text-slate-400 hover:text-slate-600"
-                  onClick={() => moveDown(i)} type="button" disabled={i === value.length - 1}
-                >
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-              <span className="text-xs text-slate-400 font-semibold mt-2.5 shrink-0 w-4">{i + 1}.</span>
-              <div className="flex-1 space-y-2">
-                <Input
-                  value={item.question}
-                  onChange={e => updateText(i, "question", e.target.value)}
-                  placeholder="Вопрос..."
-                  className="font-medium"
-                />
-                <Textarea
-                  rows={2}
-                  value={item.answer}
-                  onChange={e => updateText(i, "answer", e.target.value)}
-                  placeholder="Ответ..."
-                  className="text-sm resize-none"
-                />
-                <div className="flex items-center gap-5 pt-1">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id={`faq-pub-${i}`}
-                      checked={isPublished}
-                      onCheckedChange={v => updateBool(i, "is_published", v)}
-                    />
-                    <Label htmlFor={`faq-pub-${i}`} className="text-xs text-slate-500 cursor-pointer">
-                      Опубликован
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id={`faq-schema-${i}`}
-                      checked={inSchema}
-                      onCheckedChange={v => updateBool(i, "include_in_schema", v)}
-                      disabled={!isPublished}
-                    />
-                    <Label htmlFor={`faq-schema-${i}`} className="text-xs text-slate-500 cursor-pointer">
-                      В FAQPage JSON-LD
-                    </Label>
-                  </div>
-                </div>
-              </div>
-              <Button
-                variant="ghost" size="icon" className="w-8 h-8 shrink-0 text-red-500 hover:text-red-600 mt-0.5"
-                onClick={() => remove(i)}
-                type="button"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        );
-      })}
-      <Button variant="outline" size="sm" onClick={add} type="button" className="mt-1">
-        <Plus className="w-3.5 h-3.5 mr-1" /> Добавить вопрос
       </Button>
     </div>
   );
@@ -899,7 +793,6 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     promoText: string;
     advantages: BrandAdvantage[];
     features: string[];
-    faq: BrandFaqItem[];
     promotions: BrandPromotion[];
     models: BrandModel[];
     services: BrandService[];
@@ -913,7 +806,6 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     promoText: "",
     advantages: [],
     features: [],
-    faq: [],
     promotions: [],
     models: [],
     services: [],
@@ -963,7 +855,6 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
         promoText: data.content.promoText ?? "",
         advantages: data.content.advantages ?? [],
         features: data.content.features ?? [],
-        faq: data.content.faq ?? [],
         promotions: data.content.promotions ?? [],
         models: data.content.models ?? [],
         services: data.content.services ?? [],
@@ -985,7 +876,6 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
       promoText: form.promoText || null,
       advantages: form.advantages,
       features: form.features,
-      faq: form.faq,
       promotions: form.promotions,
       models: form.models,
       services: form.services,
@@ -1161,16 +1051,17 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
               />
             </div>
 
-            {/* FAQ */}
+            {/* FAQ — управляется в разделе FAQ */}
             <div className="border-t pt-4">
-              <SectionHeading>FAQ — Вопросы и ответы</SectionHeading>
-              <p className="text-xs text-slate-400 mb-3">
-                Часто задаваемые вопросы о бренде и ответы на них.
+              <div className="flex items-center justify-between">
+                <SectionHeading>FAQ — Вопросы и ответы</SectionHeading>
+                <a href={`/faq?page=brands%2F${brand.slug}`} className="text-xs text-[#0070b8] hover:underline font-medium">
+                  Управлять в FAQ →
+                </a>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                FAQ для этой страницы теперь управляются в централизованном разделе FAQ.
               </p>
-              <FaqEditor
-                value={form.faq}
-                onChange={faq => setForm(f => ({ ...f, faq }))}
-              />
             </div>
 
             {/* Services */}
