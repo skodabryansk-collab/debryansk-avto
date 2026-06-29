@@ -112,7 +112,7 @@ router.put("/:brandId", async (req, res) => {
 
     const {
       description, serviceText, promoText, metaTitle, metaDescription,
-      advantages, features, faq, heroImageUrl, heroImageMobileUrl, promotions, models, services,
+      advantages, features, heroImageUrl, heroImageMobileUrl, promotions, models, services,
     } = req.body as {
       description?: string | null;
       serviceText?: string | null;
@@ -121,7 +121,6 @@ router.put("/:brandId", async (req, res) => {
       metaDescription?: string | null;
       advantages?: { icon: string; text: string }[] | null;
       features?: string[] | null;
-      faq?: { question: string; answer: string }[] | null;
       heroImageUrl?: string | null;
       heroImageMobileUrl?: string | null;
       promotions?: { title: string; description: string; image?: string; badge?: string; expiresAt?: string; buttonText?: string; buttonUrl?: string; isActive?: boolean }[] | null;
@@ -138,7 +137,6 @@ router.put("/:brandId", async (req, res) => {
       metaDescription: metaDescription ?? null,
       advantages: advantages ?? [],
       features: features ?? [],
-      faq: faq ?? [],
       heroImageUrl: heroImageUrl ?? null,
       heroImageMobileUrl: heroImageMobileUrl ?? null,
       promotions: promotions ?? [],
@@ -160,7 +158,6 @@ router.put("/:brandId", async (req, res) => {
           metaDescription: values.metaDescription,
           advantages: values.advantages,
           features: values.features,
-          faq: values.faq,
           heroImageUrl: values.heroImageUrl,
           heroImageMobileUrl: values.heroImageMobileUrl,
           promotions: values.promotions,
