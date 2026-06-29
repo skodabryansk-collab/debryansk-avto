@@ -402,7 +402,7 @@ export default function NewCars() {
   });
   const { data: brandsData = [] } = useQuery<Array<{ id: number }>>({
     queryKey: ["public-brands"],
-    queryFn: () => fetch("/api/brands").then(r => r.json()),
+    queryFn: () => fetch("/api/brands").then(r => r.json()).then(j => j.ok ? j.data : []),
     staleTime: 60 * 60 * 1000,
     retry: 0,
   });
