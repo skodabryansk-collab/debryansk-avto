@@ -302,6 +302,13 @@ async function main() {
       .catch(err => logger.warn({ err }, "Navigator context cache warmup failed"));
   }).catch(err => logger.warn({ err }, "Chat module load failed"));
 
+  // Seed FAQ data if table is empty (dev data doesn't auto-migrate to prod)
+  import("./lib/seedFaqs").then(({ seedFaqsIfEmpty }) => {
+    seedFaqsIfEmpty()
+      .then(() => logger.info("[faq-seed] Startup check done"))
+      .catch(err => logger.warn({ err }, "[faq-seed] Startup seed failed"));
+  }).catch(err => logger.warn({ err }, "[faq-seed] Module load failed"));
+
   // Start server
   app.listen(port, () => {
     logger.info({ port }, "Server listening");
