@@ -315,12 +315,38 @@ async function main() {
 
     if (process.env.PRERENDER_ENABLED === "true") {
       import("./middleware/prerender")
-        .then(async ({ loadPrerenderCacheFromGCS }) => {
-          const { countPrerendered } = await import("./lib/prerenderStorage");
-          const count = await countPrerendered();
-          logger.info({ count }, "prerender: startup cache check");
-          await loadPrerenderCacheFromGCS();
-          logger.info("prerender: triggering full prerender on startup (refreshes cache)");
+        .then(async ({ updatePrerenderCache }) => {
+          // Load fresh SSG HTML from dist/public into prerender cache
+          // instead of stale GCS cache (GCS cache has old asset hashes)
+          const { readFileSync, readdirSync, statSync } = await import("fs");
+          const { join } = await import("path");
+          const distDir = join(process.cwd(), "artifacts/debryansk-avto/dist/public");
+
+          function findHtmlFiles(dir: string, prefix = ""): string[] {
+            const entries = readdirSync(dir, { withFileTypes: true });
+            const files: string[] = [];
+            for (const entry of entries) {
+              const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+              const full = join(dir, entry.name);
+              if (entry.isDirectory()) {
+                files.push(...findHtmlFiles(full, rel));
+              } else if (entry.name.endsWith(".html")) {
+                files.push(rel);
+              }
+            }
+            return files;
+          }
+
+          const htmlFiles = findHtmlFiles(distDir);
+          let loaded = 0;
+          for (const file of htmlFiles) {
+            const route = file === "index.html" ? "/" : "/" + file.replace(/\/index\.html$/, "");
+            const html = readFileSync(join(distDir, file), "utf-8");
+            updatePrerenderCache(route, html);
+            loaded++;
+          }
+          logger.info({ loaded }, "prerender: loaded fresh SSG HTML into cache");
+          logger.info("prerender: triggering full prerender on startup (refreshes GCS cache)");
           spawnPrerender([]);
         })
         .catch(err => logger.warn({ err }, "prerender: startup init failed"));
