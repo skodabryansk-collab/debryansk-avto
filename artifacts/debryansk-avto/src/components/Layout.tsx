@@ -137,8 +137,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     queryFn: () => fetch("/api/settings").then(r => r.json()).then(j => j.data as Record<string, string>),
     staleTime: 5 * 60 * 1000,
   });
-  const headerPhone = normalizePhone(siteSettings?.header_phone) || "+7 (4832) 63-10-00";
-  const headerPhoneTel = phoneHref(siteSettings?.header_phone) || "tel:+74832631000";
+  const headerPhone = normalizePhone(siteSettings?.header_phone) || "+7 (4832) 77-77-70";
+  const headerPhoneTel = phoneHref(siteSettings?.header_phone) || "tel:+74832777770";
 
   const { data: locationsData = [] } = useQuery<Array<{ id: number; title: string; address: string; phone: string | null; hours: string | null; mapX: number | null; mapY: number | null }>>({
     queryKey: ["locations"],
@@ -184,7 +184,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       "name": "Дебрянск Авто",
       "alternateName": "Территория Автомобилей",
       "url": "https://debryansk-auto.ru",
-      "telephone": "+74832631000",
+      "telephone": "+74832777770",
       "description": `Группа автодилеров в Брянске. ${brandsCount} брендов новых авто: OMODA, JAECOO, HAVAL, Tenet, Jetour, Soueast и другие. Автомобили с пробегом, сервис, выкуп.`,
       "image": "https://debryansk-auto.ru/opengraph.jpg",
       "address": {
