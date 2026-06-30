@@ -13,6 +13,12 @@ const SITE = "https://debryansk-auto.ru";
 const DEFAULT_OG_IMAGE = `${SITE}/opengraph.jpg`;
 
 const STATIC_ROUTES = {
+  "/service/bonus": {
+    title: "Бонусная программа — Дебрянск Авто | Копите и тратьте бонусы",
+    description:
+      "Бонусная программа автодилера «Дебрянск Авто» в Брянске. Начисляем бонусы за покупку и сервис, оплачивайте ими до 50% услуг. Накопительные уровни по Приказу №474.",
+    h1: "Бонусная программа Дебрянск Авто",
+  },
   "/": {
     title: "Дебрянск Авто — официальный автосалон в Брянске | Продажа, сервис, кредит",
     description:
@@ -270,6 +276,8 @@ function getTemplate() {
     let raw = readFileSync(join(distDir, "index.html"), "utf-8");
     // Strip any previously injected sr-only H1 tags so re-runs are idempotent
     raw = raw.replace(/\n\s*<h1 class="sr-only">[^<]*<\/h1>/g, "");
+    // Strip all previously injected ld+json blocks (they are regenerated per-route)
+    raw = raw.replace(/\n\s*<script type="application\/ld\+json">[^]*?<\/script>/g, "");
     _template = raw;
     return _template;
   } catch {
@@ -340,6 +348,7 @@ function segmentName(seg) {
     brands: "Бренды",
     news: "Новости",
     service: "Сервис",
+    bonus: "Бонусная программа",
     buyout: "Выкуп",
     vacancies: "Вакансии",
     contacts: "Контакты",
@@ -379,6 +388,7 @@ async function main() {
     const staticRouteSlugMap = {
       "/": "main",
       "/service": "service",
+      "/service/bonus": "bonus-program",
       "/buyout": "buyout",
       "/vacancies": "vacancies",
     };
