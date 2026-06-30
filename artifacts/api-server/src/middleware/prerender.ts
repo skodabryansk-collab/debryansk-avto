@@ -17,7 +17,7 @@ const cache: PrerenderCacheState = {
 // SSG routes have correct FAQPage schema in their HTML — they must pass through
 // seoMeta middleware to get meta description, canonical, OG tags, LocalBusiness schema.
 const SSG_ROUTES = new Set([
-  "/", "/service", "/buyout", "/vacancies", "/about", "/contacts", "/news",
+  "/", "/service", "/service/bonus", "/buyout", "/vacancies", "/about", "/contacts", "/news",
   "/new-cars", "/cars", "/legal", "/privacy",
 ]);
 function isSsgRoute(route: string): boolean {
