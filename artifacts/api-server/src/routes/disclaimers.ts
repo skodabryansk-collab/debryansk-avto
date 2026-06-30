@@ -26,38 +26,47 @@ router.get("/disclaimers/price-from-new", async (req, res) => {
   try {
     const brandName = req.query["brandName"] as string | undefined;
     const model = req.query["model"] as string | undefined;
+    const baseModel = model ? model.split(",")[0].trim() : undefined;
 
-    let brandId: number | null = null;
+    // Resolve ALL brand IDs sharing this car_mark (e.g. "Haval" → [3,4])
+    let brandIds: number[] = [];
     if (brandName) {
-      const b = await db.execute(sql`
-        SELECT id FROM brands WHERE LOWER(name) = LOWER(${brandName}) OR LOWER(slug) = LOWER(${brandName}) LIMIT 1
-      `);
-      brandId = (b.rows[0] as { id: number } | undefined)?.id ?? null;
+      const b = await pool.query(
+        "SELECT id FROM brands WHERE LOWER(car_mark) = LOWER($1) OR LOWER(name) = LOWER($1) OR LOWER(slug) = LOWER($1)",
+        [brandName]
+      );
+      brandIds = b.rows.map((r: any) => r.id);
     }
 
-    // 1. Exact brand+model match
-    if (brandId && model) {
-      const exact = await db.execute(sql`
-        SELECT id, title, content FROM disclaimers
-        WHERE scope = 'price_from_new' AND brand_id = ${brandId}
-          AND LOWER(model) = LOWER(${model}) AND is_active = TRUE
-        LIMIT 1
-      `);
-      const row = exact.rows[0] as { id: number; title: string; content: string } | undefined;
+    if (brandIds.length > 0) {
+      const idList = brandIds.join(",");
+
+      if (baseModel) {
+        const exact = await pool.query(
+          `SELECT id, title, content FROM disclaimers
+           WHERE scope = 'price_from_new'
+             AND brand_id = ANY(ARRAY[${idList}]::int[])
+             AND LOWER(SPLIT_PART(model, ',', 1)) = LOWER($1)
+             AND is_active = TRUE
+           ORDER BY brand_id, id LIMIT 1`,
+          [baseModel]
+        );
+        const row = exact.rows[0];
+        if (row) return res.json({ ok: true, data: { id: row.id, title: row.title, content: row.content } });
+      }
+
+      const brandOnly = await pool.query(
+        `SELECT id, title, content FROM disclaimers
+         WHERE scope = 'price_from_new'
+           AND brand_id = ANY(ARRAY[${idList}]::int[])
+           AND model IS NULL
+           AND is_active = TRUE
+         ORDER BY brand_id, id LIMIT 1`,
+        []
+      );
+      const row = brandOnly.rows[0];
       if (row) return res.json({ ok: true, data: { id: row.id, title: row.title, content: row.content } });
     }
-    // 2. Brand-wide fallback (model IS NULL)
-    if (brandId) {
-      const brandOnly = await db.execute(sql`
-        SELECT id, title, content FROM disclaimers
-        WHERE scope = 'price_from_new' AND brand_id = ${brandId}
-          AND model IS NULL AND is_active = TRUE
-        LIMIT 1
-      `);
-      const row = brandOnly.rows[0] as { id: number; title: string; content: string } | undefined;
-      if (row) return res.json({ ok: true, data: { id: row.id, title: row.title, content: row.content } });
-    }
-    // 3. Nothing found
     return res.json({ ok: true, data: null });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
