@@ -378,6 +378,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 )}
               </AnimatePresence>
             </div>
+            <Link href="/service/bonus"
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg transition-all ${
+                location === "/service/bonus" ? "text-white bg-white/10" : "text-white/60 hover:text-white hover:bg-white/8"
+              }`}>
+              <Gift className="w-4 h-4" />
+              <span>Бонусы</span>
+            </Link>
             {NAV_LINKS.map(([label, id, href]) => (
               href.startsWith("/#") ? (
                 <button key={id} onClick={() => handleNav(href)}
@@ -473,7 +480,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
                 <Link href="/service/bonus" onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-2 text-base font-semibold py-3 border-b border-white/[0.07] text-[#0070b8] hover:text-white transition-colors">
-                  <Gift className="w-4 h-4" /> Бонусная программа
+                  <Gift className="w-4 h-4" /> Бонусы
                 </Link>
                 <Link href="/vacancies"
                   className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block">
