@@ -35,6 +35,7 @@ import adminCacheRouter from "./admin-cache";
 import disclaimersRouter from "./disclaimers";
 import feedYmlRouter from "./feed-yml";
 import { publicFaqRouter, adminFaqRouter } from "./faq";
+import { publicBonusProgramRouter, adminBonusProgramRouter } from "./bonus-program";
 
 const router: IRouter = Router();
 
@@ -80,6 +81,8 @@ router.use("/admin/cache", adminCacheRouter);
 router.use("/faq", publicFaqRouter);
 router.use("/admin/faq", adminFaqRouter);
 router.use(disclaimersRouter);
+router.use(publicBonusProgramRouter);
+router.use("/admin/bonus-program", adminBonusProgramRouter);
 
 // Public settings
 router.use("/settings", publicSettingsRouter);
@@ -88,7 +91,7 @@ router.use("/settings", publicSettingsRouter);
 router.use("/reviews", publicReviewsRouter);
 
 // Internal: live prerender cache update (called by prerender.mjs after each page)
-const SSG_PROTECTED_ROUTES = new Set(["/", "/service", "/buyout", "/vacancies", "/about", "/contacts", "/news", "/new-cars", "/cars", "/legal", "/privacy"]);
+const SSG_PROTECTED_ROUTES = new Set(["/", "/service", "/buyout", "/vacancies", "/about", "/contacts", "/news", "/new-cars", "/cars", "/legal", "/privacy", "/service/bonus"]);
 function isSsgProtected(route: string): boolean {
   if (SSG_PROTECTED_ROUTES.has(route)) return true;
   // /brands/* and /news/* are prerendered by Puppeteer — allow cache updates
