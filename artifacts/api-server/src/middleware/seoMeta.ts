@@ -222,7 +222,10 @@ function injectMeta(
   while ((ldMatch = ldRegex.exec(result)) !== null) {
     try {
       const parsed = JSON.parse(ldMatch[1].trim());
-      if (parsed["@type"] !== "BreadcrumbList" && parsed["@type"] !== ["AutoDealer", "LocalBusiness"]) {
+      const atType = parsed["@type"];
+      const isBreadcrumb = atType === "BreadcrumbList";
+      const isLocalBusiness = Array.isArray(atType) && atType.includes("AutoDealer") && atType.includes("LocalBusiness");
+      if (!isBreadcrumb && !isLocalBusiness) {
         preservedLd.push(ldMatch[0]);
       }
     } catch {
