@@ -1,4 +1,6 @@
 import { Router, type IRouter } from "express";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -32,6 +34,7 @@ export interface CarRecord {
   maxDiscount: number;
   creditDiscount: number;
   tradeinDiscount: number;
+  popularity_score: number;
 }
 
 let cache: { data: CarRecord[]; ts: number } | null = null;
@@ -96,15 +99,36 @@ export async function getUsedCars(): Promise<CarRecord[]> {
 
 router.get("/cars/used", async (_req, res) => {
   try {
-    if (cache && Date.now() - cache.ts < CACHE_TTL) {
-      return res.json({ ok: true, data: cache.data, total: cache.data.length });
+    if (!cache || Date.now() - cache.ts >= CACHE_TTL) {
+      const r = await fetch(XML_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
+      if (!r.ok) throw new Error(`XML fetch failed: ${r.status}`);
+      const text = await r.text();
+      const data = parseXml(text);
+      cache = { data, ts: Date.now() };
     }
-    const r = await fetch(XML_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
-    if (!r.ok) throw new Error(`XML fetch failed: ${r.status}`);
-    const text = await r.text();
-    const data = parseXml(text);
-    cache = { data, ts: Date.now() };
-    return res.json({ ok: true, data, total: data.length });
+    const data = cache!.data;
+    const ids = data.map(c => c.id);
+    const rows = ids.length
+      ? await db.execute(sql`SELECT external_id, popularity_score FROM cars WHERE external_id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)}) AND type = 'used'`)
+      : { rows: [] };
+    const scoreMap = new Map(
+      (rows.rows as { external_id: string; popularity_score: number }[]).map(r => [r.external_id, r.popularity_score ?? 0])
+    );
+    const enriched = data.map(c => ({ ...c, popularity_score: scoreMap.get(c.id) ?? 0 }));
+    return res.json({ ok: true, data: enriched, total: enriched.length });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+router.post("/cars/views/used/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.execute(sql`
+      UPDATE cars SET popularity_score = COALESCE(popularity_score, 0) + 1
+      WHERE external_id = ${id} AND type = 'used'
+    `);
+    return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
   }
