@@ -20,6 +20,17 @@ const POOL_SIZE = 5;
 const PAGE_TIMEOUT_MS = 14_000;
 const NETWORK_IDLE_MS = 800;
 
+// Routes with SSG HTML that already has correct FAQPage schema — skip prerender
+const SSG_ROUTES = new Set([
+  "/", "/service", "/buyout", "/vacancies", "/about", "/contacts", "/news", "/new-cars", "/cars", "/legal", "/privacy"
+]);
+function isSsgRoute(route) {
+  if (SSG_ROUTES.has(route)) return true;
+  // /news/ — static article pages with SSG HTML
+  if (route.startsWith("/news/")) return true;
+  return false;
+}
+
 const carsOnly = process.argv.includes("--cars-only");
 
 if (!BUCKET_ID) {
@@ -56,9 +67,11 @@ async function saveToGCS(route, html) {
 }
 
 async function getRoutes() {
+  // Static routes with SSG HTML already have FAQ schema — skip prerender
+  // Only prerender dynamic routes: car detail pages, news articles
   const staticRoutes = carsOnly
     ? []
-    : ["/", "/new-cars", "/cars", "/service", "/about", "/contacts", "/news", "/buyout", "/vacancies"];
+    : ["/new-cars", "/cars"]; // these have SSG but no FAQ — still prerender for freshness
 
   const [newCarsRes, usedCarsRes, newsRes, brandsRes] = await Promise.all([
     fetch(`${SITE_URL}/api/cars/new`)
@@ -92,22 +105,36 @@ async function getRoutes() {
     .filter((b) => b.slug && b.slug !== "s-probegom")
     .map((b) => `/brands/${b.slug}`);
 
-  return [...staticRoutes, ...newCarRoutes, ...usedCarRoutes, ...newsRoutes, ...brandRoutes];
+  // Brand pages first — high SEO priority, must not be delayed by 400+ car routes
+  return [...brandRoutes, ...staticRoutes, ...newCarRoutes, ...usedCarRoutes, ...newsRoutes];
 }
 
 async function processRoute(page, route) {
+  if (isSsgRoute(route)) {
+    console.log(`[prerender] SKIP ${route} (SSG HTML already has correct FAQ schema)`);
+    return;
+  }
   const url = `${SITE_URL}${route}`;
+  // Brand pages need more time: React fetches models/prices/cards before setting data-prerender-ready
+  const gotoTimeout = route.startsWith("/brands/") ? 25_000 : PAGE_TIMEOUT_MS;
   try {
     await page.goto(url, {
       waitUntil: "domcontentloaded",
-      timeout: PAGE_TIMEOUT_MS,
+      timeout: gotoTimeout,
     });
 
     if (route.startsWith("/brands/")) {
+      // Wait for React to mount (data-prerender-ready appears immediately),
+      // then wait for network idle so all API fetches (models, cars, news) complete.
       await page
-        .waitForSelector("[data-prerender-ready]", { timeout: 12_000 })
+        .waitForSelector("[data-prerender-ready]", { timeout: 20_000 })
         .catch(() => {
           console.warn(`[prerender] WARN: [data-prerender-ready] not found at ${route} — using fallback`);
+        });
+      await page
+        .waitForNetworkIdle({ idleTime: 1_500, timeout: 15_000 })
+        .catch(() => {
+          console.warn(`[prerender] WARN: network idle timeout at ${route} — capturing anyway`);
         });
     } else {
       await page
