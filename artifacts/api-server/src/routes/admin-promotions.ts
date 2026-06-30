@@ -18,6 +18,7 @@ function mapRow(row: Record<string, unknown>) {
     buttonText: row["button_text"] ?? null,
     buttonUrl: row["button_url"] ?? null,
     brandIds: row["brand_ids"] ?? [],
+    promotionType: row["promotion_type"] ?? "sales",
     createdAt: row["created_at"],
     updatedAt: row["updated_at"],
   };
@@ -82,7 +83,7 @@ router.post("/", async (req, res) => {
   try {
     const {
       title, description, image, badge, expiresAt, isActive,
-      buttonText, buttonUrl, brandIds,
+      buttonText, buttonUrl, brandIds, promotionType,
     } = req.body as {
       title: string;
       description?: string;
@@ -93,6 +94,7 @@ router.post("/", async (req, res) => {
       buttonText?: string | null;
       buttonUrl?: string | null;
       brandIds?: number[];
+      promotionType?: "sales" | "service";
     };
 
     if (!title?.trim()) return res.status(400).json({ ok: false, error: "Title required" });
@@ -100,14 +102,15 @@ router.post("/", async (req, res) => {
     const expires = expiresAt ? new Date(expiresAt) : null;
     const active = isActive !== false;
     const ids = parseBrandIds(brandIds);
+    const pType = promotionType === "service" ? "service" : "sales";
 
     const rows = await db.execute(sql`
       INSERT INTO promotions
-        (title, description, image, badge, expires_at, is_active, button_text, button_url, brand_ids, created_at, updated_at)
+        (title, description, image, badge, expires_at, is_active, button_text, button_url, brand_ids, promotion_type, created_at, updated_at)
       VALUES
         (${title.trim()}, ${description ?? ""}, ${image ?? null}, ${badge ?? null},
          ${expires}, ${active}, ${buttonText ?? null}, ${buttonUrl ?? null},
-         ${sql.raw(brandIdsLiteral(ids))},
+         ${sql.raw(brandIdsLiteral(ids))}, ${pType},
          NOW(), NOW())
       RETURNING *
     `);
@@ -127,7 +130,7 @@ router.put("/:id", async (req, res) => {
 
     const {
       title, description, image, badge, expiresAt, isActive,
-      buttonText, buttonUrl, brandIds,
+      buttonText, buttonUrl, brandIds, promotionType,
     } = req.body as {
       title?: string;
       description?: string;
@@ -138,10 +141,12 @@ router.put("/:id", async (req, res) => {
       buttonText?: string | null;
       buttonUrl?: string | null;
       brandIds?: number[];
+      promotionType?: "sales" | "service";
     };
 
     const expires = expiresAt ? new Date(expiresAt) : null;
     const ids = parseBrandIds(brandIds);
+    const pType = promotionType === "service" ? "service" : "sales";
 
     const rows = await db.execute(sql`
       UPDATE promotions SET
@@ -154,6 +159,7 @@ router.put("/:id", async (req, res) => {
         button_text = ${buttonText ?? null},
         button_url = ${buttonUrl ?? null},
         brand_ids = ${sql.raw(brandIdsLiteral(ids))},
+        promotion_type = ${pType},
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
