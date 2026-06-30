@@ -2,7 +2,7 @@ import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Car, Percent, Gift, TrendingUp, Users, Wrench,
-  CheckCircle, ChevronRight, AlertCircle
+  CheckCircle, ChevronRight, AlertCircle, MapPin, ArrowRight
 } from "lucide-react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
@@ -216,6 +216,40 @@ export default function BonusProgramPage() {
         </div>
       </section>
 
+      {/* ── Benefit example ────────────────────────────────────────────── */}
+      <section className="py-14 sm:py-20 bg-[#0070b8] text-white border-t border-white/10">
+        <div className="container mx-auto px-4 sm:px-6 max-w-4xl">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-white/50 mb-2 text-center">
+            Расчёт выгоды
+          </p>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-center mb-8">
+            На практике это работает так
+          </h2>
+          <div className="grid sm:grid-cols-3 gap-4 sm:gap-5">
+            <div className="bg-white/10 rounded-2xl p-5 sm:p-6 border border-white/15 backdrop-blur-sm text-center">
+              <p className="text-xs text-white/60 font-semibold uppercase tracking-widest mb-3">Заказ-наряд</p>
+              <p className="text-3xl font-extrabold mb-1">15 000 ₽</p>
+              <p className="text-sm text-white/50">ТО + замена масла</p>
+            </div>
+            <div className="bg-white/10 rounded-2xl p-5 sm:p-6 border border-white/15 backdrop-blur-sm text-center">
+              <p className="text-xs text-white/60 font-semibold uppercase tracking-widest mb-3">Начисление</p>
+              <p className="text-3xl font-extrabold text-[#87b63c] mb-1">+1 500 ₽</p>
+              <p className="text-sm text-white/50">10% на бонусный счёт</p>
+            </div>
+            <div className="bg-white/10 rounded-2xl p-5 sm:p-6 border border-white/15 backdrop-blur-sm text-center">
+              <p className="text-xs text-white/60 font-semibold uppercase tracking-widest mb-3">Следующий визит</p>
+              <p className="text-3xl font-extrabold text-[#87b63c] mb-1">−1 500 ₽</p>
+              <p className="text-sm text-white/50">10% списание со счёта</p>
+            </div>
+          </div>
+          <div className="mt-6 text-center">
+            <p className="text-sm text-white/70 max-w-lg mx-auto">
+              Оплатили 15 000 ₽ за техобслуживание — заработали 1 500 баллов. При следующем обращении потратили уже 13 500 ₽ вместо 15 000. Программа позволяет вам получить до 10% от заказ-наряда на счёт автоматически — без регистраций и SMS. Действует во всех 4 дилерских центрах группы компаний «Дебрянск Авто».
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* ── Perks ────────────────────────────────────────────────────── */}
       <section className="py-14 sm:py-20 bg-white">
         <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
@@ -247,6 +281,19 @@ export default function BonusProgramPage() {
                 </div>
               );
             })}
+            <div className="flex gap-4 p-5 sm:p-6 rounded-2xl border border-[#87b63c]/20 bg-[#87b63c]/5 hover:border-[#87b63c]/30 hover:shadow-sm transition-all">
+              <div className="w-10 h-10 rounded-xl bg-[#87b63c]/15 flex items-center justify-center shrink-0">
+                <MapPin className="w-5 h-5 text-[#87b63c]" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 mb-1 text-sm sm:text-base">
+                  Во всех 4 центрах
+                </h3>
+                <p className="text-sm text-slate-500 leading-relaxed">
+                  Бонусная карта действует в любом дилерском центре группы. Накопленные баллы работают везде одинаково.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
