@@ -3,7 +3,7 @@ import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Heart, Scale, ArrowLeft, Phone, User, CheckCircle, Car, ChevronDown } from "lucide-react";
+import { Menu, X, Heart, Scale, ArrowLeft, Phone, User, CheckCircle, Car, ChevronDown, Wrench, Gift } from "lucide-react";
 import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import { SiVk, SiTelegram } from "react-icons/si";
@@ -34,7 +34,6 @@ function parseHoursSpec(raw: string | null | undefined): object[] | null {
 const NAV_LINKS: [string, string, string][] = [
   ["О группе", "about", "/about"],
   ["Дилеры", "dealers", "/#dealers"],
-  ["Услуги", "services", "/service"],
   ["Выкуп", "buyout", "/buyout"],
   ["Контакты", "contacts", "/contacts"],
 ];
@@ -125,7 +124,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [callbackOpen, setCallbackOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [carsDropdownOpen, setCarsDropdownOpen] = useState(false);
+  const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const servicesDropdownRef = useRef<HTMLDivElement>(null);
   const [location] = useLocation();
   const { favorites, compare } = useCarStorage();
   const favCount = favorites.length;
@@ -226,6 +227,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     const handler = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setCarsDropdownOpen(false);
+      }
+      if (servicesDropdownRef.current && !servicesDropdownRef.current.contains(e.target as Node)) {
+        setServicesDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -333,6 +337,47 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 )}
               </AnimatePresence>
             </div>
+            {/* Услуги dropdown */}
+            <div className="relative" ref={servicesDropdownRef}>
+              <button
+                onClick={() => setServicesDropdownOpen(o => !o)}
+                className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all flex items-center gap-1 ${
+                  location === "/service" || location === "/service/bonus"
+                    ? "text-white bg-white/10"
+                    : "text-white/60 hover:text-white hover:bg-white/8"
+                }`}
+              >
+                Услуги
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${servicesDropdownOpen ? "rotate-180" : ""}`} />
+              </button>
+              <AnimatePresence>
+                {servicesDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden min-w-[230px] z-50"
+                  >
+                    <Link href="/service"
+                      onClick={() => setServicesDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
+                    >
+                      <Wrench className="w-4 h-4 text-slate-400" />
+                      Сервис и ТО
+                    </Link>
+                    <div className="mx-4 border-t border-slate-100" />
+                    <Link href="/service/bonus"
+                      onClick={() => setServicesDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
+                    >
+                      <Gift className="w-4 h-4 text-[#0070b8]" />
+                      Бонусная программа
+                    </Link>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             {NAV_LINKS.map(([label, id, href]) => (
               href.startsWith("/#") ? (
                 <button key={id} onClick={() => handleNav(href)}
@@ -422,6 +467,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </Link>
                   )
                 ))}
+                <Link href="/service" onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors">
+                  <Wrench className="w-4 h-4 opacity-60" /> Сервис и ТО
+                </Link>
+                <Link href="/service/bonus" onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 text-base font-semibold py-3 border-b border-white/[0.07] text-[#0070b8] hover:text-white transition-colors">
+                  <Gift className="w-4 h-4" /> Бонусная программа
+                </Link>
                 <Link href="/vacancies"
                   className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block">
                   Вакансии
