@@ -869,17 +869,17 @@ export default function ServicePage() {
               <div className="flex-1 text-center lg:text-left">
                 <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full bg-[#0070b8]/15 border border-[#0070b8]/25">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#0070b8] animate-pulse" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#0070b8]">Приказ №474 от 01.10.2024</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#0070b8]">Программа лояльности</span>
                 </div>
                 <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-3 leading-tight">
                   Бонусная программа<br className="hidden sm:block" />
                   <span className="text-[#0070b8]"> Дебрянск Авто</span>
                 </h2>
                 <p className="text-white/55 text-sm sm:text-base max-w-xl mx-auto lg:mx-0 mb-5">
-                  Копите бонусы за каждое ТО, ремонт и сервисные работы. Оплачивайте ими до 50% стоимости следующего визита — автоматически.
+                  Получайте 10% от суммы каждого заказ-наряда на бонусный счёт и оплачивайте ими до 10% следующего визита.
                 </p>
                 <div className="flex flex-wrap justify-center lg:justify-start gap-2">
-                  {["Начисление за каждый визит", "До 50% оплаты бонусами", "Накопительные уровни", "Действуют 12 месяцев"].map(b => (
+                  {["10% начисление за сервис", "Списание от 5% до 10%", "Накопительные уровни", "Действуют 12 месяцев"].map(b => (
                     <span key={b} className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/65 text-xs font-medium">
                       {b}
                     </span>
