@@ -163,14 +163,21 @@ async function seedDatabase() {
   }
 }
 
+let _prerenderChild: ReturnType<typeof spawn> | null = null;
+
 function spawnPrerender(args: string[]): void {
   if (process.env.PRERENDER_ENABLED !== "true") return;
+  if (_prerenderChild !== null) {
+    logger.warn({ args }, "prerender: skipping spawn — another process is already running");
+    return;
+  }
   const scriptPath = path.resolve(__dirname, "../scripts/prerender.mjs");
   const child = spawn(process.execPath, [scriptPath, ...args], {
     env: { ...process.env },
     stdio: ["ignore", "pipe", "pipe"],
     detached: false,
   });
+  _prerenderChild = child;
   child.stdout?.on("data", (d: Buffer) =>
     logger.info({ src: "prerender" }, d.toString().trim()),
   );
@@ -178,6 +185,7 @@ function spawnPrerender(args: string[]): void {
     logger.warn({ src: "prerender" }, d.toString().trim()),
   );
   child.on("exit", (code: number | null) => {
+    _prerenderChild = null;
     logger.info({ code, args }, "prerender: script exited");
     if (code === 0 && process.env.PRERENDER_ENABLED === "true") {
       import("./middleware/prerender")
@@ -320,7 +328,7 @@ async function main() {
           // instead of stale GCS cache (GCS cache has old asset hashes)
           const { readFileSync, readdirSync, statSync } = await import("fs");
           const { join } = await import("path");
-          const distDir = join(process.cwd(), "artifacts/debryansk-avto/dist/public");
+          const distDir = join(__dirname, "../../debryansk-avto/dist/public");
 
           function findHtmlFiles(dir: string, prefix = ""): string[] {
             const entries = readdirSync(dir, { withFileTypes: true });
