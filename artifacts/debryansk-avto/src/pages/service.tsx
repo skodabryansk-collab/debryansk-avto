@@ -850,6 +850,32 @@ export default function ServicePage() {
 
         <ServicePromotionsBlock />
 
+        {/* ── Бонусная программа ──────────────────────────────────── */}
+        <section className="py-10 sm:py-12 bg-gradient-to-r from-[#0d1b2e] to-[#0a2540] border-t border-white/5">
+          <div className="container mx-auto px-4 sm:px-6 max-w-5xl">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+              <div className="text-white text-center sm:text-left">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#0070b8] bg-[#0070b8]/10 px-2.5 py-1 rounded-full">
+                  Для клиентов сервиса
+                </span>
+                <h2 className="text-xl sm:text-2xl font-extrabold mt-3 mb-2">
+                  Бонусная программа
+                </h2>
+                <p className="text-white/60 text-sm max-w-md">
+                  Копите бонусы за каждое ТО и списывайте их при следующем визите. До 50% стоимости услуг — бонусами.
+                </p>
+              </div>
+              <a
+                href="/service/bonus"
+                className="shrink-0 inline-flex items-center gap-2 bg-[#0070b8] text-white font-bold px-7 py-3.5 rounded-full hover:bg-[#005fa0] transition-colors text-sm whitespace-nowrap"
+              >
+                Узнать подробнее
+                <ArrowRight className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+        </section>
+
         <FaqBlock pageSlug="service" />
       </div>
     </Layout>
