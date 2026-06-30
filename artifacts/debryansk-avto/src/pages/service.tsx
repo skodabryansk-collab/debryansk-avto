@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Wrench, Hammer, Sparkles, Package, Car, Shield,
   MapPin, Phone, Clock, CheckCircle, Star, Settings, Gauge,
-  Tag, ChevronRight, ChevronLeft, X, Calendar, ArrowRight, ExternalLink
+  Tag, ChevronRight, ChevronLeft, X, Calendar, ArrowRight, ExternalLink, Gift
 } from "lucide-react";
 import SEO from "@/components/SEO";
 import Layout from "@/components/Layout";
@@ -850,28 +850,55 @@ export default function ServicePage() {
 
         <ServicePromotionsBlock />
 
-        {/* ── Бонусная программа ──────────────────────────────────── */}
-        <section className="py-10 sm:py-12 bg-gradient-to-r from-[#0d1b2e] to-[#0a2540] border-t border-white/5">
-          <div className="container mx-auto px-4 sm:px-6 max-w-5xl">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-              <div className="text-white text-center sm:text-left">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#0070b8] bg-[#0070b8]/10 px-2.5 py-1 rounded-full">
-                  Для клиентов сервиса
-                </span>
-                <h2 className="text-xl sm:text-2xl font-extrabold mt-3 mb-2">
-                  Бонусная программа
-                </h2>
-                <p className="text-white/60 text-sm max-w-md">
-                  Копите бонусы за каждое ТО и списывайте их при следующем визите. До 50% стоимости услуг — бонусами.
-                </p>
+        {/* ── Промо-растяжка: Бонусная программа ─────────────────── */}
+        <section className="relative overflow-hidden py-12 sm:py-16 lg:py-20 bg-[#07111f]">
+          {/* Декоративные пятна */}
+          <div className="absolute -right-24 -top-24 w-[480px] h-[480px] rounded-full bg-[#0070b8]/10 blur-3xl pointer-events-none" />
+          <div className="absolute -left-16 bottom-0 w-72 h-72 rounded-full bg-[#0040a0]/10 blur-3xl pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0070b8]/5 via-transparent to-transparent pointer-events-none" />
+
+          <div className="relative container mx-auto px-4 sm:px-6">
+            <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-14">
+
+              {/* Иконка */}
+              <div className="shrink-0 w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-gradient-to-br from-[#0070b8]/30 to-[#0040a0]/20 border border-[#0070b8]/30 flex items-center justify-center shadow-[0_0_40px_rgba(0,112,184,0.2)]">
+                <Gift className="w-12 h-12 sm:w-14 sm:h-14 text-[#0070b8]" />
               </div>
-              <a
-                href="/service/bonus"
-                className="shrink-0 inline-flex items-center gap-2 bg-[#0070b8] text-white font-bold px-7 py-3.5 rounded-full hover:bg-[#005fa0] transition-colors text-sm whitespace-nowrap"
-              >
-                Узнать подробнее
-                <ArrowRight className="w-4 h-4" />
-              </a>
+
+              {/* Текст */}
+              <div className="flex-1 text-center lg:text-left">
+                <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full bg-[#0070b8]/15 border border-[#0070b8]/25">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#0070b8] animate-pulse" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#0070b8]">Приказ №474 от 01.10.2024</span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-3 leading-tight">
+                  Бонусная программа<br className="hidden sm:block" />
+                  <span className="text-[#0070b8]"> Дебрянск Авто</span>
+                </h2>
+                <p className="text-white/55 text-sm sm:text-base max-w-xl mx-auto lg:mx-0 mb-5">
+                  Копите бонусы за каждое ТО, ремонт и сервисные работы. Оплачивайте ими до 50% стоимости следующего визита — автоматически.
+                </p>
+                <div className="flex flex-wrap justify-center lg:justify-start gap-2">
+                  {["Начисление за каждый визит", "До 50% оплаты бонусами", "Накопительные уровни", "Действуют 12 месяцев"].map(b => (
+                    <span key={b} className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/65 text-xs font-medium">
+                      {b}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* CTA */}
+              <div className="shrink-0 flex flex-col items-center gap-2">
+                <a
+                  href="/service/bonus"
+                  className="inline-flex items-center gap-2.5 bg-[#0070b8] hover:bg-[#005fa0] text-white font-bold px-8 py-4 rounded-2xl transition-all hover:shadow-[0_0_28px_rgba(0,112,184,0.45)] text-base whitespace-nowrap"
+                >
+                  <Gift className="w-5 h-5" />
+                  Узнать подробнее
+                </a>
+                <p className="text-white/35 text-xs">Регистрация бесплатная</p>
+              </div>
+
             </div>
           </div>
         </section>
