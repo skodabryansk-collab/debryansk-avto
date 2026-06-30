@@ -83,11 +83,19 @@ export function deleteDealer(id: number) { return api<{ ok: true }>("DELETE", `/
 
 /* Brands */
 export interface Brand {
-  id: number; name: string; slug: string | null; websiteUrl: string | null; logoUrl: string | null; isServiceOnly: boolean; createdAt: string;
+  id: number; name: string; slug: string | null; websiteUrl: string | null; logoUrl: string | null; isServiceOnly: boolean; carMark: string | null; createdAt: string;
+}
+
+export function getCarMarks(): Promise<string[]> {
+  return api<string[]>("GET", "/admin/brands/car-marks");
+}
+
+export function getCarModels(mark: string): Promise<string[]> {
+  return api<string[]>("GET", `/admin/brands/car-models?mark=${encodeURIComponent(mark)}`);
 }
 export function getBrands() { return api<Brand[]>("GET", "/admin/brands"); }
 export function getBrand(id: number) { return api<Brand>("GET", `/admin/brands/${id}`); }
-export function createBrand(data: Omit<Brand, "id" | "createdAt">) { return api<Brand>("POST", "/admin/brands", data); }
+export function createBrand(data: Omit<Brand, "id" | "createdAt" | "carMark"> & { carMark?: string | null }) { return api<Brand>("POST", "/admin/brands", data); }
 export function updateBrand(id: number, data: Partial<Brand>) { return api<Brand>("PUT", `/admin/brands/${id}`, data); }
 export function deleteBrand(id: number) { return api<{ ok: true }>("DELETE", `/admin/brands/${id}`); }
 
