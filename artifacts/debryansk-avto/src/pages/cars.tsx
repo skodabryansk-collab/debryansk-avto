@@ -36,6 +36,7 @@ interface CarRecord {
   maxDiscount: number;
   creditDiscount: number;
   tradeinDiscount: number;
+  popularity_score?: number;
 }
 
 function parseTransmission(mod: string): string {
@@ -208,7 +209,10 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
       viewport={{ once: true, margin: "-40px" }}
       transition={{ duration: 0.4 }}
       className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow group flex flex-col cursor-pointer"
-      onClick={() => navigate(`/cars/${encodeURIComponent(car.id)}`)}
+      onClick={() => {
+        fetch(`/api/cars/views/used/${encodeURIComponent(car.id)}`, { method: "POST" }).catch(() => {});
+        navigate(`/cars/${encodeURIComponent(car.id)}`);
+      }}
     >
       <div className="relative h-48 bg-slate-100 overflow-hidden">
         {img ? (
@@ -409,7 +413,7 @@ export default function UsedCars() {
   const [filterDrive, setFilterDrive] = useState("Любой");
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
-  const [sortBy, setSortBy] = useState<"price_asc" | "price_desc" | "year_desc" | "run_asc">("price_asc");
+  const [sortBy, setSortBy] = useState<"popular" | "price_asc" | "price_desc" | "year_desc" | "run_asc">("popular");
   const [page, setPage] = useState(1);
   const [leadCar, setLeadCar] = useState<CarRecord | null>(null);
   const [creditCar, setCreditCar] = useState<CarRecord | null>(null);
@@ -431,6 +435,7 @@ export default function UsedCars() {
     const pMax = priceMax ? parseInt(priceMax.replace(/\D/g, "")) : Infinity;
     if (pMin) list = list.filter(c => (c.price - (c.maxDiscount || 0)) >= pMin);
     if (pMax !== Infinity) list = list.filter(c => (c.price - (c.maxDiscount || 0)) <= pMax);
+    if (sortBy === "popular") list = [...list].sort((a, b) => (b.popularity_score ?? 0) - (a.popularity_score ?? 0));
     if (sortBy === "price_asc") list = [...list].sort((a, b) => (a.price - (a.maxDiscount || 0)) - (b.price - (b.maxDiscount || 0)));
     if (sortBy === "price_desc") list = [...list].sort((a, b) => (b.price - (b.maxDiscount || 0)) - (a.price - (a.maxDiscount || 0)));
     if (sortBy === "year_desc") list = [...list].sort((a, b) => b.year - a.year);
@@ -666,6 +671,7 @@ export default function UsedCars() {
                 onChange={e => { setSortBy(e.target.value as typeof sortBy); setPage(1); }}
                 className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 bg-white focus:outline-none focus:border-[#0070b8] shrink-0"
               >
+                <option value="popular">Популярные</option>
                 <option value="price_asc">Цена: по возрастанию</option>
                 <option value="price_desc">Цена: по убыванию</option>
                 <option value="year_desc">Год: сначала новее</option>
