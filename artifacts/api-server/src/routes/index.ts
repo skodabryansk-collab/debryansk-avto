@@ -32,6 +32,7 @@ import adminBrandPagesRouter from "./admin-brand-pages";
 import adminPromotionsRouter from "./admin-promotions";
 import adminCacheRouter from "./admin-cache";
 import feedYmlRouter from "./feed-yml";
+import { publicFaqRouter, adminFaqRouter } from "./faq";
 
 const router: IRouter = Router();
 
@@ -73,6 +74,8 @@ router.use("/admin/reviews", adminReviewsRouter);
 router.use("/admin/brand-pages", adminBrandPagesRouter);
 router.use("/admin/promotions", adminPromotionsRouter);
 router.use("/admin/cache", adminCacheRouter);
+router.use("/faq", publicFaqRouter);
+router.use("/admin/faq", adminFaqRouter);
 
 // Public settings
 router.use("/settings", publicSettingsRouter);
@@ -81,6 +84,14 @@ router.use("/settings", publicSettingsRouter);
 router.use("/reviews", publicReviewsRouter);
 
 // Internal: live prerender cache update (called by prerender.mjs after each page)
+const SSG_PROTECTED_ROUTES = new Set(["/", "/service", "/buyout", "/vacancies", "/about", "/contacts", "/news", "/new-cars", "/cars", "/legal", "/privacy"]);
+function isSsgProtected(route: string): boolean {
+  if (SSG_PROTECTED_ROUTES.has(route)) return true;
+  // /brands/* and /news/* are prerendered by Puppeteer — allow cache updates
+  if (route.startsWith("/news/")) return true;
+  return false;
+}
+
 router.post("/internal/prerender-update", (req, res) => {
   const secret = req.headers["x-prerender-secret"];
   if (secret !== process.env.PRERENDER_INTERNAL_SECRET) {
@@ -90,6 +101,11 @@ router.post("/internal/prerender-update", (req, res) => {
   const { route, html } = req.body as { route?: string; html?: string };
   if (!route || !html) {
     res.status(400).json({ ok: false, error: "missing route or html" });
+    return;
+  }
+  // Never overwrite SSG routes — they have correct FAQPage schema
+  if (isSsgProtected(route)) {
+    res.json({ ok: true, route, skipped: true, reason: "SSG protected" });
     return;
   }
   updatePrerenderCache(route, html);
