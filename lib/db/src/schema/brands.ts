@@ -10,6 +10,7 @@ export const brandsTable = pgTable("brands", {
   bgColor: text("bg_color"),
   subName: text("sub_name"),
   isServiceOnly: boolean("is_service_only").default(false),
+  carMark: text("car_mark"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
 });
 
