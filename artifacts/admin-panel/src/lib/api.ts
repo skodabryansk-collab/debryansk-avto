@@ -319,7 +319,7 @@ export function deletePromotion(id: number) {
 /* Upload - Object Storage (GCS) */
 export async function uploadFile(file: File): Promise<string> {
   const token = getToken();
-  const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
+  const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
   // Images go through the server-side optimisation pipeline (sharp → WebP → GCS)
   if (file.type.startsWith("image/")) {
@@ -362,4 +362,78 @@ export async function uploadFile(file: File): Promise<string> {
   if (!uploadRes.ok) throw new Error("Upload to storage failed");
 
   return `${API_BASE}/storage${objectPath}`;
+}
+
+/* ── FAQ ───────────────────────────────────────────────────────────────── */
+
+export interface FaqItem {
+  id: number;
+  pageSlug: string;
+  question: string;
+  answer: string;
+  sortOrder: number;
+  isPublished: boolean;
+  includeInSchema: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export function getAdminFaq(pageSlug: string) {
+  return api<{ ok: true; faqs: FaqItem[] }>("GET", `/admin/faq?page=${encodeURIComponent(pageSlug)}`).then(r => r.faqs);
+}
+
+export function createFaq(data: Omit<FaqItem, "id" | "createdAt" | "updatedAt">) {
+  return api<{ ok: true; faq: FaqItem }>("POST", "/admin/faq", data).then(r => r.faq);
+}
+
+export function updateFaq(id: number, data: Partial<Omit<FaqItem, "id" | "createdAt" | "updatedAt">>) {
+  return api<{ ok: true; faq: FaqItem }>("PUT", `/admin/faq/${id}`, data).then(r => r.faq);
+}
+
+export function deleteFaq(id: number) {
+  return api<{ ok: true }>("DELETE", `/admin/faq/${id}`);
+}
+
+export function reorderFaq(items: Array<{ id: number; sortOrder: number }>) {
+  return api<{ ok: true }>("PATCH", "/admin/faq/reorder", { items });
+}
+
+/* ── Disclaimers ─────────────────────────────────────────────────────────── */
+export interface Disclaimer {
+  id: number;
+  scope: string;
+  brand_id: number | null;
+  model: string | null;
+  title: string;
+  content: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface DisclaimerVersion {
+  id: number;
+  version_number: number;
+  content: string;
+  changed_at: string;
+}
+
+export function getDisclaimers(scope?: string) {
+  const q = scope ? `?scope=${encodeURIComponent(scope)}` : "";
+  return api<{ ok: true; data: Disclaimer[] }>("GET", `/admin/disclaimers${q}`).then(r => r.data);
+}
+
+export function createDisclaimer(data: { scope: string; brandId?: number; model?: string; title: string; content: string }) {
+  return api<{ ok: true; id: number }>("POST", "/admin/disclaimers", data);
+}
+
+export function updateDisclaimer(id: number, data: { brandId?: number; model?: string; title?: string; content?: string; isActive?: boolean }) {
+  return api<{ ok: true }>("PUT", `/admin/disclaimers/${id}`, data);
+}
+
+export function deleteDisclaimer(id: number) {
+  return api<{ ok: true }>("DELETE", `/admin/disclaimers/${id}`);
+}
+
+export function getDisclaimerVersions(id: number) {
+  return api<{ ok: true; data: DisclaimerVersion[] }>("GET", `/admin/disclaimers/${id}/versions`).then(r => r.data);
 }
