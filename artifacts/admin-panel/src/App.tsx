@@ -16,6 +16,8 @@ import SettingsPage from "@/pages/settings";
 import NavigatorPage from "@/pages/navigator";
 import ReviewsPage from "@/pages/reviews";
 import PromotionsPage from "@/pages/promotions";
+import FaqPage from "@/pages/faq";
+import DisclaimersPage from "@/pages/disclaimers";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -35,6 +37,8 @@ function AppRouter() {
       <Route path="/navigator" component={() => <RequireAuth><AdminLayout><NavigatorPage /></AdminLayout></RequireAuth>} />
       <Route path="/reviews" component={() => <RequireAuth><AdminLayout><ReviewsPage /></AdminLayout></RequireAuth>} />
       <Route path="/promotions" component={() => <RequireAuth><AdminLayout><PromotionsPage /></AdminLayout></RequireAuth>} />
+      <Route path="/faq" component={() => <RequireAuth><AdminLayout><FaqPage /></AdminLayout></RequireAuth>} />
+      <Route path="/disclaimers" component={() => <RequireAuth><AdminLayout><DisclaimersPage /></AdminLayout></RequireAuth>} />
       <Route component={() => <RequireAuth><AdminLayout><NotFound /></AdminLayout></RequireAuth>} />
     </Switch>
   );
