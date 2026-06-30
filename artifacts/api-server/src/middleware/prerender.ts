@@ -14,6 +14,21 @@ const cache: PrerenderCacheState = {
   gone: new Set(),
 };
 
+// SSG routes have correct FAQPage schema in their HTML — they must pass through
+// seoMeta middleware to get meta description, canonical, OG tags, LocalBusiness schema.
+const SSG_ROUTES = new Set([
+  "/", "/service", "/buyout", "/vacancies", "/about", "/contacts", "/news",
+  "/new-cars", "/cars", "/legal", "/privacy",
+]);
+function isSsgRoute(route: string): boolean {
+  if (SSG_ROUTES.has(route)) return true;
+  // /brands/* — NOT SSG: prerender.mjs renders them via Puppeteer and stores in GCS cache.
+  // When cache is empty (new brand not yet crawled), middleware falls through to next()
+  // which serves the SPA shell — same as normal user, no 500/empty response.
+  if (route.startsWith("/news/")) return true;
+  return false;
+}
+
 export function getPrerenderCache(): PrerenderCacheState {
   return cache;
 }
@@ -23,13 +38,18 @@ export async function loadPrerenderCacheFromGCS(): Promise<void> {
   try {
     const { loadAllPrerendered } = await import("../lib/prerenderStorage");
     const loaded = await loadAllPrerendered();
-    cache.pages.clear();
+    // Do NOT clear cache — SSG HTML loaded at startup takes precedence
+    // (SSG has fresh asset hashes and FAQPage JSON-LD schema)
+    let added = 0;
     for (const [route, html] of loaded) {
-      cache.pages.set(route, html);
+      if (!cache.pages.has(route)) {
+        cache.pages.set(route, html);
+        added++;
+      }
     }
     logger.info(
-      { count: cache.pages.size },
-      "prerender: cache loaded from GCS",
+      { added, total: cache.pages.size },
+      "prerender: cache loaded from GCS (SSG routes preserved)",
     );
   } catch (err) {
     logger.warn({ err }, "prerender: failed to load cache from GCS");
@@ -88,7 +108,14 @@ export function prerenderMiddleware(
 
   const html = cache.pages.get(route);
   if (html) {
-    // Deduplicate <title> tags — Puppeteer renders both index.html title and React Helmet title
+    // SSG routes have correct FAQ schema but need seoMeta to add
+    // meta description, canonical, OG tags, LocalBusiness schema.
+    // Pass through to seoMeta middleware (which loads SSG HTML itself).
+    if (isSsgRoute(route)) {
+      next();
+      return;
+    }
+    // Dynamic routes (car detail pages) already have full meta from Helmet
     const dedupedHtml = html.replace(/(<title>[^<]*<\/title>)(<title>[^<]*<\/title>)+/, "$1");
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("X-Prerendered", "1");
