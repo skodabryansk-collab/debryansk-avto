@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
   LayoutDashboard, Newspaper, Phone, LogOut,
-  ChevronRight, Menu, X, Tag, Users, Building2, Settings, Bot, Star, Megaphone, RefreshCw
+  ChevronRight, Menu, X, Tag, Users, Building2, Settings, Bot, Star, Megaphone, RefreshCw, HelpCircle, FileText
 } from "lucide-react";
 import { rebuildCache, getRebuildStatus } from "@/lib/api";
 
@@ -14,6 +14,8 @@ const navItems = [
   { path: "/", label: "Дашборд", icon: LayoutDashboard },
   { path: "/news", label: "Новости", icon: Newspaper },
   { path: "/promotions", label: "Акции", icon: Megaphone },
+  { path: "/faq", label: "FAQ", icon: HelpCircle },
+  { path: "/disclaimers", label: "Дисклеймеры", icon: FileText },
   { path: "/leads", label: "Заявки", icon: Phone },
   { path: "/reviews", label: "Отзывы", icon: Star },
   { path: "/locations", label: "Локации", icon: Building2 },
