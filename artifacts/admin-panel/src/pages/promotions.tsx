@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Upload, X, Loader2, Calendar, Tag } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, X, Loader2, Calendar, Tag, Wrench, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 /* ── helpers ─────────────────────────────────────────────────── */
@@ -28,12 +28,26 @@ function isExpired(iso: string | null) {
   return new Date(iso) < new Date();
 }
 
+const TYPE_LABELS: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  sales: {
+    label: "Продажи",
+    color: "bg-blue-100 text-blue-700",
+    icon: <ShoppingCart className="w-2.5 h-2.5" />,
+  },
+  service: {
+    label: "Сервис",
+    color: "bg-orange-100 text-orange-700",
+    icon: <Wrench className="w-2.5 h-2.5" />,
+  },
+};
+
 /* ── Page ────────────────────────────────────────────────────── */
 export default function PromotionsPage() {
   const [editItem, setEditItem] = React.useState<Promotion | null>(null);
   const [isCreate, setIsCreate] = React.useState(false);
   const [deleteId, setDeleteId] = React.useState<number | null>(null);
   const [filterBrandId, setFilterBrandId] = React.useState<number | "">("");
+  const [filterType, setFilterType] = React.useState<"" | "sales" | "service">("");
 
   const { data: promotions = [], isLoading } = useQuery({
     queryKey: ["promotions", filterBrandId || undefined],
@@ -64,11 +78,24 @@ export default function PromotionsPage() {
     return m;
   }, [brands]);
 
+  const filtered = filterType
+    ? promotions.filter(p => (p.promotionType ?? "sales") === filterType)
+    : promotions;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h1 className="text-xl font-bold text-slate-900">Акции</h1>
         <div className="flex items-center gap-2 flex-wrap">
+          <select
+            className="border border-slate-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#0070b8]"
+            value={filterType}
+            onChange={e => setFilterType(e.target.value as "" | "sales" | "service")}
+          >
+            <option value="">Все типы</option>
+            <option value="sales">Продажи</option>
+            <option value="service">Сервис</option>
+          </select>
           <select
             className="border border-slate-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#0070b8]"
             value={filterBrandId}
@@ -92,7 +119,7 @@ export default function PromotionsPage() {
 
       {isLoading ? (
         <div className="text-center py-12 text-slate-400">Загрузка...</div>
-      ) : promotions.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
           <p className="text-4xl mb-3">🏷️</p>
           <p className="text-sm font-medium">Нет акций</p>
@@ -100,9 +127,11 @@ export default function PromotionsPage() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {promotions.map(promo => {
+          {filtered.map(promo => {
             const expired = isExpired(promo.expiresAt);
             const linked = (promo.brandIds as number[]) ?? [];
+            const pType = (promo.promotionType ?? "sales") as "sales" | "service";
+            const typeInfo = TYPE_LABELS[pType];
             return (
               <Card key={promo.id} className={`border-0 shadow-sm overflow-hidden ${!promo.isActive || expired ? "opacity-60" : ""}`}>
                 {promo.image && (
@@ -133,6 +162,11 @@ export default function PromotionsPage() {
                   )}
 
                   <div className="flex flex-wrap gap-1.5">
+                    {/* Type badge */}
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${typeInfo.color}`}>
+                      {typeInfo.icon}
+                      {typeInfo.label}
+                    </span>
                     {promo.badge && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-[#87b63c]/15 text-[#4a7a0f] px-2 py-0.5 rounded-full">
                         <Tag className="w-2.5 h-2.5" />
@@ -243,6 +277,7 @@ function PromotionFormDialog({
     buttonText: item?.buttonText ?? null,
     buttonUrl: item?.buttonUrl ?? null,
     brandIds: (item?.brandIds as number[]) ?? [],
+    promotionType: item?.promotionType ?? "sales",
   });
 
   const toggleBrand = (id: number) => {
@@ -278,6 +313,7 @@ function PromotionFormDialog({
         buttonText: form.buttonText || null,
         buttonUrl: form.buttonUrl || null,
         brandIds: (form.brandIds as number[]) ?? [],
+        promotionType: form.promotionType ?? "sales",
       };
       if (isEdit) return updatePromotion(item!.id, payload);
       return createPromotion(payload);
@@ -300,6 +336,34 @@ function PromotionFormDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Type selector */}
+          <div>
+            <Label className="mb-1.5 block">Тип акции</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["sales", "service"] as const).map(t => {
+                const info = TYPE_LABELS[t];
+                const active = form.promotionType === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, promotionType: t }))}
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-colors ${
+                      active
+                        ? "border-[#0070b8] bg-[#0070b8]/5 text-[#0070b8]"
+                        : "border-slate-200 text-slate-600 hover:border-slate-300"
+                    }`}
+                  >
+                    <span className={`flex items-center justify-center w-5 h-5 rounded-full text-white ${t === "service" ? "bg-orange-500" : "bg-blue-500"}`}>
+                      {t === "service" ? <Wrench className="w-2.5 h-2.5" /> : <ShoppingCart className="w-2.5 h-2.5" />}
+                    </span>
+                    {info.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Title */}
           <div>
             <Label className="mb-1.5 block">Заголовок *</Label>
