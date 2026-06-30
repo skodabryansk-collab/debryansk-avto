@@ -447,3 +447,29 @@ export function deleteDisclaimer(id: number) {
 export function getDisclaimerVersions(id: number) {
   return api<{ ok: true; data: DisclaimerVersion[] }>("GET", `/admin/disclaimers/${id}/versions`).then(r => r.data);
 }
+
+/* ── Bonus Program ────────────────────────────────────────────────────────── */
+export interface BonusPerk { icon: string; title: string; description: string; }
+export interface BonusDiscountLevel { level: number; name: string; threshold: number; percent: number; color: string; }
+export interface BonusAction { title: string; items: string[]; }
+export interface BonusRulesSection { title: string; items: string[]; }
+export interface BonusProgramData {
+  id: number;
+  hero_title: string;
+  hero_description: string;
+  perks: BonusPerk[];
+  discount_levels: BonusDiscountLevel[];
+  redemption_rules: string[];
+  bonus_actions: BonusAction[];
+  important_notes: string;
+  full_rules_sections: BonusRulesSection[];
+  updated_at: string;
+}
+
+export function getBonusProgram() {
+  return api<{ ok: true; data: BonusProgramData | null }>("GET", "/admin/bonus-program").then(r => r.data);
+}
+
+export function updateBonusProgram(data: Partial<Omit<BonusProgramData, "id" | "updated_at">>) {
+  return api<{ ok: true; data: BonusProgramData }>("PUT", "/admin/bonus-program", data).then(r => r.data);
+}
