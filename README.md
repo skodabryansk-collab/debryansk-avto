@@ -25,6 +25,7 @@
 - [Публичный сайт](#публичный-сайт)
 - [Бренд-страницы](#бренд-страницы)
 - [AI Навигатор](#ai-навигатор)
+- [Бонусная программа лояльности](#бонусная-программа-лояльности)
 - [Административная панель](#административная-панель)
 - [API-сервер](#api-сервер)
 - [Внешние интеграции](#внешние-интеграции)
@@ -74,391 +75,416 @@
 | **TanStack Query** | Загрузка и мутации данных |
 | **shadcn/ui** | UI-компоненты (DataTable, Form, Dialog) |
 | **recharts** | Графики на дашборде |
+| **@codemirror** | Markdown-редактор новостей |
 
 ### Backend (`artifacts/api-server`)
 
 | Технология | Назначение |
 |---|---|
-| **Express 5** | HTTP-сервер |
-| **Drizzle ORM** | Type-safe работа с БД |
-| **PostgreSQL** | Реляционная база данных |
-| **Nodemailer** | Отправка email-уведомлений |
-| **Puppeteer** | Серверный пре-рендер для SEO-ботов |
-| **esbuild** | Сборка сервера |
+| **Express 5** | Веб-фреймворк |
+| **TypeScript** | Строгая типизация |
+| **Drizzle ORM** | Типобезопасные SQL-запросы |
+| **PostgreSQL** | Хранение данных |
+| **Puppeteer** | SSR/SSG (Server-Side Rendering / Static Site Generation) |
+| **Nodemailer** | SMTP-отправка писем |
 
 ---
 
 ## Архитектура
 
+Проект оформлен как **pnpm-монорепозиторий** с чётким разделением фронтенда, бэкенда и админки.
+
 ```
-workspace/ (pnpm monorepo)
+workspace/
 ├── artifacts/
-│   ├── debryansk-avto/      → Публичный сайт (React SPA + SSG)
-│   ├── admin-panel/         → Административная панель (React SPA)
-│   ├── api-server/          → REST API + email + интеграции (Express)
-│   └── mockup-sandbox/      → Изолированная среда для прототипов UI
-│
-├── lib/
-│   ├── db/                  → Drizzle схема + PostgreSQL (schema, migrations)
-│   └── api-zod/             → Zod-схемы, общие типы
-│
-└── scripts/                 → Утилиты: SSG, импорт данных
+│   ├── debryansk-avto/      # Публичный сайт (React + Vite + Tailwind)
+│   ├── admin-panel/           # Административная панель (React + Vite)
+│   ├── api-server/            # REST API (Express + Drizzle)
+│   ├── mockup-sandbox/        # Canvas-компоненты (для превью на доске)
+│   └── debryansk-presentation/ # Слайды для презентаций
+├── packages/
+│   ├── db/                    # Drizzle схема + миграции (shared)
+│   ├── shared/                # Утилиты, типы (shared)
+│   └── ui/                    # shadcn/ui компоненты (shared)
+└── pnpm-workspace.yaml
 ```
 
-### Поток данных
-
-```
-CM Expert XML / Auto.ru API → API-сервер → PostgreSQL → React-Query → UI
-Формы (лиды) → POST /api/send-email → SMTP + БД leads_table
-Медиафайлы → presigned URL → Google Cloud Storage → публичные URL
-SEO-бот → middleware → Puppeteer prerender → кэш GCS → HTML-ответ
-```
+Все приложения подключаются к единой PostgreSQL БД через пакет `@workspace/db`.
 
 ---
 
 ## Публичный сайт
 
-### Страницы
+### Основные разделы
 
-| Путь | Описание |
-|---|---|
-| `/` | Главная: hero-баннер, бренды, карусели авто, новости, карта дилеров, AI Навигатор |
-| `/new-cars` | Каталог новых автомобилей с фильтрами, сортировкой, поддержкой `?dealer=` и `?model=` |
-| `/new-cars/:id` | Карточка нового авто: фото, характеристики, комплектация, скидки |
-| `/cars` | Каталог автомобилей с пробегом |
-| `/cars/:id` | Карточка б/у авто: фото, VIN, ПТС, история владельцев |
-| `/brands` | Список брендов дилерской группы |
-| `/brands/:slug` | Бренд-страница: модельный ряд, спецпредложения, карта, новости, сервис |
-| `/buyout` | Выкуп автомобилей: многошаговая форма с онлайн-оценкой CM Expert |
-| `/compare` | Сравнение до 3 автомобилей по характеристикам и опциям |
-| `/favorites` | Избранные авто (localStorage) |
-| `/service` | Сервисный центр: услуги, онлайн-запись |
-| `/news` | Новости и статьи компании |
-| `/news/:slug` | Детальная страница новости с SEO и JSON-LD |
-| `/vacancies` | Вакансии (синхронизация с hh.ru + ручные позиции) |
-| `/about` | О компании: история, бренды, статистика |
-| `/contacts` | Контакты: дилерские центры с интерактивной Яндекс Картой |
-| `/privacy` | Политика конфиденциальности |
+| Раздел | URL | Описание |
+|---|---|---|
+| **Главная** | `/` | Hero, бренды, модели в наличии, отзывы, карта |
+| **Каталог новых** | `/new-cars` | Каталог новых авто с фильтрами по бренду, модели, цене, кузову |
+| **Каталог с пробегом** | `/cars` | Каталог б/у авто (CM Expert feed) |
+| **Страница авто** | `/new-cars/:id`, `/cars/:id` | Детальная карточка: фото, характеристики, кредитный калькулятор |
+| **Сервис** | `/service` | Техническое обслуживание: онлайн-запись, услуги, запчасти |
+| **Бонусная программа** | `/service/bonus` | Программа лояльности для клиентов сервиса |
+| **Выкуп** | `/buyout` | Оценка и выкуп автомобиля (3 шага формы) |
+| **О компании** | `/about` | История, контакты, расположение на карте |
+| **Контакты** | `/contacts` | Все контакты с картой и схемами проезда |
+| **Новости** | `/news` | Блог автодилера, новости по брендам |
+| **Вакансии** | `/vacancies` | Вакансии (интеграция с hh.ru) |
+| **Юридическая информация** | `/legal` | Реквизиты, схемы проезда |
+| **Политика конфиденциальности** | `/privacy` | Политика обработки данных |
 
-### Модальные формы (Lead Generation)
+### Главное меню (навигация)
+- **Автомобили** — dropdown: Новые / С пробегом
+- **Услуги** — dropdown: Сервис и ТО / Бонусная программа
+- **О группе**, **Дилеры**, **Выкуп**, **Контакты**, **Бонусы**
+- **Вакансии**, **Новости**, **Избранное**, **Сравнить**
 
-| Модаль | Функционал |
-|---|---|
-| **Заказать звонок** | Имя + телефон → email-уведомление |
-| **Тест-драйв** | Выбор даты/времени, дилерского центра → email |
-| **Кредитный калькулятор** | Взнос, срок, платёж, итоговая сумма → email |
-| **Trade-in** | Оценка через CM Expert API, включает данные целевого авто → email |
-| **Выкуп** | Многошаговая форма с оценкой CM Expert → email |
-| **Заявка на вакансию** | Имя, телефон, позиция → email |
+### Общие компоненты
+- **ChatWidget** — кнопка связи (вкладки: Звонок, WhatsApp, Telegram, VK)
+- **LocationBar** — бар с адресом и графиком работы над шапкой
+- **Compare / Favorites** — сравнение и избранное с localStorage
+- **StickyHeader** — шапка с тенью при скролле, 1 rem (16 px) уменьшение
 
-### Возможности каталога
-
-- Двойной каталог: новые (`/new-cars`) и с пробегом (`/cars`)
-- Фильтрация по бренду, модели, типу кузова, трансмиссии, приводу, цене, году, пробегу
-- Поиск по названию, модели, VIN
-- Сортировка: по цене, году, пробегу, дате добавления
-- Сравнение до 3 автомобилей (localStorage)
-- Избранное (localStorage)
-- Адаптивные WebP-изображения с lazy loading
-- Отображение скидок (кредитная, trade-in, итоговая цена)
-- Похожие автомобили и рекомендации на карточке
+### Кредитный калькулятор
+- Расчёт ежемесячного платежа по формуле аннуитета
+- Гибкие настройки: первоначальный взнос, срок, ставка
+- Предзаполнение данными из URL-параметров (utm, model, price)
 
 ---
 
 ## Бренд-страницы
 
-Каждый бренд имеет полноценный лендинг по пути `/brands/:slug` со следующими секциями:
+### Структура
+Каждый бренд имеет собственную страницу (например, `/brands/haval-pro`) с уникальным контентом:
+- Hero-баннер с логотипом и слоганом бренда
+- Описание бренда, преимущества, характерные черты
+- Модельный ряд в наличии (фильтр по бренду)
+- Техническое обслуживание и сервис
+- Блок новостей по бренду
+- Отзывы клиентов (GetLoyalty)
+- Яндекс Карта с точками продаж/сервиса бренда
+- FAQ по бренду (из таблицы `faqs`)
 
-| Секция | Содержимое |
-|---|---|
-| **Hero** | Логотип бренда, кнопки Тест-драйв / Заказать звонок / Сайт бренда |
-| **О бренде** | Текстовое описание (управляется из админки) |
-| **Модельный ряд** | Карточки моделей с фото, типом кузова, ценой. HAVAL — статичный каталог (8 моделей) |
-| **В наличии** | До 6 актуальных авто со скидками из фида |
-| **Сервис** | Гарантийное обслуживание, преимущества, кнопка записи на ТО |
-| **Новости** | До 4 новостей, привязанных к бренду или упоминающих его в тексте |
-| **Контакты** | Встроенная Яндекс Карта с маркером + адрес, телефон, режим работы |
+### SEO
+- Уникальные meta-title, meta-description и H1 для каждого бренда
+- JSON-LD `BreadcrumbList` и `FAQPage` для всех страниц
+- Динамические OG-картинки, canonical URLs
+- Prerender/SSG для ботов через middleware `seoMeta.ts`
 
-### Привязка новостей к бренду
-
-Новости можно явно привязать к бренду через поле `brand_id` (таблица `news`). В форме редактирования новости в админке — выпадающий список брендов (опциональное поле). API бренд-страницы возвращает сначала статьи с совпадающим `brand_id`, затем дополняет text-match по названию (до 4 итого).
+### Каталог новых брендов
+- OMODA: `/brands/omoda`
+- JAECOO: `/brands/jaecoo`
+- Haval City: `/brands/haval-city`
+- Haval Pro: `/brands/haval-pro`
+- Jetour: `/brands/jetour`
+- Tenet: `/brands/tenet`
+- EXEED: `/brands/exeed`
+- Mercedes-Benz: `/brands/mercedes-benz`
+- Volkswagen: `/brands/volkswagen`
+- SKODA: `/brands/skoda`
 
 ---
 
 ## AI Навигатор
 
-Виджет искусственного интеллекта в правом нижнем углу главной страницы.
+Интеллектуальный чат-помощник на главной странице.
 
-| Параметр | Значение |
-|---|---|
-| **Модель** | GPT-5-mini (JSON mode) |
-| **Каталог** | 50 б/у + 60 новых авто инжектируется в системный промпт |
-| **Ответ** | `{ reply, car_ids[], action }` — может рекомендовать конкретные авто |
-| **Персистентность** | История чата сохраняется в `localStorage` (`nav_messages_<session_id>`) |
-| **Лимит** | 60 сообщений на сессию, очищается при отказе от обработки данных |
-| **Скидки** | Навигатор знает о `max_discount`, `credit_discount`, `tradein_discount` |
+### Функционал
+- **Анализ запроса** клиента на естественном языке (GPT-5-mini)
+- **Поиск по каталогу** — подбор авто по параметрам (цена, кузов, бренд)
+- **Ответы на вопросы** о кредите, trade-in, гарантии, сервисе
+- **Действия**: запись на ТО, запрос цены, связь с менеджером
+
+### Техническая реализация
+- Системный промпт с контекстом каталога (50 б/у + 60 новых авто)
+- JSON-mode ответы: `{ reply, car_ids[], action }`
+- Персистентность сообщений в `localStorage` (до 60 сообщений)
+- Синхронизация каталога авто каждые 30 минут
+
+---
+
+## Бонусная программа лояльности
+
+Программа лояльности для клиентов сервиса, действующая во всех 4 дилерских центрах группы компаний.
+
+### Страница `/service/bonus`
+- **Начисление**: 10% от суммы любого заказ-наряда (ТО, ремонт, запчасти, аксессуары)
+- **Списание**: от 5% до 10% стоимости заказ-наряда в зависимости от накопительного уровня
+- **Накопительные уровни** (6 штук): Базовый 5% → +50K → 6% → +100K → 7% → +150K → 8% → +200K → 9% → +250K → 10%
+- **Фиксированные бонусы**: 10 000 (новый авто), 20 000 (повторная покупка), 5 000 (б/у новый клиент), 2 500 (приветственные), 4 000 (за 4 ТО), 1 000 (рекомендации), 5 000 (акция «Приведи друга»)
+- **СБП-скидка**: дополнительные 5% при оплате через Систему быстрых платежей
+- **Пример выгоды**: 15 000 ₽ заказ-наряд → +1 500 баллов → следующий визит уже 13 500 ₽
+- **Ограничения**: списание не производится при кузовном ремонте и покупке шин/дисков
+- **Срок действия**: баллы действуют 12 месяцев, при неактивности замораживаются на 6 месяцев
+
+### Интеграция
+- Главное меню: отдельная ссылка «Бонусы» с иконкой Gift
+- Промо-баннер на странице `/service`
+- BreadcrumbList JSON-LD: Главная → Сервис → Бонусная программа
+- FAQ-блок на странице программы (таблица `faqs`)
 
 ---
 
 ## Административная панель
 
-Полноценный back-office на `/admin-panel`:
+Полноценный back-office для управления контентом и данными.
+
+### Разделы
 
 | Раздел | Функционал |
 |---|---|
-| **Дашборд** | Статистика заявок, новостей, состояние системы |
-| **Заявки (Leads)** | Все обращения с сайта: тип, имя, телефон, авто, дата; экспорт CSV |
-| **Бренды** | CRUD брендов: название, логотип, slug, активность; редактор контента бренд-страницы |
-| **Локации** | Дилерские центры: адрес, телефон, координаты, привязка брендов |
-| **Новости** | CRUD статей: заголовок, slug, содержание, изображения, привязка к бренду |
-| **Отзывы** | Синхронизация с GetLoyalty (Яндекс / 2ГИС), управление отображением |
-| **Навигатор** | История диалогов AI-ассистента, экспорт в JSONL для дообучения |
-| **Вакансии** | Ручные вакансии (дополнение hh.ru) |
-| **Настройки сайта** | SEO-настройки, контакты, телефоны — применяются динамически |
-| **Пользователи** | Управление доступом к панели |
+| **Дашборд** | Графики по продажам, записям на сервис, выкупам |
+| **Автомобили** | CRUD: добавление, редактирование, удаление, изменение статуса |
+| **Записи на сервис** | Таблица заявок, фильтры по статусу, быстрое действие |
+| **Заявки на выкуп** | Управление заявками, фильтрация, просмотр деталей |
+| **Бренды** | CRUD брендов: название, slug, SEO-мета, контент, изображения |
+| **Новости** | CRUD новостей: редактор Markdown, изображения, категории |
+| **Вакансии** | CRUD вакансий: заголовок, описание, требования, зарплата |
+| **FAQ** | CRUD вопросов-ответов по страницам (с JSON-LD флагом) |
+| **Страницы контента** | SEO-контент для бренд-страниц (блоки: Описание, Преимущества, Модели, Сервис, Контакты) |
+| **Локации** | CRUD дилерских центров: адреса, телефоны, часы работы, карты |
+| **Отзывы** | Агрегированные отзывы с GetLoyalty (с фильтрами) |
+| **Настройки сайта** | SEO-заголовки, телефоны, email, соцсети |
+| **Навигатор (AI)** | Логи запросов к AI-чату, управление системным промптом |
+| **Пользователи** | CRUD администраторов |
+
+### Защита
+- Авторизация по паролю (bcrypt)
+- Protected routes (React Router guards)
+- Logout + redirect на login
 
 ---
 
 ## API-сервер
 
-### Публичные эндпойнты
+### Endpoints
 
-| Метод | Путь | Описание |
-|---|---|---|
-| GET | `/api/cars/used` | Автомобили с пробегом (фильтры: brand, body, price, year и др.) |
-| GET | `/api/cars/new` | Новые автомобили |
-| GET | `/api/cars/featured` | Избранные авто для главной |
-| GET | `/api/news` | Список новостей |
-| GET | `/api/news/:slug` | Новость по slug |
-| GET | `/api/brands` | Список брендов с числом авто |
-| GET | `/api/brands/:slug` | Бренд-страница: бренд + контент + локации + авто + новости |
-| GET | `/api/locations` | Дилерские центры |
-| GET | `/api/brand-locations` | Телефон/локация по бренду (для динамических контактов) |
-| GET | `/api/settings` | Настройки сайта (SEO, телефоны, адреса) |
-| GET | `/api/hh-vacancies` | Вакансии с hh.ru (RSS + API) |
-| GET | `/api/reviews` | Отзывы (GetLoyalty: Яндекс / 2ГИС) |
-| POST | `/api/send-email` | Отправка заявок (8 типов) + сохранение лида в БД |
+#### Автомобили
+- `GET /api/cars` — список авто (фильтры: бренд, модель, тип, цена)
+- `GET /api/cars/:id` — детали авто
+- `GET /api/brands/:slug/cars` — авто по бренду
 
-### CM Expert эндпойнты
+#### Записи на сервис
+- `POST /api/service-bookings` — создание заявки
+- `GET /api/service-bookings` — список (admin only)
 
-| Метод | Путь | Описание |
-|---|---|---|
-| GET | `/api/car-catalog/cm-brands` | Марки из CM Expert |
-| GET | `/api/car-catalog/cm-models` | Модели по марке |
-| GET | `/api/car-catalog/cm-generations` | Поколения по марке + модели + году |
-| GET | `/api/car-catalog/cm-bodies` | Типы кузова |
-| GET | `/api/car-catalog/cm-years` | Доступные годы выпуска |
-| GET | `/api/car-catalog/cm-expert-predict` | Онлайн-оценка выкупной стоимости |
+#### Выкуп
+- `POST /api/buyout-requests` — заявка на выкуп (3 шага)
+- `GET /api/buyout-requests` — список (admin only)
 
-### Административные эндпойнты
+#### Новости
+- `GET /api/news` — список новостей
+- `GET /api/news/:slug` — детальная новость
+- `POST /api/news` — создание (admin only)
 
-| Метод | Путь | Описание |
-|---|---|---|
-| GET/POST/PUT/DELETE | `/api/admin/leads` | Управление заявками |
-| GET/POST/PUT/DELETE | `/api/admin/brands` | CRUD брендов |
-| GET/PUT | `/api/admin/brand-pages/:id` | Контент бренд-страницы (описание, FAQ, преимущества) |
-| GET/POST/PUT/DELETE | `/api/admin/locations` | CRUD локаций + привязка брендов |
-| GET/POST/PUT/DELETE | `/api/admin/news` | CRUD новостей (включая brand_id) |
-| GET/POST/PUT/DELETE | `/api/admin/settings` | Настройки сайта |
-| GET/POST | `/api/admin/reviews` | Отзывы + синхронизация с GetLoyalty |
-| GET/POST | `/api/admin/navigator/chats` | История AI-диалогов, экспорт JSONL |
-| POST | `/api/admin/navigator/sync-cars` | Принудительная синхронизация каталога авто в Navigator |
-| POST | `/api/storage/uploads/request-url` | Presigned URL для загрузки в GCS |
+#### Вакансии
+- `GET /api/vacancies` — список вакансий
+- `POST /api/vacancies` — создание (admin only)
+
+#### Отзывы
+- `GET /api/reviews` — список отзывов (GetLoyalty)
+- `GET /api/reviews/aggregate` — агрегированные данные (средний рейтинг, количество)
+
+#### AI Навигатор
+- `POST /api/chat` — чат с AI (GPT-5-mini)
+- `GET /api/chat/logs` — логи запросов (admin only)
+
+#### Настройки
+- `GET /api/settings` — публичные настройки сайта
+- `PUT /api/settings` — обновление настроек (admin only)
+
+#### Email
+- `POST /api/send-email` — отправка письма (callback, заявка, обратная связь)
+
+### Middleware
+- `seoMeta.ts` — Prerender для ботов (Puppeteer + кэширование)
+- `botDetection.ts` — Определение User-Agent ботов
+- `cacheControl.ts` — Настройки кэширования
+- BreadcrumbList JSON-LD для всех страниц
 
 ---
 
 ## Внешние интеграции
 
-| Сервис | Назначение | Статус |
-|---|---|---|
-| **CM Expert** | Оценка стоимости авто, справочник марок/моделей/поколений, фид авто | ✅ Реализовано |
-| **Auto.ru API** | Справочник брендов и моделей для каталога | ✅ Реализовано |
-| **hh.ru** | Синхронизация вакансий (RSS + API) | ✅ Реализовано |
-| **GetLoyalty** | Синхронизация отзывов с Яндекс Карт и 2ГИС | ✅ Реализовано |
-| **OpenAI GPT** | AI Навигатор — чат-ассистент по подбору авто | ✅ Реализовано |
-| **Яндекс.Карты JS API 3.0** | Карты на страницах Контакты, Главная, бренд-страницы | ✅ Реализовано |
-| **SMTP (Timeweb)** | Отправка email-уведомлений о заявках | ✅ Реализовано |
-| **Google Cloud Storage** | Хранение изображений (загрузки из админки, prerender-кэш) | ✅ Реализовано |
-| **IndexNow** | Мгновенное уведомление поисковиков о новых URL | ✅ Реализовано |
+### Auto.ru API
+- Каталог марок и моделей (breadcrumbs)
+- Проксирование через бэкенд (CORS-защита)
+- Используется для валидации и подсказок в формах
+
+### GetLoyalty
+- Агрегация отзывов с Яндекс.Карт и 2ГИС
+- Автоматическая дедупликация и фильтрация (4-5★, 90 дней)
+- Защита от wrap-around пагинации (обнаружение дубликатов)
+- Обновление каждые 30 минут
+
+### hh.ru API
+- Загрузка вакансий дилера
+- Фильтрация по ключевым словам
+- Кэширование на 1 час
+
+### CM Expert
+- Каталог автомобилей с пробегом
+- Интеграция фида в БД (синхронизация)
+
+### Google Cloud Storage (Object Storage)
+- Хранение изображений авто, логотипов брендов, медиафайлов
+- Публичный доступ через signed URLs
 
 ---
 
 ## Email-уведомления
 
-При каждой заявке отправляется HTML-письмо с логотипом Дебрянск Авто на адрес `sales@debryansk-auto.ru`. Все заявки также сохраняются в таблице `leads` в PostgreSQL.
+### SMTP (Nodemailer)
+- Отправка через провайдера с авторизацией
+- HTML-шаблоны для разных типов писем
 
-| Тип (`type`) | Тема письма | Форма |
-|---|---|---|
-| `callback` | 📞 Заказать звонок | Хедер сайта |
-| `testdrive` | 🏁 Тест-драйв | Карточка нового авто |
-| `credit` | 💳 Автокредит | Карточки авто |
-| `tradein` | 🔄 Trade-in | Карточки авто + включает целевой авто |
-| `buyout` | 💰 Выкуп автомобиля | Страница `/buyout` |
-| `vacancy` | 💼 Отклик на вакансию | Страница `/vacancies` |
-| `openresume` | 📋 Открытый отклик | Страница `/vacancies` |
-| `feedback` | ✉️ Форма контактов | Страница `/contacts` |
+### Типы писем
+- **Callback** — заявка на обратный звонок
+- **Service Booking** — запись на ТО/сервис
+- **Buyout Request** — заявка на выкуп (3 шага)
+- **Contact Form** — обратная связь
 
 ---
 
 ## SEO и производительность
 
-| Оптимизация | Детали |
-|---|---|
-| **Серверный пре-рендер** | Puppeteer + Chromium: боты получают полный HTML, обычные пользователи — SPA |
-| **SSG (Static Site Generation)** | Критические маршруты генерируются как статические HTML при сборке |
-| **Schema.org JSON-LD** | AutoDealer, Vehicle/Car (VIN, fuelType, itemCondition), ItemList, BreadcrumbList, NewsArticle |
-| **BreadcrumbList** | На всех страницах сайта |
-| **Open Graph** | `og:title`, `og:description`, `og:image`, `og:locale:ru_RU` на каждой странице |
-| **Twitter Cards** | `summary_large_image` |
-| **Canonical URLs** | Предотвращение дублирования контента |
-| **React Helmet Async** | Динамические `<title>` и `<meta>` для каждой страницы |
-| **sitemap.xml** | Все статические страницы + приоритеты |
-| **robots.txt** | Правила для поисковых роботов |
-| **IndexNow** | Мгновенная индексация при публикации новостей |
-| **WebP-изображения** | Все PNG/JPG конвертированы в WebP (−95% размер) |
-| **Адаптивный `<picture>`** | `srcset` с мобильными вариантами для hero |
-| **Lazy loading** | `loading="lazy"` + `decoding="async"` для всех некритических изображений |
-| **SVG-оптимизация** | Очистка неймспейсов, объединение путей, короткие ID градиентов |
+### Технические решения
+- **SSG** (Static Site Generation) — все маршруты предгенерируются в HTML
+- **Prerender** для ботов — Puppeteer + User-Agent detection
+- **JSON-LD** schema.org: FAQPage, NewsArticle, BreadcrumbList, LocalBusiness, AutoDealer
+- **Lazy loading** изображений (`loading="lazy"`, `decoding="async"`)
+- **WebP-оптимизация** — конвертация PNG/JPG (~95% уменьшение размера)
+- **SVG-оптимизация** — ручная чистка, группировка по fill
+- **Image srcset** для адаптивных hero-баннеров
+
+### Core Web Vitals (SEO Audit)
+- **Lighthouse score**: ~79/100 (7 раундов аудита)
+- Исправлены: canonical URLs, meta tags, OG/Twitter cards, alt-тексты
+- Осталось: thin content (новостные статьи), author byline, orphan links, LCP preload
+
+### Кэширование
+- `staleTime` для React Query (5-60 минут в зависимости от эндпоинта)
+- Prerender-кэш в памяти (`ssgCache`)
+- Browser cache headers через middleware
 
 ---
 
 ## Структура проекта
 
-### Публичный сайт (`artifacts/debryansk-avto/src/`)
-
 ```
-src/
-├── App.tsx                    # Роутинг (wouter)
-├── pages/
-│   ├── home.tsx               # Главная (standalone, без Layout — AI Навигатор встроен напрямую)
-│   ├── brand-page.tsx         # Бренд-страница (/brands/:slug) — карта, модели, новости
-│   ├── cars.tsx               # Каталог б/у
-│   ├── new-cars.tsx           # Каталог новых (+ ?dealer= и ?model= из URL)
-│   ├── car-detail.tsx         # Карточка б/у авто
-│   ├── new-car-detail.tsx     # Карточка нового авто
-│   ├── buyout.tsx             # Страница выкупа с CM Expert оценкой
-│   ├── compare.tsx            # Сравнение автомобилей
-│   ├── favorites.tsx          # Избранное
-│   ├── news.tsx               # Новости
-│   ├── news-detail.tsx        # Детальная новости
-│   ├── service.tsx            # Сервисный центр
-│   ├── vacancies.tsx          # Вакансии
-│   ├── about.tsx              # О компании
-│   ├── contacts.tsx           # Контакты + Яндекс Карта всех дилеров
-│   └── not-found.tsx          # 404
+debryansk-avto/
+├── artifacts/
+│   ├── debryansk-avto/
+│   │   ├── src/
+│   │   │   ├── pages/              # Страницы (home, cars, brands, service, bonus-program, buyout, about, contacts, news, vacancies, legal, privacy)
+│   │   │   ├── components/         # Layout, SEO, ChatWidget, FaqBlock, ComparePanel, FavoritesPanel
+│   │   │   ├── hooks/              # usePhoneMask, useCarStorage, useToast
+│   │   │   ├── lib/                # normalizePhone, utils
+│   │   │   ├── assets/             # Логотипы, изображения, иконки
+│   │   │   └── App.tsx             # Роутинг (wouter)
+│   │   ├── scripts/
+│   │   │   └── ssg.mjs             # Скрипт статической генерации
+│   │   ├── public/                 # Статика (robots.txt, sitemap, og-image)
+│   │   └── vite.config.ts          # Конфигурация Vite
+│   │
+│   ├── admin-panel/
+│   │   ├── src/
+│   │   │   ├── pages/              # Дашборд, Автомобили, Записи, Выкуп, Бренды, Новости, Вакансии, FAQ, Настройки, AI-логи, Локации, Отзывы, Пользователи
+│   │   │   ├── components/         # ui (shared shadcn)
+│   │   │   ├── hooks/              # useAuth, useApi
+│   │   │   └── App.tsx             # Роутинг
+│   │   └── vite.config.ts
+│   │
+│   └── api-server/
+│       ├── src/
+│       │   ├── middleware/         # seoMeta.ts, botDetection.ts, cacheControl.ts
+│       │   ├── routes/             # cars, brands, news, vacancies, buyout, service-bookings, reviews, chat, settings
+│       │   ├── lib/                # logger.ts, db.ts
+│       │   └── app.ts              # Express приложение
+│       └── migration.ts            # Drizzle миграции
 │
-├── components/
-│   ├── Layout.tsx             # Шапка + подвал (телефоны из БД, Schema.org)
-│   ├── SEO.tsx                # SEO: meta, JSON-LD, BreadcrumbList
-│   ├── YandexMap.tsx          # Яндекс Карта JS API 3.0 (контакты, главная, бренды)
-│   ├── ChatWidget.tsx         # AI Навигатор (виджет)
-│   ├── CarActionButtons.tsx   # Кнопки избранного/сравнения
-│   └── modals/
-│       ├── CallbackModal.tsx  # Заказать звонок
-│       ├── TestDriveModal.tsx # Запись на тест-драйв
-│       ├── CreditModal.tsx    # Кредитный калькулятор
-│       └── TradeInModal.tsx   # Trade-in (с оценкой CM Expert + целевой авто)
+├── packages/
+│   ├── db/
+│   │   ├── src/
+│   │   │   ├── schema.ts           # Drizzle schema (cars, brands, news, vacancies, locations, settings, faqs, chat_logs)
+│   │   │   └── index.ts            # Экспорт db-коннекшена
+│   │   └── drizzle.config.ts
+│   │
+│   ├── shared/
+│   │   └── src/
+│   │       └── index.ts            # Общие типы и утилиты
+│   │
+│   └── ui/
+│       └── src/
+│           └── components/         # shadcn/ui компоненты (Button, Input, Dialog, Accordion, etc.)
 │
-└── hooks/
-    ├── useCarStorage.ts       # localStorage: избранное, сравнение
-    └── use-toast.ts           # Toast-уведомления
+├── .github/
+│   └── workflows/
+│       └── deploy.yml              # GitHub Actions (CI/CD)
+│
+├── .local/
+│   └── skills/                     # Кастомные скилы для Replit Agent
+│       └── auto-track-and-sync/
+│           └── SKILL.md            # Автоматическая синхронизация с GitHub
+│
+├── pnpm-workspace.yaml
+├── package.json
+└── README.md
 ```
-
-### API-сервер (`artifacts/api-server/src/`)
-
-```
-src/
-├── index.ts                   # Точка входа Express + prerender middleware
-├── routes/
-│   ├── cars.ts                # /api/cars/*
-│   ├── public-brands.ts       # /api/brands/* (список + бренд-страница)
-│   ├── admin-news.ts          # /api/admin/news (CRUD + brand_id)
-│   ├── admin-brands.ts        # /api/admin/brands + brand-pages content
-│   ├── email.ts               # POST /api/send-email (8 типов, HTML-шаблоны)
-│   ├── navigator.ts           # AI Навигатор: чат, синхронизация каталога
-│   ├── reviews.ts             # GetLoyalty интеграция (Яндекс / 2ГИС)
-│   ├── carCatalog.ts          # /api/car-catalog/* (CM Expert + Auto.ru)
-│   ├── hh.ts                  # /api/hh-vacancies
-│   └── settings.ts            # /api/settings, /api/brand-locations
-└── services/
-    ├── indexnow.ts            # Пинг IndexNow при публикации
-    └── prerender.ts           # Puppeteer SSR для SEO-ботов
-```
-
-### База данных (`lib/db/src/schema/`)
-
-| Таблица | Описание |
-|---|---|
-| `brands` | Бренды: name, slug, logoUrl, bgColor, isServiceOnly |
-| `brand_page_content` | Контент бренд-страниц: description, serviceText, FAQ, advantages |
-| `cars` | Автомобили (новые + б/у): из CM Expert фида, синхронизация каждые 30 мин |
-| `news` | Новости: title, slug, content, image, `brand_id` (опциональная привязка к бренду) |
-| `leads` | Заявки с сайта: тип, имя, телефон, авто, дата |
-| `locations` | Дилерские центры: адрес, координаты (map_x=lat, map_y=lng) |
-| `location_brands` | Привязка брендов к дилерским центрам |
-| `reviews` | Отзывы (GetLoyalty): автор, рейтинг, текст, источник |
-| `navigator_conversations` | Диалоги AI Навигатора по сессиям |
-| `navigator_messages` | Сообщения диалогов: role, content, car_ids, rating |
-| `settings` | Настройки сайта: key-value пары |
-| `users` | Администраторы панели управления |
 
 ---
 
 ## Разработка
 
-### Требования
-
-- Node.js ≥ 18
-- pnpm ≥ 9
-- PostgreSQL ≥ 14
-
 ### Установка
-
 ```bash
-# Клонирование
-git clone https://github.com/skodabryansk-collab/debryansk-avto.git
-cd debryansk-avto
-
-# Установка зависимостей
 pnpm install
+```
 
-# Миграции БД
-pnpm --filter @workspace/db run migrate
+### Запуск dev-серверов
+```bash
+# Публичный сайт
+pnpm --filter @workspace/debryansk-avto run dev
 
-# Запуск всех сервисов
-pnpm run dev
+# API-сервер
+pnpm --filter @workspace/api-server run dev
+
+# Админ-панель
+pnpm --filter @workspace/admin-panel run dev
+```
+
+### Сборка
+```bash
+# Публичный сайт (с SSG)
+pnpm --filter @workspace/debryansk-avto run build
+
+# API-сервер
+pnpm --filter @workspace/api-server run build
+```
+
+### Миграции БД
+```bash
+pnpm --filter @workspace/api-server run migrate
+```
+
+### Статическая генерация (SSG)
+```bash
+pnpm --filter @workspace/debryansk-avto run build
+# SSG-скрипт (ssg.mjs) генерирует HTML для всех маршрутов:
+# /, /new-cars, /cars, /service, /service/bonus, /buyout, /about, /contacts, /news, /vacancies, /privacy, /legal
+# + динамические: /brands/:slug, /news/:slug, /new-cars/:id, /cars/:id
 ```
 
 ### Переменные окружения
-
-```env
-# База данных
-DATABASE_URL=postgresql://user:pass@host:5432/db
-
-# API-сервер
-PORT=8080
-
-# SMTP (email-уведомления)
-SMTP_HOST=smtp.timeweb.ru
-SMTP_PORT=465
-SMTP_USER=sales@debryansk-auto.ru
-SMTP_PASS=...
-SMTP_TO=sales@debryansk-auto.ru
-
-# Внешние API
-AUTORU_API_KEY=...            # Auto.ru dealer API
-GETLOYALTY_API_KEY=...        # GetLoyalty (отзывы Яндекс/2ГИС)
-
-# Google Cloud Storage
-DEFAULT_OBJECT_STORAGE_BUCKET_ID=...
-PRIVATE_OBJECT_DIR=...
-PUBLIC_OBJECT_SEARCH_PATHS=...
-```
+- `DATABASE_URL` — PostgreSQL connection string
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` — SMTP-конфиг
+- `AUTORU_API_KEY` — Auto.ru API
+- `GETLOYALTY_API_KEY` — GetLoyalty API
+- `DEFAULT_OBJECT_STORAGE_BUCKET_ID` — GCS bucket
+- `FRONTEND_DIST_PATH` — путь до dist (для API-сервера)
 
 ---
 
-<p align="center">
-  <strong>Дебрянск Авто · Брянск, Россия</strong><br>
-  <a href="https://debryansk-avto.ru">debryansk-avto.ru</a> ·
-  <a href="tel:+74832777770">+7 (4832) 77 77 70</a>
-</p>
+## Лицензия
+
+Внутренний проект ООО «Дебрянск Авто» (группа компаний 9 БР).
