@@ -296,6 +296,7 @@ export interface Promotion {
   buttonText: string | null;
   buttonUrl: string | null;
   brandIds: number[];
+  promotionType: "sales" | "service";
   createdAt: string;
   updatedAt: string;
 }
@@ -309,6 +310,7 @@ export type PromotionInput = {
   buttonText?: string | null;
   buttonUrl?: string | null;
   brandIds?: number[];
+  promotionType?: "sales" | "service";
 };
 export function getPromotions(brandId?: number) {
   const q = brandId ? `?brandId=${brandId}` : "";
