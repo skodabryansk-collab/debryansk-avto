@@ -522,6 +522,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <li><Link href="/news" className="hover:text-[#0070b8] transition-colors">Новости</Link></li>
                 <li><Link href="/vacancies" className="hover:text-[#0070b8] transition-colors">Вакансии</Link></li>
                 <li><Link href="/service" className="hover:text-[#0070b8] transition-colors">Сервис и ТО</Link></li>
+                <li><Link href="/service/bonus" className="hover:text-[#0070b8] transition-colors">Бонусная программа</Link></li>
               </ul>
             </div>
 
