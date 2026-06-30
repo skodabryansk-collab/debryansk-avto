@@ -22,6 +22,7 @@ import AboutPage from "@/pages/about";
 import BrandPage from "@/pages/brand-page";
 import PrivacyPage from "@/pages/privacy";
 import LegalPage from "@/pages/legal";
+import BonusProgramPage from "@/pages/bonus-program";
 
 const queryClient = new QueryClient();
 const METRIKA_ID = 109748190;
@@ -71,6 +72,7 @@ function Router() {
       <Route path="/favorites" component={FavoritesPage} />
       <Route path="/news" component={NewsPage} />
       <Route path="/news/:slug" component={NewsDetailPage} />
+      <Route path="/service/bonus" component={BonusProgramPage} />
       <Route path="/service" component={ServicePage} />
       <Route path="/buyout" component={BuyoutPage} />
       <Route path="/contacts" component={ContactsPage} />
