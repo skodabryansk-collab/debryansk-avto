@@ -30,7 +30,9 @@ import adminNavigatorRouter from "./admin-navigator";
 import adminReviewsRouter from "./admin-reviews";
 import adminBrandPagesRouter from "./admin-brand-pages";
 import adminPromotionsRouter from "./admin-promotions";
+import publicPromotionsRouter from "./public-promotions";
 import adminCacheRouter from "./admin-cache";
+import disclaimersRouter from "./disclaimers";
 import feedYmlRouter from "./feed-yml";
 import { publicFaqRouter, adminFaqRouter } from "./faq";
 
@@ -49,6 +51,7 @@ router.use(emailRouter);
 // Public content routes
 router.use("/news", publicNewsRouter);
 router.use("/brands", publicBrandsRouter);
+router.use(publicPromotionsRouter);
 router.use("/locations", publicLocationsRouter);
 router.use(brandLocationsRouter);
 
@@ -76,6 +79,7 @@ router.use("/admin/promotions", adminPromotionsRouter);
 router.use("/admin/cache", adminCacheRouter);
 router.use("/faq", publicFaqRouter);
 router.use("/admin/faq", adminFaqRouter);
+router.use(disclaimersRouter);
 
 // Public settings
 router.use("/settings", publicSettingsRouter);
