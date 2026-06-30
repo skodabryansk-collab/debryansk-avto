@@ -18,6 +18,7 @@ import ReviewsPage from "@/pages/reviews";
 import PromotionsPage from "@/pages/promotions";
 import FaqPage from "@/pages/faq";
 import DisclaimersPage from "@/pages/disclaimers";
+import BonusProgramAdminPage from "@/pages/bonus-program";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ function AppRouter() {
       <Route path="/promotions" component={() => <RequireAuth><AdminLayout><PromotionsPage /></AdminLayout></RequireAuth>} />
       <Route path="/faq" component={() => <RequireAuth><AdminLayout><FaqPage /></AdminLayout></RequireAuth>} />
       <Route path="/disclaimers" component={() => <RequireAuth><AdminLayout><DisclaimersPage /></AdminLayout></RequireAuth>} />
+      <Route path="/bonus-program" component={() => <RequireAuth><AdminLayout><BonusProgramAdminPage /></AdminLayout></RequireAuth>} />
       <Route component={() => <RequireAuth><AdminLayout><NotFound /></AdminLayout></RequireAuth>} />
     </Switch>
   );
