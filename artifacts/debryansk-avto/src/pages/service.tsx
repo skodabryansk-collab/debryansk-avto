@@ -4,10 +4,11 @@ import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
   Wrench, Hammer, Sparkles, Package, Car, Shield,
-  MapPin, Phone, Clock, CheckCircle, Star, Settings, Gauge
+  MapPin, Phone, Clock, CheckCircle, Star, Settings, Gauge, Tag, ChevronRight
 } from "lucide-react";
 import SEO from "@/components/SEO";
 import Layout from "@/components/Layout";
+import FaqBlock from "@/components/FaqBlock";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 
@@ -285,6 +286,150 @@ function BookingForm({ locations }: { locations: ApiLocation[] }) {
 }
 
 /* ─── Main Page ─────────────────────────────────────────────────── */
+/* ── Types ─────────────────────────────────────────────────── */
+interface PromoBrand { id: number; name: string; logoUrl: string | null; bgColor: string | null; }
+interface ServicePromotion {
+  id: number; title: string; description: string;
+  image: string | null; badge: string | null; expiresAt: string | null;
+  buttonText: string | null; buttonUrl: string | null;
+  brands: PromoBrand[];
+}
+
+async function fetchServicePromotions(): Promise<ServicePromotion[]> {
+  const r = await fetch("/api/promotions?type=service");
+  if (!r.ok) return [];
+  const j = await r.json();
+  return j.data ?? [];
+}
+
+/* ── ServicePromotionsBlock ────────────────────────────────── */
+function ServicePromotionsBlock() {
+  const { data: promotions = [] } = useQuery<ServicePromotion[]>({
+    queryKey: ["service-promotions"],
+    queryFn: fetchServicePromotions,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (!promotions.length) return null;
+
+  return (
+    <section className="py-12 bg-white">
+      <div className="container mx-auto px-4 sm:px-6">
+        <div className="mb-8 flex items-center gap-3">
+          <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#0070b8]/10">
+            <Tag className="w-4.5 h-4.5 text-[#0070b8]" />
+          </span>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[#0070b8] mb-0.5">Специальные предложения</p>
+            <h2 className="text-2xl font-extrabold text-slate-900 leading-tight">Акции сервисного центра</h2>
+          </div>
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {promotions.map((promo) => {
+            const isExpired = promo.expiresAt ? new Date(promo.expiresAt) < new Date() : false;
+            if (isExpired) return null;
+
+            return (
+              <motion.div
+                key={promo.id}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.35 }}
+                className="group rounded-2xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col"
+              >
+                {/* Image */}
+                {promo.image ? (
+                  <div className="relative h-44 overflow-hidden bg-slate-100">
+                    <img
+                      src={promo.image} alt={promo.title}
+                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                      loading="lazy" decoding="async"
+                    />
+                    {/* Brand badges overlay */}
+                    {promo.brands.length > 0 && (
+                      <div className="absolute bottom-2 left-2 flex flex-wrap gap-1.5">
+                        {promo.brands.slice(0, 4).map(b => (
+                          <div key={b.id} className="flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-full px-2 py-0.5 shadow-sm">
+                            {b.logoUrl && (
+                              <img src={b.logoUrl} alt={b.name} className="w-4 h-3 object-contain" loading="lazy" decoding="async" />
+                            )}
+                            <span className="text-[10px] font-bold text-slate-700">{b.name}</span>
+                          </div>
+                        ))}
+                        {promo.brands.length > 4 && (
+                          <div className="bg-white/90 backdrop-blur-sm rounded-full px-2 py-0.5 shadow-sm">
+                            <span className="text-[10px] font-bold text-slate-500">+{promo.brands.length - 4}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {promo.badge && (
+                      <div className="absolute top-2 right-2 bg-[#87b63c] text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow">
+                        {promo.badge}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* No image: brand badges inline */
+                  promo.brands.length > 0 && (
+                    <div className="bg-slate-50 border-b border-slate-100 px-4 py-3 flex flex-wrap gap-2">
+                      {promo.brands.slice(0, 5).map(b => (
+                        <div key={b.id} className="flex items-center gap-1.5 bg-white rounded-lg px-2.5 py-1.5 shadow-sm border border-slate-100">
+                          {b.logoUrl && (
+                            <img src={b.logoUrl} alt={b.name} className="w-10 h-5 object-contain" loading="lazy" decoding="async" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+
+                {/* Content */}
+                <div className="flex flex-col flex-1 p-4 gap-2">
+                  <div className="flex items-start gap-2">
+                    <h3 className="flex-1 font-bold text-slate-900 text-sm leading-snug">{promo.title}</h3>
+                    {promo.expiresAt && (
+                      <span className="shrink-0 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 whitespace-nowrap">
+                        до {new Date(promo.expiresAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                      </span>
+                    )}
+                  </div>
+                  {promo.description && (
+                    <p className="text-xs text-slate-500 leading-relaxed line-clamp-3">{promo.description}</p>
+                  )}
+
+                  {/* No-image brand badges */}
+                  {!promo.image && promo.brands.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {promo.brands.map(b => (
+                        <span key={b.id} className="text-[10px] font-semibold text-slate-600 bg-slate-100 rounded-full px-2 py-0.5">{b.name}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {promo.buttonText && (
+                    <div className="mt-auto pt-2">
+                      <a
+                        href={promo.buttonUrl || "#service-booking"}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0070b8] hover:text-[#005a94] group/btn"
+                      >
+                        {promo.buttonText}
+                        <ChevronRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function ServicePage() {
   const [, navigate] = useLocation();
   const { data: locations = [], isLoading } = useQuery({
@@ -485,6 +630,10 @@ export default function ServicePage() {
             </div>
           </div>
         </section>
+
+        <ServicePromotionsBlock />
+
+        <FaqBlock pageSlug="service" />
       </div>
     </Layout>
   );
