@@ -442,6 +442,76 @@ export async function runMigration() {
       logger.info("No legacy JSONB promotions to migrate");
     }
 
+    // ── car_mark column on brands ─────────────────────────────
+    await db.execute(sql`ALTER TABLE brands ADD COLUMN IF NOT EXISTS car_mark TEXT`);
+
+    // Seed known auto.ru mark → dealer brand mappings
+    const carMarkSeed: Array<{ id: number; mark: string }> = [
+      { id: 3, mark: "Haval" },   // Haval City
+      { id: 4, mark: "Haval" },   // Haval Pro
+      { id: 1, mark: "Omoda" },   // OMODA
+      { id: 2, mark: "Jaecoo" },  // JAECOO
+      { id: 6, mark: "Jetour" },  // Jetour
+      { id: 57, mark: "Soueast" },// Soueast
+      { id: 5, mark: "Tenet" },   // Tenet
+      { id: 19, mark: "Exeed" },  // Exeed
+      { id: 18, mark: "Skoda" },  // SKODA
+      { id: 17, mark: "Volkswagen" }, // VW
+      { id: 20, mark: "Mercedes-Benz" }, // Mercedes-Benz
+    ];
+    for (const { id, mark } of carMarkSeed) {
+      await db.execute(sql`
+        UPDATE brands SET car_mark = ${mark} WHERE id = ${id} AND car_mark IS NULL
+      `);
+    }
+    logger.info("brands.car_mark: seeded");
+
+    // ── Disclaimers tables ────────────────────────────────────
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS disclaimers (
+        id SERIAL PRIMARY KEY,
+        scope TEXT NOT NULL,
+        brand_id INTEGER,
+        model TEXT,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS disclaimer_versions (
+        id SERIAL PRIMARY KEY,
+        disclaimer_id INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        version_number INTEGER NOT NULL,
+        changed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS promotion_disclaimers (
+        promotion_id INTEGER NOT NULL,
+        disclaimer_id INTEGER NOT NULL,
+        PRIMARY KEY (promotion_id, disclaimer_id)
+      )
+    `);
+
+    // Seed system disclaimer for used-car pricing (scope='price_from_used')
+    const existingUsed = await db.execute(sql`
+      SELECT id FROM disclaimers WHERE scope = 'price_from_used' LIMIT 1
+    `);
+    if (!existingUsed.rows[0]) {
+      await db.execute(sql`
+        INSERT INTO disclaimers (scope, brand_id, model, title, content, is_active)
+        VALUES ('price_from_used', NULL, NULL, 'Информация о цене',
+          'Цена указана для базовой комплектации и может отличаться в зависимости от технического состояния, пробега и комплектации конкретного автомобиля. Точную стоимость уточняйте у менеджера.',
+          TRUE
+        )
+      `);
+      logger.info("disclaimers: seeded price_from_used system record");
+    }
+
   } catch (err) {
     logger.error({ err }, "Migration error");
   }
