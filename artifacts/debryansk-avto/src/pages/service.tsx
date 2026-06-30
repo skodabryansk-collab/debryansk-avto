@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from "react";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useLocation } from "wouter";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Wrench, Hammer, Sparkles, Package, Car, Shield,
-  MapPin, Phone, Clock, CheckCircle, Star, Settings, Gauge, Tag, ChevronRight
+  MapPin, Phone, Clock, CheckCircle, Star, Settings, Gauge,
+  Tag, ChevronRight, ChevronLeft, X, Calendar, ArrowRight, ExternalLink
 } from "lucide-react";
 import SEO from "@/components/SEO";
 import Layout from "@/components/Layout";
@@ -302,130 +303,346 @@ async function fetchServicePromotions(): Promise<ServicePromotion[]> {
   return j.data ?? [];
 }
 
+/* ── ServicePromoModal ─────────────────────────────────────── */
+function ServicePromoModal({
+  promo,
+  onClose,
+}: {
+  promo: ServicePromotion;
+  onClose: () => void;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isPhoneValid(phone)) return;
+    setSending(true);
+    setError(false);
+    try {
+      const fd = new FormData();
+      fd.append("type", "promo");
+      fd.append("phone", phone);
+      fd.append("source", `Акция сервиса: ${promo.title}`);
+      const r = await fetch("/api/send-email", { method: "POST", body: fd });
+      if (!r.ok) { setError(true); setSending(false); return; }
+      setSubmitted(true);
+    } catch {
+      setError(true);
+      setSending(false);
+    }
+  }
+
+  const btnText = promo.buttonText || "Оставить заявку";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ y: 60, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 60, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="relative z-10 w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl max-h-[92vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="h-1 bg-gradient-to-r from-[#0070b8] to-[#87b63c]" />
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-20 w-8 h-8 bg-white/90 hover:bg-slate-100 rounded-full flex items-center justify-center transition-colors shadow-sm"
+        >
+          <X className="w-4 h-4 text-slate-600" />
+        </button>
+
+        {promo.image && (
+          <div className="w-full h-48 sm:h-56 shrink-0 overflow-hidden relative">
+            <img src={promo.image} alt={promo.title} className="w-full h-full object-cover" loading="lazy" />
+            {promo.brands.length > 0 && (
+              <div className="absolute bottom-2 left-2 flex flex-wrap gap-1.5">
+                {promo.brands.slice(0, 4).map(b => (
+                  <div key={b.id} className="flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-full px-2 py-0.5 shadow-sm">
+                    {b.logoUrl && <img src={b.logoUrl} alt={b.name} className="w-4 h-3 object-contain" />}
+                    <span className="text-[10px] font-bold text-slate-700">{b.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="p-6 sm:p-8 overflow-y-auto">
+          <div className="flex flex-wrap gap-2 mb-3">
+            {promo.badge && (
+              <span className="inline-flex items-center gap-1 bg-[#87b63c]/15 text-[#4a7a0f] text-xs font-bold px-3 py-1 rounded-full">
+                {promo.badge}
+              </span>
+            )}
+            {promo.expiresAt && (
+              <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 text-xs font-semibold px-3 py-1 rounded-full border border-amber-200">
+                <Calendar className="w-3 h-3" />
+                до {new Date(promo.expiresAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+              </span>
+            )}
+          </div>
+
+          {/* Brand logos if no image */}
+          {!promo.image && promo.brands.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {promo.brands.map(b => (
+                <div key={b.id} className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5">
+                  {b.logoUrl && <img src={b.logoUrl} alt={b.name} className="w-10 h-5 object-contain" />}
+                  <span className="text-xs font-semibold text-slate-600">{b.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mb-3 leading-tight">
+            {promo.title}
+          </h2>
+          <p className="text-slate-600 leading-relaxed whitespace-pre-line mb-6 text-sm sm:text-base">
+            {promo.description}
+          </p>
+
+          {submitted ? (
+            <div className="bg-[#87b63c]/10 border border-[#87b63c]/30 rounded-2xl p-5 text-center">
+              <CheckCircle className="w-10 h-10 text-[#87b63c] mx-auto mb-2" />
+              <p className="font-bold text-slate-900">Заявка отправлена!</p>
+              <p className="text-sm text-slate-500 mt-1">Мы свяжемся с вами в ближайшее время</p>
+            </div>
+          ) : !showForm ? (
+            <div className="flex flex-col sm:flex-row gap-3">
+              {promo.buttonUrl && (
+                <a
+                  href={promo.buttonUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold px-5 py-3 rounded-xl text-sm transition-colors"
+                >
+                  Узнать подробнее <ExternalLink className="w-4 h-4" />
+                </a>
+              )}
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex-1 bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold px-5 py-3 rounded-xl text-sm hover:opacity-90 transition-opacity"
+              >
+                {btnText}
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">
+                  Ваш телефон
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="tel" inputMode="tel" maxLength={18}
+                    value={phone} onChange={e => setPhone(formatPhone(e.target.value))}
+                    placeholder="+7 (___) ___-__-__" required
+                    className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors"
+                  />
+                </div>
+              </div>
+              {error && <p className="text-red-500 text-xs">Ошибка отправки, попробуйте ещё раз</p>}
+              <button
+                type="submit"
+                disabled={sending || !isPhoneValid(phone)}
+                className="w-full bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold px-5 py-3 rounded-xl text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {sending ? "Отправляем..." : "Отправить заявку"}
+              </button>
+              <p className="text-[10px] text-slate-400 text-center leading-tight">
+                Нажимая кнопку, вы соглашаетесь с&nbsp;
+                <a href="/privacy" className="underline hover:text-slate-600">политикой конфиденциальности</a>
+              </p>
+            </form>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+const PROMOS_PER_PAGE = 6;
+
 /* ── ServicePromotionsBlock ────────────────────────────────── */
 function ServicePromotionsBlock() {
-  const { data: promotions = [] } = useQuery<ServicePromotion[]>({
+  const { data: allPromotions = [] } = useQuery<ServicePromotion[]>({
     queryKey: ["service-promotions"],
     queryFn: fetchServicePromotions,
     staleTime: 5 * 60 * 1000,
   });
+
+  const [selectedPromo, setSelectedPromo] = useState<ServicePromotion | null>(null);
+  const [page, setPage] = useState(0);
+
+  const promotions = useMemo(
+    () => allPromotions.filter(p => !p.expiresAt || new Date(p.expiresAt) >= new Date()),
+    [allPromotions]
+  );
+
+  const totalPages = Math.ceil(promotions.length / PROMOS_PER_PAGE);
+  const pagePromos = promotions.slice(page * PROMOS_PER_PAGE, (page + 1) * PROMOS_PER_PAGE);
 
   if (!promotions.length) return null;
 
   return (
     <section className="py-12 bg-white">
       <div className="container mx-auto px-4 sm:px-6">
-        <div className="mb-8 flex items-center gap-3">
-          <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#0070b8]/10">
-            <Tag className="w-4.5 h-4.5 text-[#0070b8]" />
-          </span>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#0070b8] mb-0.5">Специальные предложения</p>
-            <h2 className="text-2xl font-extrabold text-slate-900 leading-tight">Акции сервисного центра</h2>
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#0070b8]/10">
+              <Tag className="w-[18px] h-[18px] text-[#0070b8]" />
+            </span>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[#0070b8] mb-0.5">Специальные предложения</p>
+              <h2 className="text-2xl font-extrabold text-slate-900 leading-tight">Акции сервисного центра</h2>
+            </div>
           </div>
+          {promotions.length > PROMOS_PER_PAGE && (
+            <p className="text-sm text-slate-400">
+              {page * PROMOS_PER_PAGE + 1}–{Math.min((page + 1) * PROMOS_PER_PAGE, promotions.length)} из {promotions.length}
+            </p>
+          )}
         </div>
 
+        {/* Grid */}
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {promotions.map((promo) => {
-            const isExpired = promo.expiresAt ? new Date(promo.expiresAt) < new Date() : false;
-            if (isExpired) return null;
-
-            return (
-              <motion.div
-                key={promo.id}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.35 }}
-                className="group rounded-2xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col"
-              >
-                {/* Image */}
-                {promo.image ? (
-                  <div className="relative h-44 overflow-hidden bg-slate-100">
-                    <img
-                      src={promo.image} alt={promo.title}
-                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                      loading="lazy" decoding="async"
-                    />
-                    {/* Brand badges overlay */}
-                    {promo.brands.length > 0 && (
-                      <div className="absolute bottom-2 left-2 flex flex-wrap gap-1.5">
-                        {promo.brands.slice(0, 4).map(b => (
-                          <div key={b.id} className="flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-full px-2 py-0.5 shadow-sm">
-                            {b.logoUrl && (
-                              <img src={b.logoUrl} alt={b.name} className="w-4 h-3 object-contain" loading="lazy" decoding="async" />
-                            )}
-                            <span className="text-[10px] font-bold text-slate-700">{b.name}</span>
-                          </div>
-                        ))}
-                        {promo.brands.length > 4 && (
-                          <div className="bg-white/90 backdrop-blur-sm rounded-full px-2 py-0.5 shadow-sm">
-                            <span className="text-[10px] font-bold text-slate-500">+{promo.brands.length - 4}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {promo.badge && (
-                      <div className="absolute top-2 right-2 bg-[#87b63c] text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow">
-                        {promo.badge}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  /* No image: brand badges inline */
-                  promo.brands.length > 0 && (
-                    <div className="bg-slate-50 border-b border-slate-100 px-4 py-3 flex flex-wrap gap-2">
-                      {promo.brands.slice(0, 5).map(b => (
-                        <div key={b.id} className="flex items-center gap-1.5 bg-white rounded-lg px-2.5 py-1.5 shadow-sm border border-slate-100">
+          {pagePromos.map((promo, i) => (
+            <motion.button
+              key={promo.id}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.28, delay: i * 0.06 }}
+              onClick={() => setSelectedPromo(promo)}
+              className="group rounded-2xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col text-left w-full cursor-pointer"
+            >
+              {/* Image */}
+              {promo.image ? (
+                <div className="relative h-44 overflow-hidden bg-slate-100 shrink-0">
+                  <img
+                    src={promo.image} alt={promo.title}
+                    className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
+                    loading="lazy" decoding="async"
+                  />
+                  {promo.brands.length > 0 && (
+                    <div className="absolute bottom-2 left-2 flex flex-wrap gap-1.5">
+                      {promo.brands.slice(0, 4).map(b => (
+                        <div key={b.id} className="flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-full px-2 py-0.5 shadow-sm">
                           {b.logoUrl && (
-                            <img src={b.logoUrl} alt={b.name} className="w-10 h-5 object-contain" loading="lazy" decoding="async" />
+                            <img src={b.logoUrl} alt={b.name} className="w-4 h-3 object-contain" loading="lazy" decoding="async" />
                           )}
+                          <span className="text-[10px] font-bold text-slate-700">{b.name}</span>
                         </div>
                       ))}
-                    </div>
-                  )
-                )}
-
-                {/* Content */}
-                <div className="flex flex-col flex-1 p-4 gap-2">
-                  <div className="flex items-start gap-2">
-                    <h3 className="flex-1 font-bold text-slate-900 text-sm leading-snug">{promo.title}</h3>
-                    {promo.expiresAt && (
-                      <span className="shrink-0 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 whitespace-nowrap">
-                        до {new Date(promo.expiresAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
-                      </span>
-                    )}
-                  </div>
-                  {promo.description && (
-                    <p className="text-xs text-slate-500 leading-relaxed line-clamp-3">{promo.description}</p>
-                  )}
-
-                  {/* No-image brand badges */}
-                  {!promo.image && promo.brands.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {promo.brands.map(b => (
-                        <span key={b.id} className="text-[10px] font-semibold text-slate-600 bg-slate-100 rounded-full px-2 py-0.5">{b.name}</span>
-                      ))}
+                      {promo.brands.length > 4 && (
+                        <div className="bg-white/90 backdrop-blur-sm rounded-full px-2 py-0.5 shadow-sm">
+                          <span className="text-[10px] font-bold text-slate-500">+{promo.brands.length - 4}</span>
+                        </div>
+                      )}
                     </div>
                   )}
-
-                  {promo.buttonText && (
-                    <div className="mt-auto pt-2">
-                      <a
-                        href={promo.buttonUrl || "#service-booking"}
-                        className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0070b8] hover:text-[#005a94] group/btn"
-                      >
-                        {promo.buttonText}
-                        <ChevronRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" />
-                      </a>
+                  {promo.badge && (
+                    <div className="absolute top-2 right-2 bg-[#87b63c] text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow">
+                      {promo.badge}
                     </div>
                   )}
                 </div>
-              </motion.div>
-            );
-          })}
+              ) : (
+                promo.brands.length > 0 && (
+                  <div className="bg-slate-50 border-b border-slate-100 px-4 py-3 flex flex-wrap gap-2 shrink-0">
+                    {promo.brands.slice(0, 5).map(b => (
+                      <div key={b.id} className="flex items-center gap-1.5 bg-white rounded-lg px-2.5 py-1.5 shadow-sm border border-slate-100">
+                        {b.logoUrl && (
+                          <img src={b.logoUrl} alt={b.name} className="w-10 h-5 object-contain" loading="lazy" decoding="async" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+
+              {/* Content */}
+              <div className="flex flex-col flex-1 p-4 gap-2">
+                <div className="flex items-start gap-2">
+                  <h3 className="flex-1 font-bold text-slate-900 text-sm leading-snug group-hover:text-[#0070b8] transition-colors">
+                    {promo.title}
+                  </h3>
+                  {promo.expiresAt && (
+                    <span className="shrink-0 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 whitespace-nowrap">
+                      до {new Date(promo.expiresAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                    </span>
+                  )}
+                </div>
+                {promo.description && (
+                  <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{promo.description}</p>
+                )}
+                {!promo.image && promo.brands.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {promo.brands.map(b => (
+                      <span key={b.id} className="text-[10px] font-semibold text-slate-600 bg-slate-100 rounded-full px-2 py-0.5">{b.name}</span>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-auto pt-2 flex items-center gap-1.5 text-[#0070b8] text-xs font-bold">
+                  Подробнее <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </div>
+            </motion.button>
+          ))}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-8">
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" /> Назад
+            </button>
+            <div className="flex gap-1.5">
+              {Array.from({ length: totalPages }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setPage(i)}
+                  className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors ${
+                    i === page
+                      ? "bg-[#0070b8] text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page === totalPages - 1}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Далее <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Modal */}
+      <AnimatePresence>
+        {selectedPromo && (
+          <ServicePromoModal
+            promo={selectedPromo}
+            onClose={() => setSelectedPromo(null)}
+          />
+        )}
+      </AnimatePresence>
     </section>
   );
 }
