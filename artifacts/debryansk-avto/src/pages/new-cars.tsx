@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import SEO from "@/components/SEO";
+import DisclaimerBadge from "@/components/DisclaimerBadge";
 import { TestDriveModal } from "@/components/modals/TestDriveModal";
 import { CreditModal } from "@/components/modals/CreditModal";
 import { TradeInModal } from "@/components/modals/TradeInModal";
@@ -345,6 +346,7 @@ function NewCarCard({ car, onTestDrive }: { car: NewCarRecord; onTestDrive: (car
                 <span className="text-xl font-extrabold text-[#0070b8]">
                   {formatPrice(car.price - car.maxDiscount)}
                 </span>
+                <DisclaimerBadge type="price-from-new" brandName={car.mark} model={car.model} />
               </div>
               <p className="text-xs text-slate-400 line-through mb-2">{formatPrice(car.price)}</p>
               <div className="flex flex-wrap gap-1 mb-3">
