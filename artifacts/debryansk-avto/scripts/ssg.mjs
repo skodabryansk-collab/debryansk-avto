@@ -304,6 +304,71 @@ function writeRoute(routePath, title, description, h1, ogImage, jsonLd) {
   console.log(`SSG: ${routePath}`);
 }
 
+// Build JobPosting JSON-LD for the /vacancies page
+function buildVacanciesLd() {
+  const vacancies = [
+    { title: "\u041c\u0435\u043d\u0435\u0434\u0436\u0435\u0440 \u043f\u043e \u043f\u0440\u043e\u0434\u0430\u0436\u0430\u043c \u043d\u043e\u0432\u044b\u0445 \u0430\u0432\u0442\u043e\u043c\u043e\u0431\u0438\u043b\u0435\u0439", description: "\u041a\u043e\u043d\u0441\u0443\u043b\u044c\u0442\u0438\u0440\u0443\u0435\u043c \u043f\u043e\u043a\u0443\u043f\u0430\u0442\u0435\u043b\u0435\u0439, \u043f\u043e\u043c\u043e\u0433\u0430\u0435\u043c \u0441 \u0432\u044b\u0431\u043e\u0440\u043e\u043c \u0438 \u043e\u0444\u043e\u0440\u043c\u043b\u0435\u043d\u0438\u0435\u043c \u043d\u043e\u0432\u043e\u0433\u043e \u0430\u0432\u0442\u043e\u043c\u043e\u0431\u0438\u043b\u044f.", salaryFrom: 80000, salaryTo: null, location: "\u0421\u0443\u043f\u043e\u043d\u0435\u0432\u043e" },
+    { title: "\u041c\u0435\u043d\u0435\u0434\u0436\u0435\u0440 \u043f\u043e \u043f\u0440\u043e\u0434\u0430\u0436\u0430\u043c \u0430\u0432\u0442\u043e\u043c\u043e\u0431\u0438\u043b\u0435\u0439 \u0441 \u043f\u0440\u043e\u0431\u0435\u0433\u043e\u043c", description: "\u041f\u0440\u0438\u043d\u0438\u043c\u0430\u0435\u043c \u0438 \u043f\u0440\u043e\u0434\u0430\u0451\u043c \u0430\u0432\u0442\u043e\u043c\u043e\u0431\u0438\u043b\u0438 \u0441 \u043f\u0440\u043e\u0431\u0435\u0433\u043e\u043c: \u043e\u0446\u0435\u043d\u043a\u0430, \u0432\u044b\u043a\u0443\u043f, trade-in.", salaryFrom: 70000, salaryTo: null, location: "\u0421\u0443\u043f\u043e\u043d\u0435\u0432\u043e" },
+    { title: "\u0421\u043f\u0435\u0446\u0438\u0430\u043b\u0438\u0441\u0442 \u043f\u043e trade-in \u0438 \u0432\u044b\u043a\u0443\u043f\u0443", description: "\u041f\u0440\u043e\u0432\u043e\u0434\u0438\u043c \u043e\u0441\u043c\u043e\u0442\u0440 \u0438 \u043e\u0446\u0435\u043d\u043a\u0443 \u0430\u0432\u0442\u043e\u043c\u043e\u0431\u0438\u043b\u0435\u0439 \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u0432 \u0434\u043b\u044f trade-in.", salaryFrom: 65000, salaryTo: 100000, location: "\u0411\u0440\u044f\u043d\u0441\u043a" },
+    { title: "\u041c\u0435\u043d\u0435\u0434\u0436\u0435\u0440 \u043f\u043e \u0444\u0438\u043d\u0430\u043d\u0441\u043e\u0432\u044b\u043c \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u0430\u043c", description: "\u041e\u0444\u043e\u0440\u043c\u043b\u044f\u0435\u043c \u043a\u0440\u0435\u0434\u0438\u0442\u044b, \u0441\u0442\u0440\u0430\u0445\u043e\u0432\u043a\u0438 \u0438 \u0434\u043e\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c\u043d\u044b\u0435 \u0443\u0441\u043b\u0443\u0433\u0438 \u0434\u043b\u044f \u043f\u043e\u043a\u0443\u043f\u0430\u0442\u0435\u043b\u0435\u0439.", salaryFrom: 75000, salaryTo: null, location: "\u0411\u0440\u044f\u043d\u0441\u043a" },
+    { title: "\u041c\u0430\u0441\u0442\u0435\u0440-\u043a\u043e\u043d\u0441\u0443\u043b\u044c\u0442\u0430\u043d\u0442 \u0441\u0435\u0440\u0432\u0438\u0441\u043d\u043e\u0439 \u0437\u043e\u043d\u044b", description: "\u041f\u0440\u0438\u043d\u0438\u043c\u0430\u0435\u043c \u0430\u0432\u0442\u043e\u043c\u043e\u0431\u0438\u043b\u0438 \u0432 \u0441\u0435\u0440\u0432\u0438\u0441, \u043a\u043e\u043e\u0440\u0434\u0438\u043d\u0438\u0440\u0443\u0435\u043c \u0440\u0435\u043c\u043e\u043d\u0442.", salaryFrom: 70000, salaryTo: null, location: "\u0411\u0440\u044f\u043d\u0441\u043a" },
+    { title: "\u0410\u0432\u0442\u043e\u043c\u0435\u0445\u0430\u043d\u0438\u043a", description: "\u0412\u044b\u043f\u043e\u043b\u043d\u044f\u0435\u043c \u0422\u041e \u0438 \u0440\u0435\u043c\u043e\u043d\u0442 \u0430\u0432\u0442\u043e\u043c\u043e\u0431\u0438\u043b\u0435\u0439 \u0432 \u043e\u0444\u0438\u0446\u0438\u0430\u043b\u044c\u043d\u043e\u043c \u0434\u0438\u043b\u0435\u0440\u0441\u043a\u043e\u043c \u0441\u0435\u0440\u0432\u0438\u0441\u0435.", salaryFrom: 60000, salaryTo: 110000, location: "\u0411\u0440\u044f\u043d\u0441\u043a" },
+    { title: "\u0410\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440 \u0434\u0438\u043b\u0435\u0440\u0441\u043a\u043e\u0433\u043e \u0446\u0435\u043d\u0442\u0440\u0430", description: "\u0412\u0441\u0442\u0440\u0435\u0447\u0430\u0435\u043c \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u0432, \u043e\u0442\u0432\u0435\u0447\u0430\u0435\u043c \u043d\u0430 \u0437\u0432\u043e\u043d\u043a\u0438, \u043f\u043e\u043c\u043e\u0433\u0430\u0435\u043c \u0441 \u043d\u0430\u0432\u0438\u0433\u0430\u0446\u0438\u0435\u0439 \u043f\u043e \u0414\u0426.", salaryFrom: 45000, salaryTo: 55000, location: "\u0411\u0440\u044f\u043d\u0441\u043a" },
+    { title: "HR-\u0441\u043f\u0435\u0446\u0438\u0430\u043b\u0438\u0441\u0442", description: "\u041f\u043e\u0434\u0431\u0438\u0440\u0430\u0435\u043c \u043f\u0435\u0440\u0441\u043e\u043d\u0430\u043b \u0434\u043b\u044f \u0432\u0441\u0435\u0445 \u0434\u0438\u043b\u0435\u0440\u0441\u043a\u0438\u0445 \u0446\u0435\u043d\u0442\u0440\u043e\u0432, \u0432\u0435\u0434\u0451\u043c \u0430\u0434\u0430\u043f\u0442\u0430\u0446\u0438\u044e.", salaryFrom: 55000, salaryTo: 75000, location: "\u0411\u0440\u044f\u043d\u0441\u043a" },
+  ];
+
+  return {
+    "@type": "ItemList",
+    name: "\u0412\u0430\u043a\u0430\u043d\u0441\u0438\u0438 \u0414\u0435\u0431\u0440\u044f\u043d\u0441\u043a \u0410\u0432\u0442\u043e",
+    url: `${SITE}/vacancies`,
+    numberOfItems: vacancies.length,
+    itemListElement: vacancies.map((v, i) => {
+      const job = {
+        "@type": "JobPosting",
+        title: v.title,
+        description: v.description,
+        datePosted: "2026-01-01",
+        validThrough: "2026-12-31",
+        employmentType: "FULL_TIME",
+        hiringOrganization: {
+          "@type": "Organization",
+          name: "\u0414\u0435\u0431\u0440\u044f\u043d\u0441\u043a \u0410\u0432\u0442\u043e",
+          sameAs: SITE,
+          logo: `${SITE}/favicon.svg`,
+        },
+        jobLocation: {
+          "@type": "Place",
+          address: {
+            "@type": "PostalAddress",
+            streetAddress: "\u0443\u043b. \u0421\u043e\u0432\u0435\u0442\u0441\u043a\u0430\u044f, \u0434. 77",
+            addressLocality: "\u0411\u0440\u044f\u043d\u0441\u043a",
+            addressRegion: "\u0411\u0440\u044f\u043d\u0441\u043a\u0430\u044f \u043e\u0431\u043b\u0430\u0441\u0442\u044c",
+            postalCode: "241050",
+            addressCountry: "RU",
+          },
+        },
+      };
+      if (v.salaryFrom) {
+        job.baseSalary = {
+          "@type": "MonetaryAmount",
+          currency: "RUB",
+          value: {
+            "@type": "QuantitativeValue",
+            minValue: v.salaryFrom,
+            maxValue: v.salaryTo || v.salaryFrom,
+            unitText: "MONTH",
+          },
+        };
+      }
+      return {
+        "@type": "ListItem",
+        position: i + 1,
+        item: job,
+      };
+    }),
+  };
+}
+
 function buildFaqLd(faqItems) {
   if (!faqItems || faqItems.length === 0) return null;
   return {
@@ -397,8 +462,11 @@ async function main() {
       const faqSlug = staticRouteSlugMap[route];
       const faqLd = faqSlug ? buildFaqLd(faqsByPage[faqSlug]) : null;
       const breadcrumbLd = buildBreadcrumbList(route, meta.title);
-      const jsonLd = faqLd ? [faqLd, breadcrumbLd] : [breadcrumbLd];
-      writeRoute(route, meta.title, meta.description, meta.h1, DEFAULT_OG_IMAGE, jsonLd);
+      const extras = [];
+      if (faqLd) extras.push(faqLd);
+      if (route === "/vacancies") extras.push(buildVacanciesLd());
+      extras.push(breadcrumbLd);
+      writeRoute(route, meta.title, meta.description, meta.h1, DEFAULT_OG_IMAGE, extras);
     }
 
     const brandsResult = await pool.query(
