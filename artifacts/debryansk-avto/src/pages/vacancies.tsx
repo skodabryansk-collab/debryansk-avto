@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import SEO from "@/components/SEO";
 import Layout from "@/components/Layout";
+import FaqBlock from "@/components/FaqBlock";
 
 /* ─── Types ──────────────────────────────────────────────────────────
    Designed for easy hh.ru API swap:
@@ -804,11 +805,14 @@ export default function Vacancies() {
           "@type": "Place",
           "address": {
             "@type": "PostalAddress",
+            "streetAddress": "ул. Советская, д. 77",
             "addressLocality": "Брянск",
             "addressRegion": "Брянская область",
+            "postalCode": "241050",
             "addressCountry": "RU",
           },
         },
+        "validThrough": "2026-12-31",
         ...(v.salaryFrom ? {
           "baseSalary": {
             "@type": "MonetaryAmount",
@@ -816,7 +820,7 @@ export default function Vacancies() {
             "value": {
               "@type": "QuantitativeValue",
               "minValue": v.salaryFrom,
-              ...(v.salaryTo ? { "maxValue": v.salaryTo } : {}),
+              "maxValue": v.salaryTo || v.salaryFrom,
               "unitText": "MONTH",
             },
           },
@@ -1169,6 +1173,8 @@ export default function Vacancies() {
           </div>
         )}
       </AnimatePresence>
+
+      <FaqBlock pageSlug="vacancies" />
     </Layout>
   );
 }
