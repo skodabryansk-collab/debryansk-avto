@@ -1280,12 +1280,11 @@ export default function BrandPage() {
               <p className="text-slate-500 mb-6">
                 Актуальные предложения по {brandName} — свяжитесь с нами
               </p>
-              <a
-                href={`tel:+74832631000`}
+              <CTPhone
                 className="inline-flex items-center gap-2 bg-[#0070b8] text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-[#005a94] transition-colors"
-              >
+                phone="+7 (4832) 63-10-00">
                 <Phone className="w-4 h-4" /> Узнать наличие
-              </a>
+              </CTPhone>
             </FadeIn>
           </div>
         </section>
