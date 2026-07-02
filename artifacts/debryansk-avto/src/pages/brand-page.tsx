@@ -11,10 +11,11 @@ import {
 } from "lucide-react";
 import Layout from "@/components/Layout";
 import SEO from "@/components/SEO";
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import FaqBlock from "@/components/FaqBlock";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
 import { YandexMap, type DealerLocation } from "@/components/YandexMap";
+import { CTPhone } from "@/components/CTPhone";
 
 /* ─── Service icon map ───────────────────────────────────── */
 const SERVICE_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -333,13 +334,12 @@ function PromoModal({
               </span>
             )}
             {locationPhone && (
-              <a
-                href={phoneHref(locationPhone)}
+              <CTPhone
                 className="ml-auto inline-flex items-center gap-1.5 bg-[#0070b8]/10 text-[#0070b8] font-bold px-3 py-1 rounded-full text-xs hover:bg-[#0070b8]/20 transition-colors"
-              >
+                phone={normalizePhone(locationPhone) || locationPhone}>
                 <Phone className="w-3 h-3" />
-                {normalizePhone(locationPhone)}
-              </a>
+                {normalizePhone(locationPhone) || locationPhone}
+              </CTPhone>
             )}
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mb-3 leading-tight">
@@ -854,19 +854,6 @@ export default function BrandPage() {
   const cmsModels = (content?.models ?? []).filter(m => m.isActive !== false);
   const hasCmsModels = cmsModels.length > 0;
 
-  const publishedFaq = content?.faq ?? [];
-  const schemaFaq = publishedFaq.filter(item => item.include_in_schema !== false);
-  const faqPage = schemaFaq.length > 0
-    ? {
-        "@type": "FAQPage",
-        mainEntity: schemaFaq.map(item => ({
-          "@type": "Question",
-          name: item.question,
-          acceptedAnswer: { "@type": "Answer", text: item.answer },
-        })),
-      }
-    : null;
-
   const modelsWithPrice = hasCmsModels
     ? cmsModels.filter(m => {
         const matching = cars.filter(c =>
@@ -909,7 +896,6 @@ export default function BrandPage() {
     : null;
 
   const jsonLdItems: Record<string, unknown>[] = [autoDealer as Record<string, unknown>];
-  if (faqPage) jsonLdItems.push(faqPage as Record<string, unknown>);
   if (modelsItemList) jsonLdItems.push(modelsItemList as Record<string, unknown>);
   const jsonLd = jsonLdItems.length === 1 ? jsonLdItems[0] : jsonLdItems;
 
@@ -1093,12 +1079,11 @@ export default function BrandPage() {
                   <Wrench className="w-4 h-4" /> Записаться на ТО
                 </button>
                 {locations[0]?.phone && (
-                  <a
-                    href={phoneHref(locations[0].phone)}
+                  <CTPhone
                     className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-colors border border-white/20"
-                  >
+                    phone={normalizePhone(locations[0].phone) || locations[0].phone}>
                     <Phone className="w-4 h-4" /> Позвонить
-                  </a>
+                  </CTPhone>
                 )}
               </>
             ) : (
@@ -1425,32 +1410,7 @@ export default function BrandPage() {
       </section>
 
       {/* ── FAQ ───────────────────────────────────────────── */}
-      {publishedFaq.length > 0 && (
-        <section id="section-faq" className="scroll-mt-24 py-14 sm:py-20 bg-white border-b border-slate-100">
-          <div className="container mx-auto px-4 sm:px-6 max-w-3xl">
-            <FadeIn>
-              <SectionLabel>FAQ</SectionLabel>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-8">
-                Часто задаваемые вопросы
-              </h2>
-            </FadeIn>
-            <FadeIn delay={0.1}>
-              <Accordion type="single" collapsible className="w-full divide-y divide-slate-100">
-                {publishedFaq.map((item, i) => (
-                  <AccordionItem key={i} value={`faq-${i}`} className="border-none">
-                    <AccordionTrigger className="text-left font-semibold text-slate-900 hover:no-underline hover:text-[#0070b8] py-4 text-sm sm:text-base">
-                      {item.question}
-                    </AccordionTrigger>
-                    <AccordionContent className="text-slate-600 leading-relaxed text-sm sm:text-base pb-4">
-                      {item.answer}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </FadeIn>
-          </div>
-        </section>
-      )}
+      <FaqBlock pageSlug={`brands/${brand.slug}`} />
 
       {/* ── Обратная связь ────────────────────────────────── */}
       <CallbackSection brandName={brandName} />
@@ -1569,12 +1529,9 @@ export default function BrandPage() {
                         <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
                           Телефон
                         </div>
-                        <a
-                          href={phoneHref(loc.phone)}
+                        <CTPhone
                           className="font-extrabold text-[#0070b8] hover:underline text-base"
-                        >
-                          {normalizePhone(loc.phone)}
-                        </a>
+                          phone={normalizePhone(loc.phone) || loc.phone} />
                       </div>
                     </div>
                   )}
