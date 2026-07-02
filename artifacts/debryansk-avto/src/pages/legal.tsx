@@ -1,6 +1,7 @@
 import React from "react";
 import { Helmet } from "react-helmet-async";
 import Layout from "@/components/Layout";
+import { CTPhone } from "@/components/CTPhone";
 
 export default function LegalPage() {
   return (
@@ -77,9 +78,7 @@ export default function LegalPage() {
                 info@debryansk-auto.ru
               </a>{" "}
               или{" "}
-              <a href="tel:+74832777770" className="text-[#0070b8] hover:underline">
-                +7 (4832) 77-77-70
-              </a>.
+              <CTPhone className="text-[#0070b8] hover:underline" phone="+7 (4832) 77-77-70">+7 (4832) 77-77-70</CTPhone>.
             </p>
           </section>
 
