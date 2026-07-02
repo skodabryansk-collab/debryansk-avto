@@ -141,14 +141,37 @@ function BookingForm({ locations }: { locations: ApiLocation[] }) {
     return Array.from(names).sort();
   }, [locations]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !isPhoneValid(form.phone) || !form.service) {
       toast({ title: "Заполните обязательные поля", variant: "destructive" });
       return;
     }
-    setSubmitted(true);
-    toast({ title: "Заявка принята", description: "Перезвоним в течение 15 минут" });
+    if (!form.center) {
+      toast({ title: "Выберите сервисный центр", variant: "destructive" });
+      return;
+    }
+    try {
+      const fd = new FormData();
+      fd.append("type", "service");
+      fd.append("name", form.name.trim());
+      fd.append("phone", form.phone.trim());
+      fd.append("service", form.service);
+      const loc = locations.find(l => String(l.id) === form.center);
+      fd.append("location", loc?.title || form.center);
+      if (form.brand) fd.append("brand", form.brand);
+      if (form.model) fd.append("model", form.model);
+      if (form.mileage) fd.append("mileage", form.mileage);
+      if (form.date) fd.append("preferredDate", form.date);
+      if (form.comment) fd.append("comment", form.comment.trim());
+      fd.append("source", "Форма на странице сервиса");
+      const res = await fetch("/api/send-email", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("server");
+      setSubmitted(true);
+      toast({ title: "Заявка принята", description: "Перезвоним в течение 15 минут" });
+    } catch {
+      toast({ title: "Ошибка отправки", description: "Позвоните: +7 (4832) 77-77-70", variant: "destructive" });
+    }
   };
 
   if (submitted) {
@@ -241,7 +264,7 @@ function BookingForm({ locations }: { locations: ApiLocation[] }) {
           </select>
         </div>
         <div>
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Сервисный центр</label>
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Сервисный центр *</label>
           <select
             value={form.center}
             onChange={e => setForm(f => ({ ...f, center: e.target.value }))}
