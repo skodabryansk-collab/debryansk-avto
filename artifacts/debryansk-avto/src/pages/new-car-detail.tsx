@@ -14,8 +14,10 @@ import { TestDriveModal } from "@/components/modals/TestDriveModal";
 import { CreditModal } from "@/components/modals/CreditModal";
 import { TradeInModal } from "@/components/modals/TradeInModal";
 import Layout from "@/components/Layout";
+import DisclaimerBadge from "@/components/DisclaimerBadge";
 import { PageCarProvider } from "@/context/PageCarContext";
 import PhotoLightbox from "@/components/PhotoLightbox";
+import { CTPhoneDesktop, CTPhoneMobile } from "@/components/CTPhone";
 
 interface NewCarRecord {
   id: string;
@@ -175,7 +177,10 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
           <div className="p-6">
             <h3 className="text-lg font-extrabold mb-1">{car.mark} {car.model}</h3>
             {car.maxDiscount > 0 ? (
-              <p className="text-[#0070b8] font-bold text-xl mb-5">от {formatPrice(car.price - car.maxDiscount)}</p>
+              <p className="text-[#0070b8] font-bold text-xl mb-5">
+                от {formatPrice(car.price - car.maxDiscount)}
+                <DisclaimerBadge type="price-from-new" brandName={car.mark} model={car.model} />
+              </p>
             ) : (
               <p className="text-[#0070b8] font-bold text-xl mb-5">{formatPrice(car.price)}</p>
             )}
@@ -411,6 +416,7 @@ export default function NewCarDetail() {
           <div className="flex items-baseline gap-2 mb-0.5">
             <span className="text-xs font-bold text-slate-400 uppercase">Цена от</span>
             <span className="text-2xl sm:text-3xl font-extrabold text-[#0070b8]">{formatPrice(salePrice)}</span>
+            <DisclaimerBadge type="price-from-new" brandName={car.mark} model={car.model} />
           </div>
           <p className="text-sm text-slate-400 line-through mb-2.5">{formatPrice(car.price)}</p>
           <div className="flex flex-wrap gap-1.5 mb-4">
@@ -491,11 +497,8 @@ export default function NewCarDetail() {
             Trade-in
           </button>
         </div>
-        <a href={locationPhoneTel}
-          className="hidden lg:flex w-full items-center justify-center gap-2 border-2 border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8] text-slate-700 font-bold rounded-xl py-3 text-sm transition-colors">
-          <Phone className="w-4 h-4" />
-          {locationPhone}
-        </a>
+        <CTPhoneDesktop className="hidden lg:flex w-full items-center justify-center gap-2 border-2 border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8] text-slate-700 font-bold rounded-xl py-3 text-sm transition-colors"
+          phone={locationPhone} />
       </div>
       <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
         {[
@@ -822,15 +825,14 @@ export default function NewCarDetail() {
             <div className="flex items-baseline gap-1.5">
               <p className="text-base font-extrabold text-[#0070b8] leading-tight">от {formatPrice(salePrice)}</p>
               <p className="text-[11px] text-slate-400 line-through">{formatPrice(car.price)}</p>
+              <DisclaimerBadge type="price-from-new" brandName={car.mark} model={car.model} />
             </div>
           ) : (
             <p className="text-base font-extrabold text-slate-900 leading-tight">{formatPrice(car.price)}</p>
           )}
         </div>
-        <a href={locationPhoneTel}
-          className="flex items-center justify-center w-11 h-11 rounded-xl border-2 border-slate-200 text-slate-600 shrink-0">
-          <Phone className="w-4 h-4" />
-        </a>
+        <CTPhoneMobile className="flex items-center justify-center w-11 h-11 rounded-xl border-2 border-slate-200 text-slate-600 shrink-0"
+          phone={locationPhone} />
         <button
           onClick={() => setShowTestDrive(true)}
           className="bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold rounded-xl px-5 py-3 text-sm shrink-0 hover:opacity-90 transition-opacity flex items-center gap-1.5"
@@ -846,6 +848,7 @@ export default function NewCarDetail() {
         {showCredit && <CreditModal car={car} onClose={() => setShowCredit(false)} />}
         {showTradeIn && <TradeInModal onClose={() => setShowTradeIn(false)} targetCar={{ mark: car.mark, model: car.model, price: car.price, isNew: true }} />}
       </AnimatePresence>
+      <div data-prerender-ready="true" style={{ display: "none" }} />
     </Layout>
     </PageCarProvider>
   );
