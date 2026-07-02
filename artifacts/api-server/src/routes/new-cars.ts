@@ -233,17 +233,44 @@ router.get("/debug/feeds", async (_req, res) => {
   });
 });
 
-router.get("/cars/new", async (_req, res) => {
+router.get("/cars/new", async (req, res) => {
   try {
-    const data = await getNewCars();
+    let data = await getNewCars();
+    const hasDiscount = req.query.hasDiscount === "true";
+    const sort = req.query.sort as string | undefined;
+    const limit = parseInt(req.query.limit as string) || 0;
+
+    if (hasDiscount) {
+      data = data.filter(c => c.maxDiscount > 0);
+    }
+
     const ids = data.map(c => c.id);
     const rows = ids.length
-      ? await db.execute(sql`SELECT external_id, popularity_score FROM cars WHERE external_id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`)
+      ? await db.execute(sql`SELECT external_id, popularity_score, created_at FROM cars WHERE external_id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`)
       : { rows: [] };
-    const scoreMap = new Map(
-      (rows.rows as { external_id: string; popularity_score: number }[]).map(r => [r.external_id, r.popularity_score ?? 0])
+    const metaMap = new Map(
+      (rows.rows as { external_id: string; popularity_score: number; created_at: string | null }[]).map(r => [r.external_id, { score: r.popularity_score ?? 0, createdAt: r.created_at }])
     );
-    const enriched = data.map(c => ({ ...c, popularity_score: scoreMap.get(c.id) ?? 0 }));
+
+    let enriched = data.map(c => {
+      const meta = metaMap.get(c.id) ?? { score: 0, createdAt: null };
+      return { ...c, popularity_score: meta.score, created_at: meta.createdAt };
+    });
+
+    if (sort === "popularity") {
+      enriched.sort((a, b) => (b.popularity_score ?? 0) - (a.popularity_score ?? 0));
+    } else if (sort === "newest") {
+      enriched.sort((a, b) => {
+        const da = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const db = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return db - da;
+      });
+    }
+
+    if (limit > 0) {
+      enriched = enriched.slice(0, limit);
+    }
+
     return res.json({ ok: true, data: enriched, total: enriched.length });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
