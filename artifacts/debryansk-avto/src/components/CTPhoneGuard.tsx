@@ -3,27 +3,22 @@ import { useLocation } from "wouter";
 
 /* Глобальный защитник телефонов от React re-render.
  *
- * Логика:
- * 1. Маркирует все <a href="tel:..."> атрибутом data-ct-orig
- * 2. Кеширует ТОЛЬКО подменённые Calltouch номера
- * 3. При любой мутации DOM — сканирует все ссылки
- *    если текущий href = оригинал, а в кеше есть подмена — восстанавливает подмену
- *
- * 4. Периодически проверяет Calltouch скрипт первые 12 сек
- * 5. При SPA-навигации — сбрасывает периодический проверки и пересканирует
+ * Работает постоянно (не 12 сек, а бесконечно):
+ * 1. MutationObserver ловит любое изменение DOM в реальном времени
+ * 2. Периодически проверяет каждые 2 сек (первые 20 сек — каждые 500мс)
+ * 3. Перехватывает setAttribute/href на уровне прототипа ссылок
+ * 4. При навигации перезапускает агрессивный режим
  */
 export function CTPhoneGuard() {
   const [location] = useLocation();
 
   useEffect(() => {
     const CACHE = new Map<string, string>(); // original -> substituted
-    let checkTimer: ReturnType<typeof setTimeout> | null = null;
-    let checkCount = 0;
-    const MAX_CHECKS = 24; // 12 сек по 500мс
-
-    function isCalltouchLoaded() {
-      return !!(window as any).ct || !!(window as any).CalltouchDataObject;
-    }
+    let active = true;
+    let fastTimer: ReturnType<typeof setTimeout> | null = null;
+    let slowTimer: ReturnType<typeof setTimeout> | null = null;
+    let fastCount = 0;
+    const FAST_MAX = 40; // 20 сек по 500мс
 
     function mark(el: HTMLAnchorElement) {
       if (el.hasAttribute("data-ct-orig")) return;
@@ -37,61 +32,96 @@ export function CTPhoneGuard() {
       mark(el);
       const orig = el.getAttribute("data-ct-orig") || "";
       if (!orig) return;
-      const current = el.getAttribute("href") || "";
+      const currentHref = el.getAttribute("href") || "";
+      const currentText = el.textContent?.trim() || "";
 
-      // Кешируем ТОЛЬКО подмену (текущий отличается от оригинала)
-      if (current !== orig && (!CACHE.has(orig) || CACHE.get(orig) !== current)) {
-        CACHE.set(orig, current);
-      }
+      // Определяем, подменён ли номер сейчас
+      const isSubstituted = currentHref !== orig || (currentHref === orig && currentText && currentText !== orig.replace("tel:", "").replace(/\+/g, ""));
 
-      // Восстанавливаем подмену, если React вернул оригинал
-      if (current === orig) {
+      if (isSubstituted) {
+        // Кешируем подмену (последний виденный номер)
+        if (!CACHE.has(orig) || CACHE.get(orig) !== currentHref) {
+          CACHE.set(orig, currentHref);
+        }
+      } else {
+        // Текущий = оригинал, но в кеше есть подмена — восстанавливаем
         const sub = CACHE.get(orig);
-        if (sub && sub !== current) {
+        if (sub && sub !== orig) {
           el.setAttribute("href", sub);
         }
       }
     }
 
-    function scan(scope: Element = document.body) {
-      scope.querySelectorAll<HTMLAnchorElement>('a[href^="tel:"]').forEach(restore);
+    function scan() {
+      if (!active) return;
+      document.querySelectorAll<HTMLAnchorElement>('a[href^="tel:"]').forEach(restore);
     }
 
-    function scheduleCheck() {
-      if (checkCount >= MAX_CHECKS) return;
-      checkCount++;
-      checkTimer = setTimeout(() => {
+    function scheduleFast() {
+      if (!active || fastCount >= FAST_MAX) {
+        scheduleSlow();
+        return;
+      }
+      fastCount++;
+      fastTimer = setTimeout(() => {
         scan();
-        scheduleCheck();
+        scheduleFast();
       }, 500);
+    }
+
+    function scheduleSlow() {
+      if (!active) return;
+      slowTimer = setTimeout(() => {
+        scan();
+        scheduleSlow();
+      }, 2000);
     }
 
     // Первичный скан
     scan();
-    scheduleCheck();
+    scheduleFast();
 
-    // MutationObserver для мгновенной реакции на любые изменения
+    // MutationObserver — мгновенная реакция
     let rafId: number | null = null;
-    const observer = new MutationObserver(() => {
-      if (rafId !== null) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
-        scan();
-      });
+    const observer = new MutationObserver((mutations) => {
+      if (!active) return;
+      // Проверяем быстро без raf для перехвата href
+      let needsScan = false;
+      for (const m of mutations) {
+        if (m.type === "attributes" && m.attributeName === "href") {
+          const el = m.target as HTMLAnchorElement;
+          const href = el.getAttribute("href") || "";
+          if (href.startsWith("tel:")) {
+            restore(el);
+          }
+        } else if (m.type === "childList") {
+          needsScan = true;
+        }
+      }
+      if (needsScan) {
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          scan();
+        });
+      }
     });
 
     observer.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
+      attributeFilter: ["href"],
     });
 
     return () => {
-      if (checkTimer) clearTimeout(checkTimer);
+      active = false;
+      if (fastTimer) clearTimeout(fastTimer);
+      if (slowTimer) clearTimeout(slowTimer);
       observer.disconnect();
       if (rafId !== null) cancelAnimationFrame(rafId);
     };
-  }, [location]); // Сбрасывает при каждой смене страницы
+  }, [location]);
 
   return null;
 }
