@@ -355,12 +355,11 @@ export default function ContactsPage() {
                       ))}
                     </div>
                   </div>
-                  <a
-                    href={phoneHref(loc.phone) || "#"}
+                  <CTPhone
                     className="text-[#0070b8] font-bold text-sm hover:underline shrink-0"
-                  >
+                    phone={normalizePhone(loc.phone) || loc.phone || ""}>
                     {normalizePhone(loc.phone) || "—"}
-                  </a>
+                  </CTPhone>
                 </div>
                 <div className="flex items-start gap-2 text-sm text-slate-500">
                   <MapPin className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
