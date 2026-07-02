@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import CookieBanner from "@/components/CookieBanner";
+import { CTPhoneGuard } from "@/components/CTPhoneGuard";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import UsedCars from "@/pages/cars";
@@ -99,6 +100,7 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
           <ScrollToTop />
           <MetrikaTracker />
+          <CTPhoneGuard />
           <Router />
           <CookieBanner />
         </WouterRouter>
