@@ -13,6 +13,7 @@ import SEO from "@/components/SEO";
 import { CreditModal } from "@/components/modals/CreditModal";
 import { TradeInModal } from "@/components/modals/TradeInModal";
 import Layout from "@/components/Layout";
+import DisclaimerBadge from "@/components/DisclaimerBadge";
 import { PageCarProvider } from "@/context/PageCarContext";
 import PhotoLightbox from "@/components/PhotoLightbox";
 
@@ -160,7 +161,10 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
           <div className="p-6">
             <h3 className="text-lg font-extrabold mb-1">{car.mark} {car.model}</h3>
             {car.maxDiscount > 0 ? (
-              <p className="text-[#0070b8] font-bold text-xl mb-5">от {formatPrice(car.price - car.maxDiscount)}</p>
+              <p className="text-[#0070b8] font-bold text-xl mb-5">
+                от {formatPrice(car.price - car.maxDiscount)}
+                <DisclaimerBadge type="price-from-used" />
+              </p>
             ) : (
               <p className="text-[#0070b8] font-bold text-xl mb-5">{formatPrice(car.price)}</p>
             )}
@@ -329,9 +333,11 @@ export default function UsedCarDetail() {
       .slice(0, 3);
   }, [newCars, car]);
   const carMark = car?.mark?.toLowerCase() ?? "";
+  /* Автомобили с пробегом: всегда телефон Супонево */
+  const SUPONEVO_PHONE = "+7 (4832) 63-10-00";
   const locationEntry = brandLocations[carMark]
     ?? Object.entries(brandLocations).find(([k]) => k.startsWith(carMark) || carMark.startsWith(k))?.[1];
-  const locationPhone = locationEntry?.phone ?? "+7 (4832) 77 77 70";
+  const locationPhone = SUPONEVO_PHONE;
   const locationPhoneTel = "tel:+" + locationPhone.replace(/\D/g, "");
 
   const [imgIdx, setImgIdx] = useState(0);
@@ -399,6 +405,7 @@ export default function UsedCarDetail() {
           <div className="flex items-baseline gap-2 mb-0.5">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Цена от</span>
             <span className="text-2xl sm:text-3xl font-extrabold text-[#0070b8]">{formatPrice(car.price - car.maxDiscount)}</span>
+            <DisclaimerBadge type="price-from-used" />
           </div>
           <p className="text-sm text-slate-400 line-through mb-1">{formatPrice(car.price)}</p>
           <div className="flex flex-wrap gap-1.5 mb-1">
@@ -804,6 +811,7 @@ export default function UsedCarDetail() {
             <div className="flex items-baseline gap-1.5">
               <p className="text-base font-extrabold text-[#0070b8] leading-tight">от {formatPrice(car.price - car.maxDiscount)}</p>
               <p className="text-[11px] text-slate-400 line-through">{formatPrice(car.price)}</p>
+              <DisclaimerBadge type="price-from-used" />
             </div>
           ) : (
             <p className="text-base font-extrabold text-slate-900 leading-tight">{formatPrice(car.price)}</p>
@@ -826,6 +834,7 @@ export default function UsedCarDetail() {
         {showCredit && <CreditModal car={car} onClose={() => setShowCredit(false)} />}
         {showTradeIn && <TradeInModal onClose={() => setShowTradeIn(false)} targetCar={{ mark: car.mark, model: car.model, year: car.year, price: car.price }} />}
       </AnimatePresence>
+      <div data-prerender-ready="true" style={{ display: "none" }} />
     </Layout>
     </PageCarProvider>
   );
