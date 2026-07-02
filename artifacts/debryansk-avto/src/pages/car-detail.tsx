@@ -1,4 +1,49 @@
 import React, { useState, useMemo } from "react";
+
+/* Class component: React НИКОГДА не перерисовывает DOM после mount */
+class CTPhoneDesktop extends React.Component<{ className: string; defaultPhone: string }> {
+  private ref = React.createRef<HTMLAnchorElement>();
+  shouldComponentUpdate() { return false; }
+  componentDidMount() {
+    const el = this.ref.current;
+    if (!el) return;
+    const h = el.getAttribute("href");
+    const defaultHref = "tel:+" + this.props.defaultPhone.replace(/\D/g, "");
+    if (!h || h === defaultHref) {
+      el.href = defaultHref;
+      el.textContent = this.props.defaultPhone;
+    }
+  }
+  render() {
+    return (
+      <a ref={this.ref} className={this.props.className}>
+        <Phone className="w-4 h-4" />
+        {this.props.defaultPhone}
+      </a>
+    );
+  }
+}
+
+class CTPhoneMobile extends React.Component<{ className: string; defaultPhone: string }> {
+  private ref = React.createRef<HTMLAnchorElement>();
+  shouldComponentUpdate() { return false; }
+  componentDidMount() {
+    const el = this.ref.current;
+    if (!el) return;
+    const h = el.getAttribute("href");
+    const defaultHref = "tel:+" + this.props.defaultPhone.replace(/\D/g, "");
+    if (!h || h === defaultHref) {
+      el.href = defaultHref;
+    }
+  }
+  render() {
+    return (
+      <a ref={this.ref} className={this.props.className}>
+        <Phone className="w-4 h-4" />
+      </a>
+    );
+  }
+}
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -489,11 +534,8 @@ export default function UsedCarDetail() {
             <ArrowLeftRight className="w-4 h-4" /> Trade-In
           </button>
         </div>
-        <a href={locationPhoneTel}
-          className="hidden lg:flex w-full items-center justify-center gap-2 border-2 border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8] text-slate-700 font-bold rounded-xl py-3 text-sm transition-colors">
-          <Phone className="w-4 h-4" />
-          {locationPhone}
-        </a>
+        <CTPhoneDesktop className="hidden lg:flex w-full items-center justify-center gap-2 border-2 border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8] text-slate-700 font-bold rounded-xl py-3 text-sm transition-colors"
+          defaultPhone={locationPhone} />
       </div>
       <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
         {[
@@ -825,10 +867,8 @@ export default function UsedCarDetail() {
             <p className="text-base font-extrabold text-slate-900 leading-tight">{formatPrice(car.price)}</p>
           )}
         </div>
-        <a href={locationPhoneTel}
-          className="flex items-center justify-center w-11 h-11 rounded-xl border-2 border-slate-200 text-slate-600 shrink-0">
-          <Phone className="w-4 h-4" />
-        </a>
+        <CTPhoneMobile className="flex items-center justify-center w-11 h-11 rounded-xl border-2 border-slate-200 text-slate-600 shrink-0"
+          defaultPhone={locationPhone} />
         <button
           onClick={() => setShowLead(true)}
           className="brand-gradient text-white font-bold rounded-xl px-5 py-3 text-sm shrink-0 hover:opacity-90 transition-opacity"
