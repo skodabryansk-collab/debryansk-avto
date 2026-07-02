@@ -2,12 +2,13 @@ import { useEffect } from "react";
 import { useLocation } from "wouter";
 
 /* Глобальный защитник телефонов от React re-render.
- * Патчим setAttribute/removeAttribute/href на уровне прототипа.
- * Оригинал берем из data-ct-orig (задан в JSX при рендере).
+ *
+ * Ключевой принцип: глобальный кеш по data-ct-orig.
+ * Когда Calltouch подменил номер на любом элементе с data-ct-orig="tel:+74832777770",
+ * мы запоминаем: кеш["tel:+74832777770"] = "tel:+79123456789".
+ * Когда React создаёт новый элемент с тем же data-ct-orig,
+ * патч setAttribute сразу подменяет href, не ждя сканера.
  */
-
-const CT_ORIG = Symbol.for("ct-orig");
-const CT_SUB = Symbol.for("ct-sub");
 
 export function CTPhoneGuard() {
   const [location] = useLocation();
@@ -20,32 +21,40 @@ export function CTPhoneGuard() {
       const origSetAttr = HTMLAnchorElement.prototype.setAttribute;
       const origRemoveAttr = HTMLAnchorElement.prototype.removeAttribute;
 
-      function getOrig(el: HTMLAnchorElement): string | undefined {
-        return (el as any)[CT_ORIG] as string | undefined;
+      // Глобальный кеш: оригинал -> подмена
+      const subCache = new Map<string, string>();
+      (window as any).__CT_SUB_CACHE__ = subCache;
+
+      function readDataCtOrig(el: HTMLAnchorElement): string | null {
+        return el.getAttribute("data-ct-orig");
       }
-      function setOrig(el: HTMLAnchorElement, val: string) {
-        (el as any)[CT_ORIG] = val;
-      }
-      function getSub(el: HTMLAnchorElement): string | undefined {
-        return (el as any)[CT_SUB] as string | undefined;
-      }
-      function setSub(el: HTMLAnchorElement, val: string) {
-        (el as any)[CT_SUB] = val;
+
+      function applySubIfKnown(el: HTMLAnchorElement, value: string): string {
+        const domOrig = readDataCtOrig(el);
+        if (domOrig && subCache.has(domOrig) && value === domOrig) {
+          return subCache.get(domOrig)!;
+        }
+        return value;
       }
 
       HTMLAnchorElement.prototype.setAttribute = function (name: string, value: string) {
         if (name.toLowerCase() === "href" && value?.startsWith("tel:")) {
-          const orig = getOrig(this);
-          const storedSub = getSub(this);
+          const domOrig = readDataCtOrig(this);
 
-          if (orig && storedSub) {
-            // React пытается вернуть оригинал — восстанавливаем подмену
-            if (value === orig) {
-              return origSetAttr.call(this, name, storedSub);
+          if (domOrig) {
+            // Если это оригинал и в кеше есть подмена — подменяем
+            const sub = subCache.get(domOrig);
+            if (sub && value === domOrig) {
+              return origSetAttr.call(this, name, sub);
             }
-            // Calltouch подменил на новый номер — обновляем кеш
-            if (value !== orig && value !== storedSub) {
-              setSub(this, value);
+            // Если это новая подмена (не оригинал и не текущая кешированная) — обновляем кеш
+            if (value !== domOrig && (!sub || value !== sub)) {
+              subCache.set(domOrig, value);
+            }
+          } else {
+            // Нет data-ct-orig — запоминаем оригинал первый раз
+            if (!subCache.has(value)) {
+              subCache.set(value, value); // пока нет подмены, оригинал = оригинал
             }
           }
         }
@@ -54,9 +63,9 @@ export function CTPhoneGuard() {
 
       HTMLAnchorElement.prototype.removeAttribute = function (name: string) {
         if (name.toLowerCase() === "href") {
-          const storedSub = getSub(this);
-          if (storedSub) {
-            return origSetAttr.call(this, "href", storedSub);
+          const domOrig = readDataCtOrig(this);
+          if (domOrig && subCache.has(domOrig)) {
+            return origSetAttr.call(this, "href", subCache.get(domOrig)!);
           }
         }
         return origRemoveAttr.call(this, name);
@@ -70,11 +79,16 @@ export function CTPhoneGuard() {
       if (origDescriptor && origDescriptor.set) {
         Object.defineProperty(HTMLAnchorElement.prototype, "href", {
           set(value: string) {
-            const storedOrig = getOrig(this as HTMLAnchorElement);
-            const storedSub = getSub(this as HTMLAnchorElement);
-            if (storedOrig && storedSub && value === storedOrig) {
-              origDescriptor.set!.call(this, storedSub);
-              return;
+            const domOrig = readDataCtOrig(this as HTMLAnchorElement);
+            if (domOrig) {
+              const sub = subCache.get(domOrig);
+              if (sub && value === domOrig) {
+                origDescriptor.set!.call(this, sub);
+                return;
+              }
+              if (value !== domOrig && (!sub || value !== sub)) {
+                subCache.set(domOrig, value);
+              }
             }
             origDescriptor.set!.call(this, value);
           },
@@ -85,51 +99,49 @@ export function CTPhoneGuard() {
       }
     }
 
-    // === Сканер запускается при каждой смене локации ===
+    // === MutationObserver для мгновенной реакции на новые элементы ===
+    const subCache = (window as any).__CT_SUB_CACHE__ as Map<string, string>;
     let active = true;
 
-    function getOrig(el: HTMLAnchorElement): string | undefined {
-      return (el as any)[CT_ORIG] as string | undefined;
-    }
-    function setOrig(el: HTMLAnchorElement, val: string) {
-      (el as any)[CT_ORIG] = val;
-    }
-    function getSub(el: HTMLAnchorElement): string | undefined {
-      return (el as any)[CT_SUB] as string | undefined;
-    }
-    function setSub(el: HTMLAnchorElement, val: string) {
-      (el as any)[CT_SUB] = val;
-    }
-
-    function scan() {
+    function scanAll() {
       if (!active) return;
       document.querySelectorAll<HTMLAnchorElement>('a[href^="tel:"]').forEach((el) => {
-        // Запоминаем оригинал из data-ct-orig (задан в JSX)
         const domOrig = el.getAttribute("data-ct-orig");
-        if (domOrig && !getOrig(el)) {
-          setOrig(el, domOrig);
-        }
-
+        if (!domOrig) return;
         const current = el.getAttribute("href") || "";
-        const orig = getOrig(el);
+        const sub = subCache.get(domOrig);
 
-        if (orig && current !== orig) {
-          // Есть подмена — запоминаем/обновляем
-          if (!getSub(el) || getSub(el) !== current) {
-            setSub(el, current);
-          }
+        if (sub && current === domOrig) {
+          // Есть подмена в кеше, но элемент имеет оригинал — применяем
+          el.setAttribute("href", sub);
+        } else if (current !== domOrig && (!sub || current !== sub)) {
+          // Новая подмена — обновляем кеш
+          subCache.set(domOrig, current);
         }
       });
     }
 
-    // Агрессивный запуск первые 10 сек (500мс), потом режим 2 сек
+    // MutationObserver ловит новые элементы мгновенно
+    let rafId: number | null = null;
+    const observer = new MutationObserver(() => {
+      if (!active) return;
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        scanAll();
+      });
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Периодический скан (агрессивный первые 10 сек)
     let fastCount = 0;
     const FAST_MAX = 20;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     function tick() {
       if (!active) return;
-      scan();
+      scanAll();
       fastCount++;
       if (fastCount < FAST_MAX) {
         timer = setTimeout(tick, 500);
@@ -143,6 +155,8 @@ export function CTPhoneGuard() {
     return () => {
       active = false;
       if (timer) clearTimeout(timer);
+      observer.disconnect();
+      if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, [location]);
 
