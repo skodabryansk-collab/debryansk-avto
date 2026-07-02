@@ -2,42 +2,30 @@ import React from "react";
 import { Phone } from "lucide-react";
 
 /* Calltouch-safe phone link.
- * 1. data-ct-original — оригинальный номер, React не трогает (статический атрибут)
- * 2. shouldComponentUpdate = false — React НИКОГДА не перерисовывает DOM после mount
- * 3. componentDidMount — проверяем, если Calltouch уже подменил, оставляем подмену
+ * 1. data-ct-orig — оригинальный номер (задан при рендере, не изменяется)
+ * 2. shouldComponentUpdate = false — React НИКОГДА не перерисовывает DOM
+ * 3. CTPhoneGuard читает data-ct-orig для определения оригинала
  */
 class CTPhoneLink extends React.Component<{
   className: string;
   phone: string;
   children?: React.ReactNode;
 }> {
-  private ref = React.createRef<HTMLAnchorElement>();
-
   shouldComponentUpdate() {
     return false;
   }
 
-  componentDidMount() {
-    const el = this.ref.current;
-    if (!el) return;
-    // Если Calltouch уже подменил href — не трогаем
-    const h = el.getAttribute("href");
-    const defaultHref = "tel:+" + this.props.phone.replace(/\D/g, "");
-    if (!h || h === defaultHref) {
-      el.href = defaultHref;
-    }
-  }
-
   render() {
-    const href = "tel:+" + this.props.phone.replace(/\D/g, "");
+    const phone = this.props.phone || "";
+    const digits = phone.replace(/\D/g, "");
+    const href = digits ? "tel:+" + digits : "tel:";
     return (
       <a
-        ref={this.ref}
         href={href}
-        data-ct-original={href}
+        data-ct-orig={href}
         className={this.props.className}
       >
-        {this.props.children || this.props.phone}
+        {this.props.children || phone}
       </a>
     );
   }
