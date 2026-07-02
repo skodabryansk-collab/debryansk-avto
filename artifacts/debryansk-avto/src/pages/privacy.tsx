@@ -1,6 +1,7 @@
 import React from "react";
 import { Helmet } from "react-helmet-async";
 import Layout from "@/components/Layout";
+import { CTPhone } from "@/components/CTPhone";
 
 export default function PrivacyPage() {
   return (
@@ -50,9 +51,7 @@ export default function PrivacyPage() {
               <p><strong>Фактический адрес:</strong> 241050, г. Брянск, ул. Советская, д. 77</p>
               <p>
                 <strong>Телефон:</strong>{" "}
-                <a href="tel:+74832777770" className="text-[#0070b8] hover:underline">
-                  +7 (4832) 77-77-70
-                </a>
+                <CTPhone className="text-[#0070b8] hover:underline" phone="+7 (4832) 77-77-70">+7 (4832) 77-77-70</CTPhone>
               </p>
               <p>
                 <strong>Сайт:</strong>{" "}
@@ -307,9 +306,7 @@ export default function PrivacyPage() {
               <p><strong>Адрес:</strong> 241050, г. Брянск, ул. Советская, д. 77</p>
               <p>
                 <strong>Телефон:</strong>{" "}
-                <a href="tel:+74832777770" className="text-[#0070b8] hover:underline">
-                  +7 (4832) 77-77-70
-                </a>
+                <CTPhone className="text-[#0070b8] hover:underline" phone="+7 (4832) 77-77-70">+7 (4832) 77-77-70</CTPhone>
               </p>
               <p>
                 <strong>Email:</strong>{" "}
