@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useLocation } from "wouter";
+import { CTPhone } from "@/components/CTPhone";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Wrench, Hammer, Sparkles, Package, Car, Shield,
@@ -848,10 +849,10 @@ export default function ServicePage() {
                           </div>
                           {loc.phone && (
                             <div className="flex gap-2 shrink-0">
-                              <a href={`tel:${loc.phone}`}
-                                className="px-4 py-2 bg-[#0070b8] text-white font-bold rounded-xl text-sm hover:bg-[#005a94] transition-colors">
+                              <CTPhone className="px-4 py-2 bg-[#0070b8] text-white font-bold rounded-xl text-sm hover:bg-[#005a94] transition-colors"
+                                phone={loc.phone}>
                                 Позвонить
-                              </a>
+                              </CTPhone>
                             </div>
                           )}
                         </div>
