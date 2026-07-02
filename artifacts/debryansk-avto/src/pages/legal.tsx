@@ -103,7 +103,7 @@ function RowPhone({ label, phone, display }: { label: string; phone: string; dis
   return (
     <div className="flex flex-col sm:flex-row sm:gap-4">
       <span className="text-slate-500 shrink-0 sm:w-48">{label}:</span>
-      <a href={`tel:${phone}`} className="font-medium text-[#0070b8] hover:underline">{display}</a>
+      <CTPhone className="font-medium text-[#0070b8] hover:underline" phone={display}>{display}</CTPhone>
     </div>
   );
 }
