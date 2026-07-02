@@ -82,6 +82,7 @@ function parseXml(text: string): CarRecord[] {
       maxDiscount: parseInt(getField(block, "max_discount")) || 0,
       creditDiscount: parseInt(getField(block, "credit_discount")) || 0,
       tradeinDiscount: parseInt(getField(block, "tradein_discount")) || 0,
+      popularity_score: 0,
     });
   }
   return cars;
@@ -97,7 +98,7 @@ export async function getUsedCars(): Promise<CarRecord[]> {
   return data;
 }
 
-router.get("/cars/used", async (_req, res) => {
+router.get("/cars/used", async (req, res) => {
   try {
     if (!cache || Date.now() - cache.ts >= CACHE_TTL) {
       const r = await fetch(XML_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
@@ -106,15 +107,37 @@ router.get("/cars/used", async (_req, res) => {
       const data = parseXml(text);
       cache = { data, ts: Date.now() };
     }
-    const data = cache!.data;
+    let data = cache!.data;
+    const sort = req.query.sort as string | undefined;
+    const limit = parseInt(req.query.limit as string) || 0;
+
     const ids = data.map(c => c.id);
     const rows = ids.length
-      ? await db.execute(sql`SELECT external_id, popularity_score FROM cars WHERE external_id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)}) AND type = 'used'`)
+      ? await db.execute(sql`SELECT external_id, popularity_score, created_at FROM cars WHERE external_id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)}) AND type = 'used'`)
       : { rows: [] };
-    const scoreMap = new Map(
-      (rows.rows as { external_id: string; popularity_score: number }[]).map(r => [r.external_id, r.popularity_score ?? 0])
+    const metaMap = new Map(
+      (rows.rows as { external_id: string; popularity_score: number; created_at: string | null }[]).map(r => [r.external_id, { score: r.popularity_score ?? 0, createdAt: r.created_at }])
     );
-    const enriched = data.map(c => ({ ...c, popularity_score: scoreMap.get(c.id) ?? 0 }));
+
+    let enriched = data.map(c => {
+      const meta = metaMap.get(c.id) ?? { score: 0, createdAt: null };
+      return { ...c, popularity_score: meta.score, created_at: meta.createdAt };
+    });
+
+    if (sort === "popularity") {
+      enriched.sort((a, b) => (b.popularity_score ?? 0) - (a.popularity_score ?? 0));
+    } else if (sort === "newest") {
+      enriched.sort((a, b) => {
+        const da = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const db = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return db - da;
+      });
+    }
+
+    if (limit > 0) {
+      enriched = enriched.slice(0, limit);
+    }
+
     return res.json({ ok: true, data: enriched, total: enriched.length });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
