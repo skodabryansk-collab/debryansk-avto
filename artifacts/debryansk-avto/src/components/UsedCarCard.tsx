@@ -13,6 +13,48 @@ interface UsedCar {
 function fmtPrice(p: number) { return p.toLocaleString("ru-RU") + " ₽"; }
 function fmtRun(km: number) { return km < 1000 ? km + " км" : Math.round(km / 1000) + " тыс. км"; }
 
+const COLOR_MAP: Record<string, { bg: string; border?: string }> = {
+  "Белый":      { bg: "#ffffff", border: "#d1d5db" },
+  "Чёрный":     { bg: "#1a1a1a" },
+  "Черный":     { bg: "#1a1a1a" },
+  "Серый":      { bg: "#9ca3af" },
+  "Серебряный": { bg: "#c0c0c0", border: "#d1d5db" },
+  "Серебристый":{ bg: "#c0c0c0", border: "#d1d5db" },
+  "Синий":      { bg: "#2563eb" },
+  "Голубой":    { bg: "#38bdf8" },
+  "Красный":    { bg: "#dc2626" },
+  "Зеленый":    { bg: "#16a34a" },
+  "Зелёный":    { bg: "#16a34a" },
+  "Бежевый":    { bg: "#d4b896" },
+  "Коричневый": { bg: "#92400e" },
+  "Оранжевый":  { bg: "#f97316" },
+  "Желтый":     { bg: "#facc15" },
+  "Жёлтый":     { bg: "#facc15" },
+  "Фиолетовый": { bg: "#7c3aed" },
+  "Розовый":    { bg: "#f9a8d4" },
+  "Золотой":    { bg: "#d4a017", border: "#c49a0a" },
+};
+
+function ColorDot({ color }: { color: string }) {
+  const match = COLOR_MAP[color];
+  const bg = match?.bg ?? "#e5e7eb";
+  const border = match?.border ?? (match ? undefined : "#d1d5db");
+  return (
+    <span
+      title={color}
+      style={{
+        display: "inline-block",
+        width: 12,
+        height: 12,
+        borderRadius: "50%",
+        backgroundColor: bg,
+        border: `1.5px solid ${border ?? "transparent"}`,
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
 export default function UsedCarCard({ car }: { car: UsedCar }) {
   const { isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
   const stored = {
@@ -64,12 +106,12 @@ export default function UsedCarCard({ car }: { car: UsedCar }) {
         {car.modification && (
           <p className="text-[11px] text-slate-400 leading-snug mb-2 line-clamp-1">{car.modification}</p>
         )}
-        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-semibold mb-3 overflow-hidden">
+        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-semibold mb-3">
           <span className="whitespace-nowrap shrink-0">{car.year}</span>
           <span className="text-slate-300 shrink-0">·</span>
           <span className="whitespace-nowrap shrink-0">{fmtRun(car.run)}</span>
           <span className="text-slate-300 shrink-0">·</span>
-          <span className="truncate">{car.color}</span>
+          <ColorDot color={car.color} />
         </div>
         <p className="text-base font-extrabold text-slate-900 mt-auto">{fmtPrice(car.price)}</p>
       </div>
