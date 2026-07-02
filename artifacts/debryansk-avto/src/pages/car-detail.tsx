@@ -333,11 +333,19 @@ export default function UsedCarDetail() {
       .slice(0, 3);
   }, [newCars, car]);
   const carMark = car?.mark?.toLowerCase() ?? "";
-  /* Автомобили с пробегом: всегда телефон Супонево */
-  const SUPONEVO_PHONE = "+7 (4832) 63-10-00";
-  const locationEntry = brandLocations[carMark]
-    ?? Object.entries(brandLocations).find(([k]) => k.startsWith(carMark) || carMark.startsWith(k))?.[1];
-  const locationPhone = SUPONEVO_PHONE;
+  /* Автомобили с пробегом: телефон из локации Супонево */
+  const { data: allLocations = [] } = useQuery({
+    queryKey: ["detail-locations"],
+    queryFn: async () => {
+      const r = await fetch("/api/locations");
+      if (!r.ok) throw new Error("API error");
+      const json = await r.json();
+      return json.ok ? json.data : [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const suponevo = allLocations.find((l: any) => l.title === "Супонево");
+  const locationPhone = suponevo?.phone ?? "+7 (4832) 77 77 70";
   const locationPhoneTel = "tel:+" + locationPhone.replace(/\D/g, "");
 
   const [imgIdx, setImgIdx] = useState(0);
