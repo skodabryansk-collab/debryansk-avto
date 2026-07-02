@@ -10,8 +10,10 @@ import {
 import { SearchableSelect } from "@/components/SearchableSelect";
 import SEO from "@/components/SEO";
 import Layout from "@/components/Layout";
+import FaqBlock from "@/components/FaqBlock";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { CTPhone } from "@/components/CTPhone";
 import { useQuery } from "@tanstack/react-query";
 
 /* ── Types ─────────────────────────────────────────────────── */
@@ -957,12 +959,13 @@ export default function BuyoutPage() {
                   Заполните данные — система покажет диапазон цен, а наш специалист перезвонит и подтвердит предложение. Оценка бесплатно, без обязательств.
                 </p>
                 <div className="space-y-4">
-                  <a href={headerPhoneTel} className="flex items-center gap-3 text-sm font-bold text-slate-700 hover:text-[#0070b8] transition-colors">
+                  <CTPhone className="flex items-center gap-3 text-sm font-bold text-slate-700 hover:text-[#0070b8] transition-colors"
+                    phone={headerPhone}>
                     <div className="w-9 h-9 rounded-xl bg-[#0070b8]/10 flex items-center justify-center">
                       <Phone className="w-4 h-4 text-[#0070b8]" />
                     </div>
                     {headerPhone}
-                  </a>
+                  </CTPhone>
                   <p className="text-xs text-slate-400 pl-12">Ежедневно с 9:00 до 21:00</p>
                 </div>
               </FadeIn>
@@ -975,6 +978,8 @@ export default function BuyoutPage() {
           </div>
         </div>
       </section>
+
+      <FaqBlock pageSlug="buyout" />
     </Layout>
   );
 }
