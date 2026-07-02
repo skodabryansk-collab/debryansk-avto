@@ -8,6 +8,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import SEO from "@/components/SEO";
 import FaqBlock from "@/components/FaqBlock";
+import { CTPhone } from "@/components/CTPhone";
 import {
   Accordion,
   AccordionContent,
@@ -206,46 +207,11 @@ export default function BonusProgramPage() {
             {d.hero_description}
           </p>
           <div className="mt-8">
-            <a
-              href="tel:+74832777770"
+            <CTPhone
               className="inline-flex items-center gap-2 bg-white text-[#0070b8] font-bold px-7 py-3.5 rounded-full hover:bg-white/90 transition-colors shadow-lg text-sm"
-            >
+              phone="+7 (4832) 77-77-70">
               Узнать подробности
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Benefit example ────────────────────────────────────────────── */}
-      <section className="py-14 sm:py-20 bg-[#0070b8] text-white border-t border-white/10">
-        <div className="container mx-auto px-4 sm:px-6 max-w-4xl">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-white/50 mb-2 text-center">
-            Расчёт выгоды
-          </p>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-center mb-8">
-            На практике это работает так
-          </h2>
-          <div className="grid sm:grid-cols-3 gap-4 sm:gap-5">
-            <div className="bg-white/10 rounded-2xl p-5 sm:p-6 border border-white/15 backdrop-blur-sm text-center">
-              <p className="text-xs text-white/60 font-semibold uppercase tracking-widest mb-3">Заказ-наряд</p>
-              <p className="text-3xl font-extrabold mb-1">15 000 ₽</p>
-              <p className="text-sm text-white/50">ТО + замена масла</p>
-            </div>
-            <div className="bg-white/10 rounded-2xl p-5 sm:p-6 border border-white/15 backdrop-blur-sm text-center">
-              <p className="text-xs text-white/60 font-semibold uppercase tracking-widest mb-3">Начисление</p>
-              <p className="text-3xl font-extrabold text-[#87b63c] mb-1">+1 500 ₽</p>
-              <p className="text-sm text-white/50">10% на бонусный счёт</p>
-            </div>
-            <div className="bg-white/10 rounded-2xl p-5 sm:p-6 border border-white/15 backdrop-blur-sm text-center">
-              <p className="text-xs text-white/60 font-semibold uppercase tracking-widest mb-3">Следующий визит</p>
-              <p className="text-3xl font-extrabold text-[#87b63c] mb-1">−1 500 ₽</p>
-              <p className="text-sm text-white/50">10% списание со счёта</p>
-            </div>
-          </div>
-          <div className="mt-6 text-center">
-            <p className="text-sm text-white/70 max-w-lg mx-auto">
-              Оплатили 15 000 ₽ за техобслуживание — заработали 1 500 баллов. При следующем обращении потратили уже 13 500 ₽ вместо 15 000. Программа позволяет вам получить до 10% от заказ-наряда на счёт автоматически — без регистраций и SMS. Действует во всех 4 дилерских центрах группы компаний «Дебрянск Авто».
-            </p>
+            </CTPhone>
           </div>
         </div>
       </section>
@@ -262,13 +228,31 @@ export default function BonusProgramPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
             {d.perks.map((perk, i) => {
               const Icon = ICON_MAP[perk.icon] ?? Gift;
+              const bgColors = [
+                "bg-blue-50 border-blue-100 hover:border-blue-200",
+                "bg-teal-50 border-teal-100 hover:border-teal-200",
+                "bg-amber-50 border-amber-100 hover:border-amber-200",
+                "bg-indigo-50 border-indigo-100 hover:border-indigo-200",
+                "bg-emerald-50 border-emerald-100 hover:border-emerald-200",
+                "bg-rose-50 border-rose-100 hover:border-rose-200",
+              ];
+              const iconColors = [
+                "bg-blue-100 text-blue-600",
+                "bg-teal-100 text-teal-600",
+                "bg-amber-100 text-amber-600",
+                "bg-indigo-100 text-indigo-600",
+                "bg-emerald-100 text-emerald-600",
+                "bg-rose-100 text-rose-600",
+              ];
+              const bgCls = bgColors[i % bgColors.length];
+              const iconCls = iconColors[i % iconColors.length];
               return (
                 <div
                   key={i}
-                  className="flex gap-4 p-5 sm:p-6 rounded-2xl border border-slate-100 hover:border-[#0070b8]/20 hover:shadow-sm transition-all"
+                  className={`flex gap-4 p-5 sm:p-6 rounded-2xl border ${bgCls} hover:shadow-sm transition-all`}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-[#0070b8]/10 flex items-center justify-center shrink-0">
-                    <Icon className="w-5 h-5 text-[#0070b8]" />
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconCls}`}>
+                    <Icon className="w-5 h-5" />
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-900 mb-1 text-sm sm:text-base">
@@ -295,6 +279,52 @@ export default function BonusProgramPage() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ── Customer journey ───────────────────────────────────────────── */}
+      <section className="py-14 sm:py-20 bg-[#0070b8] text-white border-t border-white/10">
+        <div className="container mx-auto px-4 sm:px-6 max-w-5xl">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-white/50 mb-2 text-center">
+            Ваша выгода по бонусной программе
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-8">
+            <div className="bg-white/10 rounded-2xl p-5 sm:p-6 border border-white/15 backdrop-blur-sm text-center">
+              <p className="text-xs text-white/60 font-semibold uppercase tracking-widest mb-3">Год 1 — ТО</p>
+              <p className="text-3xl font-extrabold mb-1">15 000 ₽</p>
+              <p className="text-sm text-white/50">заказ-наряд</p>
+              <div className="mt-2 pt-2 border-t border-white/10 flex flex-col gap-1">
+                <p className="text-sm">Списано <span className="font-extrabold text-[#87b63c]">1 500 ₽</span></p>
+                <p className="text-sm">+Начислено <span className="font-extrabold text-[#87b63c]">1 500 ₽</span></p>
+              </div>
+            </div>
+            <div className="bg-white/10 rounded-2xl p-5 sm:p-6 border border-white/15 backdrop-blur-sm text-center">
+              <p className="text-xs text-white/60 font-semibold uppercase tracking-widest mb-3">Год 2 — ТО</p>
+              <p className="text-3xl font-extrabold mb-1">20 000 ₽</p>
+              <p className="text-sm text-white/50">заказ-наряд</p>
+              <div className="mt-2 pt-2 border-t border-white/10 flex flex-col gap-1">
+                <p className="text-sm">Списано <span className="font-extrabold text-[#87b63c]">2 000 ₽</span></p>
+                <p className="text-sm">+Начислено <span className="font-extrabold text-[#87b63c]">2 000 ₽</span></p>
+              </div>
+            </div>
+            <div className="bg-white/10 rounded-2xl p-5 sm:p-6 border border-white/15 backdrop-blur-sm text-center">
+              <p className="text-xs text-white/60 font-semibold uppercase tracking-widest mb-3">Год 3 — ТО</p>
+              <p className="text-3xl font-extrabold mb-1">25 000 ₽</p>
+              <p className="text-sm text-white/50">заказ-наряд</p>
+              <div className="mt-2 pt-2 border-t border-white/10 flex flex-col gap-1">
+                <p className="text-sm">Списано <span className="font-extrabold text-[#87b63c]">2 500 ₽</span></p>
+                <p className="text-sm">+Начислено <span className="font-extrabold text-[#87b63c]">2 500 ₽</span></p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl p-6 sm:p-8 text-center shadow-lg">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Итого ваша выгода</p>
+            <p className="text-4xl sm:text-5xl font-extrabold text-[#0070b8] mb-2">6 000 ₽</p>
+            <p className="text-sm text-slate-500 max-w-md mx-auto">Сумма выгоды за 3 года обслуживания (только списания бонусов на ТО)</p>
+          </div>
+          <p className="mt-4 text-center text-xs text-white/40">
+            * Расчёт является предварительным. Фактические суммы зависят от уровня программы и объёма заказ-наряда.
+          </p>
         </div>
       </section>
 
@@ -484,12 +514,11 @@ export default function BonusProgramPage() {
             Просто обратитесь на ресепшен любого нашего центра — оформим карту за 5 минут.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <a
-              href="tel:+74832777770"
+            <CTPhone
               className="inline-flex items-center justify-center gap-2 bg-white text-[#0070b8] font-bold px-7 py-3.5 rounded-full hover:bg-white/90 transition-colors shadow-md text-sm"
-            >
+              phone="+7 (4832) 77-77-70">
               +7 (4832) 77-77-70
-            </a>
+            </CTPhone>
             <Link
               href="/contacts"
               className="inline-flex items-center justify-center gap-2 border border-white/30 text-white font-bold px-7 py-3.5 rounded-full hover:bg-white/10 transition-colors text-sm"
