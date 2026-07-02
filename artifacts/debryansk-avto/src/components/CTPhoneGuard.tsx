@@ -3,11 +3,14 @@ import { useLocation } from "wouter";
 
 /* Глобальный защитник телефонов от React re-render.
  *
- * Ключевой принцип: глобальный кеш по data-ct-orig.
- * Когда Calltouch подменил номер на любом элементе с data-ct-orig="tel:+74832777770",
+ * Принцип: глобальный кеш по оригинальному номеру.
+ * Когда Calltouch подменил номер на любом элементе,
  * мы запоминаем: кеш["tel:+74832777770"] = "tel:+79123456789".
- * Когда React создаёт новый элемент с тем же data-ct-orig,
- * патч setAttribute сразу подменяет href, не ждя сканера.
+ * При любом последующем setAttribute("href", "tel:+74832777770")
+ * патч сразу подменяет на значение из кеша.
+ *
+ * MutationObserver отслеживает изменения href в реальном времени
+ * и пополняет кеш мгновенно, без ожидания сканера.
  */
 
 export function CTPhoneGuard() {
@@ -21,41 +24,24 @@ export function CTPhoneGuard() {
       const origSetAttr = HTMLAnchorElement.prototype.setAttribute;
       const origRemoveAttr = HTMLAnchorElement.prototype.removeAttribute;
 
-      // Глобальный кеш: оригинал -> подмена
+      // Глобальный кеш: оригинальный href -> подмена
       const subCache = new Map<string, string>();
       (window as any).__CT_SUB_CACHE__ = subCache;
 
-      function readDataCtOrig(el: HTMLAnchorElement): string | null {
-        return el.getAttribute("data-ct-orig");
-      }
-
-      function applySubIfKnown(el: HTMLAnchorElement, value: string): string {
-        const domOrig = readDataCtOrig(el);
-        if (domOrig && subCache.has(domOrig) && value === domOrig) {
-          return subCache.get(domOrig)!;
+      function applyCache(el: HTMLAnchorElement, value: string): string | null {
+        const sub = subCache.get(value);
+        if (sub && sub !== value) {
+          // Есть подмена в кеше — возвращаем её
+          return sub;
         }
-        return value;
+        return null;
       }
 
       HTMLAnchorElement.prototype.setAttribute = function (name: string, value: string) {
         if (name.toLowerCase() === "href" && value?.startsWith("tel:")) {
-          const domOrig = readDataCtOrig(this);
-
-          if (domOrig) {
-            // Если это оригинал и в кеше есть подмена — подменяем
-            const sub = subCache.get(domOrig);
-            if (sub && value === domOrig) {
-              return origSetAttr.call(this, name, sub);
-            }
-            // Если это новая подмена (не оригинал и не текущая кешированная) — обновляем кеш
-            if (value !== domOrig && (!sub || value !== sub)) {
-              subCache.set(domOrig, value);
-            }
-          } else {
-            // Нет data-ct-orig — запоминаем оригинал первый раз
-            if (!subCache.has(value)) {
-              subCache.set(value, value); // пока нет подмены, оригинал = оригинал
-            }
+          const sub = applyCache(this, value);
+          if (sub) {
+            return origSetAttr.call(this, name, sub);
           }
         }
         return origSetAttr.call(this, name, value);
@@ -63,9 +49,11 @@ export function CTPhoneGuard() {
 
       HTMLAnchorElement.prototype.removeAttribute = function (name: string) {
         if (name.toLowerCase() === "href") {
-          const domOrig = readDataCtOrig(this);
-          if (domOrig && subCache.has(domOrig)) {
-            return origSetAttr.call(this, "href", subCache.get(domOrig)!);
+          const current = this.getAttribute("href") || "";
+          const sub = subCache.get(current);
+          if (sub && sub !== current) {
+            // Восстанавливаем подмену вместо удаления
+            return origSetAttr.call(this, "href", sub);
           }
         }
         return origRemoveAttr.call(this, name);
@@ -79,15 +67,11 @@ export function CTPhoneGuard() {
       if (origDescriptor && origDescriptor.set) {
         Object.defineProperty(HTMLAnchorElement.prototype, "href", {
           set(value: string) {
-            const domOrig = readDataCtOrig(this as HTMLAnchorElement);
-            if (domOrig) {
-              const sub = subCache.get(domOrig);
-              if (sub && value === domOrig) {
+            if (value?.startsWith("tel:")) {
+              const sub = subCache.get(value);
+              if (sub && sub !== value) {
                 origDescriptor.set!.call(this, sub);
                 return;
-              }
-              if (value !== domOrig && (!sub || value !== sub)) {
-                subCache.set(domOrig, value);
               }
             }
             origDescriptor.set!.call(this, value);
@@ -99,7 +83,7 @@ export function CTPhoneGuard() {
       }
     }
 
-    // === MutationObserver для мгновенной реакции на новые элементы ===
+    // === MutationObserver для мгновенного обнаружения подмен ===
     const subCache = (window as any).__CT_SUB_CACHE__ as Map<string, string>;
     let active = true;
 
@@ -108,31 +92,61 @@ export function CTPhoneGuard() {
       document.querySelectorAll<HTMLAnchorElement>('a[href^="tel:"]').forEach((el) => {
         const domOrig = el.getAttribute("data-ct-orig");
         if (!domOrig) return;
-        const current = el.getAttribute("href") || "";
-        const sub = subCache.get(domOrig);
 
-        if (sub && current === domOrig) {
-          // Есть подмена в кеше, но элемент имеет оригинал — применяем
-          el.setAttribute("href", sub);
-        } else if (current !== domOrig && (!sub || current !== sub)) {
-          // Новая подмена — обновляем кеш
-          subCache.set(domOrig, current);
+        const current = el.getAttribute("href") || "";
+
+        if (current !== domOrig) {
+          // Есть подмена — обновляем кеш
+          if (!subCache.has(domOrig) || subCache.get(domOrig) !== current) {
+            subCache.set(domOrig, current);
+          }
+        } else {
+          // Текущий = оригинал, но в кеше есть подмена — применяем
+          const sub = subCache.get(domOrig);
+          if (sub && sub !== current) {
+            el.setAttribute("href", sub);
+          }
         }
       });
     }
 
-    // MutationObserver ловит новые элементы мгновенно
+    // MutationObserver ловит изменения href в реальном времени
     let rafId: number | null = null;
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver((mutations) => {
       if (!active) return;
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
-        scanAll();
-      });
+
+      let needScan = false;
+      for (const m of mutations) {
+        if (m.type === "attributes" && m.attributeName === "href") {
+          const el = m.target as HTMLAnchorElement;
+          const href = el.getAttribute("href") || "";
+          if (href.startsWith("tel:")) {
+            const domOrig = el.getAttribute("data-ct-orig");
+            if (domOrig && href !== domOrig) {
+              // Calltouch подменил — мгновенно в кеш
+              subCache.set(domOrig, href);
+            }
+          }
+        } else if (m.type === "childList") {
+          needScan = true;
+        }
+      }
+
+      if (needScan) {
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          scanAll();
+        });
+      }
     });
 
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["href"],
+    });
 
     // Периодический скан (агрессивный первые 10 сек)
     let fastCount = 0;
