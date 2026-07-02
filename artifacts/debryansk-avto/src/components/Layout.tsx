@@ -5,6 +5,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Heart, Scale, ArrowLeft, Phone, User, CheckCircle, Car, ChevronDown, Wrench, Gift } from "lucide-react";
 import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
+import { CTPhone } from "@/components/CTPhone";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import { SiVk, SiTelegram } from "react-icons/si";
 import { Helmet } from "react-helmet-async";
@@ -257,10 +258,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <span>г. Брянск</span>
             </div>
             <div className="flex items-center gap-3">
-              <a href={headerPhoneTel}
-                className="text-xs sm:text-sm font-bold text-white/70 hover:text-white transition-colors">
-                {headerPhone}
-              </a>
+              <CTPhone className="text-xs sm:text-sm font-bold text-white/70 hover:text-white transition-colors"
+                phone={headerPhone} />
               <Button size="sm"
                 data-callback-trigger
                 className="h-7 sm:h-8 px-3 sm:px-4 brand-gradient border-0 text-white font-bold rounded-lg text-[11px] sm:text-xs hover:opacity-90"
@@ -499,7 +498,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <Scale className="w-4 h-4" /> Сравнить {compCount > 0 && <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{compCount}</span>}
                 </Link>
                 <div className="pt-3 flex items-center justify-between">
-                  <a href={headerPhoneTel} className="text-base font-bold text-[#0070b8]">{headerPhone}</a>
+                  <CTPhone className="text-base font-bold text-[#0070b8]" phone={headerPhone} />
                   <div className="flex gap-2">
                     <a href="#" className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center hover:bg-[#0070b8] transition-colors">
                       <SiVk size={14} />
