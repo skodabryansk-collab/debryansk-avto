@@ -380,15 +380,22 @@ function buildFeedbackHtml(d: Record<string, string>) {
 
 function buildServiceHtml(d: Record<string, string>) {
   const accent = "#0070b8";
+  const rows: [string, string | undefined][] = [
+    ["Имя клиента",        d.name],
+    ["Телефон",            d.phone],
+    ["Сервисный центр",    d.location],
+    ["Тип услуги",         d.service],
+  ];
+  if (d.brand)    rows.push(["Марка авто",    d.brand]);
+  if (d.model)    rows.push(["Модель",        d.model]);
+  if (d.mileage)  rows.push(["Пробег",        d.mileage + " км"]);
+  if (d.preferredDate) rows.push(["Желаемая дата", d.preferredDate]);
+  rows.push(["Что нужно сделать", d.comment]);
+  rows.push(["Источник", d.source || "Навигатор (чат)"]);
   return wrapEmail(
     banner("🔧", "Запись на сервис", accent) +
     heading("Новая запись на сервис", "Клиент хочет записаться на техническое обслуживание или ремонт") +
-    dataTable([
-      ["Имя клиента",      d.name],
-      ["Телефон",          d.phone],
-      ["Что нужно сделать", d.comment],
-      ["Источник",         d.source || "Навигатор (чат)"],
-    ]) +
+    dataTable(rows) +
     chatHistorySection(d.chatHistory ?? "") +
     hr() +
     actionBlock(d.phone, undefined, "Записать клиента на сервис", accent),
