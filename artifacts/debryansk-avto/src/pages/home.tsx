@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { Link } from "wouter";
+import { CTPhone } from "@/components/CTPhone";
 import { motion, useInView, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { YandexMap, type YandexMapHandle } from "@/components/YandexMap";
@@ -10,7 +11,7 @@ import {
   Wrench, Hammer, Building2, MapPin, Phone, Clock, Search,
   Menu, X, ArrowRight, ChevronRight, ChevronDown, Sparkles, ChevronLeft,
   Package, Users, Banknote, Navigation, MapPinned, ArrowUpRight,
-  Heart, Scale
+  Heart, Scale, Gift, User
 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import { HomeActionBtn } from "@/components/HomeActionBtn";
@@ -32,6 +33,7 @@ import {
 import logoPng from "@/assets/logo-optimized.webp";
 import ChatWidget from "@/components/ChatWidget";
 import { ReviewsSection } from "@/components/ReviewsSection";
+import FaqBlock from "@/components/FaqBlock";
 import logoWhiteSvg from "@/assets/logo-white.svg";
 import miniLogo from "@/assets/mini-logo.webp";
 import heroDynamic from "../assets/hero-isometric.webp";
@@ -839,10 +841,8 @@ export default function Home() {
               <span>г. Брянск</span>
             </div>
             <div className="flex items-center gap-3">
-              <a href={headerPhoneTel}
-                className="text-xs sm:text-sm font-bold text-white/70 hover:text-white transition-colors">
-                {headerPhone}
-              </a>
+              <CTPhone className="text-xs sm:text-sm font-bold text-white/70 hover:text-white transition-colors"
+                phone={headerPhone} />
               <Button size="sm"
                 className="h-7 sm:h-8 px-3 sm:px-4 brand-gradient border-0 text-white font-bold rounded-lg text-[11px] sm:text-xs hover:opacity-90"
                 onClick={() => openModal("callback")}>
@@ -898,7 +898,7 @@ export default function Home() {
                 </div>
               )}
             </div>
-            {[["О группе","about","/about"],["Дилеры","dealers","#dealers"],["Услуги","services","/service"],["Выкуп","buyout","/buyout"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
+            {[["О группе","about","/about"],["Дилеры","dealers","#dealers"],["Услуги","services","/service"],["Бонусы","bonus","/service/bonus"],["Выкуп","buyout","/buyout"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
               href.startsWith("/") ? (
                 <Link key={id} href={href}
                   className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
@@ -962,7 +962,7 @@ export default function Home() {
                   className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors flex items-center gap-2">
                   <RotateCcw className="w-4 h-4 text-[#0070b8]" /> Автомобили с пробегом
                 </Link>
-                {[["О группе","about","/about"],["Дилеры","dealers","#dealers"],["Услуги","services","/service"],["Выкуп","buyout","/buyout"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
+                {[["О группе","about","/about"],["Дилеры","dealers","#dealers"],["Услуги","services","/service"],["Бонусы","bonus","/service/bonus"],["Выкуп","buyout","/buyout"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
                   href.startsWith("/") ? (
                     <Link key={id} href={href}
                       className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block">
@@ -992,7 +992,7 @@ export default function Home() {
                   <Scale className="w-4 h-4" /> Сравнить {compCount > 0 && <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{compCount}</span>}
                 </Link>
                 <div className="pt-3 flex items-center justify-between">
-                  <a href={headerPhoneTel} className="text-base font-bold text-[#0070b8]">{headerPhone}</a>
+                  <CTPhone className="text-base font-bold text-[#0070b8]" phone={headerPhone} />
                   <div className="flex gap-2">
                     <a href="#" className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center hover:bg-[#0070b8] transition-colors">
                       <SiVk size={14} />
@@ -1080,7 +1080,7 @@ export default function Home() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.55, delay: 0.55 }}
-              className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 w-full max-w-2xl"
+              className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 w-full max-w-3xl"
             >
               {[
                 { icon: Car,            label: "Новые авто",    sub: "В наличии и под заказ", type: null, href: "/new-cars" },
@@ -1096,6 +1096,8 @@ export default function Home() {
                     <div className="text-white/40 text-[10px] sm:text-xs mt-0.5 leading-snug">{sub}</div>
                   </>
                 );
+                const isExternal = href && href.startsWith("http");
+                if (isExternal) return <a key={label} href={href} target="_blank" rel="noopener noreferrer" className={cls}>{inner}</a>;
                 return href
                   ? <Link key={label} href={href} className={cls}>{inner}</Link>
                   : <button key={label} onClick={() => type && openModal(type)} className={cls}>{inner}</button>;
@@ -1432,7 +1434,7 @@ export default function Home() {
                         <Sparkles className="w-5 h-5 text-[#0070b8]" />
                       </div>
                       <div className="text-3xl sm:text-4xl font-extrabold text-white mb-1">
-                        9
+                        {apiBrands.length || 9}
                       </div>
                       <div className="text-sm font-bold text-white">брендов</div>
                       <div className="text-xs text-slate-400">официально</div>
@@ -1598,12 +1600,11 @@ export default function Home() {
                           ))}
                         </div>
                         {loc.phone && (
-                          <a href={phoneHref(loc.phone)}
-                            onClick={e => e.stopPropagation()}
-                            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0070b8] hover:text-[#0058a0] transition-colors mt-3">
+                          <CTPhone className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0070b8] hover:text-[#0058a0] transition-colors mt-3"
+                            phone={normalizePhone(loc.phone) || loc.phone}>
                             <Phone className="w-3.5 h-3.5" />
-                            {normalizePhone(loc.phone)}
-                          </a>
+                            {normalizePhone(loc.phone) || loc.phone}
+                          </CTPhone>
                         )}
                       </div>
                     </div>
@@ -1664,7 +1665,8 @@ export default function Home() {
                     </div>
                     <div>
                       <div className="text-xs font-bold text-slate-400 uppercase mb-1">Телефон</div>
-                      <a href={headerPhoneTel} className="text-xl sm:text-2xl font-extrabold text-white hover:text-[#0070b8] transition-colors">{headerPhone}</a>
+                      <CTPhone className="text-xl sm:text-2xl font-extrabold text-white hover:text-[#0070b8] transition-colors"
+                        phone={headerPhone} />
                     </div>
                   </div>
                 </div>
@@ -1871,6 +1873,8 @@ export default function Home() {
       </footer>
 
       <ChatWidget onOpenCallback={() => setModal("callback")} />
+
+      <FaqBlock pageSlug="main" />
     </div>
   );
 }
