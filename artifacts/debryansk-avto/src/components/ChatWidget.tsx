@@ -508,13 +508,37 @@ function TestDriveFormCard({ base, prefillModel, history }: { base: string; pref
 }
 
 /* ── Service form card ───────────────────────────────────────── */
+interface ApiLocation {
+  id: number;
+  title: string;
+  address: string;
+  phone: string | null;
+}
+
 function ServiceFormCard({ base, history }: { base: string; history?: Message[] }) {
+  const { data: locations = [] } = useQuery({
+    queryKey: ["chat-locations"],
+    queryFn: async (): Promise<ApiLocation[]> => {
+      const r = await fetch("/api/locations");
+      if (!r.ok) throw new Error("API error");
+      const json = await r.json();
+      return json.ok ? json.data : [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [comment, setComment] = useState("");
+  const [locationId, setLocationId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+
+  const selectedLocation = useMemo(
+    () => locations.find(loc => String(loc.id) === locationId),
+    [locations, locationId]
+  );
 
   if (submitted) {
     return (
@@ -527,7 +551,14 @@ function ServiceFormCard({ base, history }: { base: string; history?: Message[] 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !phone.trim()) return;
+    if (!name.trim() || !phone.trim() || !locationId) {
+      setError(locationId ? "Заполните имя и телефон" : "Выберите сервисный центр");
+      return;
+    }
+    if (!isPhoneValid(phone)) {
+      setError("Введите корректный номер телефона");
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
@@ -536,6 +567,7 @@ function ServiceFormCard({ base, history }: { base: string; history?: Message[] 
       fd.append("name", name.trim());
       fd.append("phone", phone.trim());
       if (comment.trim()) fd.append("comment", comment.trim());
+      fd.append("location", selectedLocation?.title || locationId);
       fd.append("source", "Навигатор (чат)");
       if (history?.length) fd.append("chatHistory", formatHistoryForEmail(history));
       const res = await fetch(`${base}/api/send-email`, { method: "POST", body: fd });
@@ -551,6 +583,16 @@ function ServiceFormCard({ base, history }: { base: string; history?: Message[] 
   return (
     <form onSubmit={handleSubmit} className="mt-3 rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2">
       <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Запись на сервис</p>
+      <select
+        value={locationId}
+        onChange={e => setLocationId(e.target.value)}
+        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-[#0070b8]/50 bg-white"
+      >
+        <option value="">Выберите сервисный центр *</option>
+        {locations.map(loc => (
+          <option key={loc.id} value={String(loc.id)}>{loc.title}</option>
+        ))}
+      </select>
       <input
         placeholder="Ваше имя"
         value={name}
@@ -575,7 +617,7 @@ function ServiceFormCard({ base, history }: { base: string; history?: Message[] 
       {error && <p className="text-[10px] text-red-500">{error}</p>}
       <button
         type="submit"
-        disabled={submitting || !name.trim() || !isPhoneValid(phone)}
+        disabled={submitting || !name.trim() || !isPhoneValid(phone) || !locationId}
         className="w-full text-xs font-bold text-white bg-[#0070b8] hover:bg-[#005fa0] disabled:opacity-50 rounded-lg py-2 transition-colors"
       >
         {submitting ? "Отправка…" : "Записаться на сервис"}
