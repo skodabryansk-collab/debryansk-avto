@@ -24,7 +24,14 @@ import PrivacyPage from "@/pages/privacy";
 import LegalPage from "@/pages/legal";
 import BonusProgramPage from "@/pages/bonus-program";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    },
+  },
+});
 const METRIKA_ID = 109748190;
 
 function ScrollToTop() {
