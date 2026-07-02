@@ -2,6 +2,7 @@ import React from "react";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
 import { Link } from "wouter";
+import { CTPhone } from "@/components/CTPhone";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, MapPin, Phone, Clock, Mail, Navigation,
@@ -285,9 +286,8 @@ export default function ContactsPage() {
             </div>
             <div>
               <p className="text-xs text-slate-400 font-semibold uppercase">Телефон</p>
-              <a href={headerPhoneTel} className="text-lg font-bold text-slate-900 hover:text-[#0070b8] transition-colors">
-                {headerPhone}
-              </a>
+              <CTPhone className="text-lg font-bold text-slate-900 hover:text-[#0070b8] transition-colors"
+                phone={headerPhone} />
             </div>
           </div>
           <div className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center gap-4">
