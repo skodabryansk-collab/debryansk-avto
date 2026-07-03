@@ -20,11 +20,12 @@ const POOL_SIZE = 5;
 const PAGE_TIMEOUT_MS = 14_000;
 const NETWORK_IDLE_MS = 800;
 
-// Routes with SSG HTML that already has correct FAQPage schema — skip prerender.
-// NOTE: "/" (homepage) is intentionally NOT listed here — it has dynamic content
-// (brands, carousel, reviews) that must be Puppeteer-rendered for bots to see.
+// Routes whose page content is entirely static (no DB-driven sections worth rendering).
+// These are served to bots via seoMeta (SSG HTML + meta injection) — no Puppeteer needed.
+// Contentful pages (/, /service, /service/bonus, /about, /news, /buyout, /cars) are
+// intentionally excluded and rendered via Puppeteer so bots see real page content.
 const SSG_ROUTES = new Set([
-  "/service", "/buyout", "/vacancies", "/about", "/contacts", "/news", "/new-cars", "/cars", "/legal", "/privacy"
+  "/vacancies", "/contacts", "/new-cars", "/legal", "/privacy"
 ]);
 function isSsgRoute(route) {
   if (SSG_ROUTES.has(route)) return true;
@@ -71,11 +72,11 @@ async function saveToGCS(route, html) {
 async function getRoutes() {
   // Static routes with SSG HTML already have FAQ schema — skip prerender
   // Only prerender dynamic routes: car detail pages, news articles
-  // "/" (homepage) is intentionally included — full dynamic content (brands, carousel, reviews)
-  // must be Puppeteer-rendered so bots see actual page content, not just the 4KB SSG shell.
+  // Contentful static-URL pages: Puppeteer renders the full React DOM so bots get real content.
+  // /vacancies, /contacts, /new-cars, /legal, /privacy stay as SSG-only (no DB-driven sections).
   const staticRoutes = carsOnly
     ? []
-    : ["/"];
+    : ["/", "/service", "/service/bonus", "/about", "/news", "/buyout", "/cars"];
 
   const [newCarsRes, usedCarsRes, newsRes, brandsRes] = await Promise.all([
     fetch(`${SITE_URL}/api/cars/new`)
