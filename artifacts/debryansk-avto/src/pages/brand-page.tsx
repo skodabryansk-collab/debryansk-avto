@@ -12,6 +12,7 @@ import {
 import Layout from "@/components/Layout";
 import SEO from "@/components/SEO";
 import FaqBlock from "@/components/FaqBlock";
+import ToCalculator from "@/components/ToCalculator";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
 import { YandexMap, type DealerLocation } from "@/components/YandexMap";
@@ -1407,6 +1408,9 @@ export default function BrandPage() {
           </FadeIn>
         </div>
       </section>
+
+      {/* ── TO Calculator ─────────────────────────────────── */}
+      <ToCalculator brandName={brandName} />
 
       {/* ── FAQ ───────────────────────────────────────────── */}
       <FaqBlock pageSlug={`brands/${brand.slug}`} />
