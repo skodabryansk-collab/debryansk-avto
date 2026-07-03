@@ -317,6 +317,11 @@ async function main() {
       .catch(err => logger.warn({ err }, "[faq-seed] Startup seed failed"));
   }).catch(err => logger.warn({ err }, "[faq-seed] Module load failed"));
 
+  // Metrika daily report — 9:00 MSK (06:00 UTC)
+  import("./services/metrika-report").then(({ scheduleMetrikaReport }) => {
+    scheduleMetrikaReport();
+  }).catch(err => logger.warn({ err }, "[metrika] Scheduler load failed"));
+
   // Start server
   app.listen(port, () => {
     logger.info({ port }, "Server listening");
