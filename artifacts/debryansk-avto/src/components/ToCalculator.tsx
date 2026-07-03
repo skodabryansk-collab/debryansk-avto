@@ -355,7 +355,7 @@ export default function ToCalculator({ brandName }: { brandName: string }) {
                         </p>
                       </div>
                       <p className="mt-3 text-[10px] text-slate-400">
-                        * Точная стоимость ТО — уточняйте в дилерском центре.
+                        * Точную стоимость ТО уточняйте в дилерском центре.
                       </p>
                     </div>
                   </motion.div>
