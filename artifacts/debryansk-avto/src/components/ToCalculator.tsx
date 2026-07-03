@@ -38,7 +38,7 @@ async function checkHasBrand(brand: string): Promise<boolean> {
   return Boolean(j.has);
 }
 
-function fmt(n: number) { return n.toLocaleString("ru-RU") + " ₽"; }
+function fmt(n: number) { return n.toLocaleString("ru-RU").replace(/\s/g, "\u00a0") + "\u00a0₽"; }
 
 function SelectField({
   label,
@@ -310,18 +310,18 @@ export default function ToCalculator({ brandName }: { brandName: string }) {
                       <p className="text-[11px] font-bold uppercase tracking-widest text-[#0070b8] mb-4">
                         Расчёт стоимости — {selectedEntry.TO} ({selectedEntry.Mileage.toLocaleString("ru-RU")} км)
                       </p>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-white rounded-xl p-4 border border-slate-100">
-                          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Работы</div>
-                          <div className="text-lg font-extrabold text-slate-900">{fmt(selectedEntry.SumServices)}</div>
+                      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                        <div className="bg-white rounded-xl p-3 sm:p-4 border border-slate-100">
+                          <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Работы</div>
+                          <div className="text-sm sm:text-lg font-extrabold text-slate-900 whitespace-nowrap">{fmt(selectedEntry.SumServices)}</div>
                         </div>
-                        <div className="bg-white rounded-xl p-4 border border-slate-100">
-                          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Запчасти</div>
-                          <div className="text-lg font-extrabold text-slate-900">{fmt(selectedEntry.SumSpareParts)}</div>
+                        <div className="bg-white rounded-xl p-3 sm:p-4 border border-slate-100">
+                          <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Запчасти</div>
+                          <div className="text-sm sm:text-lg font-extrabold text-slate-900 whitespace-nowrap">{fmt(selectedEntry.SumSpareParts)}</div>
                         </div>
-                        <div className="bg-[#0070b8] rounded-xl p-4 border border-[#0070b8]">
-                          <div className="text-[10px] font-bold uppercase tracking-widest text-blue-200 mb-1.5">Итого</div>
-                          <div className="text-lg font-extrabold text-white">{fmt(selectedEntry.TotalSum)}</div>
+                        <div className="bg-[#0070b8] rounded-xl p-3 sm:p-4 border border-[#0070b8]">
+                          <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-blue-200 mb-1.5">Итого</div>
+                          <div className="text-sm sm:text-lg font-extrabold text-white whitespace-nowrap">{fmt(selectedEntry.TotalSum)}</div>
                         </div>
                       </div>
 
@@ -330,23 +330,23 @@ export default function ToCalculator({ brandName }: { brandName: string }) {
                         <p className="text-[11px] font-bold uppercase tracking-widest text-[#5a8a1a] mb-3">
                           Бонусная программа ГК «Дебрянск-Авто»
                         </p>
-                        <div className="grid sm:grid-cols-3 gap-3 mb-3">
-                          <div className="bg-white rounded-xl p-3.5 border border-[#87b63c]/20">
-                            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Ваша выгода (10%)</div>
-                            <div className="text-base font-extrabold text-[#87b63c]">
+                        <div className="grid sm:grid-cols-3 gap-2 sm:gap-3 mb-3">
+                          <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-[#87b63c]/20">
+                            <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Ваша выгода (10%)</div>
+                            <div className="text-sm sm:text-base font-extrabold text-[#87b63c] whitespace-nowrap">
                               −{fmt(Math.round(selectedEntry.TotalSum * 0.1))}
                             </div>
                           </div>
-                          <div className="bg-white rounded-xl p-3.5 border border-[#87b63c]/20">
-                            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Итого с выгодой</div>
-                            <div className="text-base font-extrabold text-slate-900">
+                          <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-[#87b63c]/20">
+                            <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Итого с выгодой</div>
+                            <div className="text-sm sm:text-base font-extrabold text-slate-900 whitespace-nowrap">
                               {fmt(Math.round(selectedEntry.TotalSum * 0.9))}
                             </div>
                           </div>
-                          <div className="bg-white rounded-xl p-3.5 border border-[#87b63c]/20">
-                            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Начислят баллов</div>
-                            <div className="text-base font-extrabold text-[#0070b8]">
-                              +{Math.round(selectedEntry.TotalSum * 0.1).toLocaleString("ru-RU")} ₽
+                          <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-[#87b63c]/20">
+                            <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Начислят баллов</div>
+                            <div className="text-sm sm:text-base font-extrabold text-[#0070b8] whitespace-nowrap">
+                              +{fmt(Math.round(selectedEntry.TotalSum * 0.1))}
                             </div>
                           </div>
                         </div>
@@ -354,6 +354,9 @@ export default function ToCalculator({ brandName }: { brandName: string }) {
                           * При наличии уровня бонусной программы ГК «Дебрянск-Авто» и достаточного количества баллов на счёте. Выгода применяется как оплата баллами; начисление — за фактически оплаченную сумму.
                         </p>
                       </div>
+                      <p className="mt-3 text-[10px] text-slate-400">
+                        * Точная стоимость ТО — уточняйте в дилерском центре.
+                      </p>
                     </div>
                   </motion.div>
                 )}
