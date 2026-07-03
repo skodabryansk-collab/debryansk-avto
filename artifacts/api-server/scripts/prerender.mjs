@@ -226,8 +226,20 @@ async function main() {
     );
 
     for (const page of pages) {
-      await page.setExtraHTTPHeaders({ "X-Prerender-Bot": "1" });
       await page.setViewport({ width: 1280, height: 900 });
+
+      // Add X-Prerender-Bot only to same-origin requests (localhost)
+      // setExtraHTTPHeaders sends to ALL requests including cross-origin (Google Fonts etc.)
+      // which triggers CORS preflight rejection — fonts fail to load in headless
+      await page.setRequestInterception(true);
+      page.on("request", (req) => {
+        const url = req.url();
+        if (url.startsWith("http://localhost") || url.startsWith("http://127.0.0.1")) {
+          req.continue({ headers: { ...req.headers(), "X-Prerender-Bot": "1" } });
+        } else {
+          req.continue();
+        }
+      });
 
       // Expose __PRERENDER__ flag so the app can skip headless-unsafe components (e.g. CTPhoneGuard)
       await page.evaluateOnNewDocument(() => { window.__PRERENDER__ = true; });
