@@ -100,7 +100,7 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
           <ScrollToTop />
           <MetrikaTracker />
-          <CTPhoneGuard />
+          {!((window as any).__PRERENDER__ || navigator.userAgent.includes("HeadlessChrome")) && <CTPhoneGuard />}
           <Router />
           <CookieBanner />
         </WouterRouter>
