@@ -22,10 +22,10 @@ const NETWORK_IDLE_MS = 800;
 
 // Routes whose page content is entirely static (no DB-driven sections worth rendering).
 // These are served to bots via seoMeta (SSG HTML + meta injection) — no Puppeteer needed.
-// Contentful pages (/, /service, /service/bonus, /about, /news, /buyout, /cars) are
-// intentionally excluded and rendered via Puppeteer so bots see real page content.
+// Contentful pages (/, /new-cars, /service, /service/bonus, /about, /news, /buyout, /cars)
+// are intentionally excluded and rendered via Puppeteer so bots see real page content.
 const SSG_ROUTES = new Set([
-  "/vacancies", "/contacts", "/new-cars", "/legal", "/privacy"
+  "/vacancies", "/contacts", "/legal", "/privacy"
 ]);
 function isSsgRoute(route) {
   if (SSG_ROUTES.has(route)) return true;
@@ -76,7 +76,7 @@ async function getRoutes() {
   // /vacancies, /contacts, /new-cars, /legal, /privacy stay as SSG-only (no DB-driven sections).
   const staticRoutes = carsOnly
     ? []
-    : ["/", "/service", "/service/bonus", "/about", "/news", "/buyout", "/cars"];
+    : ["/", "/new-cars", "/service", "/service/bonus", "/about", "/news", "/buyout", "/cars"];
 
   const [newCarsRes, usedCarsRes, newsRes, brandsRes] = await Promise.all([
     fetch(`${SITE_URL}/api/cars/new`)
