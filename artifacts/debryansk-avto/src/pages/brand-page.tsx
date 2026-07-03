@@ -1355,7 +1355,7 @@ export default function BrandPage() {
           <FadeIn>
             <SectionLabel>Сервис</SectionLabel>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-3">
-              Гарантийное обслуживание {brandName}
+              Официальный сервисный центр {brandName}
             </h2>
             {content?.serviceText && (
               <p className="text-slate-400 mb-8 leading-relaxed max-w-2xl">
