@@ -20,9 +20,11 @@ const POOL_SIZE = 5;
 const PAGE_TIMEOUT_MS = 14_000;
 const NETWORK_IDLE_MS = 800;
 
-// Routes with SSG HTML that already has correct FAQPage schema — skip prerender
+// Routes with SSG HTML that already has correct FAQPage schema — skip prerender.
+// NOTE: "/" (homepage) is intentionally NOT listed here — it has dynamic content
+// (brands, carousel, reviews) that must be Puppeteer-rendered for bots to see.
 const SSG_ROUTES = new Set([
-  "/", "/service", "/buyout", "/vacancies", "/about", "/contacts", "/news", "/new-cars", "/cars", "/legal", "/privacy"
+  "/service", "/buyout", "/vacancies", "/about", "/contacts", "/news", "/new-cars", "/cars", "/legal", "/privacy"
 ]);
 function isSsgRoute(route) {
   if (SSG_ROUTES.has(route)) return true;
@@ -69,9 +71,11 @@ async function saveToGCS(route, html) {
 async function getRoutes() {
   // Static routes with SSG HTML already have FAQ schema — skip prerender
   // Only prerender dynamic routes: car detail pages, news articles
+  // "/" (homepage) is intentionally included — full dynamic content (brands, carousel, reviews)
+  // must be Puppeteer-rendered so bots see actual page content, not just the 4KB SSG shell.
   const staticRoutes = carsOnly
     ? []
-    : ["/new-cars", "/cars"]; // these have SSG but no FAQ — still prerender for freshness
+    : ["/"];
 
   const [newCarsRes, usedCarsRes, newsRes, brandsRes] = await Promise.all([
     fetch(`${SITE_URL}/api/cars/new`)
