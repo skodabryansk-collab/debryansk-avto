@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import SEO from "@/components/SEO";
+import CarOptionsBlock from "@/components/CarOptionsBlock";
 import { TestDriveModal } from "@/components/modals/TestDriveModal";
 import { CreditModal } from "@/components/modals/CreditModal";
 import { TradeInModal } from "@/components/modals/TradeInModal";
@@ -344,8 +345,11 @@ export default function NewCarDetail() {
       .slice(0, 3);
   }, [usedCars, car]);
 
+  const carDealer = car?.dealer?.toLowerCase() ?? "";
   const carMark = car?.mark?.toLowerCase() ?? "";
-  const locationEntry = brandLocations[carMark]
+  const locationEntry = brandLocations[carDealer]
+    ?? brandLocations[carMark]
+    ?? Object.entries(brandLocations).find(([k]) => k.startsWith(carDealer) || carDealer.startsWith(k))?.[1]
     ?? Object.entries(brandLocations).find(([k]) => k.startsWith(carMark) || carMark.startsWith(k))?.[1];
   const locationPhone = locationEntry?.phone ?? "+7 (4832) 77 77 70";
   const locationPhoneTel = "tel:+" + locationPhone.replace(/\D/g, "");
@@ -615,14 +619,10 @@ export default function NewCarDetail() {
           {/* Options */}
           {car.extras && (
             <div className="bg-white rounded-2xl border border-slate-100 p-4">
-              <h2 className="text-sm font-extrabold mb-3 text-slate-900">Опции и комплектация</h2>
-              <div className="flex flex-wrap gap-1.5">
-                {car.extras.split(", ").filter(Boolean).map((opt, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 bg-slate-50 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded-full border border-slate-100">
-                    <CheckCircle className="w-2.5 h-2.5 text-[#87b63c]" /> {opt.trim()}
-                  </span>
-                ))}
-              </div>
+              <CarOptionsBlock
+                extras={car.extras}
+                titleClassName="text-sm font-extrabold text-slate-900"
+              />
             </div>
           )}
 
@@ -728,14 +728,10 @@ export default function NewCarDetail() {
             {/* Options */}
             {car.extras && (
               <div className="mt-5 bg-white rounded-2xl border border-slate-100 p-6">
-                <h2 className="text-base font-extrabold mb-4 text-slate-900">Опции и комплектация</h2>
-                <div className="flex flex-wrap gap-2">
-                  {car.extras.split(", ").filter(Boolean).map((opt, i) => (
-                    <span key={i} className="inline-flex items-center gap-1.5 bg-slate-50 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-full border border-slate-100">
-                      <CheckCircle className="w-3 h-3 text-[#87b63c]" /> {opt.trim()}
-                    </span>
-                  ))}
-                </div>
+                <CarOptionsBlock
+                  extras={car.extras}
+                  titleClassName="text-base font-extrabold text-slate-900"
+                />
               </div>
             )}
 
