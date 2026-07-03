@@ -18,7 +18,7 @@ const cache: PrerenderCacheState = {
 // Contentful pages (/, /service, /service/bonus, /about, /news, /buyout, /cars) are
 // intentionally excluded — prerender.mjs renders them via Puppeteer so bots get real content.
 const SSG_ROUTES = new Set([
-  "/vacancies", "/contacts", "/new-cars", "/legal", "/privacy",
+  "/vacancies", "/contacts", "/legal", "/privacy",
 ]);
 function isSsgRoute(route: string): boolean {
   if (SSG_ROUTES.has(route)) return true;
