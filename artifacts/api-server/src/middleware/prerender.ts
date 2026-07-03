@@ -79,11 +79,8 @@ export function prerenderMiddleware(
   const PRERENDER_ALL = process.env.PRERENDER_ALL === "true";
 
   const ua = (req.headers["user-agent"] ?? "") as string;
+  const isBot = PRERENDER_ALL || BOT_UA.test(ua);
   logger.info(`[bot-check] path=${req.path} raw_ua="${ua}" matched=${BOT_UA.test(ua)}`);
-  if (!PRERENDER_ALL && !BOT_UA.test(ua)) {
-    next();
-    return;
-  }
 
   if (/\.\w{2,10}$/.test(req.path)) {
     next();
@@ -101,8 +98,16 @@ export function prerenderMiddleware(
   console.log(
     `[DEBUG] path=${route}, ua=${ua.substring(0, 50)}, cached=${cache.pages.has(route)}, isGone=${cache.gone.has(route)}`,
   );
-  if (cache.gone.has(route)) {
+
+  // 410 Gone — only for bots/crawlers; regular browsers get the SPA shell
+  // so React can render a "not found" state instead of a blank page
+  if (isBot && cache.gone.has(route)) {
     res.status(410).end();
+    return;
+  }
+
+  if (!isBot) {
+    next();
     return;
   }
 
