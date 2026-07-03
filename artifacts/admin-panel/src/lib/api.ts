@@ -283,6 +283,12 @@ export function rebuildCache() {
 export function getRebuildStatus() {
   return api<{ status: "idle" | "running" }>("GET", "/admin/cache/rebuild/status");
 }
+export function runPrerender() {
+  return api<{ status: string; message: string }>("POST", "/admin/cache/prerender");
+}
+export function getPrerenderStatus() {
+  return api<{ status: "idle" | "running" }>("GET", "/admin/cache/prerender/status");
+}
 
 /* Promotions */
 export interface Promotion {
