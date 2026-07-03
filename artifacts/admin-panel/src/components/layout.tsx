@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Newspaper, Phone, LogOut,
   ChevronRight, Menu, X, Tag, Users, Building2, Settings, Bot, Star, Megaphone, RefreshCw, HelpCircle, FileText, Gift
 } from "lucide-react";
-import { rebuildCache, getRebuildStatus } from "@/lib/api";
+import { rebuildCache, getRebuildStatus, runPrerender, getPrerenderStatus } from "@/lib/api";
 
 const navItems = [
   { path: "/", label: "Дашборд", icon: LayoutDashboard },
@@ -103,6 +103,81 @@ function RebuildCacheButton() {
   );
 }
 
+function PrerenderButton() {
+  const [state, setState] = React.useState<RebuildState>("idle");
+  const pollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopPolling = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
+  };
+
+  const handleClick = async () => {
+    if (state === "running") return;
+    try {
+      await runPrerender();
+      setState("running");
+
+      pollRef.current = setInterval(async () => {
+        try {
+          const { status } = await getPrerenderStatus();
+          if (status === "idle") {
+            stopPolling();
+            setState("success");
+            setTimeout(() => setState("idle"), 4000);
+          }
+        } catch {
+          stopPolling();
+          setState("error");
+          setTimeout(() => setState("idle"), 3000);
+        }
+      }, 5000);
+
+      timeoutRef.current = setTimeout(() => {
+        stopPolling();
+        setState("success");
+        setTimeout(() => setState("idle"), 4000);
+      }, 15 * 60 * 1000);
+    } catch {
+      setState("error");
+      setTimeout(() => setState("idle"), 3000);
+    }
+  };
+
+  React.useEffect(() => () => stopPolling(), []);
+
+  if (state === "success") {
+    return (
+      <div className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-green-600">
+        <RefreshCw className="w-4 h-4" />
+        Пририндер завершён ✓
+      </div>
+    );
+  }
+
+  if (state === "error") {
+    return (
+      <div className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-500">
+        <RefreshCw className="w-4 h-4" />
+        Ошибка пририндера
+      </div>
+    );
+  }
+
+  return (
+    <Button
+      variant="outline"
+      className="w-full justify-start text-slate-600"
+      onClick={handleClick}
+      disabled={state === "running"}
+    >
+      <RefreshCw className={`w-4 h-4 mr-2 ${state === "running" ? "animate-spin" : ""}`} />
+      {state === "running" ? "Пририндер (~10 мин)..." : "Запустить пририндер"}
+    </Button>
+  );
+}
+
 function SidebarItem({ path, label, icon: Icon }: typeof navItems[0]) {
   const [location] = useLocation();
   const active = location === path || location.startsWith(path + "/");
@@ -144,6 +219,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <Separator />
         <div className="p-3 space-y-1">
           <RebuildCacheButton />
+          <PrerenderButton />
           <Button variant="ghost" className="w-full justify-start text-slate-500 hover:text-slate-900" onClick={logout}>
             <LogOut className="w-4 h-4 mr-2" />
             Выйти
@@ -174,6 +250,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Separator className="my-2" />
             <div className="px-3 space-y-1">
               <RebuildCacheButton />
+              <PrerenderButton />
               <Button variant="ghost" className="w-full justify-start text-slate-500 hover:text-slate-900" onClick={logout}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Выйти
