@@ -16,8 +16,10 @@ const cache: PrerenderCacheState = {
 
 // SSG routes have correct FAQPage schema in their HTML — they must pass through
 // seoMeta middleware to get meta description, canonical, OG tags, LocalBusiness schema.
+// NOTE: "/" (homepage) is intentionally excluded — it's prerendered by Puppeteer
+// so bots get the full 50+ KB page (brands, carousel, reviews), not the 4 KB SSG shell.
 const SSG_ROUTES = new Set([
-  "/", "/service", "/service/bonus", "/buyout", "/vacancies", "/about", "/contacts", "/news",
+  "/service", "/service/bonus", "/buyout", "/vacancies", "/about", "/contacts", "/news",
   "/new-cars", "/cars", "/legal", "/privacy",
 ]);
 function isSsgRoute(route: string): boolean {
