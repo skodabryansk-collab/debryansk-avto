@@ -228,6 +228,20 @@ async function main() {
     for (const page of pages) {
       await page.setExtraHTTPHeaders({ "X-Prerender-Bot": "1" });
       await page.setViewport({ width: 1280, height: 900 });
+
+      // Expose __PRERENDER__ flag so the app can skip headless-unsafe components (e.g. CTPhoneGuard)
+      await page.evaluateOnNewDocument(() => { window.__PRERENDER__ = true; });
+
+      // Log all browser console messages and page errors for debugging
+      page.on("console", (msg) => {
+        const type = msg.type();
+        if (type === "error" || type === "warning" || type === "warn") {
+          console.log(`[puppeteer][${type}] ${msg.text()}`);
+        }
+      });
+      page.on("pageerror", (err) => {
+        console.error(`[puppeteer][pageerror] ${err.message}`);
+      });
     }
 
     let idx = 0;
