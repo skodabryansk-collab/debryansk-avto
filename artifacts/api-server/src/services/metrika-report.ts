@@ -10,6 +10,16 @@ const BLUE = "#0070b8";
 const DARK = "#1a2332";
 const GREEN = "#15803d";
 const RED = "#dc2626";
+const ORANGE = "#d97706";
+
+/* ── Goals to track (id → display name) ── */
+const GOALS: Array<{ id: number; name: string }> = [
+  { id: 567620431, name: "📞 Клик по телефону" },
+  { id: 567837105, name: "📋 Отправка формы" },
+  { id: 568274052, name: "✅ Контактные данные отправлены" },
+  { id: 572559350, name: "🛒 Заказ создан (CRM)" },
+  { id: 572559351, name: "💳 Заказ оплачен (CRM)" },
+];
 
 /* ── Transport ── */
 function createTransport() {
@@ -135,8 +145,20 @@ function table(rows: string): string {
 
 function altRow(label: string, val: string, i: number): string {
   return `<tr style="background:${i % 2 === 0 ? "#f8fafc" : "#fff"}">
-    <td style="padding:7px 14px;color:#64748b;font-size:11px;width:40%;border-right:1px solid #e2e8f0;font-family:Arial,sans-serif">${label}</td>
+    <td style="padding:7px 14px;color:#64748b;font-size:11px;width:55%;border-right:1px solid #e2e8f0;font-family:Arial,sans-serif">${label}</td>
     <td style="padding:7px 14px;color:${DARK};font-size:12px;font-family:Arial,sans-serif;font-weight:600">${val}</td>
+  </tr>`;
+}
+
+function goalRow(name: string, reaches: number, reachesW: number, i: number): string {
+  const dlt = delta(reaches, reachesW);
+  const clr = deltaColor(reaches, reachesW);
+  const badge = reaches > 0
+    ? `<span style="display:inline-block;background:#dcfce7;color:#15803d;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:4px">${reaches}</span>`
+    : `<span style="display:inline-block;background:#f1f5f9;color:#94a3b8;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:4px">0</span>`;
+  return `<tr style="background:${i % 2 === 0 ? "#f8fafc" : "#fff"}">
+    <td style="padding:8px 14px;color:#64748b;font-size:11px;width:65%;border-right:1px solid #e2e8f0;font-family:Arial,sans-serif">${name}</td>
+    <td style="padding:8px 14px;font-family:Arial,sans-serif">${badge}${dlt ? `&nbsp;<span style="color:${clr};font-size:10px;font-weight:600">${dlt}</span>` : ""}</td>
   </tr>`;
 }
 
@@ -157,16 +179,32 @@ function buildHtml(report: ReportData): string {
       ⚠️ ${report.error}
     </div>`;
   } else {
+    const m = report.main!;
+
     /* ── Основные метрики ── */
     body += section("Основные метрики", "📈");
-    const m = report.main!;
     body += table(
       metricRow("Визиты", m.visits, m.visitsW) +
-      metricRow("Посетители", m.users, m.usersW) +
+      metricRow("Уникальные посетители", m.users, m.usersW) +
       metricRow("Просмотры страниц", m.pageviews) +
       metricRow("Отказы", m.bounceRate, undefined, n => n.toFixed(1) + "%") +
       metricRow("Ср. время на сайте", m.avgDuration, undefined, formatDuration)
     );
+
+    /* ── Достижение целей ── */
+    if (report.goals.length > 0) {
+      const hasAny = report.goals.some(g => g.reaches > 0 || g.reachesW > 0);
+      body += section("Достижение целей", "🎯");
+      if (hasAny) {
+        body += table(
+          report.goals
+            .map((g, i) => goalRow(g.name, g.reaches, g.reachesW, i))
+            .join("")
+        );
+      } else {
+        body += `<div style="margin:10px 24px;color:#94a3b8;font-size:12px;font-family:Arial,sans-serif">Нет данных по целям за этот день</div>`;
+      }
+    }
 
     /* ── Источники трафика ── */
     if (report.sources.length > 0) {
@@ -177,7 +215,16 @@ function buildHtml(report: ReportData): string {
       body += table(srcRows);
     }
 
-    /* ── Топ страниц ── */
+    /* ── Топ поисковых запросов ── */
+    if (report.searchQueries.length > 0) {
+      body += section("Топ поисковых запросов", "🔎");
+      const sqRows = report.searchQueries
+        .map((q, i) => altRow(`${i + 1}. ${q.phrase}`, q.visits.toLocaleString("ru-RU"), i))
+        .join("");
+      body += table(sqRows);
+    }
+
+    /* ── Топ страниц входа ── */
     if (report.topPages.length > 0) {
       body += section("Топ-5 страниц входа", "📄");
       const pageRows = report.topPages
@@ -233,7 +280,9 @@ interface ReportData {
     bounceRate: number; avgDuration: number;
     visitsW: number; usersW: number;
   };
+  goals: Array<{ name: string; reaches: number; reachesW: number }>;
   sources: Array<{ name: string; visits: number; visitsW: number }>;
+  searchQueries: Array<{ phrase: string; visits: number }>;
   topPages: Array<{ path: string; visits: number }>;
   searchEngines: Array<{ name: string; visits: number }>;
   maps?: { visits: number; users: number; visitsW: number; usersW: number };
@@ -243,10 +292,13 @@ interface ReportData {
 async function collectReport(): Promise<ReportData> {
   const date = yesterdayStr();
   const weekDate = weekAgoStr();
-  const data: ReportData = { date, weekDate, sources: [], topPages: [], searchEngines: [] };
+  const data: ReportData = { date, weekDate, goals: [], sources: [], searchQueries: [], topPages: [], searchEngines: [] };
 
-  /* ── Main counter: overall metrics (yesterday + week ago) ── */
-  const [mainYest, mainWeek] = await Promise.all([
+  /* ── Build goal metrics string ── */
+  const goalMetrics = GOALS.map(g => `ym:s:goal${g.id}reaches`).join(",");
+
+  /* ── Parallel: main metrics + goals (yesterday + week ago) + sources + top pages ── */
+  const [mainYest, mainWeek, goalsYest, goalsWeek, srcYest, srcWeek, topRes] = await Promise.all([
     fetchMetrika({
       ids: COUNTER_MAIN,
       date1: date, date2: date,
@@ -257,8 +309,43 @@ async function collectReport(): Promise<ReportData> {
       date1: weekDate, date2: weekDate,
       metrics: "ym:s:visits,ym:s:users,ym:s:pageviews,ym:s:bounceRate,ym:s:avgVisitDurationSeconds",
     }),
+    fetchMetrika({
+      ids: COUNTER_MAIN,
+      date1: date, date2: date,
+      metrics: goalMetrics,
+    }),
+    fetchMetrika({
+      ids: COUNTER_MAIN,
+      date1: weekDate, date2: weekDate,
+      metrics: goalMetrics,
+    }),
+    fetchMetrika({
+      ids: COUNTER_MAIN,
+      date1: date, date2: date,
+      dimensions: "ym:s:trafficSource",
+      metrics: "ym:s:visits",
+      sort: "-ym:s:visits",
+      limit: 10,
+    }),
+    fetchMetrika({
+      ids: COUNTER_MAIN,
+      date1: weekDate, date2: weekDate,
+      dimensions: "ym:s:trafficSource",
+      metrics: "ym:s:visits",
+      sort: "-ym:s:visits",
+      limit: 10,
+    }),
+    fetchMetrika({
+      ids: COUNTER_MAIN,
+      date1: date, date2: date,
+      dimensions: "ym:s:startURLPath",
+      metrics: "ym:s:visits",
+      sort: "-ym:s:visits",
+      limit: 5,
+    }),
   ]);
 
+  /* ── Main metrics ── */
   const [mv, mu, mp, mb, md] = mainYest.totals;
   const [mvW, muW] = mainWeek.totals;
   data.main = {
@@ -271,32 +358,19 @@ async function collectReport(): Promise<ReportData> {
     usersW: Math.round(muW || 0),
   };
 
-  /* ── Sources (yesterday + week ago for delta) ── */
-  const [srcYest, srcWeek] = await Promise.all([
-    fetchMetrika({
-      ids: COUNTER_MAIN,
-      date1: date, date2: date,
-      dimensions: "ym:s:trafficSource",
-      metrics: "ym:s:visits",
-      sort: "-ym:s:visits",
-      limit: 10,
-    }),
-    fetchMetrika({
-      ids: COUNTER_MAIN,
-      date1: weekDate, date2: weekDate,
-      dimensions: "ym:s:trafficSource",
-      metrics: "ym:s:visits",
-      sort: "-ym:s:visits",
-      limit: 10,
-    }),
-  ]);
+  /* ── Goals ── */
+  data.goals = GOALS.map((g, idx) => ({
+    name: g.name,
+    reaches: Math.round(goalsYest.totals[idx] || 0),
+    reachesW: Math.round(goalsWeek.totals[idx] || 0),
+  }));
 
+  /* ── Sources ── */
   const srcWeekMap = new Map<string, number>();
   for (const row of srcWeek.data) {
     const id = row.dimensions[0]?.id || row.dimensions[0]?.name;
     srcWeekMap.set(String(id), Math.round(row.metrics[0] || 0));
   }
-
   data.sources = srcYest.data.map(row => {
     const id = row.dimensions[0]?.id;
     const name = srcName(id, row.dimensions[0]?.name);
@@ -305,31 +379,42 @@ async function collectReport(): Promise<ReportData> {
     return { name, visits, visitsW };
   }).filter(s => s.visits > 0);
 
-  /* ── Top-5 entry pages ── */
-  const topRes = await fetchMetrika({
-    ids: COUNTER_MAIN,
-    date1: date, date2: date,
-    dimensions: "ym:s:startURLPath",
-    metrics: "ym:s:visits",
-    sort: "-ym:s:visits",
-    limit: 5,
-  });
+  /* ── Top entry pages ── */
   data.topPages = topRes.data.map(row => ({
     path: row.dimensions[0]?.name || "/",
     visits: Math.round(row.metrics[0] || 0),
   })).filter(p => p.visits > 0);
 
-  /* ── Search engines (only if organic traffic > 0) ── */
+  /* ── Search queries + search engines (parallel, only if organic > 0) ── */
   const organicVisits = data.sources.find(s => s.name === "Поиск")?.visits || 0;
   if (organicVisits > 0) {
-    const seRes = await fetchMetrika({
-      ids: COUNTER_MAIN,
-      date1: date, date2: date,
-      dimensions: "ym:s:searchEngine",
-      metrics: "ym:s:visits",
-      sort: "-ym:s:visits",
-      limit: 5,
-    });
+    const [sqRes, seRes] = await Promise.all([
+      fetchMetrika({
+        ids: COUNTER_MAIN,
+        date1: date, date2: date,
+        dimensions: "ym:s:searchPhrase",
+        metrics: "ym:s:visits",
+        sort: "-ym:s:visits",
+        limit: 10,
+        filters: "ym:s:searchPhrase!='(not set)'",
+      }),
+      fetchMetrika({
+        ids: COUNTER_MAIN,
+        date1: date, date2: date,
+        dimensions: "ym:s:searchEngine",
+        metrics: "ym:s:visits",
+        sort: "-ym:s:visits",
+        limit: 5,
+      }),
+    ]);
+
+    data.searchQueries = sqRes.data
+      .map(row => ({
+        phrase: row.dimensions[0]?.name || "—",
+        visits: Math.round(row.metrics[0] || 0),
+      }))
+      .filter(q => q.visits > 0 && q.phrase !== "(not set)" && q.phrase !== "—");
+
     data.searchEngines = seRes.data
       .map(row => ({ name: row.dimensions[0]?.name || "Другие", visits: Math.round(row.metrics[0] || 0) }))
       .filter(se => se.visits > 0);
@@ -374,7 +459,7 @@ export async function sendMetrikaReport(): Promise<void> {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error({ err }, "[metrika] Failed to collect report");
-    reportData = { date, weekDate: weekAgoStr(), sources: [], topPages: [], searchEngines: [], error: msg };
+    reportData = { date, weekDate: weekAgoStr(), goals: [], sources: [], searchQueries: [], topPages: [], searchEngines: [], error: msg };
   }
 
   const html = buildHtml(reportData);
@@ -407,7 +492,7 @@ export async function previewMetrikaReport(): Promise<{ subject: string; html: s
     reportData = await collectReport();
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    reportData = { date, weekDate: weekAgoStr(), sources: [], topPages: [], searchEngines: [], error: msg };
+    reportData = { date, weekDate: weekAgoStr(), goals: [], sources: [], searchQueries: [], topPages: [], searchEngines: [], error: msg };
   }
 
   const html = buildHtml(reportData);
