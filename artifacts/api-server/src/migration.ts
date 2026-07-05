@@ -512,6 +512,60 @@ export async function runMigration() {
       logger.info("disclaimers: seeded price_from_used system record");
     }
 
+    // TO catalog persistent store — single-row JSONB table (survives redeploys)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS to_catalog_store (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        data JSONB NOT NULL DEFAULT '[]',
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        CONSTRAINT to_catalog_store_single_row CHECK (id = 1)
+      )
+    `);
+    logger.info("to_catalog_store schema ready (idempotent)");
+
+    // SEO query snapshots — weekly Webmaster API position tracking
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS seo_query_snapshots (
+        id SERIAL PRIMARY KEY,
+        query_text TEXT NOT NULL,
+        total_shows INTEGER NOT NULL,
+        total_clicks INTEGER NOT NULL,
+        avg_position REAL NOT NULL,
+        snapshot_date DATE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_seo_query_snapshots_query_date
+      ON seo_query_snapshots (query_text, snapshot_date)
+    `);
+    logger.info("seo_query_snapshots schema ready (idempotent)");
+
+    // Calltouch call tracking
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS calltouch_calls (
+        id                    SERIAL PRIMARY KEY,
+        call_id               TEXT NOT NULL UNIQUE,
+        phone_number          TEXT,
+        tracking_number       TEXT,
+        source                TEXT,
+        campaign              TEXT,
+        landing_page          TEXT,
+        status                TEXT NOT NULL DEFAULT 'started',
+        duration_seconds      INTEGER,
+        call_recording_url    TEXT,
+        recording_stored_path TEXT,
+        started_at            TIMESTAMPTZ,
+        completed_at          TIMESTAMPTZ,
+        created_at            TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_calltouch_calls_call_id
+      ON calltouch_calls (call_id)
+    `);
+    logger.info("calltouch_calls schema ready (idempotent)");
+
   } catch (err) {
     logger.error({ err }, "Migration error");
   }
