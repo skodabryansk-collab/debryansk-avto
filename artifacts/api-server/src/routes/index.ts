@@ -33,10 +33,15 @@ import adminPromotionsRouter from "./admin-promotions";
 import publicPromotionsRouter from "./public-promotions";
 import adminCacheRouter from "./admin-cache";
 import adminMetrikaRouter from "./admin-metrika";
+import adminSeoPositionsRouter from "./admin-seo-positions";
 import disclaimersRouter from "./disclaimers";
 import feedYmlRouter from "./feed-yml";
 import { publicFaqRouter, adminFaqRouter } from "./faq";
 import { publicBonusProgramRouter, adminBonusProgramRouter } from "./bonus-program";
+import toCatalogRouter from "./to-catalog";
+import adminToCatalogRouter from "./admin-to-catalog";
+import calltouchWebhookRouter from "./webhooks-calltouch";
+import adminCalltouchRouter from "./admin-calltouch";
 
 const router: IRouter = Router();
 
@@ -80,11 +85,22 @@ router.use("/admin/brand-pages", adminBrandPagesRouter);
 router.use("/admin/promotions", adminPromotionsRouter);
 router.use("/admin/cache", adminCacheRouter);
 router.use("/admin/metrika", adminMetrikaRouter);
+router.use("/admin/seo-positions", adminSeoPositionsRouter);
 router.use("/faq", publicFaqRouter);
 router.use("/admin/faq", adminFaqRouter);
 router.use(disclaimersRouter);
 router.use(publicBonusProgramRouter);
 router.use("/admin/bonus-program", adminBonusProgramRouter);
+router.use("/admin/to-catalog", adminToCatalogRouter);
+
+// TO catalog (public)
+router.use("/to-catalog", toCatalogRouter);
+
+// Calltouch webhooks (public, protected by secret query param)
+router.use("/webhooks/calltouch", calltouchWebhookRouter);
+
+// Calltouch admin
+router.use("/admin/calltouch-calls", adminCalltouchRouter);
 
 // Public settings
 router.use("/settings", publicSettingsRouter);
