@@ -19,6 +19,9 @@ import PromotionsPage from "@/pages/promotions";
 import FaqPage from "@/pages/faq";
 import DisclaimersPage from "@/pages/disclaimers";
 import BonusProgramAdminPage from "@/pages/bonus-program";
+import ToCatalogPage from "@/pages/to-catalog";
+import SeoPositionsPage from "@/pages/seo-positions";
+import CalltouchPage from "@/pages/calltouch";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -41,6 +44,9 @@ function AppRouter() {
       <Route path="/faq" component={() => <RequireAuth><AdminLayout><FaqPage /></AdminLayout></RequireAuth>} />
       <Route path="/disclaimers" component={() => <RequireAuth><AdminLayout><DisclaimersPage /></AdminLayout></RequireAuth>} />
       <Route path="/bonus-program" component={() => <RequireAuth><AdminLayout><BonusProgramAdminPage /></AdminLayout></RequireAuth>} />
+      <Route path="/to-catalog" component={() => <RequireAuth><AdminLayout><ToCatalogPage /></AdminLayout></RequireAuth>} />
+      <Route path="/seo-positions" component={() => <RequireAuth><AdminLayout><SeoPositionsPage /></AdminLayout></RequireAuth>} />
+      <Route path="/calltouch" component={() => <RequireAuth><AdminLayout><CalltouchPage /></AdminLayout></RequireAuth>} />
       <Route component={() => <RequireAuth><AdminLayout><NotFound /></AdminLayout></RequireAuth>} />
     </Switch>
   );
