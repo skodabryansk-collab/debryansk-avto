@@ -479,3 +479,84 @@ export function getBonusProgram() {
 export function updateBonusProgram(data: Partial<Omit<BonusProgramData, "id" | "updated_at">>) {
   return api<{ ok: true; data: BonusProgramData }>("PUT", "/admin/bonus-program", data).then(r => r.data);
 }
+
+/* ── SEO Positions ─────────────────────────────────────────────────────────── */
+export interface SeoQueryRow {
+  query_text: string;
+  total_shows: number;
+  total_clicks: number;
+  avg_position: number;
+}
+export interface SeoCommercialRow extends SeoQueryRow {
+  old_position: number | null;
+}
+export interface SeoCompareRow extends SeoQueryRow {
+  position_change: number;
+}
+export interface SeoLatestResponse {
+  ok: boolean;
+  date: string | null;
+  data: SeoQueryRow[];
+}
+export interface SeoCompareResponse {
+  ok: boolean;
+  newDate: string | null;
+  oldDate: string | null;
+  improved: SeoCompareRow[];
+  declined: SeoCompareRow[];
+  stable: SeoCompareRow[];
+  newQueries: SeoQueryRow[];
+  lostQueries: SeoQueryRow[];
+}
+export interface SeoCommercialResponse {
+  ok: boolean;
+  date: string | null;
+  oldDate: string | null;
+  data: SeoCommercialRow[];
+}
+
+export function getSeoLatest() {
+  return api<SeoLatestResponse>("GET", "/admin/seo-positions/latest");
+}
+export function getSeoCompare(days = 7) {
+  return api<SeoCompareResponse>("GET", `/admin/seo-positions/compare?days=${days}`);
+}
+export function getSeoCommercial() {
+  return api<SeoCommercialResponse>("GET", "/admin/seo-positions/commercial");
+}
+export function triggerSeoFetch() {
+  return api<{ ok: boolean; upserted: number; skipped: boolean; error?: string }>(
+    "POST", "/admin/seo-positions/fetch-now"
+  );
+}
+
+/* Calltouch */
+export interface CalltouchCall {
+  id: number;
+  callId: string;
+  phoneNumber: string | null;
+  trackingNumber: string | null;
+  source: string | null;
+  campaign: string | null;
+  landingPage: string | null;
+  status: string;
+  durationSeconds: number | null;
+  callRecordingUrl: string | null;
+  recordingStoredPath: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string | null;
+}
+
+export function getCalltouchCalls(page = 1, status = "all") {
+  const qs = `page=${page}&status=${status}`;
+  return api<{ ok: boolean; data: CalltouchCall[]; total: number; page: number; limit: number }>(
+    "GET", `/admin/calltouch-calls?${qs}`
+  );
+}
+
+export function getCalltouchRecordingUrl(id: number) {
+  return api<{ ok: boolean; url: string; external?: boolean }>(
+    "GET", `/admin/calltouch-calls/${id}/recording`
+  );
+}
