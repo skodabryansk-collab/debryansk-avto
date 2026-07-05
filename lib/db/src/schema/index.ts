@@ -13,3 +13,5 @@ export * from "./promotions";
 export * from "./disclaimers";
 export * from "./faqs";
 export * from "./bonus-program";
+export * from "./seo-positions";
+export * from "./calltouch-calls";
