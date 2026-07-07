@@ -97,7 +97,9 @@ router.use("/admin/to-catalog", adminToCatalogRouter);
 router.use("/to-catalog", toCatalogRouter);
 
 // Calltouch webhooks (public, protected by secret query param)
+// Both /webhook/ and /webhooks/ are supported — CallTouch cabinet uses the singular form
 router.use("/webhooks/calltouch", calltouchWebhookRouter);
+router.use("/webhook/calltouch", calltouchWebhookRouter);
 
 // Calltouch admin
 router.use("/admin/calltouch-calls", adminCalltouchRouter);
