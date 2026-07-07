@@ -7,8 +7,6 @@ function authHeaders(): Record<string, string> {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
-const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
-
 interface CatalogMeta {
   count: number;
   brands: string[];
@@ -16,7 +14,7 @@ interface CatalogMeta {
 }
 
 async function fetchMeta(): Promise<CatalogMeta> {
-  const r = await fetch(`${BASE}/api/admin/to-catalog`, { headers: authHeaders() });
+  const r = await fetch("/api/admin/to-catalog", { headers: authHeaders() });
   const j = await r.json();
   if (!j.ok) throw new Error(j.error ?? "Ошибка");
   return { count: j.count, brands: j.brands, updatedAt: j.updatedAt };
@@ -25,12 +23,12 @@ async function fetchMeta(): Promise<CatalogMeta> {
 async function uploadFile(file: File): Promise<CatalogMeta> {
   const fd = new FormData();
   fd.append("file", file, "upload.json");
-  const r = await fetch(`${BASE}/api/admin/to-catalog/upload`, {
+  const r = await fetch("/api/admin/to-catalog/upload", {
     method: "POST",
     headers: authHeaders(),
     body: fd,
   });
-  const j = await r.json();
+  const j = await r.json().catch(() => ({ ok: false, error: `Сервер вернул не JSON (HTTP ${r.status})` }));
   if (!j.ok) throw new Error(j.error ?? "Ошибка загрузки");
   return { count: j.count, brands: j.brands, updatedAt: j.updatedAt };
 }
