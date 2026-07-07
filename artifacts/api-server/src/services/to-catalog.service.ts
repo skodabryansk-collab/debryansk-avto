@@ -133,6 +133,83 @@ export function hasBrand(brand: string): boolean {
   return load().some(e => e.Brand.toLowerCase() === brand.toLowerCase());
 }
 
+export interface VinLookupResult {
+  carInfo: {
+    brand: string;
+    model: string;
+    year?: number;
+    power?: number;
+    engine?: string;
+    raw: unknown;
+  };
+  catalogBrand: string | null;
+  catalogModel: string | null;
+  modifications: Array<{
+    name: string;
+    engine: string;
+    power: number;
+    entries: ToCatalogEntry[];
+  }>;
+}
+
+function normStr(s: string): string {
+  return s.toLowerCase().replace(/[^a-zа-яё0-9]/gi, "");
+}
+
+function brandMatch(autoruBrand: string, catalogBrand: string): boolean {
+  const a = normStr(autoruBrand);
+  const c = normStr(catalogBrand);
+  const cBase = c.replace(/pro|plus|\+/gi, "");
+  return c.includes(a) || a.includes(cBase) || cBase.includes(a);
+}
+
+function modelMatch(autoruModel: string, catalogModel: string, catalogBrand: string): boolean {
+  const brandWords = catalogBrand.toLowerCase().split(/\s+/);
+  let stripped = catalogModel;
+  for (const w of brandWords) {
+    const re = new RegExp("^" + w + "\\s*", "i");
+    stripped = stripped.replace(re, "").trim();
+  }
+  const a = normStr(autoruModel);
+  const m = normStr(stripped);
+  if (a === m) return true;
+  if (a.length > 1 && m.includes(a)) return true;
+  if (m.length > 1 && a.includes(m)) return true;
+  const aN = a.replace(/х/gi, "x").replace(/ё/gi, "e");
+  const mN = m.replace(/х/gi, "x").replace(/ё/gi, "e");
+  return aN === mN || mN.includes(aN) || aN.includes(mN);
+}
+
+export function findByVehicle(
+  autoruBrand: string,
+  autoruModel: string,
+  power?: number,
+): VinLookupResult["modifications"] {
+  const brand = getBrands().find(b => brandMatch(autoruBrand, b)) ?? null;
+  if (!brand) return [];
+  const models = getModels(brand);
+  const catalogModel = models.find(m => modelMatch(autoruModel, m, brand)) ?? null;
+  if (!catalogModel) return [];
+  const mods = getModifications(brand, catalogModel);
+  return mods.map(mod => {
+    const modEntries = getEntries(brand, catalogModel, mod);
+    const sample = modEntries[0];
+    return { name: mod, engine: sample?.Engine ?? "", power: sample?.Power ?? 0, entries: modEntries };
+  }).filter(m => {
+    if (!power || power <= 0) return true;
+    return m.power === 0 || Math.abs(m.power - power) <= 15;
+  });
+}
+
+export function findCatalogNames(autoruBrand: string, autoruModel: string): { brand: string | null; model: string | null } {
+  const brands = getBrands();
+  const brand = brands.find(b => brandMatch(autoruBrand, b)) ?? null;
+  if (!brand) return { brand: null, model: null };
+  const models = getModels(brand);
+  const model = models.find(m => modelMatch(autoruModel, m, brand)) ?? null;
+  return { brand, model };
+}
+
 export async function saveCatalog(data: ToCatalogEntry[]): Promise<void> {
   await db.execute(sql`
     INSERT INTO to_catalog_store (id, data, updated_at)
