@@ -15,10 +15,10 @@ const cache: PrerenderCacheState = {
 };
 
 // Routes served to bots via seoMeta (SSG HTML + meta injection, no Puppeteer cache needed).
-// Contentful pages (/, /service, /service/bonus, /about, /news, /buyout, /cars) are
-// intentionally excluded — prerender.mjs renders them via Puppeteer so bots get real content.
+// "/" added here so the prerender middleware always falls through to seoMeta for the home page,
+// which reads dist/public/index.html with the current build's CSS hash (never stale GCS cache).
 const SSG_ROUTES = new Set([
-  "/vacancies", "/contacts", "/legal", "/privacy",
+  "/", "/vacancies", "/contacts", "/legal", "/privacy",
 ]);
 function isSsgRoute(route: string): boolean {
   if (SSG_ROUTES.has(route)) return true;
