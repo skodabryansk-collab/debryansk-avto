@@ -254,7 +254,21 @@ export default function ToCalculator({ brandName }: { brandName: string }) {
   const [year, setYear] = useState("");
   const [calculated, setCalculated] = useState(false);
 
-  const vin = useVinLookup();
+  const vin = useVinLookup((r) => {
+    if (!r.ok) return;
+    if (r.catalogModel) {
+      setModel(r.catalogModel);
+      setMaintenance("");
+      setToKey("");
+      setCalculated(false);
+    }
+    if (r.carInfo?.year) setYear(String(r.carInfo.year));
+    if (r.modifications?.length === 1) {
+      setMaintenance(r.modifications[0].name);
+      setToKey("");
+      setCalculated(false);
+    }
+  });
   const vinResult = vin.result;
   const hasVinMatch = vinResult?.ok && (vinResult.modifications?.length ?? 0) > 0;
 
@@ -312,7 +326,7 @@ export default function ToCalculator({ brandName }: { brandName: string }) {
               {/* VIN / GRZ search — uses shared component */}
               <VinGrzInput
                 state={vin}
-                label="Быстрый поиск по VIN или ГРЗ"
+                label="Быстрый поиск по VIN"
                 showResultCard={true}
               />
 
