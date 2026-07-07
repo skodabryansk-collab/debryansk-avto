@@ -46,45 +46,77 @@ router.get("/lookup", async (req, res) => {
   if (!vin && !grz) {
     return res.status(400).json({ ok: false, error: "vin или grz обязателен" });
   }
+
   try {
-    let raw: unknown;
+    let brand = "";
+    let model = "";
+    let year: number | undefined;
+    let power: number | undefined;
+    let engineLabel: string | undefined;
+
     if (vin) {
-      raw = await cmGet("/converting/vin/autoru", { vin });
-    } else {
-      raw = await cmGet("/converting/grz/autoru", { grz });
+      // 1. Try /converting/vin/autoru (returns auto.ru catalog IDs + tech params)
+      try {
+        const raw = await cmGet("/converting/vin/autoru", { vin }) as Record<string, unknown>;
+        brand = String(raw["mark"] ?? raw["mark_id"] ?? raw["markId"] ?? "").trim();
+        model = String(raw["model"] ?? raw["model_id"] ?? raw["modelId"] ?? "").trim();
+        year = typeof raw["year"] === "number" ? raw["year"] : undefined;
+        const tp = (raw["tech_param"] ?? raw["techParam"] ?? raw["tech_params"] ?? {}) as Record<string, unknown>;
+        power = typeof tp["power"] === "number" ? tp["power"] : undefined;
+        const disp = typeof tp["displacement"] === "number" ? (tp["displacement"] / 1000).toFixed(1) : undefined;
+        const et = String(tp["engine_type"] ?? tp["engineType"] ?? "").toLowerCase();
+        if (disp) engineLabel = `${disp} ${et.includes("diesel") || et.includes("дизел") ? "Дизель" : "Бензин"}`;
+      } catch {
+        // fall through to predict endpoint
+      }
     }
 
-    const r = raw as Record<string, unknown>;
+    // 2. Fallback for VIN not in converting DB, or primary for GRZ:
+    //    /predict_by_vin_or_lp — accepts VIN or ГРЗ via carIdentifier,
+    //    returns human-readable brand.text/model.text in Russian
+    if (!brand || !model) {
+      const identifier = vin || grz;
+      let predictRaw: Record<string, unknown> | null = null;
+      try {
+        predictRaw = await cmGet("/predict_by_vin_or_lp", {
+          carIdentifier: identifier,
+          mileage: "50000",
+          regionId: "1",
+          sellerType: "private",
+        }) as Record<string, unknown>;
+      } catch {
+        predictRaw = null;
+      }
 
-    const autoruBrand = String(
-      r["mark"] ?? r["mark_id"] ?? r["markId"] ?? ""
-    ).trim();
-    const autoruModel = String(
-      r["model"] ?? r["model_id"] ?? r["modelId"] ?? ""
-    ).trim();
-    const year = typeof r["year"] === "number" ? r["year"] : undefined;
-
-    const tp = (r["tech_param"] ?? r["techParam"] ?? r["tech_params"] ?? {}) as Record<string, unknown>;
-    const power = typeof tp["power"] === "number" ? tp["power"] : undefined;
-    const displacement = typeof tp["displacement"] === "number"
-      ? (tp["displacement"] / 1000).toFixed(1)
-      : undefined;
-    const engineType = String(tp["engine_type"] ?? tp["engineType"] ?? "").toLowerCase();
-    const engineLabel = displacement
-      ? `${displacement} ${engineType.includes("diesel") || engineType.includes("дизел") ? "Дизель" : "Бензин"}`
-      : undefined;
-
-    if (!autoruBrand || !autoruModel) {
-      logger.warn({ raw, vin, grz }, "to-catalog lookup: empty brand/model from CM Expert");
-      return res.json({ ok: false, error: "Автомобиль не определён", raw });
+      if (predictRaw) {
+        const bObj = predictRaw["brand"] as Record<string, unknown> | undefined;
+        const mObj = predictRaw["model"] as Record<string, unknown> | undefined;
+        const eObj = predictRaw["engine"] as Record<string, unknown> | undefined;
+        brand = String(bObj?.["text"] ?? "").trim();
+        model = String(mObj?.["text"] ?? "").trim();
+        year = typeof predictRaw["creationYear"] === "number" ? predictRaw["creationYear"] : year;
+        power = typeof predictRaw["power"] === "number" ? predictRaw["power"] : power;
+        const vol = typeof predictRaw["volume"] === "number" ? predictRaw["volume"].toFixed(1) : undefined;
+        const et = String(eObj?.["text"] ?? "").toLowerCase();
+        if (vol) engineLabel = `${vol} ${et.includes("дизел") ? "Дизель" : "Бензин"}`;
+      }
     }
 
-    const { brand: catalogBrand, model: catalogModel } = findCatalogNames(autoruBrand, autoruModel);
-    const modifications = findByVehicle(autoruBrand, autoruModel, power);
+    if (!brand || !model) {
+      const isGrz = !vin && !!grz;
+      const msg = isGrz
+        ? "Автомобиль по ГРЗ не найден. CM Expert пока не поддерживает поиск по госномеру — попробуйте ввести VIN."
+        : "Автомобиль не найден в базе данных. Возможно, это автомобиль китайского рынка или VIN ещё не проиндексирован.";
+      logger.warn({ vin, grz }, "to-catalog lookup: brand/model not resolved");
+      return res.json({ ok: false, error: msg });
+    }
+
+    const { brand: catalogBrand, model: catalogModel } = findCatalogNames(brand, model);
+    const modifications = findByVehicle(brand, model, power);
 
     return res.json({
       ok: true,
-      carInfo: { brand: autoruBrand, model: autoruModel, year, power, engine: engineLabel },
+      carInfo: { brand, model, year, power, engine: engineLabel },
       catalogBrand,
       catalogModel,
       modifications,
