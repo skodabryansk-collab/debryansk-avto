@@ -246,12 +246,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-40 bg-black/20" onClick={() => setMobileOpen(false)}>
-          <div className="absolute left-0 top-14 bottom-0 w-64 bg-white border-r border-slate-200 shadow-xl" onClick={e => e.stopPropagation()}>
+          <div className="absolute left-0 top-14 bottom-0 w-64 bg-white border-r border-slate-200 shadow-xl overflow-y-auto" onClick={e => e.stopPropagation()}>
             <nav className="p-3 space-y-1">
               {navItems.map(item => <SidebarItem key={item.path} {...item} />)}
             </nav>
             <Separator className="my-2" />
-            <div className="px-3 space-y-1">
+            <div className="px-3 pb-6 space-y-1">
               <RebuildCacheButton />
               <PrerenderButton />
               <Button variant="ghost" className="w-full justify-start text-slate-500 hover:text-slate-900" onClick={logout}>
