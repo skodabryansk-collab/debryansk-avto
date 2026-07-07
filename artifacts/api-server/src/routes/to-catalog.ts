@@ -105,8 +105,8 @@ router.get("/lookup", async (req, res) => {
     if (!brand || !model) {
       const isGrz = !vin && !!grz;
       const msg = isGrz
-        ? "Автомобиль по ГРЗ не найден. CM Expert пока не поддерживает поиск по госномеру — попробуйте ввести VIN."
-        : "Автомобиль не найден в базе данных. Возможно, это автомобиль китайского рынка или VIN ещё не проиндексирован.";
+        ? "Автомобиль по ГРЗ не найден. Попробуйте ввести VIN."
+        : "VIN ещё не проиндексирован, выберите марку и модель самостоятельно.";
       logger.warn({ vin, grz }, "to-catalog lookup: brand/model not resolved");
       return res.json({ ok: false, error: msg });
     }
