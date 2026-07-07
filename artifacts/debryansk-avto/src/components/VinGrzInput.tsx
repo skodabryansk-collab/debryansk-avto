@@ -49,7 +49,7 @@ function CarInfoCard({ result, onClear }: { result: VinLookupResult; onClear: ()
 export function VinGrzInput({
   onResult,
   showResultCard = true,
-  placeholder = "VIN (17 символов) или ГРЗ (А123ВС77)",
+  placeholder = "VIN номер (17 символов)",
   label,
   state: externalState,
 }: VinGrzInputProps) {
