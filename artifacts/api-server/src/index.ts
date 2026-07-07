@@ -246,6 +246,13 @@ async function main() {
   // Then seed data
   await seedDatabase();
 
+  // Load TO catalog from DB (seeds from bundled JSON on first run)
+  import("./services/to-catalog.service").then(({ initCatalog }) => {
+    initCatalog()
+      .then(() => logger.info("TO catalog ready"))
+      .catch(err => logger.warn({ err }, "TO catalog init failed"));
+  }).catch(err => logger.warn({ err }, "TO catalog module load failed"));
+
   // Initial car sync (non-blocking)
   import("./services/car-sync").then(({ syncCars }) => {
     syncCars()
@@ -322,6 +329,11 @@ async function main() {
     scheduleMetrikaReport();
   }).catch(err => logger.warn({ err }, "[metrika] Scheduler load failed"));
 
+  // SEO positions — Webmaster API, weekly Sunday 10:00 MSK (07:00 UTC)
+  import("./services/seo-positions").then(({ scheduleSeoPositions }) => {
+    scheduleSeoPositions();
+  }).catch(err => logger.warn({ err }, "[seo-positions] Scheduler load failed"));
+
   // Start server
   app.listen(port, () => {
     logger.info({ port }, "Server listening");
@@ -350,17 +362,54 @@ async function main() {
             return files;
           }
 
+          // Only load truly-static SSG routes from dist/public.
+          // All other routes (/, /cars, /new-cars, /brands/*, /cars/*, etc.) are
+          // Puppeteer-rendered and live in GCS — loading shells from dist here
+          // would block GCS from populating the cache (cache already-has check).
+          const SSG_ONLY_ROUTES = new Set([
+            "/vacancies", "/contacts", "/legal", "/privacy",
+          ]);
+          function isDistSsgRoute(route: string): boolean {
+            if (SSG_ONLY_ROUTES.has(route)) return true;
+            if (route.startsWith("/news/")) return true; // article pages have real SSG HTML
+            return false;
+          }
+
           const htmlFiles = findHtmlFiles(distDir);
           let loaded = 0;
           for (const file of htmlFiles) {
-            const route = file === "index.html" ? "/" : "/" + file.replace(/\/index\.html$/, "");
+            if (file === "index.html") continue; // root SPA shell — skip
+            const route = "/" + file.replace(/\/index\.html$/, "");
+            if (!isDistSsgRoute(route)) continue; // let GCS handle dynamic/Puppeteer routes
             const html = readFileSync(join(distDir, file), "utf-8");
             updatePrerenderCache(route, html);
             loaded++;
           }
           logger.info({ loaded }, "prerender: loaded fresh SSG HTML into cache");
-          logger.info("prerender: triggering full prerender on startup (refreshes GCS cache)");
-          spawnPrerender([]);
+          // Pre-load GCS before spawning prerender so dynamic routes (especially /)
+          // are immediately available from the previous run, rather than waiting 30 min.
+          const { loadPrerenderCacheFromGCS } = await import("./middleware/prerender");
+          await loadPrerenderCacheFromGCS().catch(err =>
+            logger.warn({ err }, "prerender: initial GCS pre-load failed (non-fatal)")
+          );
+          // Guard: skip startup prerender if DB is unhealthy — running Puppeteer
+          // during a DB outage renders empty/broken pages and overwrites the good
+          // GCS cache with broken HTML. We already loaded the GCS cache above, so
+          // visitors are served from the last good run while DB recovers.
+          let dbHealthy = false;
+          try {
+            await db.execute(sql`SELECT 1`);
+            dbHealthy = true;
+          } catch (err) {
+            logger.warn({ err }, "prerender: startup prerender SKIPPED — DB health check failed");
+          }
+
+          if (dbHealthy) {
+            logger.info("prerender: triggering full prerender on startup (refreshes GCS cache)");
+            spawnPrerender([]);
+          } else {
+            logger.warn("prerender: startup prerender deferred — will run on next scheduled cycle or manual trigger");
+          }
         })
         .catch(err => logger.warn({ err }, "prerender: startup init failed"));
     }
