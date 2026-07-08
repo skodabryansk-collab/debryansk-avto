@@ -1,7 +1,7 @@
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
-import { getUsedCars } from "../routes/cars";
+import { getUsedCars, getAvitoMeta } from "../routes/cars";
 import { getNewCars } from "../routes/new-cars";
 
 export interface RemovedCar {
@@ -24,9 +24,10 @@ export interface SyncStats {
 export async function syncCars(): Promise<SyncStats> {
   const startedAt = Date.now();
 
-  const [usedCars, newCars] = await Promise.all([
+  const [usedCars, newCars, avitoMap] = await Promise.all([
     getUsedCars().catch(err => { logger.warn({ err }, "car-sync: used cars fetch failed"); return []; }),
     getNewCars().catch(err => { logger.warn({ err }, "car-sync: new cars fetch failed"); return []; }),
+    getAvitoMeta().catch(err => { logger.warn({ err }, "car-sync: avito fetch failed"); return new Map(); }),
   ]);
 
   if (!usedCars.length && !newCars.length) {
@@ -60,17 +61,19 @@ export async function syncCars(): Promise<SyncStats> {
   for (const c of usedCars) {
     allExternalIds.push(c.id);
     if (!existingIds.has(c.id)) addedUsedCarIds.push(c.id);
-    const ownersNum = parseOwners(c.ownersNumber);
+    const avito = avitoMap.get(c.id);
+    const ownersNum = avito?.owners ? parseInt(avito.owners, 10) || null : parseOwners(c.ownersNumber);
+    const driveType = avito?.driveType || null;
     await db.execute(sql`
       INSERT INTO cars (external_id, type, brand, model, year, color, price, mileage,
                         body_type, modification, complectation, extras, description,
-                        image_url, vin, dealer, owners_number,
+                        image_url, vin, dealer, owners_number, drive_type,
                         max_discount, credit_discount, tradein_discount, synced_at)
       VALUES (
         ${c.id}, 'used', ${c.mark}, ${c.model}, ${c.year}, ${c.color}, ${c.price},
         ${c.run}, ${c.bodyType}, ${c.modification}, ${c.complectation},
         ${c.extras || null}, ${c.description || null}, ${c.images[0] ?? null},
-        ${c.vin || null}, null, ${ownersNum},
+        ${c.vin || null}, null, ${ownersNum}, ${driveType},
         ${c.maxDiscount}, ${c.creditDiscount}, ${c.tradeinDiscount}, NOW()
       )
       ON CONFLICT (external_id) DO UPDATE SET
@@ -87,6 +90,7 @@ export async function syncCars(): Promise<SyncStats> {
         image_url = EXCLUDED.image_url,
         vin = EXCLUDED.vin,
         owners_number = EXCLUDED.owners_number,
+        drive_type = EXCLUDED.drive_type,
         max_discount = EXCLUDED.max_discount,
         credit_discount = EXCLUDED.credit_discount,
         tradein_discount = EXCLUDED.tradein_discount,
