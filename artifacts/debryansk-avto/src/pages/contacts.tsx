@@ -219,6 +219,16 @@ export default function ContactsPage() {
     return null;
   }
 
+  function toOHString(raw: string | null | undefined): string {
+    if (!raw) return "Mo-Su 09:00-21:00";
+    const m = /ежедневно\s+(\d{1,2}:\d{2})[–\-](\d{1,2}:\d{2})/i.exec(raw);
+    if (m) {
+      const pad = (t: string) => t.length < 5 ? "0" + t : t;
+      return `Mo-Su ${pad(m[1])}-${pad(m[2])}`;
+    }
+    return "Mo-Su 09:00-21:00";
+  }
+
   const dealersSchema = locations.map((loc) => {
     const hoursSpec = parseHoursSpec(loc.hours);
     return {
@@ -241,7 +251,7 @@ export default function ContactsPage() {
         },
       } : {}),
       ...(hoursSpec ? { "openingHoursSpecification": hoursSpec } : {}),
-      "openingHours": "Mo-Su 09:00-21:00",
+      "openingHours": toOHString(loc.hours),
     };
   });
 
