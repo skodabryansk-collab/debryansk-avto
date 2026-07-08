@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 
 const DESKTOP_PER_PAGE = 3;
+const MOBILE_PER_PAGE = 2;
 
 interface HomeCarouselProps {
   title: string;
@@ -19,15 +20,18 @@ export default function HomeCarousel({
   viewAllLink,
   viewAllLabel,
 }: HomeCarouselProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const desktopScrollRef = useRef<HTMLDivElement>(null);
+  const mobileScrollRef = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(0);
+  const [mobilePage, setMobilePage] = useState(0);
 
   const total = children.length;
   const pages = Math.max(1, Math.ceil(total / DESKTOP_PER_PAGE));
+  const mobilePages = Math.max(1, Math.ceil(total / MOBILE_PER_PAGE));
 
   const goToPage = useCallback(
     (target: number) => {
-      const el = scrollRef.current;
+      const el = desktopScrollRef.current;
       if (!el || total === 0) return;
       const clamped = Math.max(0, Math.min(target, pages - 1));
 
@@ -41,11 +45,27 @@ export default function HomeCarousel({
     [total, pages]
   );
 
+  const goToMobilePage = useCallback(
+    (target: number) => {
+      const el = mobileScrollRef.current;
+      if (!el || total === 0) return;
+      const clamped = Math.max(0, Math.min(target, mobilePages - 1));
+
+      const first = el.children[0] as HTMLElement | undefined;
+      const cardW = first ? first.getBoundingClientRect().width : 0;
+      const gap = parseFloat(getComputedStyle(el).gap) || 12;
+      const step = (cardW + gap) * MOBILE_PER_PAGE;
+      el.scrollTo({ left: clamped * step, behavior: "smooth" });
+      setMobilePage(clamped);
+    },
+    [total, mobilePages]
+  );
+
   const prev = () => goToPage(page - 1);
   const next = () => goToPage(page + 1);
 
   useEffect(() => {
-    const el = scrollRef.current;
+    const el = desktopScrollRef.current;
     if (!el) return;
     const onScroll = () => {
       const first = el.children[0] as HTMLElement | undefined;
@@ -59,6 +79,22 @@ export default function HomeCarousel({
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, [pages]);
+
+  useEffect(() => {
+    const el = mobileScrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const first = el.children[0] as HTMLElement | undefined;
+      const cardW = first ? first.getBoundingClientRect().width : 0;
+      const gap = parseFloat(getComputedStyle(el).gap) || 12;
+      const step = (cardW + gap) * MOBILE_PER_PAGE;
+      if (step <= 0) return;
+      const cur = Math.round(el.scrollLeft / step);
+      setMobilePage(Math.max(0, Math.min(cur, mobilePages - 1)));
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [mobilePages]);
 
   if (total === 0) return null;
 
@@ -108,7 +144,7 @@ export default function HomeCarousel({
         {/* Mobile carousel */}
         <div className="md:hidden -mx-4 px-4">
           <div
-            ref={scrollRef}
+            ref={mobileScrollRef}
             className="flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-3"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
@@ -118,12 +154,30 @@ export default function HomeCarousel({
               </div>
             ))}
           </div>
+
+          {/* Mobile dots */}
+          {mobilePages > 1 && (
+            <div className="flex justify-center gap-2 mt-3">
+              {Array.from({ length: mobilePages }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => goToMobilePage(i)}
+                  className={`h-2 rounded-full transition-all ${
+                    i === mobilePage
+                      ? "w-[18px] bg-[#0070b8]"
+                      : "w-2 bg-slate-300 hover:bg-slate-400"
+                  }`}
+                  aria-label={`Страница ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Desktop carousel */}
         <div className="hidden md:block">
           <div
-            ref={scrollRef}
+            ref={desktopScrollRef}
             className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
@@ -134,7 +188,7 @@ export default function HomeCarousel({
             ))}
           </div>
 
-          {/* Dots */}
+          {/* Desktop dots */}
           {pages > 1 && (
             <div className="flex justify-center gap-2 mt-4">
               {Array.from({ length: pages }).map((_, i) => (
