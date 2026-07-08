@@ -778,6 +778,81 @@ function BrandCarCard({ car }: { car: BrandPageData["cars"][number] }) {
   );
 }
 
+/* ─── Featured cars carousel (mobile scroll + dots, desktop grid) ─── */
+function BrandStockCarousel({ cars }: { cars: BrandPageData["cars"] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(0);
+  const total = cars.length;
+  const mobilePages = Math.max(1, Math.ceil(total / 2));
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const first = el.children[0] as HTMLElement | undefined;
+      const cardW = first ? first.getBoundingClientRect().width : 0;
+      const gap = parseFloat(getComputedStyle(el).gap) || 12;
+      const step = (cardW + gap) * 2;
+      if (step <= 0) return;
+      const cur = Math.round(el.scrollLeft / step);
+      setPage(Math.max(0, Math.min(cur, mobilePages - 1)));
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [mobilePages]);
+
+  const goToPage = (i: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const first = el.children[0] as HTMLElement | undefined;
+    const cardW = first ? first.getBoundingClientRect().width : 0;
+    const gap = parseFloat(getComputedStyle(el).gap) || 12;
+    el.scrollTo({ left: i * (cardW + gap) * 2, behavior: "smooth" });
+    setPage(i);
+  };
+
+  return (
+    <>
+      {/* Mobile: horizontal scroll with dots */}
+      <div className="md:hidden -mx-4 px-4">
+        <div
+          ref={scrollRef}
+          className="flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-3"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
+          {cars.map((car) => (
+            <div key={car.id} className="snap-start shrink-0 w-[47%]">
+              <BrandCarCard car={car} />
+            </div>
+          ))}
+        </div>
+        {mobilePages > 1 && (
+          <div className="flex justify-center gap-2 mt-3">
+            {Array.from({ length: mobilePages }).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => goToPage(i)}
+                className={`h-2 rounded-full transition-all ${
+                  i === page
+                    ? "w-[18px] bg-[#0070b8]"
+                    : "w-2 bg-slate-300 hover:bg-slate-400"
+                }`}
+                aria-label={`Страница ${i + 1}`}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+      {/* Desktop: 3-column grid */}
+      <div className="hidden md:grid md:grid-cols-3 gap-4 gap-5">
+        {cars.map((car) => (
+          <BrandCarCard key={car.id} car={car} />
+        ))}
+      </div>
+    </>
+  );
+}
+
 /* ─── Main component ─────────────────────────────────────── */
 export default function BrandPage() {
   const params = useParams<{ slug: string }>();
@@ -1253,11 +1328,7 @@ export default function BrandPage() {
               </a>
             </FadeIn>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-5">
-              {featuredCars.map((car) => (
-                <BrandCarCard key={car.id} car={car} />
-              ))}
-            </div>
+            <BrandStockCarousel cars={featuredCars} />
 
             <FadeIn className="text-center mt-8">
               <a
