@@ -50,8 +50,18 @@ function parseTransmission(mod: string): string {
 }
 
 function parseDrive(mod: string): string {
-  if (!mod) return "";
-  return mod.includes("4WD") ? "Полный" : "Передний/задний";
+  if (!mod) return "Передний";
+  return mod.includes("4WD") ? "Полный" : "Передний";
+}
+function formatOwners(raw: string): string {
+  if (!raw) return "";
+  const s = raw.toLowerCase().trim();
+  if (s === "1" || s.includes("один")) return "1";
+  if (s === "2" || s.includes("два")) return "2";
+  if (s === "3" || s.includes("три")) return "3";
+  const n = parseInt(s);
+  if (!isNaN(n)) return n >= 4 ? "4+" : String(n);
+  return "4+";
 }
 
 async function fetchCarsXml(): Promise<CarRecord[]> {
@@ -392,7 +402,7 @@ const BODY_TYPES = [
   "Купе",
 ];
 const TRANSMISSIONS = ["Любая", "Автомат", "Механика", "Робот", "Вариатор"];
-const DRIVES = ["Любой", "Полный", "Передний/задний"];
+const DRIVES = ["Любой", "Полный", "Передний"];
 
 export default function UsedCars() {
   const { favorites, compare } = useCarStorage();
