@@ -6,6 +6,8 @@ const router: IRouter = Router();
 
 const XML_URL =
   "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/used/55c50e2b8b4277d96c5dde95c3c16421.xml";
+const AVITO_XML_URL =
+  "https://media.cm.expert/stock/export/cmexpert/avito.ru/all/all/3bc95b6dca38f0b5e5e757199fe16420.xml";
 
 export interface CarRecord {
   id: string;
@@ -21,7 +23,7 @@ export interface CarRecord {
   url: string;
   images: string[];
   ownersNumber: string;
-  drive: string;
+  driveType: string;
   state: string;
   extras: string;
   description: string;
@@ -40,6 +42,32 @@ export interface CarRecord {
 
 let cache: { data: CarRecord[]; ts: number } | null = null;
 const CACHE_TTL = 30 * 60 * 1000;
+
+interface AvitoMeta { driveType: string; owners: string; }
+let avitoCache: { data: Map<string, AvitoMeta>; ts: number } | null = null;
+
+function parseAvitoXml(text: string): Map<string, AvitoMeta> {
+  const map = new Map<string, AvitoMeta>();
+  const blocks = text.match(/<Ad>[\s\S]*?<\/Ad>/g) ?? [];
+  for (const block of blocks) {
+    const id = getField(block, "Id");
+    if (id) map.set(id, { driveType: getField(block, "DriveType"), owners: getField(block, "Owners") });
+  }
+  return map;
+}
+
+async function getAvitoMeta(): Promise<Map<string, AvitoMeta>> {
+  if (avitoCache && Date.now() - avitoCache.ts < CACHE_TTL) return avitoCache.data;
+  try {
+    const r = await fetch(AVITO_XML_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
+    if (!r.ok) return avitoCache?.data ?? new Map();
+    const data = parseAvitoXml(await r.text());
+    avitoCache = { data, ts: Date.now() };
+    return data;
+  } catch {
+    return avitoCache?.data ?? new Map();
+  }
+}
 
 function getField(xml: string, field: string): string {
   const m = xml.match(new RegExp(`<${field}[^>]*>([\\s\\S]*?)<\\/${field}>`));
@@ -70,7 +98,7 @@ function parseXml(text: string): CarRecord[] {
       url: getField(block, "url"),
       images: getImages(block),
       ownersNumber: getField(block, "owners_number"),
-      drive: getField(block, "drive"),
+      driveType: "",
       state: getField(block, "state"),
       extras: getField(block, "extras"),
       description: getField(block, "description"),
@@ -121,9 +149,18 @@ router.get("/cars/used", async (req, res) => {
       (rows.rows as { external_id: string; popularity_score: number; created_at: string | null }[]).map(r => [r.external_id, { score: r.popularity_score ?? 0, createdAt: r.created_at }])
     );
 
+    const avitoMap = await getAvitoMeta();
+
     let enriched = data.map(c => {
       const meta = metaMap.get(c.id) ?? { score: 0, createdAt: null };
-      return { ...c, popularity_score: meta.score, created_at: meta.createdAt };
+      const avito = avitoMap.get(c.id);
+      return {
+        ...c,
+        popularity_score: meta.score,
+        created_at: meta.createdAt,
+        driveType: avito?.driveType || "",
+        ownersNumber: avito?.owners || c.ownersNumber,
+      };
     });
 
     if (sort === "popularity") {
