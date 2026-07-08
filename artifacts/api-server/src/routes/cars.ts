@@ -21,6 +21,7 @@ export interface CarRecord {
   url: string;
   images: string[];
   ownersNumber: string;
+  drive: string;
   state: string;
   extras: string;
   description: string;
@@ -69,6 +70,7 @@ function parseXml(text: string): CarRecord[] {
       url: getField(block, "url"),
       images: getImages(block),
       ownersNumber: getField(block, "owners_number"),
+      drive: getField(block, "drive"),
       state: getField(block, "state"),
       extras: getField(block, "extras"),
       description: getField(block, "description"),
