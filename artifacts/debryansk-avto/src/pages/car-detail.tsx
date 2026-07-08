@@ -60,18 +60,19 @@ function parseTransmission(mod: string): string {
 function parseDriveLabel(drive: string, mod: string): string {
   const d = (drive ?? "").toLowerCase();
   if (d.includes("all") || d === "4wd" || d.includes("полн") || (mod ?? "").includes("4WD")) return "Полный";
-  if (d.includes("front") || d.includes("forward") || d.includes("перед")) return "Передний";
   if (d.includes("rear") || d.includes("задн")) return "Задний";
-  return "";
+  if (d.includes("front") || d.includes("forward") || d.includes("перед")) return "Передний";
+  return (mod ?? "").includes("4WD") ? "Полный" : "Передний";
 }
 function formatOwners(raw: string): string {
   if (!raw) return "";
   const s = raw.toLowerCase().trim();
   if (s === "1" || s.includes("один")) return "1";
   if (s === "2" || s.includes("два")) return "2";
+  if (s === "3" || s.includes("три")) return "3";
   const n = parseInt(s);
-  if (!isNaN(n)) return n >= 3 ? "3+" : String(n);
-  return "3+";
+  if (!isNaN(n)) return n >= 4 ? "4+" : String(n);
+  return "4+";
 }
 function parseEngine(mod: string): string {
   const m = mod.match(/(\d+\.\d+)\s*([\w]+)\s*\((\d+)\s*л\.с\.\)/);
@@ -513,7 +514,7 @@ export default function UsedCarDetail() {
           { label: "Пробег", value: formatRun(car.run) },
           { label: "Цвет", value: car.color },
           ...(transmission ? [{ label: "КПП", value: transmission }] : []),
-          ...(car.ownersNumber ? [{ label: "Владельцев", value: car.ownersNumber }] : []),
+          ...(car.ownersNumber ? [{ label: "Владельцев", value: formatOwners(car.ownersNumber) }] : []),
         ].map((row, i) => (
           <div key={i} className="flex justify-between text-sm">
             <span className="text-slate-400">{row.label}</span>
