@@ -56,7 +56,7 @@ function parseAvitoXml(text: string): Map<string, AvitoMeta> {
   return map;
 }
 
-async function getAvitoMeta(): Promise<Map<string, AvitoMeta>> {
+export async function getAvitoMeta(): Promise<Map<string, AvitoMeta>> {
   if (avitoCache && Date.now() - avitoCache.ts < CACHE_TTL) return avitoCache.data;
   try {
     const r = await fetch(AVITO_XML_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
