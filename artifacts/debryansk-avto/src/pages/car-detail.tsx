@@ -24,7 +24,7 @@ interface CarRecord {
   mark: string;
   model: string;
   modification: string;
-  drive: string;
+  driveType: string;
   year: number;
   price: number;
   run: number;
@@ -401,7 +401,7 @@ export default function UsedCarDetail() {
   }
 
   const transmission = parseTransmission(car.modification);
-  const driveLabel = parseDriveLabel(car.drive ?? "", car.modification);
+  const driveLabel = parseDriveLabel(car.driveType ?? "", car.modification);
   const engine = parseEngine(car.modification);
   const ownersLabel = formatOwners(car.ownersNumber);
 
@@ -535,7 +535,7 @@ export default function UsedCarDetail() {
     "brand": { "@type": "Brand", "name": car.mark },
     "model": car.model,
     "vehicleTransmission": parseTransmission(car.modification),
-    "driveWheelConfiguration": parseDriveLabel(car.drive ?? "", car.modification),
+    "driveWheelConfiguration": parseDriveLabel(car.driveType ?? "", car.modification),
     "vehicleEngine": {
       "@type": "EngineSpecification",
       "name": parseEngine(car.modification)
