@@ -59,7 +59,7 @@ async function fetchMetrika(params: Record<string, string | number>): Promise<Me
 
   const r = await fetch(url.toString(), {
     headers: { Authorization: `OAuth ${token}` },
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(30_000),
   });
 
   const json = await r.json() as MetrikaResponse;
@@ -68,6 +68,35 @@ async function fetchMetrika(params: Record<string, string | number>): Promise<Me
     throw new Error(msg);
   }
   return json;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(
+  params: Record<string, string | number>,
+  retries = 3,
+  retryDelay = 10_000,
+): Promise<MetrikaResponse> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fetchMetrika(params);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isQuota = /quota|parallel/i.test(msg);
+      const isTimeout = /timeout|aborted/i.test(msg) || (err instanceof Error && err.name === "TimeoutError");
+      const shouldRetry = (isQuota || isTimeout) && attempt < retries;
+      if (shouldRetry) {
+        logger.warn({ attempt, retryDelay, reason: isTimeout ? "timeout" : "quota" },
+          `[metrika] Retrying request ${attempt}/${retries - 1} in ${retryDelay}ms`);
+        await sleep(retryDelay);
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw new Error("fetchWithRetry: unreachable");
 }
 
 /* ── Date helpers ── */
@@ -289,65 +318,32 @@ interface ReportData {
   error?: string;
 }
 
+const BETWEEN_REQUESTS_MS = 1_500;
+
 async function collectReport(): Promise<ReportData> {
   const date = yesterdayStr();
   const weekDate = weekAgoStr();
   const data: ReportData = { date, weekDate, goals: [], sources: [], searchQueries: [], topPages: [], searchEngines: [] };
 
-  /* ── Build goal metrics string ── */
+  /* ── Goal metrics string ── */
   const goalMetrics = GOALS.map(g => `ym:s:goal${g.id}reaches`).join(",");
 
-  /* ── Parallel: main metrics + goals (yesterday + week ago) + sources + top pages ── */
-  const [mainYest, mainWeek, goalsYest, goalsWeek, srcYest, srcWeek, topRes] = await Promise.all([
-    fetchMetrika({
-      ids: COUNTER_MAIN,
-      date1: date, date2: date,
-      metrics: "ym:s:visits,ym:s:users,ym:s:pageviews,ym:s:bounceRate,ym:s:avgVisitDurationSeconds",
-    }),
-    fetchMetrika({
-      ids: COUNTER_MAIN,
-      date1: weekDate, date2: weekDate,
-      metrics: "ym:s:visits,ym:s:users,ym:s:pageviews,ym:s:bounceRate,ym:s:avgVisitDurationSeconds",
-    }),
-    fetchMetrika({
-      ids: COUNTER_MAIN,
-      date1: date, date2: date,
-      metrics: goalMetrics,
-    }),
-    fetchMetrika({
-      ids: COUNTER_MAIN,
-      date1: weekDate, date2: weekDate,
-      metrics: goalMetrics,
-    }),
-    fetchMetrika({
-      ids: COUNTER_MAIN,
-      date1: date, date2: date,
-      dimensions: "ym:s:trafficSource",
-      metrics: "ym:s:visits",
-      sort: "-ym:s:visits",
-      limit: 10,
-    }),
-    fetchMetrika({
-      ids: COUNTER_MAIN,
-      date1: weekDate, date2: weekDate,
-      dimensions: "ym:s:trafficSource",
-      metrics: "ym:s:visits",
-      sort: "-ym:s:visits",
-      limit: 10,
-    }),
-    fetchMetrika({
-      ids: COUNTER_MAIN,
-      date1: date, date2: date,
-      dimensions: "ym:s:startURLPath",
-      metrics: "ym:s:visits",
-      sort: "-ym:s:visits",
-      limit: 5,
-    }),
-  ]);
+  /* ── Combined: main + goals metrics in ONE request per date ── */
+  const combinedMetrics = `ym:s:visits,ym:s:users,ym:s:pageviews,ym:s:bounceRate,ym:s:avgVisitDurationSeconds,${goalMetrics}`;
 
-  /* ── Main metrics ── */
-  const [mv, mu, mp, mb, md] = mainYest.totals;
-  const [mvW, muW] = mainWeek.totals;
+  /* 1. Main + goals — yesterday */
+  logger.info("[metrika] 1/9 main+goals yesterday");
+  const combinedYest = await fetchWithRetry({ ids: COUNTER_MAIN, date1: date, date2: date, metrics: combinedMetrics });
+  await sleep(BETWEEN_REQUESTS_MS);
+
+  /* 2. Main + goals — week ago */
+  logger.info("[metrika] 2/9 main+goals week ago");
+  const combinedWeek = await fetchWithRetry({ ids: COUNTER_MAIN, date1: weekDate, date2: weekDate, metrics: combinedMetrics });
+  await sleep(BETWEEN_REQUESTS_MS);
+
+  /* ── Parse main metrics (first 5 totals) ── */
+  const [mv, mu, mp, mb, md, ...goalTotalsY] = combinedYest.totals;
+  const [mvW, muW, , , , ...goalTotalsW] = combinedWeek.totals;
   data.main = {
     visits: Math.round(mv || 0),
     users: Math.round(mu || 0),
@@ -358,14 +354,32 @@ async function collectReport(): Promise<ReportData> {
     usersW: Math.round(muW || 0),
   };
 
-  /* ── Goals ── */
+  /* ── Parse goals (next N totals) ── */
   data.goals = GOALS.map((g, idx) => ({
     name: g.name,
-    reaches: Math.round(goalsYest.totals[idx] || 0),
-    reachesW: Math.round(goalsWeek.totals[idx] || 0),
+    reaches: Math.round(goalTotalsY[idx] || 0),
+    reachesW: Math.round(goalTotalsW[idx] || 0),
   }));
 
-  /* ── Sources ── */
+  /* 3. Sources — yesterday */
+  logger.info("[metrika] 3/9 sources yesterday");
+  const srcYest = await fetchWithRetry({
+    ids: COUNTER_MAIN, date1: date, date2: date,
+    dimensions: "ym:s:trafficSource", metrics: "ym:s:visits",
+    sort: "-ym:s:visits", limit: 10,
+  });
+  await sleep(BETWEEN_REQUESTS_MS);
+
+  /* 4. Sources — week ago */
+  logger.info("[metrika] 4/9 sources week ago");
+  const srcWeek = await fetchWithRetry({
+    ids: COUNTER_MAIN, date1: weekDate, date2: weekDate,
+    dimensions: "ym:s:trafficSource", metrics: "ym:s:visits",
+    sort: "-ym:s:visits", limit: 10,
+  });
+  await sleep(BETWEEN_REQUESTS_MS);
+
+  /* ── Parse sources ── */
   const srcWeekMap = new Map<string, number>();
   for (const row of srcWeek.data) {
     const id = row.dimensions[0]?.id || row.dimensions[0]?.name;
@@ -379,40 +393,42 @@ async function collectReport(): Promise<ReportData> {
     return { name, visits, visitsW };
   }).filter(s => s.visits > 0);
 
-  /* ── Top entry pages ── */
+  /* 5. Top entry pages */
+  logger.info("[metrika] 5/9 top pages");
+  const topRes = await fetchWithRetry({
+    ids: COUNTER_MAIN, date1: date, date2: date,
+    dimensions: "ym:s:startURLPath", metrics: "ym:s:visits",
+    sort: "-ym:s:visits", limit: 5,
+  });
+  await sleep(BETWEEN_REQUESTS_MS);
+
   data.topPages = topRes.data.map(row => ({
     path: row.dimensions[0]?.name || "/",
     visits: Math.round(row.metrics[0] || 0),
   })).filter(p => p.visits > 0);
 
-  /* ── Search queries + search engines (parallel, only if organic > 0) ── */
+  /* 6 & 7. Search queries + engines — only if organic traffic exists */
   const organicVisits = data.sources.find(s => s.name === "Поиск")?.visits || 0;
   if (organicVisits > 0) {
-    const [sqRes, seRes] = await Promise.all([
-      fetchMetrika({
-        ids: COUNTER_MAIN,
-        date1: date, date2: date,
-        dimensions: "ym:s:searchPhrase",
-        metrics: "ym:s:visits",
-        sort: "-ym:s:visits",
-        limit: 10,
-        filters: "ym:s:searchPhrase!='(not set)'",
-      }),
-      fetchMetrika({
-        ids: COUNTER_MAIN,
-        date1: date, date2: date,
-        dimensions: "ym:s:searchEngine",
-        metrics: "ym:s:visits",
-        sort: "-ym:s:visits",
-        limit: 5,
-      }),
-    ]);
+    logger.info("[metrika] 6/9 search phrases");
+    const sqRes = await fetchWithRetry({
+      ids: COUNTER_MAIN, date1: date, date2: date,
+      dimensions: "ym:s:searchPhrase", metrics: "ym:s:visits",
+      sort: "-ym:s:visits", limit: 10,
+      filters: "ym:s:searchPhrase!='(not set)'",
+    });
+    await sleep(BETWEEN_REQUESTS_MS);
+
+    logger.info("[metrika] 7/9 search engines");
+    const seRes = await fetchWithRetry({
+      ids: COUNTER_MAIN, date1: date, date2: date,
+      dimensions: "ym:s:searchEngine", metrics: "ym:s:visits",
+      sort: "-ym:s:visits", limit: 5,
+    });
+    await sleep(BETWEEN_REQUESTS_MS);
 
     data.searchQueries = sqRes.data
-      .map(row => ({
-        phrase: row.dimensions[0]?.name || "—",
-        visits: Math.round(row.metrics[0] || 0),
-      }))
+      .map(row => ({ phrase: row.dimensions[0]?.name || "—", visits: Math.round(row.metrics[0] || 0) }))
       .filter(q => q.visits > 0 && q.phrase !== "(not set)" && q.phrase !== "—");
 
     data.searchEngines = seRes.data
@@ -420,19 +436,21 @@ async function collectReport(): Promise<ReportData> {
       .filter(se => se.visits > 0);
   }
 
-  /* ── Maps counter ── */
-  const [mapsYest, mapsWeek] = await Promise.all([
-    fetchMetrika({
-      ids: COUNTER_MAPS,
-      date1: date, date2: date,
-      metrics: "ym:s:visits,ym:s:users",
-    }),
-    fetchMetrika({
-      ids: COUNTER_MAPS,
-      date1: weekDate, date2: weekDate,
-      metrics: "ym:s:visits,ym:s:users",
-    }),
-  ]);
+  /* 8. Maps — yesterday */
+  logger.info("[metrika] 8/9 maps yesterday");
+  const mapsYest = await fetchWithRetry({
+    ids: COUNTER_MAPS, date1: date, date2: date,
+    metrics: "ym:s:visits,ym:s:users",
+  });
+  await sleep(BETWEEN_REQUESTS_MS);
+
+  /* 9. Maps — week ago */
+  logger.info("[metrika] 9/9 maps week ago");
+  const mapsWeek = await fetchWithRetry({
+    ids: COUNTER_MAPS, date1: weekDate, date2: weekDate,
+    metrics: "ym:s:visits,ym:s:users",
+  });
+
   data.maps = {
     visits: Math.round(mapsYest.totals[0] || 0),
     users: Math.round(mapsYest.totals[1] || 0),
