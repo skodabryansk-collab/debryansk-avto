@@ -230,6 +230,7 @@ export async function runMigration() {
     await db.execute(sql`UPDATE cars SET brand = 'Tank'       WHERE brand = 'TANK'`);
 
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS popularity_score integer NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS drive_type text`);
 
     logger.info("Navigator schema ready (conversations, messages, cars — idempotent)");
 
