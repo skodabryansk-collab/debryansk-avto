@@ -54,7 +54,10 @@ export default defineConfig({
   root: path.resolve(import.meta.dirname),
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
-    emptyOutDir: true,
+    // Keep old hashed assets during rebuild so users with open tabs
+    // don't get MIME-type errors for already-referenced files.
+    // HTML files are cleaned separately via the prebuild script.
+    emptyOutDir: false,
   },
   server: {
     port,
