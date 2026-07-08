@@ -798,6 +798,13 @@ function BuyoutNav() {
   );
 }
 
+async function fetchBuyoutLocations(): Promise<Array<{ hours: string | null }>> {
+  const r = await fetch("/api/locations");
+  if (!r.ok) return [];
+  const j = await r.json();
+  return j.ok ? j.data ?? [] : [];
+}
+
 /* ── Main page ──────────────────────────────────────────────── */
 export default function BuyoutPage() {
   const { data: siteSettings } = useQuery({
@@ -807,6 +814,16 @@ export default function BuyoutPage() {
   });
   const headerPhone    = siteSettings?.header_phone ?? "+7 (4832) 77 77 70";
   const headerPhoneTel = "tel:+" + headerPhone.replace(/\D/g, "");
+  const { data: buyoutLocations = [] } = useQuery({
+    queryKey: ["locations"],
+    queryFn: fetchBuyoutLocations,
+    staleTime: 30 * 60 * 1000,
+  });
+  const commonHours = React.useMemo(() => {
+    if (!buyoutLocations.length) return "Ежедневно 9:00–21:00";
+    const unique = [...new Set(buyoutLocations.map(l => l.hours).filter(Boolean))];
+    return (unique.length >= 1 ? unique[0] as string : null) ?? "Ежедневно 9:00–21:00";
+  }, [buyoutLocations]);
 
   return (
     <Layout>
@@ -966,7 +983,7 @@ export default function BuyoutPage() {
                     </div>
                     {headerPhone}
                   </CTPhone>
-                  <p className="text-xs text-slate-400 pl-12">Ежедневно с 9:00 до 21:00</p>
+                  <p className="text-xs text-slate-400 pl-12">{commonHours}</p>
                 </div>
               </FadeIn>
             </div>
