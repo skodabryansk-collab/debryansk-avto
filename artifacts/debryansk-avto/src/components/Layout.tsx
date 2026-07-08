@@ -163,6 +163,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const brandsCount = brandsData.length || 13;
 
   const globalDealerLd = React.useMemo(() => {
+    const firstHours = locationsData.find(l => l.hours)?.hours ?? null;
+    const commonHoursSpec = parseHoursSpec(firstHours);
+    const commonOHStr = (() => {
+      if (!firstHours) return "Mo-Su 09:00-21:00";
+      const mm = /ежедневно\s+(\d{1,2}:\d{2})[–\-](\d{1,2}:\d{2})/i.exec(firstHours);
+      if (mm) { const pad = (t: string) => t.length < 5 ? "0" + t : t; return `Mo-Su ${pad(mm[1])}-${pad(mm[2])}`; }
+      return "Mo-Su 09:00-21:00";
+    })();
     const departments = locationsData.map(loc => {
       const hoursSpec = parseHoursSpec(loc.hours);
       return {
@@ -196,13 +204,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         "addressCountry": "RU",
       },
       "geo": { "@type": "GeoCoordinates", "latitude": 53.2434, "longitude": 34.3647 },
-      "openingHours": "Mo-Su 09:00-21:00",
-      "openingHoursSpecification": [{
-        "@type": "OpeningHoursSpecification",
-        "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
-        "opens": "09:00",
-        "closes": "21:00",
-      }],
+      "openingHours": commonOHStr,
+      ...(commonHoursSpec ? { "openingHoursSpecification": commonHoursSpec } : {}),
       "sameAs": ["https://vk.com/debryansk_avto"],
       "foundingDate": "2011",
       ...(departments.length > 0 ? { "department": departments } : {}),
