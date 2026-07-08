@@ -32,6 +32,8 @@ import {
 
 import logoPng from "@/assets/logo-optimized.webp";
 import ChatWidget from "@/components/ChatWidget";
+import HomeCarousel from "@/components/HomeCarousel";
+import UsedCarCard from "@/components/UsedCarCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import FaqBlock from "@/components/FaqBlock";
 import logoWhiteSvg from "@/assets/logo-white.svg";
@@ -142,11 +144,16 @@ interface HomeCar {
   vin?: string;
 }
 async function fetchHomeCars(): Promise<HomeCar[]> {
-  const r = await fetch("/api/cars/used");
+  const r = await fetch("/api/cars/used?sort=newest&limit=15");
   if (!r.ok) throw new Error("API error");
   const json = await r.json();
-  const all: HomeCar[] = json.ok ? json.data : [];
-  return [...all].sort((a, b) => b.year - a.year || b.price - a.price).slice(0, 8);
+  return json.ok ? json.data : [];
+}
+async function fetchSpecialOffers(): Promise<FeaturedCar[]> {
+  const r = await fetch("/api/cars/new?hasDiscount=true&limit=15&sort=popularity");
+  if (!r.ok) throw new Error("API error");
+  const json = await r.json();
+  return json.ok ? json.data : [];
 }
 function fmtPrice(p: number) { return p.toLocaleString("ru-RU") + " ₽"; }
 function fmtRun(km: number) { return km < 1000 ? km + " км" : Math.round(km / 1000) + " тыс. км"; }
@@ -160,13 +167,6 @@ interface FeaturedCar {
   complectation?: string;
   vin?: string;
 }
-async function fetchFeaturedCars(): Promise<FeaturedCar[]> {
-  const r = await fetch("/api/cars/featured");
-  if (!r.ok) throw new Error("API error");
-  const json = await r.json();
-  return json.ok ? json.data : [];
-}
-
 /* ── Modal types ─────────────────────────────────────────── */
 type ModalType = "callback" | "buy" | "service" | "tradein" | "credit" | "offer";
 interface ModalConfig { title: string; subtitle: string; placeholder?: string; }
@@ -397,14 +397,6 @@ const AboutStat = ({ value, suffix = "", label, sub, color, className = "" }: { 
   );
 };
 
-/* ── Offers data ─────────────────────────────────────────── */
-const offers = [
-  { brand: "OMODA C5",          label: "от 2 190 000 ₽", badge: "Горячее",    img: dealerOmoda,  tag: "Хит" },
-  { brand: "HAVAL Jolion",      label: "от 2 350 000 ₽", badge: "Trade-in",   img: dealerHaval,  tag: "Выгода" },
-  { brand: "JAECOO J7",         label: "от 2 450 000 ₽", badge: "В наличии",  img: dealerJaecoo, tag: "Новый" },
-  { brand: "TENET Tingo",       label: "от 1 990 000 ₽", badge: "Кредит 0%",  img: dealerTenet,  tag: "Акция" },
-  { brand: "МБ-Брянск",         label: "Премиум класс",  badge: "По запросу", img: dealerMb,     tag: "Премиум" },
-];
 
 /* ── Services data (split by category) ──────────────────── */
 const makeServiceCategories = (brandsCount: number) => [
@@ -455,150 +447,114 @@ const makeServiceCategories = (brandsCount: number) => [
   },
 ];
 
-/* ── UsedCarsSection ─────────────────────────────────────── */
+/* ── UsedCarsSection (carousel) ──────────────────────────── */
 function UsedCarsSection() {
   const { data: cars = [], isLoading } = useQuery({
     queryKey: ["home-used-cars"],
     queryFn: fetchHomeCars,
     staleTime: 5 * 60 * 1000,
   });
-  const { isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const scroll = (dir: "left" | "right") => {
-    scrollRef.current?.scrollBy({ left: dir === "left" ? -320 : 320, behavior: "smooth" });
-  };
-
-  const skeletons = Array.from({ length: 4 });
+  const skeletons = Array.from({ length: 6 }).map((_, i) => (
+    <div key={i} className="snap-start shrink-0 w-full bg-slate-50 rounded-2xl overflow-hidden animate-pulse">
+      <div className="h-40 bg-slate-200" />
+      <div className="p-4 space-y-2">
+        <div className="h-3 bg-slate-200 rounded w-3/4" />
+        <div className="h-3 bg-slate-200 rounded w-1/2" />
+        <div className="h-5 bg-slate-200 rounded w-2/3 mt-3" />
+      </div>
+    </div>
+  ));
 
   return (
-    <section className="py-12 sm:py-16 md:py-20 bg-white border-t border-slate-100">
-      <div className="container mx-auto px-4 sm:px-6">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-60px" }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex items-end justify-between mb-8 sm:mb-10"
-        >
-          <div>
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-1.5 sm:mb-2">
-              Авто с пробегом
-            </p>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold leading-tight">
-              Свежие поступления
-            </h2>
-            <p className="text-slate-500 mt-1 text-sm">Проверенные авто с историей обслуживания</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex gap-2">
-              <button onClick={() => scroll("left")}
-                className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center hover:border-[#0070b8] hover:text-[#0070b8] transition-colors">
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button onClick={() => scroll("right")}
-                className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center hover:border-[#0070b8] hover:text-[#0070b8] transition-colors">
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-            <Link href="/cars"
-              className="hidden sm:flex items-center gap-1.5 text-[#0070b8] font-bold text-sm hover:gap-2.5 transition-all">
-              Все авто <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </motion.div>
+    <HomeCarousel
+      title="Свежие поступления"
+      subtitle="Авто с пробегом"
+      viewAllLink="/cars"
+      viewAllLabel="Смотреть все авто →"
+    >
+      {isLoading ? skeletons : cars.map((car) => <UsedCarCard key={car.id} car={car} />)}
+    </HomeCarousel>
+  );
+}
 
-        {/* Carousel */}
-        <div ref={scrollRef}
-          className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory scroll-smooth -mx-4 px-4 sm:mx-0 sm:px-0"
-          style={{ scrollbarWidth: "none" }}>
+/* ── SpecialOffersSection ───────────────────────────────── */
+function SpecialOffersSection({ onOpenModal }: { onOpenModal: (type: ModalType) => void }) {
+  const { data: cars = [], isLoading } = useQuery({
+    queryKey: ["home-special-offers"],
+    queryFn: fetchSpecialOffers,
+    staleTime: 5 * 60 * 1000,
+  });
 
-          {isLoading
-            ? skeletons.map((_, i) => (
-                <div key={i} className="snap-start shrink-0 w-[240px] sm:w-[272px] bg-slate-50 rounded-2xl overflow-hidden animate-pulse">
-                  <div className="h-40 bg-slate-200" />
-                  <div className="p-4 space-y-2">
-                    <div className="h-3 bg-slate-200 rounded w-3/4" />
-                    <div className="h-3 bg-slate-200 rounded w-1/2" />
-                    <div className="h-5 bg-slate-200 rounded w-2/3 mt-3" />
-                  </div>
-                </div>
-              ))
-            : cars.map((car) => {
-                const stored = {
-                  id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
-                  run: car.run, color: car.color, bodyType: car.bodyType || "", modification: car.modification,
-                  images: car.images, availability: car.availability, url: car.url, type: "used" as const,
-                  extras: car.extras, complectation: car.complectation, vin: car.vin,
-                };
-                return (
-                  <div key={car.id}
-                    className="snap-start shrink-0 w-[240px] sm:w-[272px] bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg hover:border-[#0070b8]/20 transition-all group cursor-pointer"
-                    onClick={() => window.location.href = `/cars/${encodeURIComponent(car.id)}`}>
-
-                    {/* Photo */}
-                    <div className="relative h-40 bg-slate-100 overflow-hidden">
-                      {car.images[0] ? (
-                        <img src={car.images[0]} alt={`${car.mark} ${car.model}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          loading="lazy" decoding="async" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-300">
-                          <Car className="w-12 h-12" />
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                      {car.availability && (
-                        <span className="absolute top-2.5 left-2.5 bg-[#87b63c] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                          {car.availability}
-                        </span>
-                      )}
-                      {car.images.length > 1 && (
-                        <span className="absolute bottom-2 right-2.5 text-white text-[10px] font-bold opacity-80">
-                          {car.images.length} фото
-                        </span>
-                      )}
-                      <div className="absolute top-2.5 right-2.5 flex flex-col gap-1.5 z-10">
-                        <HomeActionBtn icon={<Heart className="w-3.5 h-3.5" />} active={isFavorite(car.id)} activeClass="bg-red-500 text-white" onClick={() => toggleFavorite(stored)} />
-                        <HomeActionBtn icon={<Scale className="w-3.5 h-3.5" />} active={isInCompare(car.id)} activeClass="bg-[#0070b8] text-white" onClick={() => toggleCompare(stored)} />
-                      </div>
-                    </div>
-
-                    {/* Info */}
-                    <div className="p-4">
-                      <p className="font-extrabold text-sm leading-snug text-slate-900 mb-0.5 group-hover:text-[#0070b8] transition-colors">
-                        {car.mark} {car.model}
-                      </p>
-                      {car.modification && (
-                        <p className="text-[11px] text-slate-400 leading-snug mb-2 line-clamp-1">{car.modification}</p>
-                      )}
-                      <div className="flex items-center gap-2 text-[11px] text-slate-500 font-semibold mb-3">
-                        <span>{car.year}</span>
-                        <span className="text-slate-300">·</span>
-                        <span>{fmtRun(car.run)}</span>
-                        <span className="text-slate-300">·</span>
-                        <span>{car.color}</span>
-                      </div>
-                      <p className="text-base font-extrabold text-slate-900">{fmtPrice(car.price)}</p>
-                    </div>
-                  </div>
-                );
-              })}
-        </div>
-
-        {/* Mobile CTA */}
-        <div className="flex justify-center mt-5 sm:hidden">
-          <Link href="/cars"
-            className="flex items-center gap-2 bg-[#0070b8] text-white font-bold text-sm px-6 py-3 rounded-xl hover:bg-[#005a9a] transition-colors">
-            Все автомобили с пробегом <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-
-        {/* Swipe hint */}
-        <p className="text-center text-xs text-slate-400 mt-2 sm:hidden">Листайте в сторону →</p>
+  const skeletons = Array.from({ length: 6 }).map((_, i) => (
+    <div key={i} className="snap-start shrink-0 w-full bg-slate-50 rounded-2xl overflow-hidden animate-pulse">
+      <div className="h-40 bg-slate-200" />
+      <div className="p-4 space-y-2">
+        <div className="h-3 bg-slate-200 rounded w-3/4" />
+        <div className="h-3 bg-slate-200 rounded w-1/2" />
+        <div className="h-5 bg-slate-200 rounded w-2/3 mt-3" />
       </div>
-    </section>
+    </div>
+  ));
+
+  const items = isLoading ? skeletons : cars.map((car) => {
+    const img = car.images.filter(Boolean)[0] ?? "";
+    const salePrice = car.maxDiscount > 0 ? car.price - car.maxDiscount : car.price;
+    return (
+      <div key={car.id}
+        className="snap-start shrink-0 w-full bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow group cursor-pointer flex flex-col"
+        onClick={() => window.location.href = `/new-cars/${encodeURIComponent(car.id)}`}>
+        <div className="relative h-40 sm:h-44 overflow-hidden bg-slate-100 shrink-0">
+          {img ? (
+            <img src={img} alt={`${car.mark} ${car.model}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-slate-300">
+              <Car className="w-12 h-12" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
+          <div className="absolute top-2.5 left-2.5 flex flex-col items-start gap-1">
+            {car.maxDiscount > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white bg-[#0070b8]/90 whitespace-nowrap">
+                −{fmtPrice(car.maxDiscount)}
+              </span>
+            )}
+            <span className="px-2 py-0.5 bg-white/90 rounded-full text-[10px] font-bold text-slate-800 whitespace-nowrap">
+              {car.availability}
+            </span>
+          </div>
+        </div>
+        <div className="p-4 sm:p-5 flex flex-col flex-1">
+          {car.maxDiscount > 0 ? (
+            <>
+              <div className="flex items-baseline gap-2 mb-0.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">от</span>
+                <span className="text-[#0070b8] font-extrabold text-lg">{fmtPrice(salePrice)}</span>
+              </div>
+              <p className="text-xs text-slate-400 line-through mb-3">{fmtPrice(car.price)}</p>
+            </>
+          ) : (
+            <p className="text-[#0070b8] font-extrabold text-lg mb-3">{fmtPrice(car.price)}</p>
+          )}
+          <button
+            onClick={e => { e.stopPropagation(); onOpenModal("offer"); }}
+            className="w-full py-2 sm:py-2.5 rounded-xl border-2 border-slate-200 text-xs sm:text-sm font-bold text-slate-600 hover:border-[#0070b8] hover:text-[#0070b8] transition-colors mt-auto">
+            Оставить заявку
+          </button>
+        </div>
+      </div>
+    );
+  });
+
+  return (
+    <HomeCarousel
+      title="Спецпредложения"
+      subtitle="Актуально сейчас"
+      viewAllLink="/new-cars"
+      viewAllLabel="Все спецпредложения →"
+    >
+      {items}
+    </HomeCarousel>
   );
 }
 
@@ -609,7 +565,6 @@ export default function Home() {
   const [modal, setModal] = useState<ModalType | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const [activeCardId, setActiveCardId] = useState<number | null>(null);
-  const carouselRef = useRef<HTMLDivElement>(null);
   const yandexMapRef = useRef<YandexMapHandle>(null);
   const mapSectionRef = useRef<HTMLDivElement>(null);
   const { favorites, compare, isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
@@ -706,6 +661,22 @@ export default function Home() {
       hours: loc.hours,
     })), [apiLocations]);
 
+  function parseHoursSpec(raw: string | null | undefined): object[] | null {
+    if (!raw) return null;
+    const m = /ежедневно\s+(\d{1,2}:\d{2})[–\-](\d{1,2}:\d{2})/i.exec(raw);
+    if (m) {
+      const pad = (t: string) => t.length < 5 ? "0" + t : t;
+      return [{ "@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"], "opens": pad(m[1]), "closes": pad(m[2]) }];
+    }
+    return null;
+  }
+
+  const commonHours = React.useMemo(() => {
+    if (!apiLocations.length) return "Ежедневно 9:00–21:00";
+    const unique = [...new Set(apiLocations.map(l => l.hours).filter(Boolean))];
+    return (unique.length >= 1 ? unique[0] as string : null) ?? "Ежедневно 9:00–21:00";
+  }, [apiLocations]);
+
   const organizationSchema = {
     "@type": "Organization",
     "name": "Дебрянск Авто",
@@ -749,14 +720,7 @@ export default function Home() {
       "longitude": "34.363408"
     },
     "telephone": "+7-4832-77-77-70",
-    "openingHoursSpecification": [
-      {
-        "@type": "OpeningHoursSpecification",
-        "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-        "opens": "09:00",
-        "closes": "21:00"
-      }
-    ],
+    ...(parseHoursSpec(commonHours) ? { "openingHoursSpecification": parseHoursSpec(commonHours) } : {}),
     "priceRange": "$$₽",
     "paymentAccepted": "Наличные, кредит"
   };
@@ -780,12 +744,6 @@ export default function Home() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const { data: featuredCars = [] } = useQuery<FeaturedCar[]>({
-    queryKey: ["featured-cars"],
-    queryFn: fetchFeaturedCars,
-    staleTime: 5 * 60 * 1000,
-  });
-
   const openModal = useCallback((type: ModalType) => setModal(type), []);
   const closeModal = useCallback(() => setModal(null), []);
 
@@ -804,11 +762,6 @@ export default function Home() {
   const scrollTo = (id: string) => {
     setMobileMenuOpen(false);
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const scrollCarousel = (dir: "left" | "right") => {
-    if (!carouselRef.current) return;
-    carouselRef.current.scrollBy({ left: dir === "right" ? 300 : -300, behavior: "smooth" });
   };
 
   return (
@@ -1205,115 +1158,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Offers carousel ────────────────────────────────── */}
-      <section className="py-12 sm:py-16 md:py-20 bg-slate-50">
-        <div className="container mx-auto px-4 sm:px-6">
-          <FadeIn className="flex items-end justify-between mb-8 sm:mb-10">
-            <div>
-              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-1.5 sm:mb-2">Актуально сейчас</p>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Спецпредложения</h2>
-            </div>
-            <div className="hidden sm:flex gap-2">
-              <button onClick={() => scrollCarousel("left")}
-                className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center hover:border-[#0070b8] hover:text-[#0070b8] transition-colors">
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <button onClick={() => scrollCarousel("right")}
-                className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center hover:border-[#0070b8] hover:text-[#0070b8] transition-colors">
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          </FadeIn>
-
-          <div ref={carouselRef}
-            className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scroll-smooth -mx-4 px-4 sm:mx-0 sm:px-0"
-            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
-            {featuredCars.length > 0 ? featuredCars.map((car) => {
-              const img = car.images.filter(Boolean)[0] ?? "";
-              const salePrice = car.maxDiscount > 0 ? car.price - car.maxDiscount : car.price;
-              const stored = {
-                id: car.id, mark: car.mark, model: car.model, year: car.year, price: car.price,
-                run: 0, color: car.color, bodyType: car.bodyType, modification: car.modification,
-                images: car.images, availability: car.availability, url: car.url, type: "new" as const,
-                extras: car.extras, complectation: car.complectation, vin: car.vin,
-              };
-              return (
-                <div key={car.id}
-                  className="snap-start shrink-0 w-[260px] sm:w-[300px] bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow group cursor-pointer"
-                  onClick={() => window.location.href = `/new-cars/${encodeURIComponent(car.id)}`}>
-                  <div className="relative h-40 sm:h-44 overflow-hidden bg-slate-100">
-                    {img ? (
-                      <img src={img} alt={`${car.mark} ${car.model}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-300">
-                        <Car className="w-12 h-12" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
-                    {car.maxDiscount > 0 && (
-                      <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-bold text-white bg-[#0070b8]/90">
-                        Скидка {fmtPrice(car.maxDiscount)}
-                      </span>
-                    )}
-                    <span className="absolute top-3 right-3 px-2.5 py-1 bg-white/90 rounded-full text-[11px] font-bold text-slate-800">
-                      {car.availability}
-                    </span>
-                    <div className="absolute top-14 right-3 flex flex-col gap-1.5 z-10">
-                      <HomeActionBtn icon={<Heart className="w-3.5 h-3.5" />} active={isFavorite(car.id)} activeClass="bg-red-500 text-white" onClick={() => toggleFavorite(stored)} />
-                      <HomeActionBtn icon={<Scale className="w-3.5 h-3.5" />} active={isInCompare(car.id)} activeClass="bg-[#0070b8] text-white" onClick={() => toggleCompare(stored)} />
-                    </div>
-                    <div className="absolute bottom-3 left-3 right-3">
-                      <p className="text-white font-extrabold text-sm leading-tight drop-shadow">
-                        {car.mark} {car.model}
-                      </p>
-                      <p className="text-white/70 text-[11px]">{car.dealer} · {car.year}</p>
-                    </div>
-                  </div>
-                  <div className="p-4 sm:p-5">
-                    {car.maxDiscount > 0 ? (
-                      <>
-                        <div className="flex items-baseline gap-2 mb-0.5">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase">от</span>
-                          <span className="text-[#0070b8] font-extrabold text-lg">{fmtPrice(salePrice)}</span>
-                        </div>
-                        <p className="text-xs text-slate-400 line-through mb-3">{fmtPrice(car.price)}</p>
-                      </>
-                    ) : (
-                      <p className="text-[#0070b8] font-extrabold text-lg mb-3">{fmtPrice(car.price)}</p>
-                    )}
-                    <button
-                      onClick={e => { e.stopPropagation(); openModal("offer"); }}
-                      className="w-full py-2 sm:py-2.5 rounded-xl border-2 border-slate-200 text-xs sm:text-sm font-bold text-slate-600 hover:border-[#0070b8] hover:text-[#0070b8] transition-colors">
-                      Оставить заявку
-                    </button>
-                  </div>
-                </div>
-              );
-            }) : offers.map((o, i) => (
-              <div key={i}
-                className="snap-start shrink-0 w-[260px] sm:w-[300px] bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow group cursor-pointer"
-                onClick={() => openModal("offer")}>
-                <div className="relative h-40 sm:h-44 overflow-hidden">
-                  <img src={o.img} alt={o.brand} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
-                  <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-bold text-white bg-[#0070b8]/85">{o.tag}</span>
-                  <span className="absolute top-3 right-3 px-2.5 py-1 bg-white/90 rounded-full text-[11px] font-bold text-slate-800">{o.badge}</span>
-                </div>
-                <div className="p-4 sm:p-5">
-                  <h3 className="font-extrabold text-base sm:text-lg mb-1 leading-tight">{o.brand}</h3>
-                  <p className="text-[#0070b8] font-bold text-base sm:text-lg mb-4">{o.label}</p>
-                  <button className="w-full py-2 sm:py-2.5 rounded-xl border-2 border-slate-200 text-xs sm:text-sm font-bold text-slate-600 hover:border-[#0070b8] hover:text-[#0070b8] transition-colors">
-                    Узнать подробнее
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Mobile swipe hint */}
-          <p className="text-center text-xs text-slate-400 mt-3 sm:hidden">Листайте в сторону →</p>
-        </div>
-      </section>
+      <SpecialOffersSection onOpenModal={openModal} />
 
       {/* ── Used Cars showcase ─────────────────────────────── */}
       <UsedCarsSection />
@@ -1683,7 +1528,7 @@ export default function Home() {
                     </div>
                     <div>
                       <div className="text-xs font-bold text-slate-400 uppercase mb-1">Режим работы</div>
-                      <div className="text-xl sm:text-2xl font-extrabold text-white">Ежедневно 9:00–21:00</div>
+                      <div className="text-xl sm:text-2xl font-extrabold text-white">{commonHours}</div>
                     </div>
                   </div>
                 </div>
