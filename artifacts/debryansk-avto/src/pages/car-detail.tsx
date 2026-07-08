@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import SEO from "@/components/SEO";
+import CarOptionsBlock from "@/components/CarOptionsBlock";
 import { CreditModal } from "@/components/modals/CreditModal";
 import { TradeInModal } from "@/components/modals/TradeInModal";
 import Layout from "@/components/Layout";
@@ -23,6 +24,7 @@ interface CarRecord {
   mark: string;
   model: string;
   modification: string;
+  drive: string;
   year: number;
   price: number;
   run: number;
@@ -55,9 +57,21 @@ function parseTransmission(mod: string): string {
   if (mod.includes("MT")) return "Механика";
   return "";
 }
-function parseDrive(mod: string): string {
-  if (!mod) return "";
-  return mod.includes("4WD") ? "Полный" : "Передний/задний";
+function parseDriveLabel(drive: string, mod: string): string {
+  const d = (drive ?? "").toLowerCase();
+  if (d.includes("all") || d === "4wd" || d.includes("полн") || (mod ?? "").includes("4WD")) return "Полный";
+  if (d.includes("front") || d.includes("forward") || d.includes("перед")) return "Передний";
+  if (d.includes("rear") || d.includes("задн")) return "Задний";
+  return "";
+}
+function formatOwners(raw: string): string {
+  if (!raw) return "";
+  const s = raw.toLowerCase().trim();
+  if (s === "1" || s.includes("один")) return "1";
+  if (s === "2" || s.includes("два")) return "2";
+  const n = parseInt(s);
+  if (!isNaN(n)) return n >= 3 ? "3+" : String(n);
+  return "3+";
 }
 function parseEngine(mod: string): string {
   const m = mod.match(/(\d+\.\d+)\s*([\w]+)\s*\((\d+)\s*л\.с\.\)/);
@@ -386,8 +400,9 @@ export default function UsedCarDetail() {
   }
 
   const transmission = parseTransmission(car.modification);
-  const drive = parseDrive(car.modification);
+  const driveLabel = parseDriveLabel(car.drive ?? "", car.modification);
   const engine = parseEngine(car.modification);
+  const ownersLabel = formatOwners(car.ownersNumber);
 
   const specs = [
     { label: "Год выпуска", value: String(car.year), icon: <Calendar className="w-4 h-4 text-[#0070b8]" /> },
@@ -395,9 +410,9 @@ export default function UsedCarDetail() {
     { label: "Кузов", value: car.bodyType, icon: <Car className="w-4 h-4 text-[#0070b8]" /> },
     { label: "Цвет", value: car.color, icon: <Palette className="w-4 h-4 text-[#0070b8]" /> },
     ...(transmission ? [{ label: "Коробка", value: transmission, icon: <span className="text-[10px] font-black text-[#0070b8]">КП</span> }] : []),
-    ...(drive ? [{ label: "Привод", value: drive, icon: <span className="text-[10px] font-black text-[#0070b8]">4×</span> }] : []),
+    ...(driveLabel ? [{ label: "Привод", value: driveLabel, icon: <span className="text-[10px] font-black text-[#0070b8]">4×</span> }] : []),
     ...(engine ? [{ label: "Двигатель", value: engine, icon: <span className="text-[10px] font-black text-[#0070b8]">ДВС</span> }] : []),
-    ...(car.ownersNumber ? [{ label: "Владельцы", value: car.ownersNumber + " влад.", icon: <User className="w-4 h-4 text-[#0070b8]" /> }] : []),
+    ...(ownersLabel ? [{ label: "Владельцы", value: ownersLabel, icon: <User className="w-4 h-4 text-[#0070b8]" /> }] : []),
   ].filter(s => s.value);
 
   const PriceCard = () => (
@@ -435,7 +450,6 @@ export default function UsedCarDetail() {
           <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{formatPrice(car.price)}</span>
         </div>
       )}
-      <p className="text-xs text-slate-400 mb-4">Цена окончательная, торг уместен</p>
       <div className="hidden lg:flex gap-2 mb-3">
         <button
           onClick={() => toggleFavorite({
@@ -520,7 +534,7 @@ export default function UsedCarDetail() {
     "brand": { "@type": "Brand", "name": car.mark },
     "model": car.model,
     "vehicleTransmission": parseTransmission(car.modification),
-    "driveWheelConfiguration": parseDrive(car.modification),
+    "driveWheelConfiguration": parseDriveLabel(car.drive ?? "", car.modification),
     "vehicleEngine": {
       "@type": "EngineSpecification",
       "name": parseEngine(car.modification)
@@ -607,14 +621,10 @@ export default function UsedCarDetail() {
           {/* Options */}
           {car.extras && (
             <div className="bg-white rounded-2xl border border-slate-100 p-4">
-              <h2 className="text-sm font-extrabold mb-3 text-slate-900">Опции и комплектация</h2>
-              <div className="flex flex-wrap gap-1.5">
-                {car.extras.split(", ").filter(Boolean).map((opt, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 bg-slate-50 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded-full border border-slate-100">
-                    <CheckCircle className="w-2.5 h-2.5 text-[#87b63c]" /> {opt.trim()}
-                  </span>
-                ))}
-              </div>
+              <CarOptionsBlock
+                extras={car.extras}
+                titleClassName="text-sm font-extrabold text-slate-900"
+              />
             </div>
           )}
 
@@ -720,14 +730,10 @@ export default function UsedCarDetail() {
             {/* Options */}
             {car.extras && (
               <div className="mt-5 bg-white rounded-2xl border border-slate-100 p-6">
-                <h2 className="text-base font-extrabold mb-4 text-slate-900">Опции и комплектация</h2>
-                <div className="flex flex-wrap gap-2">
-                  {car.extras.split(", ").filter(Boolean).map((opt, i) => (
-                    <span key={i} className="inline-flex items-center gap-1.5 bg-slate-50 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-full border border-slate-100">
-                      <CheckCircle className="w-3 h-3 text-[#87b63c]" /> {opt.trim()}
-                    </span>
-                  ))}
-                </div>
+                <CarOptionsBlock
+                  extras={car.extras}
+                  titleClassName="text-base font-extrabold text-slate-900"
+                />
               </div>
             )}
 
