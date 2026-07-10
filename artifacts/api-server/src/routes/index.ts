@@ -111,11 +111,18 @@ router.use("/settings", publicSettingsRouter);
 router.use("/reviews", publicReviewsRouter);
 
 // Internal: live prerender cache update (called by prerender.mjs after each page)
-const SSG_PROTECTED_ROUTES = new Set(["/", "/service", "/buyout", "/vacancies", "/about", "/contacts", "/news", "/new-cars", "/cars", "/legal", "/privacy", "/service/bonus"]);
+// "/buyout" is NOT real SSG content (dist/public/buyout/index.html is just the
+// SPA shell) — it's fully Puppeteer-rendered like /cars, /new-cars etc. Keeping
+// it protected here blocked every live crawl from refreshing its in-memory
+// cache entry, so edits only ever became visible after the next server
+// restart happened to reload a fresh GCS snapshot. Removed so crawls can
+// update it live, same as other Puppeteer-rendered routes.
+const SSG_PROTECTED_ROUTES = new Set(["/", "/service", "/vacancies", "/about", "/contacts", "/news", "/new-cars", "/cars", "/legal", "/privacy", "/service/bonus"]);
 function isSsgProtected(route: string): boolean {
   if (SSG_PROTECTED_ROUTES.has(route)) return true;
   // /brands/* and /news/* are prerendered by Puppeteer — allow cache updates
   if (route.startsWith("/news/")) return true;
+  if (route.startsWith("/promotions/")) return true;
   return false;
 }
 
