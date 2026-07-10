@@ -340,12 +340,23 @@ async function main() {
 
     if (process.env.PRERENDER_ENABLED === "true") {
       import("./middleware/prerender")
-        .then(async ({ updatePrerenderCache }) => {
+        .then(async ({ updatePrerenderCache, setCurrentAssetTags }) => {
           // Load fresh SSG HTML from dist/public into prerender cache
           // instead of stale GCS cache (GCS cache has old asset hashes)
           const { readFileSync, readdirSync, statSync } = await import("fs");
           const { join } = await import("path");
           const distDir = join(__dirname, "../../debryansk-avto/dist/public");
+
+          // Cache the current build's script/link asset tags once at startup
+          // so cached snapshot HTML can always be rewritten to reference the
+          // JS/CSS that actually exists on disk right now, regardless of
+          // which build the snapshot itself was captured under.
+          try {
+            const rootIndexHtml = readFileSync(join(distDir, "index.html"), "utf-8");
+            setCurrentAssetTags(rootIndexHtml);
+          } catch (err) {
+            logger.warn({ err }, "prerender: failed to read dist/public/index.html for asset tags");
+          }
 
           function findHtmlFiles(dir: string, prefix = ""): string[] {
             const entries = readdirSync(dir, { withFileTypes: true });
