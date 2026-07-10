@@ -14,6 +14,45 @@ const cache: PrerenderCacheState = {
   gone: new Set(),
 };
 
+// Current build's asset tags, read once from dist/public/index.html at server
+// startup (see index.ts). Cached snapshots (GCS/Puppeteer captures) bake in
+// whatever asset hash was live at capture time; if a later deploy changes the
+// bundle hash, the old snapshot's <script>/<link> tags point at deleted files
+// (404). We rewrite those tags to the CURRENT build's tags on every serve, so
+// content can be stale-ish but the referenced JS/CSS always exist on disk.
+let currentAssetTags: { script: string | null; link: string | null } = {
+  script: null,
+  link: null,
+};
+
+export function setCurrentAssetTags(html: string): void {
+  const scriptMatch = html.match(/<script[^>]*\ssrc="\/assets\/[^"]*\.js"[^>]*><\/script>/);
+  const linkMatch = html.match(/<link[^>]*\shref="\/assets\/[^"]*\.css"[^>]*>/);
+  currentAssetTags = {
+    script: scriptMatch ? scriptMatch[0] : null,
+    link: linkMatch ? linkMatch[0] : null,
+  };
+  logger.info(
+    { hasScript: !!currentAssetTags.script, hasLink: !!currentAssetTags.link },
+    "prerender: current build asset tags cached",
+  );
+}
+
+// Cheap single-pass string replacement — no DOM parsing. Only swaps the
+// index-*.js <script> tag and index-*.css <link> tag; everything else in the
+// cached HTML is left untouched. Runs on every cached-page request
+// (PRERENDER_ALL=true means every visitor), so it must stay O(1) regex work.
+function rewriteAssetTagsToCurrent(html: string): string {
+  let out = html;
+  if (currentAssetTags.script) {
+    out = out.replace(/<script[^>]*\ssrc="\/assets\/index-[^"]*\.js"[^>]*><\/script>/, currentAssetTags.script);
+  }
+  if (currentAssetTags.link) {
+    out = out.replace(/<link[^>]*\shref="\/assets\/index-[^"]*\.css"[^>]*>/, currentAssetTags.link);
+  }
+  return out;
+}
+
 // Routes served to bots via seoMeta (SSG HTML + meta injection, no Puppeteer cache needed).
 // "/" added here so the prerender middleware always falls through to seoMeta for the home page,
 // which reads dist/public/index.html with the current build's CSS hash (never stale GCS cache).
@@ -26,6 +65,7 @@ function isSsgRoute(route: string): boolean {
   // When cache is empty (new brand not yet crawled), middleware falls through to next()
   // which serves the SPA shell — same as normal user, no 500/empty response.
   if (route.startsWith("/news/")) return true;
+  if (route.startsWith("/promotions/")) return true;
   return false;
 }
 
@@ -122,10 +162,14 @@ export function prerenderMiddleware(
     }
     // Dynamic routes (car detail pages) already have full meta from Helmet
     const dedupedHtml = html.replace(/(<title>[^<]*<\/title>)(<title>[^<]*<\/title>)+/, "$1");
+    // Cached snapshot may have been captured under a previous build — swap
+    // its baked-in asset tags for the current build's so we never serve a
+    // reference to a JS/CSS file that a later deploy has already deleted.
+    const freshHtml = rewriteAssetTagsToCurrent(dedupedHtml);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("X-Prerendered", "1");
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.status(200).send(dedupedHtml);
+    res.status(200).send(freshHtml);
     return;
   }
 
