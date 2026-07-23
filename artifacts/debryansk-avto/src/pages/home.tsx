@@ -22,6 +22,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
+import { sendEmail } from "@/lib/sendEmail";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,7 @@ import logoPng from "@/assets/logo-optimized.webp";
 import ChatWidget from "@/components/ChatWidget";
 import HomeCarousel from "@/components/HomeCarousel";
 import UsedCarCard from "@/components/UsedCarCard";
-import { ReviewsSection } from "@/components/ReviewsSection";
+import { ReviewsSection, fetchReviews } from "@/components/ReviewsSection";
 import FaqBlock from "@/components/FaqBlock";
 import logoWhiteSvg from "@/assets/logo-white.svg";
 import miniLogo from "@/assets/mini-logo.webp";
@@ -201,9 +202,20 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    console.log(type, values);
-    toast({ title: "Заявка отправлена", description: "Мы свяжемся с вами в ближайшее время." });
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    try {
+      const payloadType = type === "buy" || type === "offer" ? "callback" : type;
+      const messagePrefix = type === "buy" ? "Купить автомобиль: " : type === "offer" ? "Узнать подробнее: " : "";
+      await sendEmail(payloadType, {
+        name: values.name,
+        phone: values.phone,
+        message: messagePrefix + (values.message || ""),
+        location: "Советская",
+      });
+      toast({ title: "Заявка отправлена", description: "Мы свяжемся с вами в ближайшее время." });
+    } catch (err) {
+      toast({ title: "Ошибка", description: "Не удалось отправить заявку. Попробуйте позже." });
+    }
     onClose();
   };
 
@@ -600,7 +612,7 @@ export default function Home() {
     },
   };
 
-  const { data: siteSettings } = useQuery({
+  const { data: siteSettings, isLoading: settingsLoading } = useQuery({
     queryKey: ["site-settings"],
     queryFn: () => fetch("/api/settings").then(r => r.json()).then(j => j.data as Record<string, string>),
     staleTime: 5 * 60 * 1000,
@@ -608,23 +620,50 @@ export default function Home() {
   const headerPhone = siteSettings?.header_phone ?? "+7 (4832) 77 77 70";
   const headerPhoneTel = "tel:+" + (siteSettings?.header_phone ?? "+7 (4832) 77 77 70").replace(/\D/g, "");
 
-  const { data: apiLocations = [] } = useQuery({
+  const { data: apiLocations = [], isLoading: locationsLoading } = useQuery({
     queryKey: ["public-locations"],
     queryFn: fetchLocations,
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: apiNews = [] } = useQuery({
+  const { data: apiNews = [], isLoading: newsLoading } = useQuery({
     queryKey: ["public-news"],
     queryFn: fetchPublicNews,
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: apiBrands = [] } = useQuery({
+  const { data: apiBrands = [], isLoading: brandsLoading } = useQuery({
     queryKey: ["public-brands"],
     queryFn: fetchBrands,
     staleTime: 5 * 60 * 1000,
   });
+
+  // Same query keys as UsedCarsSection / SpecialOffersSection / ReviewsSection —
+  // react-query dedupes by key, so this reads the shared cache without refetching,
+  // just to know when those below-the-fold sections have finished loading.
+  const { isLoading: usedCarsLoading } = useQuery({
+    queryKey: ["home-used-cars"],
+    queryFn: fetchHomeCars,
+    staleTime: 5 * 60 * 1000,
+  });
+  const { isLoading: specialOffersLoading } = useQuery({
+    queryKey: ["home-special-offers"],
+    queryFn: fetchSpecialOffers,
+    staleTime: 5 * 60 * 1000,
+  });
+  const { isLoading: reviewsLoading } = useQuery({
+    queryKey: ["reviews"],
+    queryFn: fetchReviews,
+    staleTime: 30 * 60 * 1000,
+    retry: 0,
+  });
+
+  // Puppeteer prerender waits for this marker before capturing the page —
+  // without it, the snapshot may be taken before promotions/used-cars/news/
+  // reviews sections finish their async queries (see home-prerender-shell.md).
+  const isPrerenderReady =
+    !settingsLoading && !locationsLoading && !newsLoading && !brandsLoading &&
+    !usedCarsLoading && !specialOffersLoading && !reviewsLoading;
   const serviceCategories = React.useMemo(
     () => makeServiceCategories(apiBrands.length || 13),
     [apiBrands.length]
@@ -744,6 +783,19 @@ export default function Home() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Fallback so the prerender marker still appears even if one of the 7 queries
+  // above hangs forever (e.g. a stalled API call) — Puppeteer must not wait past
+  // this ceiling with no marker at all, or the whole home route times out empty.
+  const [prerenderFallback, setPrerenderFallback] = useState(false);
+  useEffect(() => {
+    // Fires well before Puppeteer's 20s [data-prerender-ready] wait ceiling
+    // (prerender.mjs) — leaves margin for goto/hydration time so the marker
+    // is guaranteed to exist before the selector wait gives up.
+    const t = setTimeout(() => setPrerenderFallback(true), 9_000);
+    return () => clearTimeout(t);
+  }, []);
+  const showPrerenderReady = isPrerenderReady || prerenderFallback;
+
   const openModal = useCallback((type: ModalType) => setModal(type), []);
   const closeModal = useCallback(() => setModal(null), []);
 
@@ -753,10 +805,19 @@ export default function Home() {
     defaultValues: { name: "", phone: "", message: "" },
   });
   const { toast } = useToast();
-  const onContactSubmit = (values: z.infer<typeof formSchema>) => {
-    console.log(values);
-    toast({ title: "Заявка отправлена", description: "Мы свяжемся с вами в ближайшее время." });
-    contactForm.reset();
+  const onContactSubmit = async (values: z.infer<typeof formSchema>) => {
+    try {
+      await sendEmail("callback", {
+        name: values.name,
+        phone: values.phone,
+        message: values.message || "",
+        location: "Советская",
+      });
+      toast({ title: "Заявка отправлена", description: "Мы свяжемся с вами в ближайшее время." });
+      contactForm.reset();
+    } catch (err) {
+      toast({ title: "Ошибка", description: "Не удалось отправить заявку. Попробуйте позже." });
+    }
   };
 
   const scrollTo = (id: string) => {
@@ -766,6 +827,9 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white font-sans text-slate-900">
+      {showPrerenderReady && (
+        <div data-prerender-ready="true" style={{ display: "none" }} />
+      )}
 
       <SEO
         title="Дебрянск Авто — Территория Автомобилей"
@@ -851,18 +915,11 @@ export default function Home() {
                 </div>
               )}
             </div>
-            {[["О группе","about","/about"],["Дилеры","dealers","#dealers"],["Услуги","services","/service"],["Бонусы","bonus","/service/bonus"],["Выкуп","buyout","/buyout"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
-              href.startsWith("/") ? (
-                <Link key={id} href={href}
-                  className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
-                  {label}
-                </Link>
-              ) : (
-                <button key={id} onClick={() => scrollTo(id)}
-                  className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
-                  {label}
-                </button>
-              )
+            {[["О группе","about","/about"],["Для бизнеса","corporate","/corporate"],["Услуги","services","/service"],["Бонусы","bonus","/service/bonus"],["Выкуп","buyout","/buyout"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
+              <Link key={id} href={href}
+                className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+                {label}
+              </Link>
             ))}
             <Link href="/vacancies"
               className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
@@ -915,7 +972,7 @@ export default function Home() {
                   className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors flex items-center gap-2">
                   <RotateCcw className="w-4 h-4 text-[#0070b8]" /> Автомобили с пробегом
                 </Link>
-                {[["О группе","about","/about"],["Дилеры","dealers","#dealers"],["Услуги","services","/service"],["Бонусы","bonus","/service/bonus"],["Выкуп","buyout","/buyout"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
+                {[["О группе","about","/about"],["Для бизнеса","corporate","/corporate"],["Услуги","services","/service"],["Бонусы","bonus","/service/bonus"],["Выкуп","buyout","/buyout"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
                   href.startsWith("/") ? (
                     <Link key={id} href={href}
                       className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block">
@@ -1090,8 +1147,12 @@ export default function Home() {
         <div className="container mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 sm:gap-6">
             {apiBrands.map((b, i) => {
-              const brandHref = b.slug && b.slug !== "s-probegom" ? `/brands/${b.slug}` : (b.websiteUrl ?? "#");
-              const isExternal = !b.slug || b.slug === "s-probegom";
+              const brandHref = !b.slug
+                ? (b.websiteUrl ?? "#")
+                : b.slug === "s-probegom"
+                  ? "/cars"
+                  : `/brands/${b.slug}`;
+              const isExternal = !b.slug;
               return (
                 <FadeIn key={`${b.name}-${b.subName ?? i}`} delay={i * 0.05}>
                   <a
@@ -1396,7 +1457,7 @@ export default function Home() {
             <p className="text-slate-500 mt-2 text-sm sm:text-base">4 локации в Брянске — более 11 торгово-сервисных точек</p>
           </FadeIn>
 
-          <div ref={mapSectionRef} className="w-full h-[400px] sm:h-[500px] md:h-[600px] rounded-2xl overflow-hidden border border-slate-200 shadow-lg">
+          <div ref={mapSectionRef} className="relative isolate z-0 w-full h-[400px] sm:h-[500px] md:h-[600px] rounded-2xl overflow-hidden border border-slate-200 shadow-lg">
             <YandexMap ref={yandexMapRef} locations={dealerMapLocations} />
           </div>
 
@@ -1694,9 +1755,18 @@ export default function Home() {
               <ul className="space-y-2 text-sm">
                 <li><a href="/service" className="hover:text-[#0070b8] transition-colors">Сервис и ТО</a></li>
                 <li><a href="/about" className="hover:text-[#0070b8] transition-colors">О группе</a></li>
-                {["CHERY", "OMODA", "JAECOO", "HAVAL", "SOUEAST"].map(b => (
-                  <li key={b}>
-                    <a href={`/new-cars?brand=${encodeURIComponent(b)}`} className="hover:text-[#0070b8] transition-colors">{b}</a>
+                {[
+                  { label: "Haval City", href: "/new-cars?dealer=Haval%20City" },
+                  { label: "Haval Pro", href: "/new-cars?dealer=Haval%20Pro" },
+                  { label: "Jetour", href: "/new-cars?dealer=Jetour" },
+                  { label: "Omoda", href: "/new-cars?dealer=Omoda" },
+                  { label: "Jaecoo", href: "/new-cars?dealer=Jaecoo" },
+                  { label: "Tenet", href: "/new-cars?dealer=Tenet" },
+                  { label: "Soueast", href: "/new-cars?dealer=Soueast" },
+                  { label: "Jeland", href: "/new-cars?dealer=Jeland" },
+                ].map(b => (
+                  <li key={b.label}>
+                    <a href={b.href} className="hover:text-[#0070b8] transition-colors">{b.label}</a>
                   </li>
                 ))}
               </ul>
