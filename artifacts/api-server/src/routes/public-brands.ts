@@ -1,9 +1,14 @@
 import { Router, type IRouter } from "express";
 import { db, brandsTable, brandPageContentTable } from "@workspace/db";
 import { asc, eq, sql } from "drizzle-orm";
+import { logger } from "../lib/logger";
 import { getNewCars } from "./new-cars";
+import { getUsedCars } from "./cars";
 
 const router: IRouter = Router();
+
+const BRANDS_CACHE_TTL_MS = 5 * 60 * 1000;
+let _brandsCache: { data: unknown[]; ts: number } | null = null;
 
 /* ── GET /api/brands  — full brand list with car counts ────── */
 router.get("/", async (_req, res) => {
@@ -13,19 +18,46 @@ router.get("/", async (_req, res) => {
       .from(brandsTable)
       .orderBy(asc(brandsTable.isServiceOnly), asc(brandsTable.name));
 
-    const countRows = await db.execute(sql`
-      SELECT LOWER(dealer) AS dealer_key, type, COUNT(*)::int AS cnt
-      FROM cars
-      GROUP BY LOWER(dealer), type
-    `);
-
-    const newCounts: Record<string, number> = {};
+    // Compute counts from the SAME XML-feed caches that the catalog pages use,
+    // so the home page and /new-cars / /cars always show identical numbers.
+    let newCounts: Record<string, number> = {};
     let usedCount = 0;
-    for (const r of countRows.rows as { dealer_key: string; type: string; cnt: number }[]) {
-      if (r.type === "used") {
-        usedCount += Number(r.cnt);
+    try {
+      const [newCars, usedCars] = await Promise.all([
+        getNewCars().catch((err) => {
+          logger?.warn({ err }, "public-brands: getNewCars failed, falling back to DB counts");
+          return [];
+        }),
+        getUsedCars().catch((err) => {
+          logger?.warn({ err }, "public-brands: getUsedCars failed, falling back to DB counts");
+          return [];
+        }),
+      ]);
+
+      if (newCars.length > 0 || usedCars.length > 0) {
+        for (const c of newCars) {
+          const key = c.dealer.toLowerCase();
+          newCounts[key] = (newCounts[key] ?? 0) + 1;
+        }
+        usedCount = usedCars.length;
       } else {
-        newCounts[r.dealer_key] = (newCounts[r.dealer_key] ?? 0) + Number(r.cnt);
+        throw new Error("feed caches empty");
+      }
+    } catch {
+      // Fallback to DB counts if feeds are unavailable
+      const countRows = await db.execute(sql`
+        SELECT LOWER(dealer) AS dealer_key, type, COUNT(*)::int AS cnt
+        FROM cars
+        GROUP BY LOWER(dealer), type
+      `);
+      newCounts = {};
+      usedCount = 0;
+      for (const r of countRows.rows as { dealer_key: string; type: string; cnt: number }[]) {
+        if (r.type === "used") {
+          usedCount += Number(r.cnt);
+        } else {
+          newCounts[r.dealer_key] = (newCounts[r.dealer_key] ?? 0) + Number(r.cnt);
+        }
       }
     }
 
@@ -42,8 +74,12 @@ router.get("/", async (_req, res) => {
       return { ...brand, carCount: count };
     });
 
+    _brandsCache = { data, ts: Date.now() };
     return res.json({ ok: true, data });
   } catch (err) {
+    if (_brandsCache && Date.now() - _brandsCache.ts < BRANDS_CACHE_TTL_MS) {
+      return res.json({ ok: true, data: _brandsCache.data });
+    }
     return res.status(500).json({ ok: false, error: String(err) });
   }
 });
@@ -107,17 +143,24 @@ router.get("/:slug", async (req, res) => {
     `);
 
     // New cars for this brand — from in-memory XML feed cache
-    const brandNameLower = brand.name.toLowerCase();
-    // Build search key: strip city/dealer qualifiers (Haval City / Haval Pro / МБ-Брянск)
-    const searchName = brandNameLower.replace(/ (city|pro|брянск)$/i, "").trim();
-
+    // Use car_mark as the authoritative dealer/mark identifier.
+    // When car_mark is empty (brand not yet launched), return no cars.
+    // This prevents fuzzy-match cross-pollution between sub-brands
+    // (e.g. "Tenet Plus" vs "Tenet": "tenet plus".includes("tenet") = true).
     const allNewCars = await getNewCars();
-    // First try exact dealer match (e.g. "Haval City" only → not mixed with "Haval Pro")
-    const byDealer = allNewCars.filter(c => c.dealer.toLowerCase() === brandNameLower);
-    const brandCars = (byDealer.length > 0
-      ? byDealer
-      : allNewCars.filter(c => c.mark.toLowerCase().includes(searchName) || searchName.includes(c.mark.toLowerCase()))
-    ).sort((a, b) => a.price - b.price)
+    let brandCarsRaw: Awaited<typeof allNewCars> = [];
+    if (brand.carMark) {
+      const carMarkLower = brand.carMark.toLowerCase();
+      // Primary: exact dealer match (e.g. car_mark="Haval City" → dealer="Haval City")
+      brandCarsRaw = allNewCars.filter(c => c.dealer.toLowerCase() === carMarkLower);
+      // Fallback: exact mark match (for brands where dealer ≠ car_mark but mark matches)
+      if (brandCarsRaw.length === 0) {
+        brandCarsRaw = allNewCars.filter(c => c.mark.toLowerCase() === carMarkLower);
+      }
+    }
+    // brand.carMark empty → [] (brand launching soon, no feed yet)
+
+    const brandCars = brandCarsRaw.sort((a, b) => a.price - b.price)
       // Normalize camelCase NewCarRecord → snake_case DTO expected by frontend
       .map(c => ({
         id: c.id,
@@ -131,12 +174,15 @@ router.get("/:slug", async (req, res) => {
         body_type: c.bodyType,
         availability: c.availability,
         url: c.url,
-        images: c.images,
+        images: c.images?.slice(0, 1) ?? [],
         dealer: c.dealer,
         max_discount: c.maxDiscount,
         credit_discount: c.creditDiscount,
         tradein_discount: c.tradeinDiscount,
       }));
+
+    // For news/promo text search: strip sub-brand qualifiers from name
+    const searchName = brand.name.toLowerCase().replace(/ (city|pro|plus|брянск)$/i, "").trim();
 
     // News: first by brand_ids array, then by name mention (deduplicated)
     const newsRows = await db.execute(sql`
@@ -153,7 +199,7 @@ router.get("/:slug", async (req, res) => {
 
     // Global promotions: prefer over JSONB field in brand_page_content
     const promoRows = await db.execute(sql`
-      SELECT id, title, description, image, badge, expires_at, is_active, button_text, button_url
+      SELECT id, slug, title, description, image, badge, expires_at, is_active, button_text, button_url
       FROM promotions
       WHERE ${brand.id} = ANY(brand_ids)
         AND is_active = true
@@ -162,12 +208,13 @@ router.get("/:slug", async (req, res) => {
     `);
 
     type PromoRow = {
-      id: number; title: string; description: string; image: string | null;
+      id: number; slug: string; title: string; description: string; image: string | null;
       badge: string | null; expires_at: string | null; is_active: boolean;
       button_text: string | null; button_url: string | null;
     };
 
     const globalPromos = (promoRows.rows as PromoRow[]).map(p => ({
+      slug: p.slug,
       title: p.title,
       description: p.description,
       image: p.image ?? undefined,
