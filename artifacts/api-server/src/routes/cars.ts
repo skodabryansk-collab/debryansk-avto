@@ -2,6 +2,23 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
+const BRAND_CANONICAL: Record<string, string> = {
+  "CHERY": "Chery",
+  "OMODA": "Omoda",
+  "JAECOO": "Jaecoo",
+  "JETOUR": "Jetour",
+  "JELAND": "Jeland",
+  "HAVAL": "Haval",
+  "EXEED": "Exeed",
+  "SOUEAST": "Soueast",
+  "TENET": "Tenet",
+};
+
+function normalizeBrand(raw: string): string {
+  const upper = raw.trim().toUpperCase();
+  return BRAND_CANONICAL[upper] ?? raw.trim();
+}
+
 const router: IRouter = Router();
 
 const XML_URL =
@@ -42,6 +59,7 @@ export interface CarRecord {
 
 let cache: { data: CarRecord[]; ts: number } | null = null;
 const CACHE_TTL = 30 * 60 * 1000;
+let _usedCarsFetchInFlight: Promise<CarRecord[]> | null = null;
 
 interface AvitoMeta { driveType: string; owners: string; }
 let avitoCache: { data: Map<string, AvitoMeta>; ts: number } | null = null;
@@ -86,7 +104,7 @@ function parseXml(text: string): CarRecord[] {
     if (action !== "show") continue;
     cars.push({
       id: getField(block, "unique_id"),
-      mark: getField(block, "mark_id"),
+      mark: normalizeBrand(getField(block, "mark_id")),
       model: getField(block, "folder_id"),
       modification: getField(block, "modification_id"),
       year: parseInt(getField(block, "year")) || 0,
@@ -120,24 +138,24 @@ function parseXml(text: string): CarRecord[] {
 
 export async function getUsedCars(): Promise<CarRecord[]> {
   if (cache && Date.now() - cache.ts < CACHE_TTL) return cache.data;
-  const r = await fetch(XML_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
-  if (!r.ok) throw new Error(`XML fetch failed: ${r.status}`);
-  const text = await r.text();
-  const data = parseXml(text);
-  cache = { data, ts: Date.now() };
-  return data;
-}
-
-router.get("/cars/used", async (req, res) => {
-  try {
-    if (!cache || Date.now() - cache.ts >= CACHE_TTL) {
+  // Deduplicate concurrent fetches — prevents cache stampede when many Puppeteer
+  // instances call /api/cars/used simultaneously after a batch prerender run.
+  if (!_usedCarsFetchInFlight) {
+    _usedCarsFetchInFlight = (async () => {
       const r = await fetch(XML_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
       if (!r.ok) throw new Error(`XML fetch failed: ${r.status}`);
       const text = await r.text();
       const data = parseXml(text);
       cache = { data, ts: Date.now() };
-    }
-    let data = cache!.data;
+      return data;
+    })().finally(() => { _usedCarsFetchInFlight = null; });
+  }
+  return _usedCarsFetchInFlight;
+}
+
+router.get("/cars/used", async (req, res) => {
+  try {
+    let data = await getUsedCars();
     const sort = req.query.sort as string | undefined;
     const limit = parseInt(req.query.limit as string) || 0;
 
