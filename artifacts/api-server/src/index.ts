@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { runMigration } from "./migration";
 import path from "path";
 import { spawn } from "child_process";
+import { setPrerendererRunning } from "./lib/chrome-semaphore";
 
 const rawPort = process.env["PORT"];
 
@@ -178,6 +179,7 @@ function spawnPrerender(args: string[]): void {
     detached: false,
   });
   _prerenderChild = child;
+  setPrerendererRunning(true);
   child.stdout?.on("data", (d: Buffer) =>
     logger.info({ src: "prerender" }, d.toString().trim()),
   );
@@ -186,6 +188,7 @@ function spawnPrerender(args: string[]): void {
   );
   child.on("exit", (code: number | null) => {
     _prerenderChild = null;
+    setPrerendererRunning(false);
     logger.info({ code, args }, "prerender: script exited");
     if (code === 0 && process.env.PRERENDER_ENABLED === "true") {
       import("./middleware/prerender")
@@ -213,7 +216,9 @@ async function handlePrerenderAfterSync(
       logger.info({ route }, "prerender: marked removed car as gone");
     }
 
-    if (stats.added > 0 || stats.updated > 0) {
+    // Only re-render when cars are genuinely new — updates (price/availability changes)
+    // don't justify a full 400+ page crawl every 30 minutes that exhausts the DB pool.
+    if (stats.addedNewCarIds.length > 0 || stats.addedUsedCarIds.length > 0) {
       spawnPrerender(["--cars-only"]);
     }
 
@@ -310,6 +315,19 @@ async function main() {
     }, 8 * 60 * 60 * 1000);
   }).catch(err => logger.warn({ err }, "[reviews-sync] Module load failed"));
 
+  // Calltouch REST API sync — fetch today + yesterday on startup, then every 30 min
+  import("./services/calltouch-sync").then(({ syncCalltouchCalls }) => {
+    syncCalltouchCalls(1)
+      .then(s => logger.info(s, "[calltouch-sync] Startup sync complete"))
+      .catch(err => logger.warn({ err }, "[calltouch-sync] Startup sync failed"));
+
+    setInterval(() => {
+      syncCalltouchCalls(1)
+        .then(s => logger.info(s, "[calltouch-sync] Scheduled sync complete"))
+        .catch(err => logger.warn({ err }, "[calltouch-sync] Scheduled sync failed"));
+    }, 30 * 60 * 1000);
+  }).catch(err => logger.warn({ err }, "[calltouch-sync] Module load failed"));
+
   // Warm Navigator context cache on startup so the first user doesn't hit a cold cache
   import("./routes/chat").then(({ warmContext }) => {
     warmContext()
@@ -330,9 +348,43 @@ async function main() {
   }).catch(err => logger.warn({ err }, "[metrika] Scheduler load failed"));
 
   // SEO positions — Webmaster API, weekly Sunday 10:00 MSK (07:00 UTC)
+  // onComplete callback triggers the Петля Карпаты evaluator after each fetch
   import("./services/seo-positions").then(({ scheduleSeoPositions }) => {
-    scheduleSeoPositions();
+    import("./services/seo-evaluator").then(({ runEvaluation }) => {
+      scheduleSeoPositions(() => {
+        runEvaluation()
+          .then(r => logger.info(r, "[seo-evaluator] Evaluation triggered by positions fetch"))
+          .catch(err => logger.error({ err }, "[seo-evaluator] Evaluation failed"));
+      });
+    }).catch(() => {
+      scheduleSeoPositions(); // fallback without evaluator
+    });
   }).catch(err => logger.warn({ err }, "[seo-positions] Scheduler load failed"));
+
+  // Wordstat snapshot — weekly Wednesday 03:00 MSK (00:00 UTC)
+  import("./services/wordstat").then(({ scheduleWordstatFetch }) => {
+    scheduleWordstatFetch();
+  }).catch(err => logger.warn({ err }, "[wordstat] Scheduler load failed"));
+
+  // DB backup — nightly at 03:00 MSK, keep last 7 days in GCS
+  import("./services/db-backup").then(({ scheduleDbBackup }) => {
+    scheduleDbBackup();
+  }).catch(err => logger.warn({ err }, "[db-backup] Scheduler load failed"));
+
+  // Expire stale 'started' calls — if call-complete webhook never arrived
+  const expireStuckCalls = () =>
+    db.execute(sql`
+      UPDATE calltouch_calls
+      SET status = 'missed', completed_at = started_at
+      WHERE status = 'started'
+        AND started_at < NOW() - INTERVAL '2 hours'
+    `).then(r => {
+      const n = (r as any).rowCount ?? 0;
+      if (n > 0) logger.info({ count: n }, "[calltouch] Expired stuck started calls");
+    }).catch(err => logger.warn({ err }, "[calltouch] Expire stuck calls failed"));
+
+  expireStuckCalls();
+  setInterval(expireStuckCalls, 60 * 60 * 1000); // каждый час
 
   // Start server
   app.listen(port, () => {
@@ -343,9 +395,11 @@ async function main() {
         .then(async ({ updatePrerenderCache, setCurrentAssetTags }) => {
           // Load fresh SSG HTML from dist/public into prerender cache
           // instead of stale GCS cache (GCS cache has old asset hashes)
-          const { readFileSync, readdirSync, statSync } = await import("fs");
+          const { readFileSync, readdirSync, statSync, existsSync } = await import("fs");
           const { join } = await import("path");
-          const distDir = join(__dirname, "../../debryansk-avto/dist/public");
+          const distDir =
+            process.env.FRONTEND_DIST_PATH ||
+            join(__dirname, "../../debryansk-avto/dist/public");
 
           // Cache the current build's script/link asset tags once at startup
           // so cached snapshot HTML can always be rewritten to reference the
@@ -357,6 +411,14 @@ async function main() {
           } catch (err) {
             logger.warn({ err }, "prerender: failed to read dist/public/index.html for asset tags");
           }
+
+          // Always load Puppeteer cache from disk first — independent of distDir existence.
+          // This ensures pages cached by prerender.mjs (brands, cars, etc.) are served
+          // to bots even when the dist/ SSG files are unavailable.
+          const { loadPrerenderCacheFromGCS: loadCacheEarly } = await import("./middleware/prerender");
+          await loadCacheEarly().catch(err =>
+            logger.warn({ err }, "prerender: early disk cache load failed (non-fatal)")
+          );
 
           function findHtmlFiles(dir: string, prefix = ""): string[] {
             const entries = readdirSync(dir, { withFileTypes: true });
@@ -388,11 +450,21 @@ async function main() {
 
           const htmlFiles = findHtmlFiles(distDir);
           let loaded = 0;
+          let skipped = 0;
           for (const file of htmlFiles) {
             if (file === "index.html") continue; // root SPA shell — skip
             const route = "/" + file.replace(/\/index\.html$/, "");
             if (!isDistSsgRoute(route)) continue; // let GCS handle dynamic/Puppeteer routes
             const html = readFileSync(join(distDir, file), "utf-8");
+            // Guard: if dist HTML is < 5KB it's likely a SPA shell (no SSG
+            // content generated for this route), don't overwrite a full
+            // Puppeteer-cached page with it.
+            const { getPrerenderCache } = await import("./middleware/prerender");
+            const prerenderCache = getPrerenderCache();
+            if (html.length < 5000 && prerenderCache.pages.has(route)) {
+              skipped++;
+              continue;
+            }
             updatePrerenderCache(route, html);
             loaded++;
           }
@@ -415,9 +487,16 @@ async function main() {
             logger.warn({ err }, "prerender: startup prerender SKIPPED — DB health check failed");
           }
 
-          if (dbHealthy) {
+          // PRERENDER_STARTUP_SPAWN=false disables the full Chrome crawl on server start.
+          // Useful on memory-constrained VPS (≤1GB) where startup Chrome causes OOM.
+          // Cache is already loaded from disk above; cron handles periodic refresh.
+          const startupSpawnEnabled = process.env.PRERENDER_STARTUP_SPAWN !== "false";
+
+          if (dbHealthy && startupSpawnEnabled) {
             logger.info("prerender: triggering full prerender on startup (refreshes GCS cache)");
             spawnPrerender([]);
+          } else if (!startupSpawnEnabled) {
+            logger.info("prerender: startup spawn DISABLED (PRERENDER_STARTUP_SPAWN=false) — cache loaded from disk, cron handles refresh");
           } else {
             logger.warn("prerender: startup prerender deferred — will run on next scheduled cycle or manual trigger");
           }
