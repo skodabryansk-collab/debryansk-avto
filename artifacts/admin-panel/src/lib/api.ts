@@ -36,6 +36,22 @@ export function isLoggedIn() { return !!getToken(); }
 export interface Stats { news: number; leads: number; leadsToday: number; dealers: number; brands: number; users: number; }
 export function getStats() { return api<Stats>("GET", "/admin/stats"); }
 
+export interface DashboardData {
+  calls: { total30d: number; missedToday: number; answeredToday: number };
+  cars: { newCount: number; usedCount: number; lastSyncAt: string | null };
+  leads: { total: number; today: number; byType: { callback: number; testdrive: number; credit: number; tradein: number } };
+  reviews: { avgRating: number; total: number; lastSyncAt: string | null };
+  navigator: { total: number; today: number; rated: number };
+  content: { news: number; promotions: number; faqs: number; vacancies: number };
+  seoPositions: Array<{ query: string; position: number; change: number | null }>;
+  visitors: { today: number; week: number; month: number } | null;
+}
+export function getDashboard() { return api<DashboardData & { ok: boolean }>("GET", "/admin/dashboard"); }
+
+export interface TrendDay { date: string; total: number }
+export interface DashboardTrends { calls: TrendDay[]; leads: TrendDay[] }
+export function getDashboardTrends() { return api<DashboardTrends & { ok: boolean }>("GET", "/admin/dashboard/trends"); }
+
 /* News */
 export interface NewsItem {
   id: number; title: string; excerpt: string; content: string; category: string;
@@ -200,6 +216,12 @@ export function syncReviews(type: "full" | "recent" | "custom" = "full", days?: 
   );
 }
 
+export function syncCalltouchCalls(daysBack = 1) {
+  return api<{ ok: true; stats: { inserted: number; updated: number; total: number; errors: number } }>(
+    "POST", "/admin/calltouch-calls/sync", { daysBack }
+  );
+}
+
 /* Locations */
 export interface LocationBrandItem {
   id: number; name: string; logoUrl: string | null; bgColor: string | null;
@@ -207,7 +229,7 @@ export interface LocationBrandItem {
 }
 export interface Location {
   id: number; title: string; address: string; phone: string | null;
-  hours: string | null; mapX: number | null; mapY: number | null;
+  hours: string | null; email: string | null; mapX: number | null; mapY: number | null;
   sortOrder: number; brands: LocationBrandItem[];
 }
 export function getLocations() { return api<{ ok: true; data: Location[] }>("GET", "/admin/locations").then(r => r.data); }
@@ -289,11 +311,61 @@ export function runPrerender() {
 export function getPrerenderStatus() {
   return api<{ status: "idle" | "running" }>("GET", "/admin/cache/prerender/status");
 }
+export function prerenderRoute(route: string) {
+  return api<{ ok: true; route: string; message: string }>("POST", "/admin/cache/prerender/route", { route });
+}
+export function prerenderBulk(routes: string[]) {
+  return api<{ ok: true; count: number; message: string }>("POST", "/admin/cache/prerender/bulk", { routes });
+}
+export function flushOgCache() {
+  return api<{ ok: true; deleted: number }>("POST", "/admin/og-image/flush");
+}
+export function clearPrerenderCache(route: string) {
+  return api<{ ok: true; route: string; message: string }>("POST", "/admin/cache/prerender/clear", { route });
+}
+
+export interface SeoPageItem {
+  route: string;
+  title: string;
+  description: string;
+  source: "ssg" | "brand" | "promotion" | "car" | "static";
+  isCached: boolean;
+  isGone: boolean;
+  canonical: string;
+  ogImage?: string;
+}
+export function getSeoPages() {
+  return api<{ ok: true; data: SeoPageItem[] }>("GET", "/admin/seo/pages").then(r => r.data);
+}
+export function requestYandexRecrawl(url: string) {
+  return api<{ ok: true; task_id: string; quota_remainder: number }>("POST", "/admin/seo/recrawl", { url });
+}
+
+export interface SeoAuditResult {
+  ranAt: string;
+  items: Array<SeoPageItem & { issues: string[]; isStale: boolean; cachedTitle?: string; cachedDescription?: string }>;
+}
+export function getSeoAudit() {
+  return api<{ ok: true; data: SeoAuditResult }>("GET", "/admin/seo/audit").then(r => r.data);
+}
+export function runSeoAudit() {
+  return api<{ ok: true; data: SeoAuditResult }>("POST", "/admin/seo/audit").then(r => r.data);
+}
+export interface GeneratedBrandDescription {
+  slug: string;
+  brandName: string;
+  title: string;
+  description: string;
+}
+export function generateBrandDescriptions(apply = false) {
+  return api<{ ok: true; data: { generated: GeneratedBrandDescription[]; applied?: { updated: number; skipped: number } } }>("POST", "/admin/seo/generate-brand-descriptions", { apply }).then(r => r.data);
+}
 
 /* Promotions */
 export interface Promotion {
   id: number;
   title: string;
+  slug: string;
   description: string;
   image: string | null;
   badge: string | null;
@@ -308,6 +380,7 @@ export interface Promotion {
 }
 export type PromotionInput = {
   title: string;
+  slug?: string | null;
   description?: string;
   image?: string | null;
   badge?: string | null;
@@ -541,6 +614,7 @@ export interface CalltouchCall {
   landingPage: string | null;
   status: string;
   durationSeconds: number | null;
+  subPoolName: string | null;
   callRecordingUrl: string | null;
   recordingStoredPath: string | null;
   startedAt: string | null;
@@ -548,8 +622,12 @@ export interface CalltouchCall {
   createdAt: string | null;
 }
 
-export function getCalltouchCalls(page = 1, status = "all") {
-  const qs = `page=${page}&status=${status}`;
+export function getCalltouchCalls(params: { page?: number; status?: string; phone?: string; dateFrom?: string; dateTo?: string } = {}) {
+  const { page = 1, status = "all", phone = "", dateFrom = "", dateTo = "" } = params;
+  const qs = new URLSearchParams({ page: String(page), status });
+  if (phone) qs.set("phone", phone);
+  if (dateFrom) qs.set("dateFrom", dateFrom);
+  if (dateTo) qs.set("dateTo", dateTo);
   return api<{ ok: boolean; data: CalltouchCall[]; total: number; page: number; limit: number }>(
     "GET", `/admin/calltouch-calls?${qs}`
   );
@@ -559,4 +637,300 @@ export function getCalltouchRecordingUrl(id: number) {
   return api<{ ok: boolean; url: string; external?: boolean }>(
     "GET", `/admin/calltouch-calls/${id}/recording`
   );
+}
+
+export async function exportCalltouchCalls(params: { status?: string; phone?: string; dateFrom?: string; dateTo?: string } = {}) {
+  const token = getToken();
+  const qs = new URLSearchParams();
+  if (params.status && params.status !== "all") qs.set("status", params.status);
+  if (params.phone) qs.set("phone", params.phone);
+  if (params.dateFrom) qs.set("dateFrom", params.dateFrom);
+  if (params.dateTo) qs.set("dateTo", params.dateTo);
+  const res = await fetch(`${API_BASE}/admin/calltouch-calls/export?${qs}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Export failed");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `calltouch-calls-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ── Managers (КП) ─────────────────────────────────────────────────────── */
+export interface ManagerItem {
+  id: number;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  login: string;
+  isActive: boolean | null;
+  photoUrl: string | null;
+  brands: string[] | null;
+  registrationPending: boolean | null;
+  createdAt: string | null;
+}
+
+export function getManagers() {
+  return api<{ ok: true; data: ManagerItem[] }>("GET", "/admin/managers");
+}
+
+export function createManager(data: { name: string; phone?: string; email?: string; login: string; password: string; isActive?: boolean }) {
+  return api<{ ok: true; data: ManagerItem }>("POST", "/admin/managers", data);
+}
+
+export function toggleManager(id: number, isActive: boolean) {
+  return api<{ ok: true; data: ManagerItem }>("PATCH", `/admin/managers/${id}`, { isActive });
+}
+
+export function activateManager(id: number) {
+  return api<{ ok: true; emailSent: boolean; emailError?: string }>("POST", `/admin/managers/${id}/activate`);
+}
+
+export function updateManagerBrands(id: number, brands: string[]) {
+  return api<{ ok: true; data: ManagerItem }>("PATCH", `/admin/managers/${id}`, { brands });
+}
+
+export function resendManagerEmail(id: number) {
+  return api<{ ok: true }>("POST", `/admin/managers/${id}/resend-email`);
+}
+
+/* ── Admin Quotes ──────────────────────────────────────────────────────── */
+export interface AdminQuoteItem {
+  id: number;
+  managerId: number;
+  managerName: string | null;
+  carId: string;
+  carType: string;
+  carSnapshot: unknown;
+  clientName: string;
+  clientPhone: string;
+  discounts: unknown;
+  priceOriginal: number;
+  priceFinal: number;
+  validUntil: string;
+  pdfUrl: string | null;
+  createdAt: string;
+}
+
+export function getAdminQuotes(params?: { managerId?: number; from?: string; to?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.managerId) qs.set("managerId", String(params.managerId));
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to) qs.set("to", params.to);
+  const q = qs.toString();
+  return api<{ ok: true; data: AdminQuoteItem[] }>("GET", `/admin/quotes${q ? "?" + q : ""}`);
+}
+
+/* ── Metrika / Visitors ── */
+export interface MetrikaSummaryResult {
+  ok: boolean;
+  period: string;
+  date1: string;
+  date2: string;
+  current: { visits: number; users: number; pageviews: number; bounceRate: number; avgDuration: number; avgDurationFormatted: string };
+  previous: { visits: number; users: number; pageviews: number; bounceRate: number; avgDuration: number; avgDurationFormatted: string };
+}
+export interface MetrikaChartResult {
+  ok: boolean;
+  rows: Array<{ date: string; visits: number; users: number }>;
+}
+export interface MetrikaSourcesResult {
+  ok: boolean;
+  rows: Array<{ name: string; visits: number }>;
+}
+export interface MetrikaPagesResult {
+  ok: boolean;
+  rows: Array<{ path: string; visits: number; pageviews: number }>;
+}
+export interface MetrikaOnlineResult {
+  ok: boolean;
+  online: number | null;
+}
+
+export function getMetrikaSummary(period: "today" | "7d" | "30d") {
+  return api<MetrikaSummaryResult>("GET", `/admin/metrika/summary?period=${period}`);
+}
+export function getMetrikaChart(date1: string, date2: string) {
+  return api<MetrikaChartResult>("GET", `/admin/metrika/chart?date1=${date1}&date2=${date2}`);
+}
+export function getMetrikaSources(date1: string, date2: string) {
+  return api<MetrikaSourcesResult>("GET", `/admin/metrika/sources?date1=${date1}&date2=${date2}`);
+}
+export function getMetrikaPages(date1: string, date2: string) {
+  return api<MetrikaPagesResult>("GET", `/admin/metrika/pages?date1=${date1}&date2=${date2}`);
+}
+export function getMetrikaOnline() {
+  return api<MetrikaOnlineResult>("GET", "/admin/metrika/online");
+}
+
+/* ── SEO Autopilot ────────────────────────────────────────────────────── */
+export interface SeoSuggestion {
+  id: number;
+  type: string;
+  page_url: string;
+  current_value: string | null;
+  proposed_value: string | null;
+  reasoning: string | null;
+  priority_score: number;
+  demand: number;
+  position_factor: number;
+  ease: number;
+  status: string;
+  blocked_by_tech: boolean;
+  applied_at: string | null;
+  verified_at: string | null;
+  verification_log: string | null;
+  result_delta: number | null;
+  // Петля Карпаты evaluation fields
+  snapshot_before: { position: number | null; clicks: number | null; date: string; queryCount: number } | null;
+  evaluate_at: string | null;
+  evaluated_at: string | null;
+  evaluation_result: "improved" | "stable" | "fell" | "falsified" | null;
+  evaluation_note: string | null;
+  content_draft: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/* ── SEO Anchor Queries ───────────────────────────────────────────────── */
+export interface AnchorQuery {
+  id: number;
+  query_text: string;
+  page_url: string;
+  target_position: number;
+  current_position: number | null;
+  total_clicks: number | null;
+  last_checked_at: string | null;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AnchorSuggestion {
+  query_text: string;
+  avg_position: number;
+  total_shows: number;
+  total_clicks: number;
+  snapshot_date: string;
+}
+
+export function getAnchorQueries() {
+  return api<{ ok: boolean; data: AnchorQuery[] }>("GET", "/admin/seo-anchor");
+}
+
+export function createAnchorQuery(data: { query_text: string; page_url: string; target_position?: number; notes?: string }) {
+  return api<{ ok: boolean; data: AnchorQuery }>("POST", "/admin/seo-anchor", data);
+}
+
+export function updateAnchorQuery(id: number, data: Partial<AnchorQuery>) {
+  return api<{ ok: boolean }>("PUT", `/admin/seo-anchor/${id}`, data);
+}
+
+export function deleteAnchorQuery(id: number) {
+  return api<{ ok: boolean }>("DELETE", `/admin/seo-anchor/${id}`);
+}
+
+export function suggestAnchorQueries(limit = 20) {
+  return api<{ ok: boolean; data: AnchorSuggestion[] }>("GET", `/admin/seo-anchor/suggest?limit=${limit}`);
+}
+
+export interface OauthAlert {
+  id: number;
+  service: string;
+  status: string;
+  message: string;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface WordstatQuotaEntry {
+  date: string;
+  calls_used: number;
+  calls_estimated: number;
+  updated_at: string;
+}
+
+export function getSeoAutopilotSuggestions(params?: {
+  type?: string; status?: string; blocked_by_tech?: boolean; page?: number; limit?: number; evaluated?: boolean;
+}) {
+  const qs = new URLSearchParams();
+  if (params?.type) qs.set("type", params.type);
+  if (params?.status) qs.set("status", params.status);
+  if (params?.blocked_by_tech !== undefined) qs.set("blocked_by_tech", String(params.blocked_by_tech));
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.evaluated !== undefined) qs.set("evaluated", String(params.evaluated));
+  const q = qs.toString();
+  return api<{ ok: boolean; data: SeoSuggestion[]; total: number; page: number; limit: number }>(
+    "GET", `/admin/seo-autopilot/suggestions${q ? "?" + q : ""}`
+  );
+}
+
+export function applySeoSuggestion(id: number) {
+  return api<{ ok: boolean; message: string }>("POST", `/admin/seo-autopilot/suggestions/${id}/apply`);
+}
+
+export function rejectSeoSuggestion(id: number) {
+  return api<{ ok: boolean }>("POST", `/admin/seo-autopilot/suggestions/${id}/reject`);
+}
+
+export function getSeoAutopilotAlerts() {
+  return api<{ ok: boolean; data: OauthAlert[] }>("GET", "/admin/seo-autopilot/alerts");
+}
+
+export function resolveOauthAlert(id: number) {
+  return api<{ ok: boolean }>("POST", `/admin/seo-autopilot/alerts/${id}/resolve`);
+}
+
+export function getSeoAutopilotQuota() {
+  return api<{ ok: boolean; data: WordstatQuotaEntry[] }>("GET", "/admin/seo-autopilot/quota");
+}
+
+export function getSeoAutopilotStatus() {
+  return api<{
+    ok: boolean;
+    counts: { pending: number; applied: number; errors: number; rejected: number; blocked: number };
+    unresolvedAlerts: number;
+    wordstatRunning: boolean;
+    gapRunning: boolean;
+  }>("GET", "/admin/seo-autopilot/status");
+}
+
+export function runWordstatFetch() {
+  return api<{ ok: boolean; message: string }>("POST", "/admin/seo-autopilot/run-wordstat");
+}
+
+export function runGapAnalysis() {
+  return api<{ ok: boolean; message: string }>("POST", "/admin/seo-autopilot/run-gap");
+}
+
+export interface GapRun {
+  id: number;
+  status: "running" | "completed" | "error";
+  triggered_by: "manual" | "auto";
+  started_at: string;
+  completed_at: string | null;
+  duration_ms: number | null;
+  suggestions_created: number | null;
+  wordstat_rows: number | null;
+  webmaster_rows: number | null;
+  error_message: string | null;
+}
+
+export function getGapRuns(params?: { limit?: number; offset?: number }) {
+  const q = new URLSearchParams();
+  if (params?.limit)  q.set("limit",  String(params.limit));
+  if (params?.offset) q.set("offset", String(params.offset));
+  return api<{ ok: boolean; data: GapRun[]; total: number }>(
+    "GET", `/admin/seo-autopilot/gap-runs?${q}`
+  );
+}
+
+export interface FaqPreviewItem { modelTerm: string; question: string; answer: string; }
+export function getSuggestionPreview(id: number) {
+  return api<{ ok: boolean; faqs: FaqPreviewItem[] }>("GET", `/admin/seo-autopilot/suggestions/${id}/preview`);
 }
