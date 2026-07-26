@@ -567,6 +567,229 @@ export async function runMigration() {
     `);
     logger.info("calltouch_calls schema ready (idempotent)");
 
+    // Promotions: unique shareable slug (Task #260)
+    await db.execute(sql`ALTER TABLE promotions ADD COLUMN IF NOT EXISTS slug TEXT`);
+    // Best-effort ASCII slug from title, always suffixed with id to guarantee uniqueness;
+    // Cyrillic titles fall back to "promo-<id>" (admin can rename in the UI).
+    await db.execute(sql`
+      UPDATE promotions
+      SET slug = (
+        CASE
+          WHEN LOWER(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(title), '[^a-zA-Z0-9]+', '-', 'g'), '(^-|-$)', '', 'g')) = ''
+            THEN 'promo'
+          ELSE LOWER(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(title), '[^a-zA-Z0-9]+', '-', 'g'), '(^-|-$)', '', 'g'))
+        END
+      ) || '-' || id::text
+      WHERE slug IS NULL
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_promotions_slug ON promotions(slug)
+      WHERE slug IS NOT NULL
+    `);
+    logger.info("promotions.slug schema ready (idempotent)");
+
+    // ── Managers: self-registration columns ──────────────────────────────────
+    await db.execute(sql`ALTER TABLE managers ADD COLUMN IF NOT EXISTS photo_url TEXT`);
+    await db.execute(sql`ALTER TABLE managers ADD COLUMN IF NOT EXISTS brands JSONB`);
+    await db.execute(sql`ALTER TABLE managers ADD COLUMN IF NOT EXISTS registration_pending BOOLEAN DEFAULT FALSE`);
+    await db.execute(sql`ALTER TABLE managers ADD COLUMN IF NOT EXISTS temp_password TEXT`);
+    logger.info("managers: self-registration columns ready (idempotent)");
+
+    // ── Sales head managers: brand (text) → brands (jsonb array) ─────────────
+    await db.execute(sql`ALTER TABLE sales_head_managers ADD COLUMN IF NOT EXISTS brands JSONB DEFAULT '[]'`);
+    const shmBrandExists = await db.execute(sql`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name='sales_head_managers' AND column_name='brand'
+    `);
+    if (shmBrandExists.rows.length > 0) {
+      await db.execute(sql`
+        UPDATE sales_head_managers SET brands = json_build_array(brand)
+        WHERE brands IS NULL OR brands = '[]'::jsonb
+      `);
+    }
+    await db.execute(sql`ALTER TABLE sales_head_managers DROP COLUMN IF EXISTS brand`);
+    logger.info("sales_head_managers: brand→brands migration ready (idempotent)");
+
+    // ── Locations: email для маршрутизации заявок ─────────────────────────────
+    await db.execute(sql`ALTER TABLE locations ADD COLUMN IF NOT EXISTS email TEXT`);
+    logger.info("locations.email column ready (idempotent)");
+
+    // ── Corporate page singleton content ──────────────────────────────────────
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS corporate_page_content (
+        id                    INTEGER PRIMARY KEY DEFAULT 1,
+        hero_title            TEXT NOT NULL DEFAULT '',
+        hero_subtitle         TEXT NOT NULL DEFAULT '',
+        advantages            JSONB NOT NULL DEFAULT '[]',
+        steps                 JSONB NOT NULL DEFAULT '[]',
+        sales_manager_name    TEXT,
+        sales_manager_phone   TEXT,
+        sales_manager_email   TEXT,
+        sales_manager_photo   TEXT,
+        service_manager_name  TEXT,
+        service_manager_phone TEXT,
+        service_manager_email TEXT,
+        service_manager_photo TEXT,
+        updated_at            TIMESTAMPTZ DEFAULT NOW(),
+        CONSTRAINT corporate_page_content_single_row CHECK (id = 1)
+      )
+    `);
+    const existingCorporate = await db.execute(sql`SELECT id FROM corporate_page_content WHERE id = 1 LIMIT 1`);
+    if (!existingCorporate.rows[0]) {
+      const advantages = JSON.stringify([
+        {
+          groupTitle: "Преимущества лизинга для бизнеса",
+          items: [
+            { title: "Деньги остаются в обороте", description: "Регулярный платёж с выгодным первоначальным взносом вместо разовой оплаты полной стоимости" },
+            { title: "Экономия на налогах", description: "Лизинговые платежи относятся на расходы, уменьшая налогооблагаемую базу; налог на имущество не начисляется, так как автомобиль на балансе лизинговой компании" },
+            { title: "Ускоренная амортизация", description: "Договор лизинга позволяет применять коэффициент ускоренной амортизации" },
+            { title: "Обновление автопарка без потерь", description: "По окончании срока лизинга — новый автомобиль на новых условиях" },
+          ],
+        },
+        {
+          groupTitle: "Гибкие условия под ваш бизнес",
+          items: [
+            { title: "Гибкий график платежей", description: "Подстраивается под денежный поток вашей компании" },
+            { title: "Trade-in для автопарка одной сделкой", description: "Обмен нескольких автомобилей на новые без необходимости продавать каждый отдельно" },
+            { title: "Любой бренд из нашего каталога", description: "Лизинговая схема доступна на весь ассортимент группы, без привязки к одной марке" },
+          ],
+        },
+        {
+          groupTitle: "Почему через Дебрянск Авто",
+          items: [
+            { title: "Прямой доступ к ведущим лизинговым компаниям России", description: "Работаем с большинством топ-лизингодателей без посредников — предлагаем выбор условий, а не единственный вариант" },
+            { title: "Специальные условия по программам лизинга", description: "Выгода закладывается уже на этапе сделки" },
+            { title: "Отдельное сервисное обслуживание автопарка", description: "По предварительной записи — оперативно, без длительного ожидания в общей очереди" },
+            { title: "Персональный менеджер по сервису", description: "Отдельно от менеджера по продажам, ведёт именно обслуживание вашего автопарка" },
+          ],
+        },
+      ]);
+      const steps = JSON.stringify([
+        { title: "Оставляете заявку", description: "Указываете параметры: марки, количество авто, предпочтительная схема — покупка или лизинг" },
+        { title: "Персональный менеджер подбирает условия", description: "Связывается с вами и подбирает условия у лизинговых партнёров" },
+        { title: "Оформление сделки", description: "При необходимости — trade-in текущего автопарка в рамках той же сделки" },
+        { title: "Сервисное обслуживание", description: "Дальнейшее обслуживание автопарка с закреплённым персональным менеджером" },
+      ]);
+      await db.execute(sql`
+        INSERT INTO corporate_page_content (id, hero_title, hero_subtitle, advantages, steps)
+        VALUES (1,
+          'Автомобили для бизнеса',
+          'Лизинг от ведущих лизинговых компаний России, выгодные условия и отдельное сервисное обслуживание для корпоративных клиентов',
+          ${advantages}::jsonb,
+          ${steps}::jsonb
+        )
+      `);
+      logger.info("corporate_page_content: seeded default content");
+    }
+    // Add role columns if they don't exist yet (idempotent)
+    await db.execute(sql`ALTER TABLE corporate_page_content ADD COLUMN IF NOT EXISTS sales_manager_role TEXT`);
+    await db.execute(sql`ALTER TABLE corporate_page_content ADD COLUMN IF NOT EXISTS service_manager_role TEXT`);
+    logger.info("corporate_page_content schema ready (idempotent)");
+
+    // ── Corporate FAQ seed ────────────────────────────────────────────────────
+    const existingCorporateFaq = await db.execute(sql`SELECT id FROM faqs WHERE page_slug = 'corporate' LIMIT 1`);
+    if (!existingCorporateFaq.rows[0]) {
+      const corporateFaqs = [
+        { q: "Может ли ИП оформить автомобиль в лизинг?", a: "Да, лизинговые программы доступны как юридическим лицам, так и индивидуальным предпринимателям." },
+        { q: "С какими лизинговыми компаниями вы работаете?", a: "Мы сотрудничаем с большинством ведущих лизинговых компаний России, что позволяет подобрать оптимальные условия под конкретную задачу бизнеса." },
+        { q: "Можно ли взять в лизинг несколько автомобилей разных марок одновременно?", a: "Да, лизинговая схема доступна на любые бренды из нашего каталога, можно оформить сразу несколько автомобилей разных марок в рамках одной заявки." },
+        { q: "Как проходит trade-in для корпоративного автопарка?", a: "Обмен нескольких автомобилей на новые можно провести в рамках одной сделки — оценка проводится по каждому автомобилю парка." },
+        { q: "Нужна ли запись на сервисное обслуживание корпоративных автомобилей?", a: "Да, обслуживание проводится по предварительной записи — это позволяет обслужить ваш автопарк оперативно, без ожидания в общей очереди." },
+        { q: "Есть ли отдельный менеджер для обслуживания нашего автопарка?", a: "Да, за корпоративными клиентами закрепляется персональный менеджер по сервису, отдельно от менеджера по продажам." },
+      ];
+      for (let i = 0; i < corporateFaqs.length; i++) {
+        await db.execute(sql`
+          INSERT INTO faqs (page_slug, question, answer, sort_order, is_published, include_in_schema)
+          VALUES ('corporate', ${corporateFaqs[i].q}, ${corporateFaqs[i].a}, ${i + 1}, true, true)
+        `);
+      }
+      logger.info("corporate_page_content: seeded 6 FAQ entries");
+    }
+
+    // ── SEO Autopilot tables ──────────────────────────────────────────────────
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS wordstat_snapshots (
+        id             SERIAL PRIMARY KEY,
+        query          TEXT NOT NULL,
+        shows_count    INTEGER NOT NULL DEFAULT 0,
+        region_id      TEXT NOT NULL DEFAULT '191',
+        source         TEXT NOT NULL,
+        parent_query   TEXT,
+        snapshot_date  DATE NOT NULL,
+        created_at     TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (query, snapshot_date, source)
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS seo_suggestions (
+        id               SERIAL PRIMARY KEY,
+        type             TEXT NOT NULL,
+        page_url         TEXT NOT NULL,
+        current_value    TEXT,
+        proposed_value   TEXT,
+        reasoning        TEXT,
+        priority_score   REAL NOT NULL DEFAULT 0,
+        demand           INTEGER NOT NULL DEFAULT 0,
+        position_factor  REAL NOT NULL DEFAULT 0,
+        ease             REAL NOT NULL DEFAULT 0,
+        status           TEXT NOT NULL DEFAULT 'pending',
+        blocked_by_tech  BOOLEAN NOT NULL DEFAULT false,
+        applied_at       TIMESTAMPTZ,
+        verified_at      TIMESTAMPTZ,
+        verification_log TEXT,
+        result_delta     REAL,
+        created_at       TIMESTAMPTZ DEFAULT NOW(),
+        updated_at       TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (type, page_url)
+      )
+    `);
+
+    // Петля Карпаты evaluation columns (idempotent — ADD COLUMN IF NOT EXISTS)
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS snapshot_before  JSONB`);
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS evaluate_at      TIMESTAMPTZ`);
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS evaluated_at     TIMESTAMPTZ`);
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS evaluation_result TEXT`);
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS evaluation_note  TEXT`);
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS content_draft    TEXT`);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS seo_anchor_queries (
+        id               SERIAL PRIMARY KEY,
+        query_text       TEXT NOT NULL UNIQUE,
+        page_url         TEXT NOT NULL,
+        target_position  REAL NOT NULL DEFAULT 10,
+        current_position REAL,
+        last_checked_at  TIMESTAMPTZ,
+        is_active        BOOLEAN NOT NULL DEFAULT true,
+        notes            TEXT,
+        created_at       TIMESTAMPTZ DEFAULT NOW(),
+        updated_at       TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS oauth_alerts (
+        id          SERIAL PRIMARY KEY,
+        service     TEXT NOT NULL,
+        status      TEXT NOT NULL,
+        message     TEXT NOT NULL,
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        resolved_at TIMESTAMPTZ
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS wordstat_quota (
+        id                SERIAL PRIMARY KEY,
+        date              DATE NOT NULL UNIQUE,
+        calls_used        INTEGER NOT NULL DEFAULT 0,
+        calls_estimated   INTEGER NOT NULL DEFAULT 0,
+        updated_at        TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    logger.info("SEO Autopilot tables ready (idempotent)");
+
   } catch (err) {
     logger.error({ err }, "Migration error");
   }
