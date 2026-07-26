@@ -34,17 +34,31 @@ import publicPromotionsRouter from "./public-promotions";
 import adminCacheRouter from "./admin-cache";
 import adminMetrikaRouter from "./admin-metrika";
 import adminSeoPositionsRouter from "./admin-seo-positions";
+import adminSeoRouter from "./admin-seo";
 import disclaimersRouter from "./disclaimers";
 import feedYmlRouter from "./feed-yml";
 import { publicFaqRouter, adminFaqRouter } from "./faq";
 import { publicBonusProgramRouter, adminBonusProgramRouter } from "./bonus-program";
+import { publicCorporatePageRouter, adminCorporatePageRouter } from "./corporate-page";
 import toCatalogRouter from "./to-catalog";
 import adminToCatalogRouter from "./admin-to-catalog";
 import calltouchWebhookRouter from "./webhooks-calltouch";
 import adminCalltouchRouter from "./admin-calltouch";
+import managerAuthRouter from "./manager-auth";
+import managerRegisterRouter from "./manager-register";
+import managerQuotesRouter from "./manager-quotes";
+import managerProfileRouter from "./manager-profile";
+import adminManagersRouter from "./admin-managers";
+import adminQuotesRouter from "./admin-quotes";
+import adminSalesManagersRouter from "./admin-sales-managers";
+import adminDbRestoreRouter from "./admin-db-restore";
+import ogImageRouter from "./og-image";
+import adminSeoAutopilotRouter from "./admin-seo-autopilot";
+import adminSeoAnchorRouter from "./admin-seo-anchor";
 
 const router: IRouter = Router();
 
+router.use(ogImageRouter);
 router.use(healthRouter);
 router.use(chatRouter);
 router.use(carsRouter);
@@ -86,11 +100,16 @@ router.use("/admin/promotions", adminPromotionsRouter);
 router.use("/admin/cache", adminCacheRouter);
 router.use("/admin/metrika", adminMetrikaRouter);
 router.use("/admin/seo-positions", adminSeoPositionsRouter);
+router.use("/admin/seo", adminSeoRouter);
+router.use("/admin/seo-autopilot", adminSeoAutopilotRouter);
+router.use("/admin/seo-anchor", adminSeoAnchorRouter);
 router.use("/faq", publicFaqRouter);
 router.use("/admin/faq", adminFaqRouter);
 router.use(disclaimersRouter);
 router.use(publicBonusProgramRouter);
 router.use("/admin/bonus-program", adminBonusProgramRouter);
+router.use("/corporate-page", publicCorporatePageRouter);
+router.use("/admin/corporate-page", adminCorporatePageRouter);
 router.use("/admin/to-catalog", adminToCatalogRouter);
 
 // TO catalog (public)
@@ -103,6 +122,18 @@ router.use("/webhook/calltouch", calltouchWebhookRouter);
 
 // Calltouch admin
 router.use("/admin/calltouch-calls", adminCalltouchRouter);
+
+// Manager auth & register (public)
+router.use("/manager/login", managerAuthRouter);
+router.use("/manager/register", managerRegisterRouter);
+router.use("/manager", managerProfileRouter);
+router.use("/manager", managerQuotesRouter);
+
+// Admin: managers & quotes overview
+router.use("/admin/managers", adminManagersRouter);
+router.use("/admin/quotes", adminQuotesRouter);
+router.use("/admin/sales-managers", adminSalesManagersRouter);
+router.use("/admin/db-restore", adminDbRestoreRouter);
 
 // Public settings
 router.use("/settings", publicSettingsRouter);
@@ -117,7 +148,7 @@ router.use("/reviews", publicReviewsRouter);
 // cache entry, so edits only ever became visible after the next server
 // restart happened to reload a fresh GCS snapshot. Removed so crawls can
 // update it live, same as other Puppeteer-rendered routes.
-const SSG_PROTECTED_ROUTES = new Set(["/", "/service", "/vacancies", "/about", "/contacts", "/news", "/new-cars", "/cars", "/legal", "/privacy", "/service/bonus"]);
+const SSG_PROTECTED_ROUTES = new Set(["/", "/about", "/news", "/new-cars", "/cars", "/legal", "/privacy", "/service/bonus"]);
 function isSsgProtected(route: string): boolean {
   if (SSG_PROTECTED_ROUTES.has(route)) return true;
   // /brands/* and /news/* are prerendered by Puppeteer — allow cache updates
