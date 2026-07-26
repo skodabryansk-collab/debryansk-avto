@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
   LayoutDashboard, Newspaper, Phone, LogOut,
-  ChevronRight, Menu, X, Tag, Users, Building2, Settings, Bot, Star, Megaphone, RefreshCw, HelpCircle, FileText, Gift, Wrench, TrendingUp, PhoneCall
+  ChevronRight, Menu, X, Tag, Users, Building2, Settings, Bot, Star, Megaphone, RefreshCw, HelpCircle, FileText, Gift, Wrench, TrendingUp, PhoneCall, UserCog, FileSpreadsheet, Plus, Search, Zap
 } from "lucide-react";
 import { rebuildCache, getRebuildStatus, runPrerender, getPrerenderStatus } from "@/lib/api";
 
@@ -17,16 +17,22 @@ const navItems = [
   { path: "/faq", label: "FAQ", icon: HelpCircle },
   { path: "/disclaimers", label: "Дисклеймеры", icon: FileText },
   { path: "/bonus-program", label: "Бонусная программа", icon: Gift },
+  { path: "/corporate", label: "Корпоративные клиенты", icon: Building2 },
   { path: "/to-catalog", label: "Каталог ТО", icon: Wrench },
   { path: "/leads", label: "Заявки", icon: Phone },
   { path: "/calltouch", label: "Звонки", icon: PhoneCall },
+  { path: "/visitors", label: "Посетители", icon: Users },
   { path: "/reviews", label: "Отзывы", icon: Star },
   { path: "/locations", label: "Локации", icon: Building2 },
   { path: "/brands", label: "Бренды", icon: Tag },
   { path: "/users", label: "Пользователи", icon: Users },
   { path: "/settings", label: "Настройки", icon: Settings },
   { path: "/navigator", label: "Навигатор", icon: Bot },
-  { path: "/seo-positions", label: "SEO позиции", icon: TrendingUp },
+  { path: "/seo", label: "SEO Центр", icon: Zap },
+  { path: "/managers", label: "Менеджеры КП", icon: UserCog },
+  { path: "/sales-managers", label: "Рук. отдела продаж", icon: UserCog },
+  { path: "/quotes", label: "КП менеджеров", icon: FileSpreadsheet },
+  { path: "/manager/quotes", label: "Создать КП", icon: Plus },
 ];
 
 type RebuildState = "idle" | "running" | "success" | "error";
