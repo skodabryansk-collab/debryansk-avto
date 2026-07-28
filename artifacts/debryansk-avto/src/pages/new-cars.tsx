@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
+import { sendWithRetry } from "@/lib/sendWithRetry";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -90,15 +91,12 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [sendError, setSendError] = useState(false);
   const img = car.images.filter(Boolean)[0] ?? "";
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !isPhoneValid(phone)) return;
-    setLoading(true);
-    setSendError(false);
+    setSubmitted(true);
     const fd = new FormData();
     fd.append("type", "lead");
     fd.append("name", name);
@@ -107,15 +105,7 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
     fd.append("carModel", car.model);
     fd.append("carYear", String(car.year));
     fd.append("dealer", car.dealer);
-    try {
-      const res = await fetch("/api/send-email", { method: "POST", body: fd });
-      if (!res.ok) throw new Error("server error");
-      setSubmitted(true);
-    } catch {
-      setSendError(true);
-    } finally {
-      setLoading(false);
-    }
+    sendWithRetry(fd);
   }
 
   return (
@@ -204,17 +194,11 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
                     />
                   </div>
                 </div>
-                {sendError && (
-                  <p className="text-red-500 text-xs text-center bg-red-50 rounded-lg py-2 px-3">
-                    Не удалось отправить заявку. Пожалуйста, позвоните нам или попробуйте ещё раз.
-                  </p>
-                )}
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full brand-gradient text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity mt-1 disabled:opacity-60"
+                  className="w-full brand-gradient text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity mt-1"
                 >
-                  {loading ? "Отправка…" : "Отправить заявку"}
+                  Отправить заявку
                 </button>
                 <p className="text-[10px] text-slate-400 text-center leading-snug">
                   Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности
