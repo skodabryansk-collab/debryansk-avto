@@ -1515,8 +1515,8 @@ async function applySuggestionBackground(id: number): Promise<void> {
 
 /* ──────────────────────────────────────────────────────────────────────
    POST /api/admin/seo-autopilot/reset-and-rerun
-   Удаляет pending-предложения, запускает GAP-анализ, затем
-   автоматически применяет все новые предложения через AI.
+   Удаляет pending-предложения и запускает GAP-анализ заново.
+   Предложения остаются в статусе pending — требуется ручное согласование.
    ────────────────────────────────────────────────────────────────────── */
 router.post("/reset-and-rerun", async (_req, res) => {
   try {
@@ -1530,27 +1530,9 @@ router.post("/reset-and-rerun", async (_req, res) => {
       return res.json({ ok: true, deleted: deletedCount, gapStarted: false, message: "Предложения удалены. GAP-анализ уже запущен." });
     }
 
-    res.json({ ok: true, deleted: deletedCount, gapStarted: true, message: `Удалено ${deletedCount} pending-предложений. GAP-анализ запущен, затем AI автоматически применит все предложения.` });
+    res.json({ ok: true, deleted: deletedCount, gapStarted: true, message: `Удалено ${deletedCount} pending-предложений. GAP-анализ запущен в фоне.` });
     runGapAnalysis("manual")
-      .then(async (r) => {
-        logger.info(r, "[seo-autopilot] reset-and-rerun gap done, starting auto-apply");
-        const pendingRows = await db.execute(sql`
-          SELECT id FROM seo_suggestions
-          WHERE status = 'pending'
-          ORDER BY priority_score DESC
-        `);
-        const ids = pendingRows.rows.map(row => (row as { id: number }).id);
-        logger.info({ count: ids.length }, "[seo-autopilot] auto-applying suggestions via AI");
-        for (const sugId of ids) {
-          try {
-            await applySuggestionBackground(sugId);
-            logger.info({ sugId }, "[seo-autopilot] auto-apply OK");
-          } catch (err) {
-            logger.error({ err, sugId }, "[seo-autopilot] auto-apply failed for suggestion");
-          }
-        }
-        logger.info({ total: ids.length }, "[seo-autopilot] auto-apply pipeline complete");
-      })
+      .then(r => logger.info(r, "[seo-autopilot] reset-and-rerun gap done"))
       .catch(err => logger.error({ err }, "[seo-autopilot] reset-and-rerun gap failed"));
     return;
   } catch (err) {
