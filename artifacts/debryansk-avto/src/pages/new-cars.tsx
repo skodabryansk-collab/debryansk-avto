@@ -58,11 +58,17 @@ function cleanModel(raw: string): string {
 }
 
 async function fetchNewCars(): Promise<NewCarRecord[]> {
-  const r = await fetch("/api/cars/new");
-  if (!r.ok) throw new Error(`API error: ${r.status}`);
-  const json = await r.json();
-  if (!json.ok) throw new Error(json.error ?? "Unknown error");
-  return json.data as NewCarRecord[];
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const r = await fetch("/api/cars/new", { signal: controller.signal });
+    if (!r.ok) throw new Error(`API error: ${r.status}`);
+    const json = await r.json();
+    if (!json.ok) throw new Error(json.error ?? "Unknown error");
+    return json.data as NewCarRecord[];
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function formatPrice(p: number) {
@@ -77,18 +83,39 @@ const DEALER_COLORS: Record<string, string> = {
   "Haval City": "#e8f4ff",
   "Jetour":     "#f4f0ff",
   "Soueast":    "#fff8f0",
+  "Jeland":     "#f0fff4",
 };
 
 function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [sendError, setSendError] = useState(false);
   const img = car.images.filter(Boolean)[0] ?? "";
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !isPhoneValid(phone)) return;
-    setSubmitted(true);
+    setLoading(true);
+    setSendError(false);
+    const fd = new FormData();
+    fd.append("type", "lead");
+    fd.append("name", name);
+    fd.append("phone", phone);
+    fd.append("carMark", car.mark);
+    fd.append("carModel", car.model);
+    fd.append("carYear", String(car.year));
+    fd.append("dealer", car.dealer);
+    try {
+      const res = await fetch("/api/send-email", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("server error");
+      setSubmitted(true);
+    } catch {
+      setSendError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -177,11 +204,17 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
                     />
                   </div>
                 </div>
+                {sendError && (
+                  <p className="text-red-500 text-xs text-center bg-red-50 rounded-lg py-2 px-3">
+                    Не удалось отправить заявку. Пожалуйста, позвоните нам или попробуйте ещё раз.
+                  </p>
+                )}
                 <button
                   type="submit"
-                  className="w-full brand-gradient text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity mt-1"
+                  disabled={loading}
+                  className="w-full brand-gradient text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity mt-1 disabled:opacity-60"
                 >
-                  Отправить заявку
+                  {loading ? "Отправка…" : "Отправить заявку"}
                 </button>
                 <p className="text-[10px] text-slate-400 text-center leading-snug">
                   Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности
@@ -393,11 +426,11 @@ const BODY_TYPES = [
 ];
 const TRANSMISSIONS = ["Любая", "Робот", "Автомат", "Механика", "Вариатор"];
 const DRIVES = ["Любой", "Полный", "Передний"];
-const DEALERS = ["Все дилеры", "Jaecoo", "Omoda", "Tenet", "Haval City", "Haval Pro", "Jetour", "Soueast"];
+const DEALERS = ["Все дилеры", "Jaecoo", "Omoda", "Tenet", "Haval City", "Haval Pro", "Jetour", "Soueast", "Jeland"];
 
 export default function NewCars() {
   const { favorites, compare } = useCarStorage();
-  const { data: cars = [], isLoading, isError } = useQuery<NewCarRecord[]>({
+  const { data: cars = [], isLoading, isError, refetch } = useQuery<NewCarRecord[]>({
     queryKey: ["new-cars"],
     queryFn: fetchNewCars,
     staleTime: 5 * 60 * 1000,
@@ -797,7 +830,13 @@ export default function NewCars() {
               <div className="text-center py-20 text-slate-400">
                 <Car className="w-12 h-12 mx-auto mb-4 opacity-30" />
                 <p className="font-semibold">Не удалось загрузить каталог</p>
-                <p className="text-sm mt-1">Попробуйте обновить страницу</p>
+                <p className="text-sm mt-1">Проверьте соединение и попробуйте ещё раз</p>
+                <button
+                  onClick={() => refetch()}
+                  className="mt-4 px-5 py-2 bg-[#0070b8] text-white text-sm font-semibold rounded-full hover:bg-[#005a94] transition-colors"
+                >
+                  Повторить
+                </button>
               </div>
             )}
 
@@ -854,10 +893,10 @@ export default function NewCars() {
 
       <AnimatePresence>
         {testDriveCar && (
-          <TestDriveModal car={testDriveCar} onClose={() => setTestDriveCar(null)} />
+          <TestDriveModal car={testDriveCar} dealer={testDriveCar.dealer} onClose={() => setTestDriveCar(null)} />
         )}
         {creditCar && (
-          <CreditModal car={creditCar} onClose={() => setCreditCar(null)} />
+          <CreditModal car={creditCar} dealer={creditCar.dealer} onClose={() => setCreditCar(null)} />
         )}
         {showTradeIn && (
           <TradeInModal onClose={() => setShowTradeIn(false)} />
