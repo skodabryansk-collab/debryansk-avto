@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { CTPhoneDesktop, CTPhoneMobile } from "@/components/CTPhone";
+import { sendWithRetry } from "@/lib/sendWithRetry";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -144,14 +145,11 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [sendError, setSendError] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !isPhoneValid(phone)) return;
-    setLoading(true);
-    setSendError(false);
+    setSubmitted(true);
     const fd = new FormData();
     fd.append("type", "lead");
     fd.append("name", name);
@@ -160,15 +158,7 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
     fd.append("carModel", car.model);
     fd.append("carYear", String(car.year));
     fd.append("dealer", "Супонево");
-    try {
-      const res = await fetch("/api/send-email", { method: "POST", body: fd });
-      if (!res.ok) throw new Error("server error");
-      setSubmitted(true);
-    } catch {
-      setSendError(true);
-    } finally {
-      setLoading(false);
-    }
+    sendWithRetry(fd);
   }
 
   return (
@@ -217,14 +207,9 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
                   placeholder="+7 (___) ___-__-__" required type="tel" inputMode="tel" maxLength={18}
                   className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8]" />
               </div>
-              {sendError && (
-                <p className="text-red-500 text-xs text-center bg-red-50 rounded-lg py-2 px-3">
-                  Не удалось отправить заявку. Пожалуйста, позвоните нам или попробуйте ещё раз.
-                </p>
-              )}
-              <button type="submit" disabled={loading}
-                className="w-full brand-gradient text-white font-bold rounded-xl py-3.5 text-sm disabled:opacity-60">
-                {loading ? "Отправка…" : "Отправить заявку"}
+              <button type="submit"
+                className="w-full brand-gradient text-white font-bold rounded-xl py-3.5 text-sm">
+                Отправить заявку
               </button>
               <p className="text-[10px] text-slate-400 text-center pb-2">
                 Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности
