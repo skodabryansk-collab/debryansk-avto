@@ -522,6 +522,9 @@ export async function previewMetrikaReport(): Promise<{ subject: string; html: s
   return { subject, html };
 }
 
+/* ── Deduplication guard: prevents double-sends within the same process run ── */
+const _sentDates = new Set<string>();
+
 /* ── Scheduler: 9:00 MSK = 06:00 UTC ── */
 export function scheduleMetrikaReport(): void {
   const REPORT_HOUR_UTC = 6;
@@ -547,11 +550,8 @@ export function scheduleMetrikaReport(): void {
       sendMetrikaReport()
         .then(() => logger.info("[metrika] Scheduled report sent"))
         .catch(err => logger.error({ err }, "[metrika] Scheduled report failed"));
-      setInterval(() => {
-        sendMetrikaReport()
-          .then(() => logger.info("[metrika] Scheduled report sent"))
-          .catch(err => logger.error({ err }, "[metrika] Scheduled report failed"));
-      }, 24 * 60 * 60 * 1000);
+      // Reschedule for the next day using recursive setTimeout (drift-safe)
+      scheduleNext();
     }, ms);
   }
 
