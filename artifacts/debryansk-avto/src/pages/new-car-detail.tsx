@@ -145,11 +145,31 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [sendError, setSendError] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !isPhoneValid(phone)) return;
-    setSubmitted(true);
+    setLoading(true);
+    setSendError(false);
+    const fd = new FormData();
+    fd.append("type", "lead");
+    fd.append("name", name);
+    fd.append("phone", phone);
+    fd.append("carMark", car.mark);
+    fd.append("carModel", car.model);
+    fd.append("carYear", String(car.year));
+    fd.append("dealer", car.dealer);
+    try {
+      const res = await fetch("/api/send-email", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("server error");
+      setSubmitted(true);
+    } catch {
+      setSendError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -198,9 +218,14 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
                   placeholder="+7 (___) ___-__-__" required type="tel" inputMode="tel" maxLength={18}
                   className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8]" />
               </div>
-              <button type="submit"
-                className="w-full brand-gradient text-white font-bold rounded-xl py-3.5 text-sm">
-                Отправить заявку
+              {sendError && (
+                <p className="text-red-500 text-xs text-center bg-red-50 rounded-lg py-2 px-3">
+                  Не удалось отправить заявку. Пожалуйста, позвоните нам или попробуйте ещё раз.
+                </p>
+              )}
+              <button type="submit" disabled={loading}
+                className="w-full brand-gradient text-white font-bold rounded-xl py-3.5 text-sm disabled:opacity-60">
+                {loading ? "Отправка…" : "Отправить заявку"}
               </button>
               <p className="text-[10px] text-slate-400 text-center pb-2">
                 Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности
@@ -840,9 +865,9 @@ export default function NewCarDetail() {
 
       <AnimatePresence>
         {showLead && <LeadModal car={car} onClose={() => setShowLead(false)} />}
-        {showTestDrive && <TestDriveModal car={car} onClose={() => setShowTestDrive(false)} />}
-        {showCredit && <CreditModal car={car} onClose={() => setShowCredit(false)} />}
-        {showTradeIn && <TradeInModal onClose={() => setShowTradeIn(false)} targetCar={{ mark: car.mark, model: car.model, price: car.price, isNew: true }} />}
+        {showTestDrive && <TestDriveModal car={car} dealer={car.dealer} onClose={() => setShowTestDrive(false)} />}
+        {showCredit && <CreditModal car={car} dealer={car.dealer} onClose={() => setShowCredit(false)} />}
+        {showTradeIn && <TradeInModal onClose={() => setShowTradeIn(false)} dealer={car.dealer} targetCar={{ mark: car.mark, model: car.model, price: car.price, isNew: true }} />}
       </AnimatePresence>
       <div data-prerender-ready="true" style={{ display: "none" }} />
     </Layout>
