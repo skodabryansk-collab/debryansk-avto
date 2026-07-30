@@ -538,6 +538,7 @@ function ContentPlanTab() {
         publishedAt: new Date().toISOString().slice(0, 10),
         readTime: draftForm.readTime,
         brandIds: [],
+        brandId: null,
       });
       qc.invalidateQueries({ queryKey: ["news"] });
       setPublished(draftForm.title);
