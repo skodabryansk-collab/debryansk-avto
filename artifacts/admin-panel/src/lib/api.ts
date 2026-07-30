@@ -774,6 +774,32 @@ export function getLiveOnline() {
   return api<LiveOnlineResult>("GET", "/admin/online/live");
 }
 
+/* ── SEO Content Plan ─────────────────────────────────────────────── */
+export interface ContentTopic {
+  query: string;
+  showsCount: number;
+  latestDate: string;
+  source: string;
+  covered: boolean;
+}
+
+export interface ArticleDraft {
+  title: string;
+  category: string;
+  excerpt: string;
+  content: string;
+  readTime: number;
+  slug: string;
+}
+
+export function getContentTopics() {
+  return api<{ ok: boolean; data: ContentTopic[] }>("GET", "/admin/seo/content-topics").then(r => r.data);
+}
+
+export function generateArticle(topic: string, keywords?: string[]) {
+  return api<{ ok: boolean; data: ArticleDraft }>("POST", "/admin/seo/generate-article", { topic, keywords }).then(r => r.data);
+}
+
 /* ── SEO Autopilot ────────────────────────────────────────────────────── */
 export interface SeoSuggestion {
   id: number;
