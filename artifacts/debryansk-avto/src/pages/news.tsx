@@ -13,6 +13,7 @@ interface NewsArticle {
   content: string | null;
   category: string | null;
   image: string | null;
+  imageMobile: string | null;
   publishedAt: string | null;
   readTime: number | null;
   slug: string;
@@ -43,11 +44,16 @@ function ArticleCard({ article, index }: { article: NewsArticle; index: number }
     >
       <Link href={`/news/${article.slug}`}>
         <div className={`relative overflow-hidden ${isFeatured ? "h-48 sm:h-64" : "h-40"}`}>
-          <img
-            src={article.image ?? ""}
-            alt={article.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
+          <picture>
+            {article.imageMobile && (
+              <source media="(max-width: 639px)" srcSet={article.imageMobile} />
+            )}
+            <img
+              src={article.image ?? ""}
+              alt={article.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+          </picture>
           <div className="absolute top-3 left-3">
             <span className="inline-flex items-center bg-[#0070b8]/90 text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
               {article.category ?? "Новости"}
@@ -95,12 +101,48 @@ export default function NewsPage() {
     ? newsArticles
     : newsArticles.filter(a => a.category === activeCategory);
 
+  const newsJsonLd = newsArticles.length > 0 ? [
+    {
+      "@type": "Blog",
+      "name": "Новости авторынка — Дебрянск Авто",
+      "url": "https://debryansk-auto.ru/news",
+      "description": "Актуальные новости автомобильного рынка Брянска",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Дебрянск Авто",
+        "url": "https://debryansk-auto.ru",
+      },
+      "blogPost": newsArticles.slice(0, 10).map(a => ({
+        "@type": "BlogPosting",
+        "headline": a.title,
+        "url": `https://debryansk-auto.ru/news/${a.slug}`,
+        ...(a.publishedAt ? { "datePublished": a.publishedAt } : {}),
+        ...(a.image ? { "image": a.image } : {}),
+        ...(a.excerpt ? { "description": a.excerpt } : {}),
+      })),
+    },
+    {
+      "@type": "ItemList",
+      "name": "Последние новости — Дебрянск Авто",
+      "url": "https://debryansk-auto.ru/news",
+      "numberOfItems": newsArticles.slice(0, 10).length,
+      "itemListElement": newsArticles.slice(0, 10).map((a, i) => ({
+        "@type": "ListItem",
+        "position": i + 1,
+        "name": a.title,
+        "url": `https://debryansk-auto.ru/news/${a.slug}`,
+        ...(a.publishedAt ? { "datePublished": a.publishedAt } : {}),
+      })),
+    },
+  ] as Record<string, unknown>[] : undefined;
+
   return (
     <Layout>
       <SEO
         title="Новости авторынка Брянска"
         description="Актуальные новости автомобильного рынка Брянска. Обзоры новинок, советы по покупке, финансирование и трейд-ин. Дебрянск Авто."
         canonical="/news"
+        jsonLd={newsJsonLd}
         breadcrumbs={[
           { name: "Главная", url: "/" },
           { name: "Новости", url: "/news" },
