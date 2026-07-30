@@ -55,6 +55,7 @@ import adminDbRestoreRouter from "./admin-db-restore";
 import ogImageRouter from "./og-image";
 import adminSeoAutopilotRouter from "./admin-seo-autopilot";
 import adminSeoAnchorRouter from "./admin-seo-anchor";
+import adminSeoContentRouter from "./admin-seo-content";
 import onlineRouter from "./online";
 
 const router: IRouter = Router();
@@ -105,6 +106,7 @@ router.use("/admin/seo-positions", adminSeoPositionsRouter);
 router.use("/admin/seo", adminSeoRouter);
 router.use("/admin/seo-autopilot", adminSeoAutopilotRouter);
 router.use("/admin/seo-anchor", adminSeoAnchorRouter);
+router.use("/admin/seo", adminSeoContentRouter);
 router.use("/faq", publicFaqRouter);
 router.use("/admin/faq", adminFaqRouter);
 router.use(disclaimersRouter);
