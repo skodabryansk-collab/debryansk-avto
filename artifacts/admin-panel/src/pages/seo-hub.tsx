@@ -565,10 +565,30 @@ function ContentPlanTab() {
             Поисковые запросы без статьи на сайте — каждый можно превратить в черновик за 10 секунд
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={() => refetch()} className="gap-1.5">
-          <RefreshCw className="w-3.5 h-3.5" />Обновить
-        </Button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowOnlyNiche(v => !v)}
+            className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
+              showOnlyNiche
+                ? "bg-[#0070b8]/10 border-[#0070b8]/30 text-[#0070b8]"
+                : "bg-slate-100 border-slate-200 text-slate-500"
+            }`}
+          >
+            {showOnlyNiche ? `🎯 Только нишевые (${nicheCount})` : `Все запросы (${topicsRaw.length})`}
+          </button>
+          <Button size="sm" variant="outline" onClick={() => refetch()} className="gap-1.5">
+            <RefreshCw className="w-3.5 h-3.5" />Обновить
+          </Button>
+        </div>
       </div>
+
+      {/* Webmaster filter hint */}
+      {!isLoading && filteredOut > 0 && showOnlyNiche && (
+        <p className="text-xs text-slate-400">
+          <span className="text-[#0070b8] font-medium">Вебмастер-фильтр активен</span> — отсеяно {filteredOut} нерелевантных запросов.{" "}
+          <button className="underline hover:text-slate-600" onClick={() => setShowOnlyNiche(false)}>Показать все</button>
+        </p>
+      )}
 
       {/* Published success banner */}
       {published && (
