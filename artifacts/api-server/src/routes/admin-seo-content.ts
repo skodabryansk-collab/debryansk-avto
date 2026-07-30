@@ -67,54 +67,89 @@ function isAutomotiveQuery(query: string): boolean {
   );
 }
 
-/* ── Системный промт (генерируется динамически с актуальными брендами) ── */
-function buildArticleSystem(portfolioBrands: string[]): string {
-  const brandList = portfolioBrands.length > 0
-    ? portfolioBrands.join(", ")
-    : "Haval, Volkswagen, SKODA, JAECOO, JETOUR, OMODA, Exeed, Jeland, Tenet";
+/* ── Типы данных для динамического промта ────────────────────────── */
+interface LocationFact {
+  title: string;    // "Литейная"
+  address: string;  // "г. Брянск, ул. Литейная, 3/2"
+  salesBrands: string[];
+  serviceBrands: string[];
+  hasUsedCars: boolean;
+}
+
+/* ── Системный промт — динамический факт-лист из БД ─────────────── */
+function buildArticleSystem(locations: LocationFact[]): string {
+  // Все продажные бренды (без дублей)
+  const allSales = [...new Set(locations.flatMap(l => l.salesBrands))];
+  // Все сервисные бренды
+  const allService = [...new Set(locations.flatMap(l => l.serviceBrands))];
+
+  // Строим структурированный факт-лист адресов
+  const factSheet = locations.map(l => {
+    const parts: string[] = [];
+    if (l.salesBrands.length)   parts.push(`продажи новых авто: ${l.salesBrands.join(", ")}`);
+    if (l.serviceBrands.length) parts.push(`только сервис (продаж НЕТ): ${l.serviceBrands.join(", ")}`);
+    if (l.hasUsedCars)          parts.push(`★ АВТОМОБИЛИ С ПРОБЕГОМ — только здесь`);
+    return `📍 ${l.address} (${l.title})\n   ${parts.join("\n   ")}`;
+  }).join("\n\n");
+
+  // Правила выбора адреса для AI
+  const addressRules = locations.map(l => {
+    const triggers: string[] = [];
+    l.salesBrands.forEach(b => triggers.push(b));
+    l.serviceBrands.forEach(b => triggers.push(b));
+    if (l.hasUsedCars) triggers.push("с пробегом", "б/у", "подержан", "трейд-ин", "trade-in", "выкуп");
+    if (triggers.length === 0) return null;
+    return `- Тема содержит [${triggers.join(" / ")}] → адрес: ${l.address}`;
+  }).filter(Boolean).join("\n");
 
   return `Ты опытный автожурналист, пишешь для официального дилера «Дебрянск Авто» в Брянске.
 
-ЗАДАЧА: написать статью, которую человек прочитает с интересом, а Яндекс проиндексирует как экспертный контент. Не рекламный текст — полезный материал с живым голосом автора.
+ЗАДАЧА: написать статью, которую человек прочитает с интересом, а Яндекс проиндексирует как экспертный контент. Полезный материал с живым голосом — не рекламный текст.
 
-━━━ БРЕНДЫ ПОРТФЕЛЯ ДЕБРЯНСК АВТО ━━━
-Официальные бренды дилера: ${brandList}
+━━━ ФАКТ-ЛИСТ ДЕБРЯНСК АВТО (точные данные, не придумывай) ━━━
 
-КРИТИЧЕСКИ ВАЖНО:
-- Если упоминаешь конкретный бренд автомобиля — он ДОЛЖЕН быть из списка выше
-- НЕ называй Toyota, Hyundai, KIA, Nissan, Renault, Lada, Honda, Mazda, Ford и любые другие марки не из портфеля
-- Для общих примеров используй «автомобиль», «машина», «кроссовер» — без указания бренда
-- Haval City / Haval Pro → пиши просто «Haval» без суббренда
-- Названия моделей кириллицей с заглавной: Джолион, Дарго, Дашинг, Тигго (не ДЖОЛИОН)
+${factSheet}
 
-━━━ КОНТЕКСТ ДИЛЕРСКОГО ЦЕНТРА ━━━
-Официальный дилер «Дебрянск Авто» в Брянске, несколько точек:
-- ул. Литейная, 3/2
-- ул. Советская, 77
-- с. Супонево, ул. Шоссейная, 12Г
-- пр. Московский, 2Г
+━━━ БРЕНДЫ ПОРТФЕЛЯ ━━━
+Продажи новых авто: ${allSales.join(", ")}
+Только сервис (без продаж): ${allService.join(", ")}
 
-В статье ОБЯЗАТЕЛЬНО:
-1. Упомяни «Дебрянск Авто» хотя бы один раз — естественно, в контексте
-2. В финальном абзаце добавь приглашение с одним конкретным адресом
+КРИТИЧЕСКИ ВАЖНО ПО БРЕНДАМ:
+• Упоминаешь бренд автомобиля → ТОЛЬКО из списка выше
+• Haval City и Haval Pro → пиши просто «Haval»
+• НЕ называй: Toyota, Hyundai, KIA, Nissan, Renault, Lada, Honda, Mazda, Ford и любые другие бренды не из портфеля
+• Для общих примеров используй «автомобиль», «машина», «кроссовер» — без бренда
+• Модели кириллицей с заглавной: Джолион, Дарго, Дашинг, Тигго (не ДЖОЛИОН)
+• Сервисные бренды (Volkswagen, SKODA, Exeed, Mercedes-Benz) — упоминай ТОЛЬКО в контексте сервиса/ТО, не продаж
+
+━━━ ПРАВИЛО ВЫБОРА АДРЕСА ━━━
+Выбери ОДИН конкретный адрес для финального абзаца по теме статьи:
+${addressRules}
+- Общая тема про сервис/ремонт без конкретного бренда → ул. Литейная, 3/2
+- Если бренд не упоминается → ул. Литейная, 3/2 как основной адрес
+НЕ ПРИДУМЫВАЙ адреса. Используй только те, что в факт-листе выше.
+
+━━━ ОБЯЗАТЕЛЬНО В КАЖДОЙ СТАТЬЕ ━━━
+1. «Дебрянск Авто» — упомяни хотя бы раз естественно, в контексте
+2. Финальный абзац — приглашение с точным адресом (по правилу выше)
 
 ━━━ СТИЛЬ ━━━
-✓ Начни с конкретного факта или ситуации — НЕ с общего утверждения
-✓ Один главный тезис на абзац
+✓ Начни с конкретного факта или ситуации — НЕ с «В мире современных автомобилей...»
+✓ Один главный тезис на абзац, без перечисления всего подряд
 ✓ Чередуй длинные и короткие предложения
 ✓ Детали и цифры делают текст живым (кроме цен и ставок)
 ✓ Активный залог, говори как другу который выбирает машину
 
 ━━━ ЗАПРЕЩЕНО ━━━
 ✗ Клише: «В мире современных...», «Сегодня всё больше людей...», «Не секрет, что...»
-✗ Переходы-паразиты: «Также важно отметить», «Кроме того», «При этом», «Именно поэтому»
+✗ Паразиты: «Также важно отметить», «Кроме того», «При этом», «Именно поэтому»
 ✗ Штампы: «В заключение хочется отметить», «Таким образом», «Подводя итоги»
 ✗ Слова: «данный», «осуществить», «в рамках», «на сегодняшний день»
 ✗ Мусор: «широкий выбор», «выгодные условия», «команда профессионалов», «обращайтесь»
 ✗ Конкретные цены, ставки, количество авто в наличии
-✗ Бренды НЕ из портфеля (см. выше)
+✗ Любые бренды НЕ из портфеля
 
-Структура: зацепка (1 абзац) + 3–4 содержательных абзаца + финал с адресом (1 абзац).
+Структура: зацепка (1 абзац) + 3–4 содержательных абзаца + финал с правильным адресом (1 абзац).
 Абзацы через \\n\\n.`;
 }
 
@@ -227,21 +262,54 @@ router.post("/generate-article", async (req, res) => {
     return res.status(400).json({ ok: false, error: "topic is required" });
   }
 
-  // Загружаем актуальный портфель брендов из БД
-  let portfolioBrands: string[] = [];
+  // Загружаем факт-лист локаций с брендами из БД
+  let locationFacts: LocationFact[] = [];
   try {
-    const brandsRaw = await db.execute(sql`
-      SELECT name FROM brands WHERE is_active = true ORDER BY name
+    const locRows = await db.execute(sql`
+      SELECT
+        l.title        AS loc_title,
+        l.address,
+        l.sort_order,
+        b.name         AS brand_name,
+        b.is_service_only,
+        lb.is_service  AS is_service_at_loc
+      FROM locations l
+      LEFT JOIN location_brands lb ON lb.location_id = l.id
+      LEFT JOIN brands b ON b.id = lb.brand_id AND b.is_active = true
+      ORDER BY l.sort_order, lb.sort_order
     `);
-    portfolioBrands = (brandsRaw.rows as { name: string }[])
-      .map(r => r.name)
-      // Убираем служебные записи типа "С пробегом"
-      .filter(n => !["С пробегом", "Tenet Plus"].includes(n));
-  } catch {
-    // fallback — продолжаем с дефолтным списком в buildArticleSystem
+
+    // Группируем по локации
+    const locMap = new Map<string, LocationFact>();
+    for (const r of locRows.rows as {
+      loc_title: string; address: string; sort_order: number;
+      brand_name: string | null; is_service_only: boolean; is_service_at_loc: boolean;
+    }[]) {
+      if (!locMap.has(r.loc_title)) {
+        locMap.set(r.loc_title, {
+          title: r.loc_title,
+          address: r.address,
+          salesBrands: [],
+          serviceBrands: [],
+          hasUsedCars: r.loc_title === "Супонево",
+        });
+      }
+      if (!r.brand_name) continue;
+      const fact = locMap.get(r.loc_title)!;
+      const displayName = ["Haval City", "Haval Pro"].includes(r.brand_name)
+        ? "Haval" : r.brand_name;
+      if (r.is_service_only || r.is_service_at_loc) {
+        if (!fact.serviceBrands.includes(displayName)) fact.serviceBrands.push(displayName);
+      } else {
+        if (!fact.salesBrands.includes(displayName)) fact.salesBrands.push(displayName);
+      }
+    }
+    locationFacts = [...locMap.values()];
+  } catch (e) {
+    logger.warn({ e }, "[seo-content] failed to load location facts, using fallback");
   }
 
-  const systemPrompt = buildArticleSystem(portfolioBrands);
+  const systemPrompt = buildArticleSystem(locationFacts);
 
   // Смежные запросы из Вебмастера — дают AI контекст реальных поисковых интентов
   const relatedLine = relatedQueries.length > 0
