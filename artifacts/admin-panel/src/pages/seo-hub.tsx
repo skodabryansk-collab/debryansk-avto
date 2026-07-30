@@ -1,16 +1,18 @@
 /**
- * SEO Центр — единый хаб, объединяющий 5 вкладок:
- * 1. Автопилот      — рекомендации GAP-анализа (перенесено из seo-autopilot.tsx)
- * 2. Позиции        — Яндекс.Вебмастер снапшоты (перенесено из seo-positions.tsx)
- * 3. Аудит кэша     — метатеги и prerender-кэш (перенесено из seo.tsx)
- * 4. Анкорные запросы — целевые позиции (новая вкладка)
- * 5. Петля Карпаты  — оценка применённых рекомендаций (новая вкладка)
+ * SEO Центр — единый хаб, объединяющий 6 вкладок:
+ * 1. Автопилот      — рекомендации GAP-анализа
+ * 2. Позиции        — Яндекс.Вебмастер снапшоты
+ * 3. Аудит кэша     — метатеги и prerender-кэш
+ * 4. Анкорные запросы — целевые позиции
+ * 5. Петля Карпаты  — оценка применённых рекомендаций
+ * 6. Контент-план   — AI-черновики статей из Wordstat-запросов
  */
 import React, { useState } from "react";
 import {
   Zap, TrendingUp, Search, Link2, RotateCcw,
   Plus, Trash2, Edit3, CheckCircle2, X,
   ArrowUp, ArrowDown, Sparkles, FileText, ExternalLink, Eye,
+  Newspaper, Loader2, Wand2, CheckCheck, RefreshCw,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +20,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 
 import SeoAutopilotPage from "./seo-autopilot";
 import SeoPositionsPage from "./seo-positions";
@@ -26,7 +33,9 @@ import SeoPage from "./seo";
 import {
   getAnchorQueries, createAnchorQuery, deleteAnchorQuery,
   suggestAnchorQueries, getSeoAutopilotSuggestions,
+  getContentTopics, generateArticle, createNews,
   type AnchorQuery, type AnchorSuggestion, type SeoSuggestion,
+  type ContentTopic, type ArticleDraft,
 } from "@/lib/api";
 
 /* ── Tab definition ─────────────────────────────────────────────────── */
@@ -36,6 +45,7 @@ const TABS = [
   { id: "cache",     label: "Аудит кэша",          icon: Search,     badge: null },
   { id: "anchors",   label: "Анкорные запросы",    icon: Link2,      badge: null },
   { id: "loop",      label: "Петля Карпаты",       icon: RotateCcw,  badge: null },
+  { id: "content",   label: "Контент-план",        icon: Newspaper,  badge: null },
 ] as const;
 type TabId = typeof TABS[number]["id"];
 
@@ -482,6 +492,224 @@ function KarpathyLoopTab() {
   );
 }
 
+/* ── ContentPlanTab ──────────────────────────────────────────────────── */
+function ContentPlanTab() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  const [generatingFor, setGeneratingFor] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ArticleDraft | null>(null);
+  const [draftForm, setDraftForm] = useState<ArticleDraft | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [published, setPublished] = useState<string | null>(null); // topic that was just published
+
+  const { data: topics = [], isLoading, refetch } = useQuery({
+    queryKey: ["seo-content-topics"],
+    queryFn: getContentTopics,
+    staleTime: 5 * 60_000,
+  });
+
+  const handleGenerate = async (topic: ContentTopic) => {
+    setGeneratingFor(topic.query);
+    setPublished(null);
+    try {
+      const result = await generateArticle(topic.query);
+      setDraft(result);
+      setDraftForm({ ...result });
+    } catch (e: unknown) {
+      toast({ title: "Ошибка генерации", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setGeneratingFor(null);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!draftForm) return;
+    setPublishing(true);
+    try {
+      await createNews({
+        title: draftForm.title,
+        excerpt: draftForm.excerpt,
+        content: draftForm.content,
+        category: draftForm.category,
+        image: "",
+        imageMobile: "",
+        slug: draftForm.slug,
+        publishedAt: new Date().toISOString().slice(0, 10),
+        readTime: draftForm.readTime,
+        brandIds: [],
+      });
+      qc.invalidateQueries({ queryKey: ["news"] });
+      setPublished(draftForm.title);
+      setDraft(null);
+      setDraftForm(null);
+      toast({ title: "Статья опубликована!", description: "Откройте «Новости» для редактирования изображения." });
+    } catch (e: unknown) {
+      toast({ title: "Ошибка публикации", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const uncovered = topics.filter(t => !t.covered);
+  const covered   = topics.filter(t => t.covered);
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800">Контент-план</h2>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Поисковые запросы без статьи на сайте — каждый можно превратить в черновик за 10 секунд
+          </p>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => refetch()} className="gap-1.5">
+          <RefreshCw className="w-3.5 h-3.5" />Обновить
+        </Button>
+      </div>
+
+      {/* Published success banner */}
+      {published && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800">
+          <CheckCheck className="w-4 h-4 shrink-0" />
+          <span>«{published}» опубликована. Добавьте обложку в разделе <strong>Новости</strong>.</span>
+          <button className="ml-auto" onClick={() => setPublished(null)}><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
+
+      {/* Loading */}
+      {isLoading && (
+        <div className="space-y-2">
+          {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
+        </div>
+      )}
+
+      {/* No wordstat data */}
+      {!isLoading && topics.length === 0 && (
+        <div className="text-center py-16 text-slate-400">
+          <Newspaper className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p className="font-semibold text-slate-600">Нет данных Wordstat</p>
+          <p className="text-sm mt-1">Запустите синхронизацию во вкладке <strong>Автопилот → Запустить Wordstat</strong></p>
+        </div>
+      )}
+
+      {/* Topics without coverage */}
+      {!isLoading && uncovered.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            Без статьи — {uncovered.length} запросов
+          </p>
+          <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+            {uncovered.map(t => (
+              <div key={t.query} className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-slate-50 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-800 truncate">{t.query}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{Number(t.showsCount).toLocaleString("ru-RU")} показов · {t.source}</p>
+                </div>
+                <Button
+                  size="sm"
+                  className="shrink-0 bg-[#0070b8] hover:bg-[#005a94] gap-1.5 h-8"
+                  disabled={generatingFor === t.query}
+                  onClick={() => handleGenerate(t)}
+                >
+                  {generatingFor === t.query
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Генерация…</>
+                    : <><Wand2 className="w-3.5 h-3.5" />Создать черновик</>
+                  }
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Topics with coverage (collapsed) */}
+      {!isLoading && covered.length > 0 && (
+        <details className="group">
+          <summary className="text-xs font-semibold text-slate-400 uppercase tracking-wide cursor-pointer select-none hover:text-slate-600">
+            Уже есть статья — {covered.length} запросов ▸
+          </summary>
+          <div className="mt-2 divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+            {covered.map(t => (
+              <div key={t.query} className="flex items-center gap-3 px-4 py-3 bg-slate-50">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-slate-500 truncate">{t.query}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{Number(t.showsCount).toLocaleString("ru-RU")} показов</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {/* Draft dialog */}
+      <Dialog open={!!draft} onOpenChange={open => { if (!open) { setDraft(null); setDraftForm(null); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#0070b8]" />
+              Черновик статьи
+            </DialogTitle>
+          </DialogHeader>
+          {draftForm && (
+            <div className="space-y-3">
+              <div>
+                <Label>Заголовок</Label>
+                <Input value={draftForm.title} onChange={e => setDraftForm(f => f ? { ...f, title: e.target.value } : f)} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Категория</Label>
+                  <Input value={draftForm.category} onChange={e => setDraftForm(f => f ? { ...f, category: e.target.value } : f)} />
+                </div>
+                <div>
+                  <Label>Время чтения (мин)</Label>
+                  <Input type="number" value={draftForm.readTime} min={1} max={10}
+                    onChange={e => setDraftForm(f => f ? { ...f, readTime: Number(e.target.value) } : f)} />
+                </div>
+              </div>
+              <div>
+                <Label>Slug (URL)</Label>
+                <Input value={draftForm.slug} onChange={e => setDraftForm(f => f ? { ...f, slug: e.target.value } : f)}
+                  className="font-mono text-sm" />
+              </div>
+              <div>
+                <Label>Анонс</Label>
+                <Textarea rows={2} value={draftForm.excerpt}
+                  onChange={e => setDraftForm(f => f ? { ...f, excerpt: e.target.value } : f)} />
+              </div>
+              <div>
+                <Label>Содержание</Label>
+                <Textarea rows={10} value={draftForm.content}
+                  onChange={e => setDraftForm(f => f ? { ...f, content: e.target.value } : f)}
+                  className="text-sm font-mono resize-y" />
+              </div>
+              <p className="text-xs text-slate-400">
+                После публикации добавьте изображение в разделе <strong>Новости</strong>.
+              </p>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setDraft(null); setDraftForm(null); }}>Отмена</Button>
+            <Button
+              className="bg-[#0070b8] hover:bg-[#005a94] gap-1.5"
+              onClick={handlePublish}
+              disabled={publishing}
+            >
+              {publishing
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Публикуется…</>
+                : <><FileText className="w-3.5 h-3.5" />Опубликовать статью</>
+              }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 /* ── SeoHubPage ──────────────────────────────────────────────────────── */
 export default function SeoHubPage() {
   const [tab, setTab] = useState<TabId>("autopilot");
@@ -509,6 +737,7 @@ export default function SeoHubPage() {
         {tab === "cache"     && <SeoPage />}
         {tab === "anchors"   && <AnchorQueriesTab />}
         {tab === "loop"      && <KarpathyLoopTab />}
+        {tab === "content"   && <ContentPlanTab />}
       </div>
     </div>
   );
