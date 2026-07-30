@@ -503,6 +503,7 @@ function ContentPlanTab() {
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState<string | null>(null);
   const [showOnlyNiche, setShowOnlyNiche] = useState(true);
+  const [currentTopic, setCurrentTopic] = useState<ContentTopic | null>(null);
 
   const { data: topicsRaw = [], isLoading, refetch } = useQuery({
     queryKey: ["seo-content-topics"],
@@ -516,7 +517,10 @@ function ContentPlanTab() {
 
   const handleGenerate = async (topic: ContentTopic) => {
     setGeneratingFor(topic.query);
+    setCurrentTopic(topic);
     setPublished(null);
+    setDraft(null);
+    setDraftForm(null);
     try {
       const result = await generateArticle(topic.query);
       setDraft(result);
@@ -724,12 +728,25 @@ function ContentPlanTab() {
               </p>
             </div>
           )}
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 flex-wrap">
             <Button variant="outline" onClick={() => { setDraft(null); setDraftForm(null); }}>Отмена</Button>
+            {currentTopic && (
+              <Button
+                variant="outline"
+                className="gap-1.5 text-slate-600"
+                disabled={!!generatingFor || publishing}
+                onClick={() => currentTopic && handleGenerate(currentTopic)}
+              >
+                {generatingFor
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Генерация…</>
+                  : <><RefreshCw className="w-3.5 h-3.5" />Перегенерировать</>
+                }
+              </Button>
+            )}
             <Button
               className="bg-[#0070b8] hover:bg-[#005a94] gap-1.5"
               onClick={handlePublish}
-              disabled={publishing}
+              disabled={publishing || !!generatingFor}
             >
               {publishing
                 ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Публикуется…</>
