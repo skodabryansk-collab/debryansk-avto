@@ -630,7 +630,14 @@ function ContentPlanTab() {
             {uncovered.map(t => (
               <div key={t.query} className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-slate-50 transition-colors">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800 truncate">{t.query}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-sm font-medium text-slate-800 truncate">{t.query}</p>
+                    {t.webmasterConfirmed && (
+                      <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        📍 в городе
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-400 mt-0.5">{Number(t.showsCount).toLocaleString("ru-RU")} показов · {t.source}</p>
                 </div>
                 <Button
