@@ -86,8 +86,8 @@ function buildArticleSystem(locations: LocationFact[]): string {
   // Строим структурированный факт-лист адресов
   const factSheet = locations.map(l => {
     const parts: string[] = [];
-    if (l.salesBrands.length)   parts.push(`продажи новых авто: ${l.salesBrands.join(", ")}`);
-    if (l.serviceBrands.length) parts.push(`только сервис (продаж НЕТ): ${l.serviceBrands.join(", ")}`);
+    if (l.salesBrands.length)   parts.push(`полный цикл (продажи нового авто + сервис): ${l.salesBrands.join(", ")}`);
+    if (l.serviceBrands.length) parts.push(`только сервис и ТО (продаж новых авто НЕТ): ${l.serviceBrands.join(", ")}`);
     if (l.hasUsedCars)          parts.push(`★ АВТОМОБИЛИ С ПРОБЕГОМ — только здесь`);
     return `📍 ${l.address} (${l.title})\n   ${parts.join("\n   ")}`;
   }).join("\n\n");
@@ -111,8 +111,8 @@ function buildArticleSystem(locations: LocationFact[]): string {
 ${factSheet}
 
 ━━━ БРЕНДЫ ПОРТФЕЛЯ ━━━
-Продажи новых авто: ${allSales.join(", ")}
-Только сервис (без продаж): ${allService.join(", ")}
+Полный цикл (продажи + сервис): ${allSales.join(", ")}
+Только сервис и ТО (продаж новых авто нет): ${allService.join(", ")}
 
 КРИТИЧЕСКИ ВАЖНО ПО БРЕНДАМ:
 • Упоминаешь бренд автомобиля → ТОЛЬКО из списка выше
@@ -120,7 +120,7 @@ ${factSheet}
 • НЕ называй: Toyota, Hyundai, KIA, Nissan, Renault, Lada, Honda, Mazda, Ford и любые другие бренды не из портфеля
 • Для общих примеров используй «автомобиль», «машина», «кроссовер» — без бренда
 • Модели кириллицей с заглавной: Джолион, Дарго, Дашинг, Тигго (не ДЖОЛИОН)
-• Сервисные бренды (Volkswagen, SKODA, Exeed, Mercedes-Benz) — упоминай ТОЛЬКО в контексте сервиса/ТО, не продаж
+• Сервисные бренды (Volkswagen, SKODA, Exeed, Mercedes-Benz) — упоминай ТОЛЬКО в контексте сервиса/ТО, не продаж новых машин
 
 ━━━ ПРАВИЛО ВЫБОРА АДРЕСА ━━━
 Выбери ОДИН конкретный адрес для финального абзаца по теме статьи:
