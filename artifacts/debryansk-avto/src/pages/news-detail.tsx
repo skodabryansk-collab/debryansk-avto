@@ -13,6 +13,7 @@ interface NewsArticle {
   content: string | null;
   category: string | null;
   image: string | null;
+  imageMobile: string | null;
   publishedAt: string | null;
   readTime: number | null;
   slug: string;
@@ -153,11 +154,16 @@ export default function NewsDetailPage() {
           {/* Cover image */}
           {article.image && (
             <div className="relative rounded-2xl overflow-hidden mb-6">
-              <img
-                src={article.image}
-                alt={article.title}
-                className="w-full h-48 sm:h-80 object-cover"
-              />
+              <picture>
+                {article.imageMobile && (
+                  <source media="(max-width: 639px)" srcSet={article.imageMobile} />
+                )}
+                <img
+                  src={article.image}
+                  alt={article.title}
+                  className="w-full h-48 sm:h-80 object-cover"
+                />
+              </picture>
             </div>
           )}
 
