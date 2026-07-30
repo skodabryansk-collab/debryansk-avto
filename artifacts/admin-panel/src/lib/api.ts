@@ -766,6 +766,14 @@ export function getMetrikaOnline() {
   return api<MetrikaOnlineResult>("GET", "/admin/metrika/online");
 }
 
+export interface LiveOnlineResult {
+  ok: boolean;
+  online: number;
+}
+export function getLiveOnline() {
+  return api<LiveOnlineResult>("GET", "/admin/online/live");
+}
+
 /* ── SEO Autopilot ────────────────────────────────────────────────────── */
 export interface SeoSuggestion {
   id: number;
@@ -784,6 +792,8 @@ export interface SeoSuggestion {
   verified_at: string | null;
   verification_log: string | null;
   result_delta: number | null;
+  generated_by: "ai" | "template" | null;
+  reject_reason: string | null;
   // Петля Карпаты evaluation fields
   snapshot_before: { position: number | null; clicks: number | null; date: string; queryCount: number } | null;
   evaluate_at: string | null;
@@ -874,8 +884,8 @@ export function applySeoSuggestion(id: number) {
   return api<{ ok: boolean; message: string }>("POST", `/admin/seo-autopilot/suggestions/${id}/apply`);
 }
 
-export function rejectSeoSuggestion(id: number) {
-  return api<{ ok: boolean }>("POST", `/admin/seo-autopilot/suggestions/${id}/reject`);
+export function rejectSeoSuggestion(id: number, reason?: string) {
+  return api<{ ok: boolean }>("POST", `/admin/seo-autopilot/suggestions/${id}/reject`, reason ? { reason } : undefined);
 }
 
 export function getSeoAutopilotAlerts() {
@@ -933,4 +943,22 @@ export function getGapRuns(params?: { limit?: number; offset?: number }) {
 export interface FaqPreviewItem { modelTerm: string; question: string; answer: string; }
 export function getSuggestionPreview(id: number) {
   return api<{ ok: boolean; faqs: FaqPreviewItem[] }>("GET", `/admin/seo-autopilot/suggestions/${id}/preview`);
+}
+
+export interface CleanupDuplicateFaqsResult {
+  ok: boolean;
+  dry_run: boolean;
+  wouldDelete?: number;
+  deleted?: number;
+  rows?: { id: number; page_slug: string; question: string; reason: string }[];
+  groups?: { pageSlug: string; canonicalKey: string; keptVariant: string; deletedVariant: string; deletedCount: number }[];
+  affectedPages: string[];
+}
+
+export function cleanupDuplicateModelFaqs(dryRun = false) {
+  return api<CleanupDuplicateFaqsResult>("POST", "/admin/seo-autopilot/cleanup-duplicate-model-faqs", { dry_run: dryRun });
+}
+
+export function resetAndRerunGap() {
+  return api<{ ok: boolean; deleted: number; gapStarted: boolean; message: string }>("POST", "/admin/seo-autopilot/reset-and-rerun");
 }
