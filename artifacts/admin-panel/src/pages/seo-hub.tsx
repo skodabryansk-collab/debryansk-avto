@@ -501,13 +501,18 @@ function ContentPlanTab() {
   const [draft, setDraft] = useState<ArticleDraft | null>(null);
   const [draftForm, setDraftForm] = useState<ArticleDraft | null>(null);
   const [publishing, setPublishing] = useState(false);
-  const [published, setPublished] = useState<string | null>(null); // topic that was just published
+  const [published, setPublished] = useState<string | null>(null);
+  const [showOnlyNiche, setShowOnlyNiche] = useState(true);
 
-  const { data: topics = [], isLoading, refetch } = useQuery({
+  const { data: topicsRaw = [], isLoading, refetch } = useQuery({
     queryKey: ["seo-content-topics"],
     queryFn: getContentTopics,
     staleTime: 5 * 60_000,
   });
+
+  const topics = showOnlyNiche ? topicsRaw.filter(t => t.nicheRelevant) : topicsRaw;
+  const nicheCount  = topicsRaw.filter(t => t.nicheRelevant).length;
+  const filteredOut = topicsRaw.length - nicheCount;
 
   const handleGenerate = async (topic: ContentTopic) => {
     setGeneratingFor(topic.query);
