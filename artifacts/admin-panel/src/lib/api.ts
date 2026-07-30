@@ -781,6 +781,7 @@ export interface ContentTopic {
   latestDate: string;
   source: string;
   covered: boolean;
+  nicheRelevant: boolean;
 }
 
 export interface ArticleDraft {
