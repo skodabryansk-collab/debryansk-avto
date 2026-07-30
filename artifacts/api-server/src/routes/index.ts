@@ -55,9 +55,11 @@ import adminDbRestoreRouter from "./admin-db-restore";
 import ogImageRouter from "./og-image";
 import adminSeoAutopilotRouter from "./admin-seo-autopilot";
 import adminSeoAnchorRouter from "./admin-seo-anchor";
+import onlineRouter from "./online";
 
 const router: IRouter = Router();
 
+router.use(onlineRouter);
 router.use(ogImageRouter);
 router.use(healthRouter);
 router.use(chatRouter);
