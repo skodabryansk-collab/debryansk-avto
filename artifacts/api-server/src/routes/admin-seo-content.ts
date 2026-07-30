@@ -15,12 +15,57 @@ router.use(requireAdmin);
 
 const ARTICLE_MODEL = "openai/gpt-4.1-mini";
 
-/* ── Стоп-слова для нишевого словаря ─────────────────────────────── */
+/* ── Автомобильные стеммы (первичный фильтр ниши) ─────────────────
+   Запрос считается нишевым если хотя бы одно его слово попадает в список.
+   Используем точные слова + стеммы (startsWith) для русской морфологии.
+──────────────────────────────────────────────────────────────────── */
+
+/** Точные слова — короткие термины которые должны совпадать целиком */
+const AUTO_EXACT = new Set([
+  // Базовые
+  "авто","машина","машину","машины","машине","автомобиль","автомобиля","автомобили",
+  // Типы кузова
+  "седан","купе","кабриолет","пикап","минивэн","фургон",
+  // Финансирование
+  "кредит","кредита","кредите","лизинг","лизинга","рассрочка","рассрочку",
+  // Специфика
+  "дилер","дилера","дилеров","дилере",
+  // Бренды (короткие)
+  "kia","byd","vw","vaz","лада","нива","гранта","веста","ларгус","datsun","tank",
+]);
+
+/** Стеммы — запрос содержит слово начинающееся с этой строки */
+const AUTO_STEMS = [
+  // Общие автотермины
+  "автомобил", "автосалон", "автосервис", "автодилер", "автоцентр", "автохим",
+  "автокредит", "автолизинг", "автострахов",
+  // Типы кузова / привода
+  "кроссовер", "хэтчбек", "внедорожник", "электромобил", "гибрид",
+  // Обслуживание
+  "техобслуж", "шиномонтаж", "запчаст", "тест-драйв", "тестдрайв",
+  "трейд-ин", "трейдин",
+  // Бренды которые продаёт дилер
+  "haval", "chery", "geely", "volkswagen", "skoda",
+  // Популярные бренды б/у рынка
+  "hyundai", "toyota", "nissan", "renault", "honda", "mazda", "mitsubishi",
+  "subaru", "suzuki", "changan", "omoda", "exeed", "jetour", "jaecoo",
+  // Русские бренды/модели
+  "дебрянск", // брендовые запросы
+];
+
 const STOPWORDS = new Set([
   "и","в","на","для","с","по","от","к","или","не","как","что","из","за","до",
-  "а","но","то","же","бы","ли","при","об","до","их","его","её","всё","был",
+  "а","но","то","же","бы","ли","при","об","их","его","её","всё","был",
   "где","так","уже","ещё","если","чем","когда","под","над","без","со","во",
 ]);
+
+function isAutomotiveQuery(query: string): boolean {
+  const words = query.toLowerCase().split(/[\s,.\-–—/]+/).filter(w => w.length >= 2);
+  return words.some(w =>
+    AUTO_EXACT.has(w) ||
+    AUTO_STEMS.some(stem => w.startsWith(stem))
+  );
+}
 
 /* ── Дилерские адреса и компания (вшиты в промт) ─────────────────── */
 const DEALER_CONTEXT = `
@@ -71,39 +116,41 @@ ${DEALER_CONTEXT}
 /* ── GET /admin/seo/content-topics ─────────────────────────────────── */
 router.get("/content-topics", async (_req, res) => {
   try {
-    // 1. Строим нишевый словарь из Яндекс.Вебмастера (реальные запросы пользователей)
-    const webmasterRaw = await db.execute(sql`
-      SELECT DISTINCT query_text
-      FROM seo_query_snapshots
-      WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM seo_query_snapshots)
-      LIMIT 2000
-    `);
-    const nicheVocab = new Set<string>();
+    // 1. Webmaster — строим словарь для проверки «подтверждён в городе»
+    //    Это вторичный сигнал: запрос видел реальный трафик на нашем сайте
+    const [webmasterRaw, topicsRaw, newsRaw] = await Promise.all([
+      db.execute(sql`
+        SELECT DISTINCT query_text
+        FROM seo_query_snapshots
+        WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM seo_query_snapshots)
+        LIMIT 2000
+      `),
+      db.execute(sql`
+        SELECT
+          query,
+          MAX(shows_count)   AS shows_count,
+          MAX(snapshot_date) AS latest_date,
+          source
+        FROM wordstat_snapshots
+        WHERE shows_count > 0
+        GROUP BY query, source
+        ORDER BY MAX(shows_count) DESC
+        LIMIT 150
+      `),
+      db.execute(sql`SELECT title FROM news ORDER BY published_at DESC LIMIT 300`),
+    ]);
+
+    // Вебмастер: набор всех запросов (нормализованных) для быстрого поиска
+    const webmasterSet = new Set<string>();
+    const webmasterVocab = new Set<string>(); // отдельные слова
     for (const row of webmasterRaw.rows as { query_text: string }[]) {
+      webmasterSet.add(row.query_text.toLowerCase().trim());
       for (const word of row.query_text.toLowerCase().split(/\s+/)) {
-        if (word.length >= 3 && !STOPWORDS.has(word)) nicheVocab.add(word);
+        if (word.length >= 4 && !STOPWORDS.has(word)) webmasterVocab.add(word);
       }
     }
-    const hasWebmasterData = nicheVocab.size > 0;
 
-    // 2. Топ Wordstat-запросов
-    const topicsRaw = await db.execute(sql`
-      SELECT
-        query,
-        MAX(shows_count)   AS shows_count,
-        MAX(snapshot_date) AS latest_date,
-        source
-      FROM wordstat_snapshots
-      WHERE shows_count > 0
-      GROUP BY query, source
-      ORDER BY MAX(shows_count) DESC
-      LIMIT 100
-    `);
-
-    // 3. Существующие новости для проверки покрытия
-    const newsRaw = await db.execute(sql`
-      SELECT title FROM news ORDER BY published_at DESC LIMIT 300
-    `);
+    // 2. Покрытие существующими статьями
     const newsTitles = (newsRaw.rows as { title: string }[])
       .map(n => n.title.toLowerCase());
 
@@ -113,32 +160,50 @@ router.get("/content-topics", async (_req, res) => {
       return newsTitles.some(t => words.filter(w => t.includes(w)).length >= 2);
     }
 
-    // 4. Нишевая релевантность: запрос пересекается с Вебмастер-словарём
-    function isNicheRelevant(query: string): boolean {
-      if (!hasWebmasterData) return true; // если нет данных Вебмастера — пропускаем фильтр
+    // 3. «Подтверждён Вебмастером» — запрос или его близкий вариант есть в реальном трафике
+    function isWebmasterConfirmed(query: string): boolean {
+      if (webmasterSet.size === 0) return false;
+      if (webmasterSet.has(query.toLowerCase().trim())) return true;
+      // Нечёткое совпадение: ≥2 значимых слова из запроса есть в вебмастер-словаре
       const words = query.toLowerCase().split(/\s+/)
-        .filter(w => w.length >= 3 && !STOPWORDS.has(w));
+        .filter(w => w.length >= 4 && !STOPWORDS.has(w));
       if (words.length === 0) return false;
-      const matches = words.filter(w => nicheVocab.has(w)).length;
-      // Хотя бы одно значимое слово должно быть в словаре ниши
-      return matches >= 1;
+      return words.filter(w => webmasterVocab.has(w)).length >= Math.min(2, words.length);
     }
 
     const data = (topicsRaw.rows as {
       query: string; shows_count: string; latest_date: string; source: string;
-    }[]).map(r => ({
-      query: r.query,
-      showsCount: Number(r.shows_count),
-      latestDate: r.latest_date,
-      source: r.source,
-      covered: isCovered(r.query),
-      nicheRelevant: isNicheRelevant(r.query),
-    }));
+    }[])
+      .map(r => ({
+        query: r.query,
+        showsCount: Number(r.shows_count),
+        latestDate: r.latest_date,
+        source: r.source,
+        covered: isCovered(r.query),
+        // PRIMARY FILTER: только автомобильная тематика
+        nicheRelevant: isAutomotiveQuery(r.query),
+        // SECONDARY SIGNAL: этот запрос уже приносит трафик на наш сайт
+        webmasterConfirmed: isWebmasterConfirmed(r.query),
+      }))
+      // Сортировка: вебмастер-подтверждённые вперёд, потом по частотности
+      .sort((a, b) => {
+        if (a.webmasterConfirmed !== b.webmasterConfirmed)
+          return a.webmasterConfirmed ? -1 : 1;
+        return b.showsCount - a.showsCount;
+      });
+
+    const nicheTotal = data.filter(d => d.nicheRelevant).length;
+    const filteredOut = data.length - nicheTotal;
 
     return res.json({
       ok: true,
       data,
-      meta: { hasWebmasterData, nicheVocabSize: nicheVocab.size },
+      meta: {
+        hasWebmasterData: webmasterSet.size > 0,
+        webmasterQueryCount: webmasterSet.size,
+        nicheTotal,
+        filteredOut,
+      },
     });
   } catch (err) {
     logger.error({ err }, "[seo-content] content-topics failed");
