@@ -782,6 +782,7 @@ export interface ContentTopic {
   source: string;
   covered: boolean;
   nicheRelevant: boolean;
+  webmasterConfirmed: boolean;
 }
 
 export interface ArticleDraft {
