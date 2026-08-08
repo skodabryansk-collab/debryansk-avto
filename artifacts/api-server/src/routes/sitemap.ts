@@ -49,51 +49,59 @@ async function buildSitemap(): Promise<string> {
   const today = new Date().toISOString().slice(0, 10);
   const urls: string[] = [];
 
+  // Track every loc emitted to prevent duplicates across all sections
+  const emittedLocs = new Set<string>();
+
+  function emitUrl(loc: string, opts: Parameters<typeof url>[1] = {}): void {
+    if (emittedLocs.has(loc)) return;
+    emittedLocs.add(loc);
+    urls.push(url(loc, opts));
+  }
+
   // Static hardcoded pages
-  const staticLocs = new Set(STATIC_PAGES.map(p => p.loc));
   for (const page of STATIC_PAGES) {
-    urls.push(url(page.loc, { lastmod: today, changefreq: page.changefreq, priority: page.priority }));
+    emitUrl(page.loc, { lastmod: today, changefreq: page.changefreq, priority: page.priority });
   }
 
   // Extra pages approved via SEO Autopilot (durable, from DB)
+  // Deduplication is handled by emitUrl — any loc already covered by the dynamic
+  // sections below (brands, cars, news, landings) will be silently skipped.
   for (const row of extraResult.rows as { loc: string; changefreq: string; priority: string }[]) {
-    if (!staticLocs.has(row.loc)) {
-      urls.push(url(row.loc, { lastmod: today, changefreq: row.changefreq, priority: row.priority }));
-    }
+    emitUrl(row.loc, { lastmod: today, changefreq: row.changefreq, priority: row.priority });
   }
 
   for (const row of carsResult.rows as { external_id: string; type: string; synced_at: string }[]) {
     const path = row.type === "new" ? "/new-cars" : "/cars";
     const enc = encodeURIComponent(row.external_id);
-    urls.push(url(`${path}/${enc}`, {
+    emitUrl(`${path}/${enc}`, {
       lastmod: fmt(row.synced_at),
       changefreq: "weekly",
       priority: "0.7",
-    }));
+    });
   }
 
   for (const row of newsResult.rows as { slug: string; updated_at: string }[]) {
-    urls.push(url(`/news/${row.slug}`, {
+    emitUrl(`/news/${row.slug}`, {
       lastmod: fmt(row.updated_at),
       changefreq: "monthly",
       priority: "0.6",
-    }));
+    });
   }
 
   for (const row of brandsResult.rows as { slug: string }[]) {
-    urls.push(url(`/brands/${row.slug}`, {
+    emitUrl(`/brands/${row.slug}`, {
       lastmod: today,
       changefreq: "weekly",
       priority: "0.8",
-    }));
+    });
   }
 
   for (const row of landingResult.rows as { slug: string; updated_at: string }[]) {
-    urls.push(url(`/p/${row.slug}`, {
+    emitUrl(`/p/${row.slug}`, {
       lastmod: fmt(row.updated_at),
       changefreq: "weekly",
       priority: "0.7",
-    }));
+    });
   }
 
   return [
