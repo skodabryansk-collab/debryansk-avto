@@ -38,10 +38,11 @@ function url(loc: string, opts: { lastmod?: string; changefreq?: string; priorit
 }
 
 async function buildSitemap(): Promise<string> {
-  const [carsResult, newsResult, brandsResult] = await Promise.all([
+  const [carsResult, newsResult, brandsResult, landingResult] = await Promise.all([
     db.execute(sql`SELECT external_id, type, synced_at FROM cars ORDER BY synced_at DESC`),
     db.execute(sql`SELECT slug, updated_at FROM news ORDER BY updated_at DESC`),
     db.execute(sql`SELECT slug FROM brands WHERE slug IS NOT NULL AND slug != 's-probegom' ORDER BY name`),
+    db.execute(sql`SELECT slug, updated_at FROM seo_landing_pages WHERE is_published = true ORDER BY updated_at DESC`).catch(() => ({ rows: [] })),
   ]);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -77,6 +78,14 @@ async function buildSitemap(): Promise<string> {
     }));
   }
 
+  for (const row of landingResult.rows as { slug: string; updated_at: string }[]) {
+    urls.push(url(`/p/${row.slug}`, {
+      lastmod: fmt(row.updated_at),
+      changefreq: "weekly",
+      priority: "0.7",
+    }));
+  }
+
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
@@ -95,6 +104,27 @@ const FAKE_SITEMAPS = [
   "/sitemap2.xml",
   "/wp-sitemap.xml",
 ];
+
+/**
+ * Add a URL to STATIC_PAGES at runtime and reset the sitemap cache.
+ * Used by the SEO Autopilot when a 'sitemap' suggestion is approved.
+ * Returns true if the URL was newly added, false if it was already present.
+ */
+export function addSitemapPage(
+  loc: string,
+  opts: { changefreq?: string; priority?: string } = {},
+): boolean {
+  const normalized = loc.startsWith("/") ? loc : `/${loc}`;
+  const already = STATIC_PAGES.some(p => p.loc === normalized);
+  if (already) return false;
+  STATIC_PAGES.push({
+    loc: normalized,
+    changefreq: opts.changefreq ?? "weekly",
+    priority: opts.priority ?? "0.7",
+  });
+  cache = null; // invalidate so next request rebuilds
+  return true;
+}
 
 export function registerSitemapRoute(app: Express): void {
   const key = getIndexNowKey();
