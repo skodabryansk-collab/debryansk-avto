@@ -720,6 +720,7 @@ export async function runMigration() {
         UNIQUE (query, snapshot_date, source)
       )
     `);
+    await db.execute(sql`ALTER TABLE wordstat_snapshots ADD COLUMN IF NOT EXISTS is_partial BOOLEAN NOT NULL DEFAULT false`);
 
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS seo_suggestions (
@@ -752,6 +753,12 @@ export async function runMigration() {
     await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS evaluation_result TEXT`);
     await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS evaluation_note  TEXT`);
     await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS content_draft    TEXT`);
+
+    // Anchor-query priority boost flag (idempotent)
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS is_anchor_boosted BOOLEAN NOT NULL DEFAULT false`);
+
+    // Manager last login timestamp
+    await db.execute(sql`ALTER TABLE managers ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ`);
 
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS seo_anchor_queries (
@@ -788,7 +795,140 @@ export async function runMigration() {
         updated_at        TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+
+    // DB-layer meta overrides — written by SEO Autopilot apply for non-brand pages;
+    // read by seoMeta.resolveMeta() before falling back to STATIC_META config.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS page_seo_overrides (
+        route             TEXT PRIMARY KEY,
+        meta_title        TEXT,
+        meta_description  TEXT,
+        updated_at        TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // AI-generated SEO landing pages served at /p/:slug
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS seo_landing_pages (
+        id               SERIAL PRIMARY KEY,
+        slug             TEXT UNIQUE NOT NULL,
+        route            TEXT UNIQUE NOT NULL,
+        meta_title       TEXT,
+        meta_description TEXT,
+        h1               TEXT,
+        paragraphs       JSONB DEFAULT '[]',
+        faq_items        JSONB DEFAULT '[]',
+        is_published     BOOLEAN NOT NULL DEFAULT false,
+        created_at       TIMESTAMPTZ DEFAULT NOW(),
+        updated_at       TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
     logger.info("SEO Autopilot tables ready (idempotent)");
+
+    // ── AI Image Studio tables ─────────────────────────────────────────────────
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS ai_image_sessions (
+        id           SERIAL PRIMARY KEY,
+        title        TEXT NOT NULL DEFAULT 'Новая сессия',
+        model        TEXT NOT NULL DEFAULT 'gemini/gemini-3.1-flash-image-preview',
+        admin_login  TEXT NOT NULL,
+        admin_user_id INTEGER,
+        created_at   TIMESTAMPTZ DEFAULT NOW(),
+        updated_at   TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS ai_image_messages (
+        id                  SERIAL PRIMARY KEY,
+        session_id          INTEGER NOT NULL REFERENCES ai_image_sessions(id) ON DELETE CASCADE,
+        role                TEXT NOT NULL DEFAULT 'user',
+        prompt              TEXT,
+        image_urls          JSONB DEFAULT '[]',
+        result_url          TEXT,
+        input_tokens        INTEGER DEFAULT 0,
+        input_text_tokens   INTEGER DEFAULT 0,
+        input_image_tokens  INTEGER DEFAULT 0,
+        output_tokens       INTEGER DEFAULT 0,
+        total_tokens        INTEGER DEFAULT 0,
+        error_message       TEXT,
+        created_at          TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_ai_image_messages_session ON ai_image_messages(session_id)`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS ai_brand_assets (
+        key         TEXT PRIMARY KEY,
+        url         TEXT NOT NULL,
+        instructions TEXT,
+        position    TEXT DEFAULT 'southeast',
+        size_pct    INTEGER DEFAULT 15,
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`ALTER TABLE ai_brand_assets ADD COLUMN IF NOT EXISTS position TEXT DEFAULT 'southeast'`);
+    await db.execute(sql`ALTER TABLE ai_brand_assets ADD COLUMN IF NOT EXISTS size_pct INTEGER DEFAULT 15`);
+    logger.info("ai_image_sessions + ai_image_messages + ai_brand_assets schema ready (idempotent)");
+
+    // Brand Guidelines tables
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS ai_system_prompts (
+        id          SERIAL PRIMARY KEY,
+        name        TEXT NOT NULL,
+        content     TEXT NOT NULL,
+        is_default  BOOLEAN DEFAULT FALSE,
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS ai_logo_variants (
+        id          SERIAL PRIMARY KEY,
+        name        TEXT NOT NULL,
+        url         TEXT NOT NULL,
+        created_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`ALTER TABLE ai_brand_assets ADD COLUMN IF NOT EXISTS brand TEXT`);
+    logger.info("ai_system_prompts + ai_logo_variants + ai_brand_assets.brand ready");
+
+    // Remove stale garbage landing page created by old buggy new_page logic (idempotent)
+    await db.execute(sql`DELETE FROM seo_landing_pages WHERE slug = 'novosti-i-stati'`);
+    await db.execute(sql`DELETE FROM seo_landing_pages WHERE slug = 'kontakty-i-rezhim-raboty'`);
+    logger.info("seo_landing_pages: garbage cleanup done (idempotent)");
+
+    // sitemap_extra_pages — durable storage for URLs approved via SEO Autopilot (idempotent)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS sitemap_extra_pages (
+        loc         TEXT PRIMARY KEY,
+        changefreq  TEXT NOT NULL DEFAULT 'weekly',
+        priority    TEXT NOT NULL DEFAULT '0.7',
+        added_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    logger.info("sitemap_extra_pages schema ready (idempotent)");
+
+    // reject_reason column (added with hallucination detection feature — idempotent)
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS reject_reason TEXT`);
+
+    // Reject accumulated new_page suggestions for pages that already exist on the site.
+    // The old SITE_WIDE COVERAGE code incorrectly created new_page suggestions for
+    // /, /contacts, /about, /promotions, /brands/* etc. Real new_page suggestions
+    // are only for /p/* AI landing pages. This cleans up any accumulated garbage.
+    const staleNewPageCleanup = await db.execute(sql`
+      UPDATE seo_suggestions
+      SET status = 'rejected',
+          reject_reason = 'Страница уже существует на сайте — исправлена логика GAP (миграция)',
+          updated_at = NOW()
+      WHERE type = 'new_page'
+        AND page_url NOT LIKE '/p/%'
+        AND status IN ('pending', 'applied')
+    `);
+    const staleCount = (staleNewPageCleanup as unknown as { rowCount: number }).rowCount ?? 0;
+    if (staleCount > 0) {
+      logger.info({ count: staleCount }, "seo_suggestions: rejected stale new_page records for existing pages");
+    }
 
   } catch (err) {
     logger.error({ err }, "Migration error");
