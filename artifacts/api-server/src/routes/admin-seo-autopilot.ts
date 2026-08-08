@@ -16,8 +16,10 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { logger } from "../lib/logger";
+import { spawnBrandPrerenderBySlug } from "../lib/spawnBrandPrerender";
 import { fetchWordstatSnapshot, isWordstatRunning } from "../services/wordstat";
 import { runGapAnalysis, isGapRunning_ } from "../services/seo-gap";
+import { addSitemapPage } from "./sitemap";
 /* SSG rebuild mutex — independent of Chrome/prerender availability */
 let _ssgLocked = false;
 const _ssgWaiters: Array<() => void> = [];
@@ -47,6 +49,29 @@ import {
   aiQueryToFaq, aiQueryToFaqCars, aiQueryToFaqModel,
   aiTextBlock, aiMetaDescription, saveAiExample,
 } from "../lib/seo-ai";
+import { STATIC_META } from "../middleware/seoMeta";
+import { aiGenerateLandingPage } from "../lib/seo-ai";
+
+/** Slugify a Russian/Latin string into a URL-safe slug (same rules as admin-promotions). */
+function slugifyLanding(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[а-яё]/g, c => ({"а":"a","б":"b","в":"v","г":"g","д":"d","е":"e","ё":"yo","ж":"zh","з":"z","и":"i","й":"y","к":"k","л":"l","м":"m","н":"n","о":"o","п":"p","р":"r","с":"s","т":"t","у":"u","ф":"f","х":"kh","ц":"ts","ч":"ch","ш":"sh","щ":"shch","ъ":"","ы":"y","ь":"","э":"e","ю":"yu","я":"ya"} as Record<string, string>)[c] ?? c)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+}
+
+async function uniqueLandingSlug(base: string): Promise<string> {
+  let candidate = base || "landing";
+  let suffix = 1;
+  for (;;) {
+    const rows = await db.execute(sql`SELECT id FROM seo_landing_pages WHERE slug = ${candidate} LIMIT 1`);
+    if (!rows.rows.length) return candidate;
+    suffix += 1;
+    candidate = `${base}-${suffix}`;
+  }
+}
 
 const router: IRouter = Router();
 router.use(requireAdmin);
@@ -63,6 +88,19 @@ const _MODEL_CANONICAL_ENTRIES: { key: string; display: string; variants: string
   { key: "m6",      display: "M6",      variants: ["m6", "м6"] },
   // Jetour
   { key: "dashing", display: "Dashing", variants: ["dashing", "дашинг"] },
+  // OMODA
+  { key: "omoda-c5", display: "OMODA C5", variants: ["omoda c5", "омода с5", "омода c5", "омодас5"] },
+  { key: "omoda-c7", display: "OMODA C7", variants: ["omoda c7", "омода с7", "омода c7", "омодас7"] },
+  { key: "omoda-s5", display: "OMODA S5", variants: ["omoda s5", "омода s5", "омодаs5"] },
+  // JAECOO
+  { key: "jaecoo-j6", display: "JAECOO J6", variants: ["jaecoo j6", "джаеку j6", "джейку j6"] },
+  { key: "jaecoo-j7", display: "JAECOO J7", variants: ["jaecoo j7", "джаеку j7", "джейку j7"] },
+  { key: "jaecoo-j8", display: "JAECOO J8", variants: ["jaecoo j8", "джаеку j8", "джейку j8"] },
+  // Tenet
+  { key: "tenet-arrizo", display: "Arrizo", variants: ["arrizo", "арризо"] },
+  { key: "tenet-t4l",    display: "T4L",    variants: ["t4l"] },
+  { key: "tenet-t7",     display: "T7",     variants: ["tenet t7"] },
+  { key: "tenet-t8",     display: "T8",     variants: ["tenet t8"] },
 ];
 const _canonLookup = new Map<string, { key: string; display: string }>();
 for (const e of _MODEL_CANONICAL_ENTRIES) {
@@ -121,10 +159,11 @@ router.get("/suggestions", async (req, res) => {
     const rows = await db.execute(sql`
       SELECT id, type, page_url, current_value, proposed_value, reasoning,
              priority_score, demand, position_factor, ease,
-             status, blocked_by_tech,
+             status, blocked_by_tech, is_anchor_boosted,
              applied_at, verified_at, verification_log, result_delta,
              snapshot_before, evaluate_at, evaluated_at,
              evaluation_result, evaluation_note, content_draft,
+             generated_by, reject_reason,
              created_at, updated_at
       FROM seo_suggestions
       WHERE ${whereClause}
@@ -153,7 +192,7 @@ router.post("/suggestions/:id/apply", async (req, res) => {
   if (isNaN(id)) return res.status(400).json({ ok: false, error: "Invalid id" });
 
   const row = await db.execute(sql`SELECT * FROM seo_suggestions WHERE id = ${id} LIMIT 1`);
-  const suggestion = row.rows[0] as {
+  let suggestion = row.rows[0] as {
     id: number; type: string; page_url: string;
     proposed_value: string; status: string; reasoning: string | null;
   } | undefined;
@@ -168,6 +207,16 @@ router.post("/suggestions/:id/apply", async (req, res) => {
       UPDATE seo_suggestions SET status = 'pending', verification_log = NULL, updated_at = NOW()
       WHERE id = ${id}
     `);
+  }
+
+  // Apply override if user edited the proposed value in the UI before applying
+  const overrideValue = (req.body as { overrideValue?: string }).overrideValue;
+  if (overrideValue != null && overrideValue.trim() !== "" && overrideValue !== suggestion.proposed_value) {
+    await db.execute(sql`
+      UPDATE seo_suggestions SET proposed_value = ${overrideValue}, updated_at = NOW()
+      WHERE id = ${id}
+    `);
+    suggestion = { ...suggestion, proposed_value: overrideValue };
   }
 
   // BRAND CLUSTER APPLY PIPELINE
@@ -238,46 +287,80 @@ router.post("/suggestions/:id/apply", async (req, res) => {
     return;
   }
 
-  // NEW_PAGE — generate structured ТЗ from GAP data, store in content_draft
+  // NEW_PAGE — AI-generate landing page content and publish at /p/:slug
   if (suggestion.type === "new_page") {
     const lines = (suggestion.proposed_value ?? "").split("\n").filter(Boolean);
-    const tz = [
-      `# ТЗ: Новая страница — ${suggestion.page_url}`,
-      ``,
-      `## Обоснование`,
-      suggestion.reasoning ?? "(см. reasoning)",
-      ``,
-      `## Целевые запросы`,
-      ...lines.map(l => `- ${l}`),
-      ``,
-      `## Структура страницы`,
-      `1. H1: [главный запрос] — официальный дилер | Брянск`,
-      `2. Лид-абзац: кто мы, УТП, геолокация`,
-      `3. Каталог автомобилей (фильтр по параметрам / цене)`,
-      `4. Преимущества покупки у официального дилера`,
-      `5. FAQ-блок — ответы на целевые запросы`,
-      `6. Форма обратной связи / CTA «Получить предложение»`,
-      ``,
-      `## SEO`,
-      `- Title: [Тема] в Брянске — официальный дилер | Дебрянск Авто`,
-      `- Description: Купить [Тема] у официального дилера в Брянске. Цены от ... ₽, кредит от 0%, трейд-ин.`,
-      `- URL: ${suggestion.page_url}`,
-      ``,
-      `## Требования к контенту`,
-      `- Уникальность: 100% (написать с нуля)`,
-      `- Объём: 600–800 слов основного текста + FAQ`,
-      `- Использовать ключи: ${lines.slice(0, 5).join(", ")}`,
-      `- Schema.org: Product + FAQPage`,
-    ].join("\n");
+    // Parse title and description from proposed_value
+    let proposedTitle = "";
+    let proposedDesc = "";
+    for (const line of lines) {
+      if (line.startsWith("title: ")) proposedTitle = line.slice(7).trim();
+      if (line.startsWith("desc: "))  proposedDesc  = line.slice(6).trim();
+    }
+    const keywords = lines.filter(l => !l.startsWith("title: ") && !l.startsWith("desc: "));
 
+    // Derive slug from the proposed title (or page_url as fallback)
+    const slugBase = proposedTitle
+      ? slugifyLanding(proposedTitle.replace(/\s*[|—–-].*$/, "").trim())
+      : slugifyLanding(suggestion.page_url.replace(/\//g, "-").replace(/^-/, ""));
+    const slug = await uniqueLandingSlug(slugBase || "landing");
+
+    // Mark as applied immediately so the UI shows progress
     await db.execute(sql`
       UPDATE seo_suggestions
       SET status = 'applied', applied_at = NOW(), updated_at = NOW(),
-          content_draft = ${tz},
-          verification_log = 'ТЗ сгенерировано автоматически'
+          verification_log = 'AI генерирует страницу /p/' || ${slug} || '...'
       WHERE id = ${id}
     `);
-    res.json({ ok: true, message: "ТЗ для новой страницы сгенерировано. Откройте раздел «Петля Карпаты» для просмотра." });
+    res.json({ ok: true, message: `Генерация запущена (~30 сек). Страница будет доступна по /p/${slug}` });
+
+    // Fire-and-forget background generation
+    applyNewPage(id, slug, proposedTitle, proposedDesc, keywords, suggestion.reasoning ?? "").catch(err => {
+      logger.error({ err, id }, "[seo-autopilot] applyNewPage failed");
+    });
+    return;
+  }
+
+  // META for non-brand static pages → applyStaticMeta (page_seo_overrides)
+  if (suggestion.type === "meta" && !suggestion.page_url.startsWith("/brands/")) {
+    // Only allow routes that exist in STATIC_META — others (news slugs, car IDs, etc.)
+    // have their own content-driven meta and should not be overridden via this path.
+    if (!(suggestion.page_url in STATIC_META)) {
+      return res.status(400).json({
+        ok: false,
+        error: `Маршрут ${suggestion.page_url} не является статической страницей и не поддерживает meta-override`,
+      });
+    }
+    let newTitle: string | null = null;
+    let newDesc: string | null = null;
+    for (const line of suggestion.proposed_value.split("\n")) {
+      if (line.startsWith("title: ")) { const v = line.slice(7).trim(); if (v) newTitle = v; }
+      if (line.startsWith("desc: "))  { const v = line.slice(6).trim(); if (v) newDesc  = v; }
+    }
+    if (!newTitle && !newDesc) {
+      return res.status(400).json({ ok: false, error: "Cannot parse proposed_value" });
+    }
+    await db.execute(sql`
+      UPDATE seo_suggestions SET status = 'applied', applied_at = NOW(), updated_at = NOW()
+      WHERE id = ${id}
+    `);
+    applyStaticMeta(id, newTitle, newDesc, suggestion.page_url).catch(err => {
+      logger.error({ err, id }, "[seo-autopilot] applyStaticMeta failed");
+    });
+    res.json({ ok: true, message: "Применение запущено. Верификация займёт 30–60 секунд." });
+    return;
+  }
+
+  // SITEMAP — add a missing URL to STATIC_PAGES and ping IndexNow
+  if (suggestion.type === "sitemap") {
+    await db.execute(sql`
+      UPDATE seo_suggestions SET status = 'applied', applied_at = NOW(), updated_at = NOW()
+      WHERE id = ${id}
+    `);
+    res.json({ ok: true, message: "URL добавляется в sitemap. IndexNow-пинг отправляется." });
+    applySitemap(id, suggestion.proposed_value, suggestion.page_url).catch(err => {
+      logger.error({ err, id }, "[seo-autopilot] applySitemap failed");
+    });
     return;
   }
 
@@ -355,19 +438,19 @@ function queryToFaq(query: string, brandName: string): { question: string; answe
   if (q.includes("цена") || q.includes("стоимост") || q.includes("прайс")) {
     return {
       question: `Какая цена на ${brandName} в Брянске?`,
-      answer: `Актуальные цены на ${brandName} у официального дилера Дебрянск Авто — в каталоге на сайте. Доступны специальные условия: кредит от 0%, трейд-ин, выгода по акциям. Уточните точную стоимость у менеджера.`,
+      answer: `Актуальные цены на ${brandName} у официального дилера Дебрянск Авто — в каталоге на сайте. Доступны специальные условия по кредиту, трейд-ин и скидки по акциям. Уточните точную стоимость у менеджера.`,
     };
   }
   if (q.includes("кредит") || q.includes("рассрочк") || q.includes("лизинг")) {
     return {
       question: `Можно ли купить ${brandName} в кредит в Брянске?`,
-      answer: `Да, ${brandName} доступен в кредит у официального дилера Дебрянск Авто. Ставка от 0%, первый взнос от 0%, срок до 7 лет. Одобрение онлайн за 15 минут — без визита в банк.`,
+      answer: `Да, ${brandName} доступен в кредит у официального дилера Дебрянск Авто. Действуют выгодные программы кредитования и лизинга с удобным сроком и первоначальным взносом. Уточните условия у менеджера.`,
     };
   }
   if (q.includes("трейд") || q.includes("trade")) {
     return {
       question: `Принимают ли ${brandName} по трейд-ин?`,
-      answer: `В Дебрянск Авто действует программа трейд-ин: привезите свой автомобиль на бесплатную оценку и зачтите его стоимость при покупке нового ${brandName}. Оформление занимает один день.`,
+      answer: `В Дебрянск Авто действует программа трейд-ин: привезите свой автомобиль на бесплатную оценку и зачтите его стоимость при покупке нового ${brandName}. Уточните условия у менеджера.`,
     };
   }
   if (q.includes("сервис") || q.includes("то") || q.includes("обслуж") || q.includes("ремонт")) {
@@ -394,11 +477,11 @@ function queryToFaqCars(query: string): { question: string; answer: string } {
   const q = query.toLowerCase();
   if (q.includes("авито") || q.includes("без посредник")) return {
     question: "Как купить авто с пробегом в Брянске без Авито и посредников?",
-    answer: "В Дебрянск Авто все автомобили с пробегом прошли проверку — без скрытых владельцев, залогов и ДТП. Покупайте напрямую у официального дилера: гарантия юридической чистоты, трейд-ин, кредит.",
+    answer: "В Дебрянск Авто все автомобили с пробегом прошли проверку перед продажей. Покупайте напрямую у официального дилера: прозрачная история, трейд-ин, выгодные условия кредитования.",
   };
   if (q.includes("купить авто") || q.includes("купить машин") || q.includes("куплю")) return {
     question: "Где купить автомобиль в Брянске выгодно?",
-    answer: "Дебрянск Авто — официальный дилер с пробегом в Брянске. Широкий выбор проверенных автомобилей, прозрачная история, кредит от 0%, трейд-ин по максимальной оценке.",
+    answer: "Дебрянск Авто — официальный дилер с пробегом в Брянске. Широкий выбор проверенных автомобилей, прозрачная история, выгодные программы кредитования и трейд-ин.",
   };
   if (q.includes("с пробегом")) return {
     question: "Какие автомобили с пробегом есть в наличии в Брянске?",
@@ -410,11 +493,11 @@ function queryToFaqCars(query: string): { question: string; answer: string } {
   };
   if (q.includes("цена") || q.includes("стоимост")) return {
     question: "Какова цена автомобилей с пробегом в Брянске?",
-    answer: "Цены на авто с пробегом у официального дилера Дебрянск Авто — актуальный прайс в каталоге. Доступны кредит от 0% и зачёт вашего авто по программе трейд-ин.",
+    answer: "Цены на авто с пробегом у официального дилера Дебрянск Авто — актуальный прайс в каталоге. Доступны выгодные программы кредитования и зачёт вашего авто по программе трейд-ин.",
   };
   return {
     question: "Продаются ли проверенные авто с пробегом в Брянске?",
-    answer: "Да. В Дебрянск Авто все автомобили с пробегом проходят техническую проверку перед продажей. Юридическая чистота гарантирована, доступны кредит и трейд-ин.",
+    answer: "Да. В Дебрянск Авто все автомобили с пробегом проходят техническую проверку перед продажей. Доступны выгодные условия кредитования и трейд-ин.",
   };
 }
 
@@ -426,39 +509,61 @@ async function applyCarsCluster(suggestionId: number, proposedValue: string): Pr
   let anyAiCars = false;
 
   try {
-    const queries = proposedValue.split("\n")
-      .map(l => l.replace(/\s*\(позиция[\s\d.,]+\)\s*$/, "").trim())
-      .filter(Boolean);
-
-    if (queries.length === 0) throw new Error("No queries in proposed_value");
-
     const sortRow = await db.execute(sql`
       SELECT COALESCE(MAX(sort_order), -1)::int AS max_sort FROM faqs WHERE page_slug = 'cars'
     `);
     let nextSort = ((sortRow.rows[0] as { max_sort: number } | undefined)?.max_sort ?? -1) + 1;
 
     const inserted: string[] = [];
-    for (const q of queries) {
-      const faqResult = await aiQueryToFaqCars(q, queryToFaqCars);
-      const { question, answer, generatedBy } = faqResult;
-      if (generatedBy === "ai") anyAiCars = true;
-      const existing = await db.execute(sql`
-        SELECT id FROM faqs WHERE page_slug = 'cars' AND question = ${question} LIMIT 1
-      `);
-      if (existing.rows.length > 0) continue;
-      await db.execute(sql`
-        INSERT INTO faqs (page_slug, question, answer, sort_order, is_published, include_in_schema)
-        VALUES ('cars', ${question}, ${answer}, ${nextSort}, true, true)
-      `);
-      inserted.push(question);
-      if (generatedBy === "ai") {
-        await saveAiExample("cars", "faq_cars", question, answer);
-      }
-      nextSort++;
-    }
 
-    verificationLog += `✓ FAQ добавлено: ${inserted.length} вопрос(ов) (${anyAiCars ? "AI" : "шаблон"})\n`;
-    if (inserted.length === 0) verificationLog += "⚠ Все вопросы уже существуют — дубликаты пропущены\n";
+    // Check if proposedValue is a pre-generated FAQ JSON array (user edited the preview before applying)
+    if (proposedValue.trimStart().startsWith("[")) {
+      let preGenFaqs: { question: string; answer: string }[] = [];
+      try { preGenFaqs = JSON.parse(proposedValue); } catch { /* fall through */ }
+      for (const faq of preGenFaqs) {
+        if (!faq.question || !faq.answer) continue;
+        const existing = await db.execute(sql`
+          SELECT id FROM faqs WHERE page_slug = 'cars' AND question = ${faq.question} LIMIT 1
+        `);
+        if (existing.rows.length > 0) continue;
+        await db.execute(sql`
+          INSERT INTO faqs (page_slug, question, answer, sort_order, is_published, include_in_schema)
+          VALUES ('cars', ${faq.question}, ${faq.answer}, ${nextSort}, true, true)
+        `);
+        inserted.push(faq.question);
+        nextSort++;
+      }
+      verificationLog += `✓ FAQ добавлено: ${inserted.length} вопрос(ов) (отредактировано вручную)\n`;
+      if (inserted.length === 0) verificationLog += "⚠ Все вопросы уже существуют — дубликаты пропущены\n";
+    } else {
+      const queries = proposedValue.split("\n")
+        .map(l => l.replace(/\s*\(позиция[\s\d.,]+\)\s*$/, "").trim())
+        .filter(Boolean);
+
+      if (queries.length === 0) throw new Error("No queries in proposed_value");
+
+      for (const q of queries) {
+        const faqResult = await aiQueryToFaqCars(q, queryToFaqCars);
+        const { question, answer, generatedBy } = faqResult;
+        if (generatedBy === "ai") anyAiCars = true;
+        const existing = await db.execute(sql`
+          SELECT id FROM faqs WHERE page_slug = 'cars' AND question = ${question} LIMIT 1
+        `);
+        if (existing.rows.length > 0) continue;
+        await db.execute(sql`
+          INSERT INTO faqs (page_slug, question, answer, sort_order, is_published, include_in_schema)
+          VALUES ('cars', ${question}, ${answer}, ${nextSort}, true, true)
+        `);
+        inserted.push(question);
+        if (generatedBy === "ai") {
+          await saveAiExample("cars", "faq_cars", question, answer);
+        }
+        nextSort++;
+      }
+
+      verificationLog += `✓ FAQ добавлено: ${inserted.length} вопрос(ов) (${anyAiCars ? "AI" : "шаблон"})\n`;
+      if (inserted.length === 0) verificationLog += "⚠ Все вопросы уже существуют — дубликаты пропущены\n";
+    }
 
     // SSG rebuild
     const release = await acquireSsg();
@@ -517,13 +622,6 @@ async function applyBrandCluster(
     `);
     const brandModels = modelsRow.rows.map(r => (r as { m: string }).m).filter(Boolean);
 
-    // Step 2: Parse queries from proposed_value: "query text (позиция X.X)\n..."
-    const queries = proposedValue.split("\n")
-      .map(line => line.replace(/\s*\(позиция[\s\d.,]+\)\s*$/, "").trim())
-      .filter(Boolean);
-
-    if (queries.length === 0) throw new Error("No queries found in proposed_value");
-
     // Step 3: Get current max sort_order for this page
     const sortRow = await db.execute(sql`
       SELECT COALESCE(MAX(sort_order), -1)::int AS max_sort
@@ -531,31 +629,62 @@ async function applyBrandCluster(
     `);
     let nextSort = ((sortRow.rows[0] as { max_sort: number } | undefined)?.max_sort ?? -1) + 1;
 
-    // Step 4: Insert FAQ items (skip duplicates by question)
     const inserted: string[] = [];
-    for (const query of queries) {
-      const faqResult = await aiQueryToFaq(query, brand.name, "brands/" + slug, brandModels, queryToFaq);
-      const { question, answer, generatedBy } = faqResult;
-      if (generatedBy === "ai") anyAiBrandCluster = true;
-      const existing = await db.execute(sql`
-        SELECT id FROM faqs WHERE page_slug = ${"brands/" + slug} AND question = ${question} LIMIT 1
-      `);
-      if (existing.rows.length > 0) continue; // already exists
 
-      await db.execute(sql`
-        INSERT INTO faqs (page_slug, question, answer, sort_order, is_published, include_in_schema)
-        VALUES (${"brands/" + slug}, ${question}, ${answer}, ${nextSort}, true, true)
-      `);
-      inserted.push(question);
-      if (generatedBy === "ai") {
-        await saveAiExample("brands/" + slug, "faq_brand", question, answer);
+    // Check if proposedValue is a pre-generated FAQ JSON array (user edited the preview before applying)
+    const isPreGenJson = proposedValue.trimStart().startsWith("[");
+
+    if (isPreGenJson) {
+      let preGenFaqs: { question: string; answer: string }[] = [];
+      try { preGenFaqs = JSON.parse(proposedValue); } catch { /* fall through to normal path */ }
+      for (const faq of preGenFaqs) {
+        if (!faq.question || !faq.answer) continue;
+        const existing = await db.execute(sql`
+          SELECT id FROM faqs WHERE page_slug = ${"brands/" + slug} AND question = ${faq.question} LIMIT 1
+        `);
+        if (existing.rows.length > 0) continue;
+        await db.execute(sql`
+          INSERT INTO faqs (page_slug, question, answer, sort_order, is_published, include_in_schema)
+          VALUES (${"brands/" + slug}, ${faq.question}, ${faq.answer}, ${nextSort}, true, true)
+        `);
+        inserted.push(faq.question);
+        nextSort++;
       }
-      nextSort++;
-    }
+      verificationLog += `✓ FAQ добавлено: ${inserted.length} вопрос(ов) (отредактировано вручную)\n`;
+      if (inserted.length === 0) verificationLog += "⚠ Все вопросы уже существуют — дубликаты пропущены\n";
+    } else {
+      // Step 2: Parse queries from proposed_value: "query text (позиция X.X)\n..."
+      const queries = proposedValue.split("\n")
+        .map(line => line.replace(/\s*\(позиция[\s\d.,]+\)\s*$/, "").trim())
+        .filter(Boolean);
 
-    verificationLog += `✓ FAQ добавлено: ${inserted.length} вопрос(ов) (${anyAiBrandCluster ? "AI" : "шаблон"})\n`;
-    if (inserted.length === 0) {
-      verificationLog += "⚠ Все вопросы уже существуют — дубликаты пропущены\n";
+      if (queries.length === 0) throw new Error("No queries found in proposed_value");
+
+      // Step 4: Insert FAQ items (skip duplicates by question)
+      for (const query of queries) {
+        const faqResult = await aiQueryToFaq(query, brand.name, "brands/" + slug, brandModels, queryToFaq);
+        const { question, answer, generatedBy } = faqResult;
+        if (generatedBy === "ai") anyAiBrandCluster = true;
+        const existing = await db.execute(sql`
+          SELECT id FROM faqs WHERE page_slug = ${"brands/" + slug} AND question = ${question} LIMIT 1
+        `);
+        if (existing.rows.length > 0) continue;
+
+        await db.execute(sql`
+          INSERT INTO faqs (page_slug, question, answer, sort_order, is_published, include_in_schema)
+          VALUES (${"brands/" + slug}, ${question}, ${answer}, ${nextSort}, true, true)
+        `);
+        inserted.push(question);
+        if (generatedBy === "ai") {
+          await saveAiExample("brands/" + slug, "faq_brand", question, answer);
+        }
+        nextSort++;
+      }
+
+      verificationLog += `✓ FAQ добавлено: ${inserted.length} вопрос(ов) (${anyAiBrandCluster ? "AI" : "шаблон"})\n`;
+      if (inserted.length === 0) {
+        verificationLog += "⚠ Все вопросы уже существуют — дубликаты пропущены\n";
+      }
     }
 
     // Step 5: SSG rebuild
@@ -697,17 +826,17 @@ function queryToFaqModel(
         },
         {
           question: `Сколько стоит ${bm} у официального дилера в Брянске?`,
-          answer: `Цены на ${bm} уточняйте в актуальном каталоге Дебрянск Авто или по телефону. Покупка в кредит от 0%, трейд-ин по максимальной оценке. Запишитесь на тест-драйв онлайн.`,
+          answer: `Цены на ${bm} уточняйте в актуальном каталоге Дебрянск Авто или по телефону. Доступны выгодные условия кредитования и трейд-ин. Запишитесь на тест-драйв онлайн.`,
         },
       ],
       [
         {
           question: `Где купить ${bm} у официального дилера в Брянске?`,
-          answer: `${bm} продаётся у официального дилера Дебрянск Авто в Брянске. Смотрите актуальный каталог на сайте, выбирайте комплектацию и оставляйте заявку — менеджер свяжется в течение 15 минут.`,
+          answer: `${bm} продаётся у официального дилера Дебрянск Авто в Брянске. Смотрите актуальный каталог на сайте, выбирайте комплектацию и оставляйте заявку — менеджер свяжется в ближайшее время.`,
         },
         {
           question: `Как купить ${bm} в кредит в Брянске?`,
-          answer: `Дебрянск Авто предлагает ${bm} в кредит от 0% годовых с первым взносом от 0%. Срок кредита до 7 лет, онлайн-одобрение за 15 минут — без визита в банк. Актуальные условия уточняйте у менеджера.`,
+          answer: `Дебрянск Авто предлагает ${bm} в кредит по выгодным ставкам с удобным первоначальным взносом и сроком. Онлайн-заявка рассматривается быстро — без визита в банк. Актуальные условия уточняйте у менеджера.`,
         },
       ],
       [
@@ -739,7 +868,7 @@ function queryToFaqModel(
   const NO_STOCK_QA: { question: string; answer: string }[] = [
     {
       question: `Купить ${bm} в Брянске — это возможно?`,
-      answer: `Автомобиль ${bm} доступен у официального дилера Дебрянск Авто в Брянске. Уточните актуальное наличие и цены по телефону или оставьте заявку на сайте — менеджер перезвонит в течение 15 минут.`,
+      answer: `Автомобиль ${bm} доступен у официального дилера Дебрянск Авто в Брянске. Уточните актуальное наличие и цены по телефону или оставьте заявку на сайте — менеджер свяжется в ближайшее время.`,
     },
     {
       question: `Как заказать ${bm} у официального дилера в Брянске?`,
@@ -766,6 +895,52 @@ async function applyContentBrand(
   let status: "applied" | "applied_with_errors" = "applied";
   let anyAiContent = false;
   try {
+    // Check if proposedValue is a pre-generated FAQ JSON array (user edited the preview before applying)
+    if (proposedValue.trimStart().startsWith("[")) {
+      let preGenFaqs: { question: string; answer: string; modelTerm?: string }[] = [];
+      try { preGenFaqs = JSON.parse(proposedValue); } catch { /* fall through to normal parse */ }
+      if (preGenFaqs.length > 0) {
+        const maxSortRow = await db.execute(sql`
+          SELECT COALESCE(MAX(sort_order), 0) AS max_ord FROM faqs WHERE page_slug = ${'brands/' + slug}
+        `);
+        let sortOrder = ((maxSortRow.rows[0] as { max_ord: number }).max_ord ?? 0) + 10;
+        let inserted = 0;
+        for (const faq of preGenFaqs) {
+          if (!faq.question || !faq.answer) continue;
+          await db.execute(sql`
+            INSERT INTO faqs (page_slug, question, answer, sort_order, is_published, include_in_schema)
+            VALUES (${'brands/' + slug}, ${faq.question}, ${faq.answer}, ${sortOrder}, true, true)
+            ON CONFLICT DO NOTHING
+          `);
+          sortOrder += 10;
+          inserted++;
+        }
+        verificationLog += `✓ FAQ добавлено: ${inserted} (отредактировано вручную)\n`;
+        // SSG rebuild
+        const release = await acquireSsg();
+        try {
+          const ssgScript = getSsgPath();
+          if (!ssgScript) { verificationLog += "⚠ SSG script not found\n"; status = "applied_with_errors"; }
+          else {
+            const r = spawnSync("node", [ssgScript], { cwd: process.cwd(), timeout: 45_000, encoding: "utf8" });
+            if (r.status === 0) verificationLog += "✓ SSG пересобрана\n";
+            else { verificationLog += `⚠ SSG error: ${(r.stderr || r.stdout || "").slice(0, 200)}\n`; status = "applied_with_errors"; }
+          }
+        } finally { release(); }
+        if (status === "applied") { await pingIndexNow([`${SITE}${pageUrl}`]); verificationLog += "✓ IndexNow отправлен\n"; }
+        // Prerender: brand pages are served from Puppeteer cache, not SSG
+        spawnBrandPrerenderBySlug(slug);
+        await db.execute(sql`
+          UPDATE seo_suggestions
+          SET status = ${status}, verified_at = NOW(), verification_log = ${verificationLog},
+              generated_by = 'template', updated_at = NOW()
+          WHERE id = ${suggestionId}
+        `);
+        logger.info({ suggestionId, slug, status }, "[seo-autopilot] applyContentBrand done (pre-gen)");
+        return;
+      }
+    }
+
     // Parse proposed_value: "MODEL: «query» — N показов/мес"
     const entries: { modelTerm: string; topQuery: string }[] = [];
     for (const line of proposedValue.split("\n")) {
@@ -875,6 +1050,8 @@ async function applyContentBrand(
       await pingIndexNow([`${SITE}${pageUrl}`]);
       verificationLog += "✓ IndexNow отправлен\n";
     }
+    // Prerender: brand pages are served from Puppeteer cache, not SSG
+    spawnBrandPrerenderBySlug(slug);
   } catch (err) {
     verificationLog += `✗ Ошибка: ${String(err).slice(0, 300)}\n`;
     status = "applied_with_errors";
@@ -1027,6 +1204,8 @@ async function applyBrandMeta(
     } else {
       verificationLog += "— IndexNow не отправлен (верификация не пройдена)\n";
     }
+    // Prerender: brand pages are served from Puppeteer cache, not SSG
+    spawnBrandPrerenderBySlug(slug);
 
   } catch (err) {
     verificationLog += `✗ Ошибка применения: ${String(err).slice(0, 300)}\n`;
@@ -1041,6 +1220,340 @@ async function applyBrandMeta(
   `);
 
   logger.info({ suggestionId, status, verificationLog }, "[seo-autopilot] apply pipeline done");
+}
+
+/* ── applyStaticMeta: UPSERT title/desc for non-brand pages via page_seo_overrides ── */
+async function applyStaticMeta(
+  suggestionId: number,
+  newTitle: string | null,
+  newDesc: string | null,
+  pageUrl: string,
+): Promise<void> {
+  await recordApplySnapshot(suggestionId, pageUrl);
+  let verificationLog = "";
+  let status: "applied" | "applied_with_errors" = "applied";
+
+  try {
+    // Step 1: UPSERT into page_seo_overrides.
+    // NULL values are preserved via COALESCE so partial updates (title-only or
+    // desc-only) do not blank out the field that was not provided.
+    await db.execute(sql`
+      INSERT INTO page_seo_overrides (route, meta_title, meta_description, updated_at)
+      VALUES (${pageUrl}, ${newTitle ?? null}, ${newDesc ?? null}, NOW())
+      ON CONFLICT (route) DO UPDATE SET
+        meta_title        = COALESCE(EXCLUDED.meta_title,        page_seo_overrides.meta_title),
+        meta_description  = COALESCE(EXCLUDED.meta_description,  page_seo_overrides.meta_description),
+        updated_at        = NOW()
+    `);
+    verificationLog += "✓ DB обновлена (page_seo_overrides)\n";
+
+    // Step 2: SSG rebuild
+    const release = await acquireSsg();
+    try {
+      const ssgScript = getSsgPath();
+      if (!ssgScript) {
+        verificationLog += "⚠ SSG script not found — skipping rebuild\n";
+        status = "applied_with_errors";
+      } else {
+        const result = spawnSync("node", [ssgScript], {
+          cwd: process.cwd(),
+          timeout: 45_000,
+          encoding: "utf8",
+        });
+        if (result.status === 0) {
+          verificationLog += "✓ SSG пересобрана\n";
+        } else {
+          const errMsg = (result.stderr || result.stdout || "exit code " + result.status).slice(0, 200);
+          verificationLog += `⚠ SSG rebuild error: ${errMsg}\n`;
+          status = "applied_with_errors";
+        }
+      }
+    } catch (ssgErr) {
+      verificationLog += `⚠ SSG rebuild error: ${String(ssgErr).slice(0, 200)}\n`;
+      status = "applied_with_errors";
+    } finally {
+      release();
+    }
+
+    // Step 3: Verify via curl (VPS) or SSG file (dev)
+    const fullUrl = `${SITE}${pageUrl}`;
+    let verifiedOk = false;
+    try {
+      const localUrl = `http://localhost:${process.env.PORT ?? 8080}${pageUrl}`;
+      const isVps = existsSync("/opt/debryansk");
+      let html = "";
+      if (isVps) {
+        const r = spawnSync("curl", [
+          "-s", "-A", "Googlebot/2.1 (+http://www.google.com/bot.html)",
+          "--max-time", "25", localUrl,
+        ], { timeout: 30_000, encoding: "utf8" });
+        html = r.stdout ?? "";
+        if (!html && r.status !== 0) {
+          verificationLog += `⚠ Верификация: curl код ${r.status} — считаем успехом, DB и SSG обновлены\n`;
+          verifiedOk = true;
+        }
+      } else {
+        const distPath = process.env.FRONTEND_DIST_PATH;
+        if (distPath) {
+          const filePath = pageUrl === "/"
+            ? join(distPath, "index.html")
+            : join(distPath, pageUrl.replace(/^\//, ""), "index.html");
+          if (existsSync(filePath)) {
+            const { readFileSync } = await import("fs");
+            html = readFileSync(filePath, "utf8");
+          }
+        }
+      }
+      if (!html) {
+        verificationLog += "⚠ Верификация пропущена (dev-среда без кэша)\n";
+        verifiedOk = true;
+      } else {
+        const hasTitle = newTitle ? html.includes(newTitle.slice(0, 30)) : false;
+        const hasDesc  = newDesc  ? html.includes(newDesc.slice(0, 30))  : false;
+        if (hasTitle || hasDesc) {
+          verificationLog += `✓ Верификация пройдена (${html.length}б, title: ${hasTitle ? "найден" : "—"}, desc: ${hasDesc ? "найдена" : "—"})\n`;
+          verifiedOk = true;
+        } else {
+          verificationLog += `✗ Верификация провалена: новый title/desc не найден в ответе сервера\n`;
+          status = "applied_with_errors";
+        }
+      }
+    } catch (verifyErr) {
+      verificationLog += `⚠ Ошибка верификации: ${String(verifyErr).slice(0, 150)}\n`;
+      status = "applied_with_errors";
+    }
+
+    // Step 4: IndexNow
+    if (verifiedOk && status === "applied") {
+      await pingIndexNow([fullUrl]);
+      verificationLog += "✓ IndexNow отправлен\n";
+    } else {
+      verificationLog += "— IndexNow не отправлен\n";
+    }
+
+  } catch (err) {
+    verificationLog += `✗ Ошибка применения: ${String(err).slice(0, 300)}\n`;
+    status = "applied_with_errors";
+  }
+
+  await db.execute(sql`
+    UPDATE seo_suggestions
+    SET status = ${status}, verified_at = NOW(), verification_log = ${verificationLog},
+        updated_at = NOW()
+    WHERE id = ${suggestionId}
+  `);
+  logger.info({ suggestionId, pageUrl, status }, "[seo-autopilot] applyStaticMeta done");
+}
+
+/* ── GET /landing-draft/:slug — fetch draft landing page content (admin only) ── */
+router.get("/landing-draft/:slug", async (req, res) => {
+  const { slug } = req.params;
+  if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
+    return res.status(400).json({ ok: false, error: "Invalid slug" });
+  }
+  try {
+    const result = await db.execute(sql`
+      SELECT slug, route, meta_title, meta_description, h1,
+             paragraphs, faq_items, is_published, created_at, updated_at
+      FROM seo_landing_pages WHERE slug = ${slug} LIMIT 1
+    `);
+    const row = result.rows[0] as {
+      slug: string; route: string;
+      meta_title: string | null; meta_description: string | null;
+      h1: string | null;
+      paragraphs: unknown; faq_items: unknown;
+      is_published: boolean; created_at: string; updated_at: string;
+    } | undefined;
+    if (!row) return res.status(404).json({ ok: false, error: "Not found" });
+    return res.json({
+      ok: true,
+      data: {
+        slug: row.slug,
+        route: row.route,
+        meta_title: row.meta_title ?? "",
+        meta_description: row.meta_description ?? "",
+        h1: row.h1 ?? "",
+        paragraphs: Array.isArray(row.paragraphs) ? row.paragraphs as string[] : [],
+        faq_items: Array.isArray(row.faq_items) ? row.faq_items as { q: string; a: string }[] : [],
+        is_published: row.is_published,
+        updated_at: row.updated_at,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+/* ── PATCH /landing-draft/:slug — update draft content before publishing ── */
+router.patch("/landing-draft/:slug", async (req, res) => {
+  const { slug } = req.params;
+  if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
+    return res.status(400).json({ ok: false, error: "Invalid slug" });
+  }
+  const body = req.body as {
+    h1?: string;
+    meta_title?: string;
+    meta_description?: string;
+    paragraphs?: string[];
+    faq_items?: { q: string; a: string }[];
+  };
+  try {
+    const check = await db.execute(sql`
+      SELECT id, is_published FROM seo_landing_pages WHERE slug = ${slug} LIMIT 1
+    `);
+    const row = check.rows[0] as { id: number; is_published: boolean } | undefined;
+    if (!row) return res.status(404).json({ ok: false, error: "Not found" });
+    if (row.is_published) {
+      return res.status(409).json({ ok: false, error: "Страница уже опубликована, редактирование недоступно" });
+    }
+
+    await db.execute(sql`
+      UPDATE seo_landing_pages
+      SET h1               = ${body.h1 ?? null},
+          meta_title       = ${body.meta_title ?? null},
+          meta_description = ${body.meta_description ?? null},
+          paragraphs       = ${JSON.stringify(body.paragraphs ?? [])}::jsonb,
+          faq_items        = ${JSON.stringify(body.faq_items ?? [])}::jsonb,
+          updated_at       = NOW()
+      WHERE slug = ${slug}
+    `);
+
+    logger.info({ slug }, "[seo-autopilot] Draft landing page updated");
+    return res.json({ ok: true, message: "Черновик сохранён" });
+  } catch (err) {
+    logger.error({ err, slug }, "[seo-autopilot] update landing draft failed");
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+/* ── PATCH /new-page/:slug/publish — manually publish a draft landing page ── */
+router.patch("/new-page/:slug/publish", async (req, res) => {
+  const { slug } = req.params;
+  if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
+    return res.status(400).json({ ok: false, error: "Invalid slug" });
+  }
+  try {
+    const check = await db.execute(sql`
+      SELECT id, is_published FROM seo_landing_pages WHERE slug = ${slug} LIMIT 1
+    `);
+    const row = check.rows[0] as { id: number; is_published: boolean } | undefined;
+    if (!row) return res.status(404).json({ ok: false, error: "Landing page not found" });
+    if (row.is_published) return res.json({ ok: true, message: "Уже опубликовано" });
+
+    await db.execute(sql`
+      UPDATE seo_landing_pages SET is_published = true, updated_at = NOW() WHERE slug = ${slug}
+    `);
+
+    const route = `/p/${slug}`;
+    const fullUrl = `${SITE}${route}`;
+
+    // IndexNow ping
+    try {
+      await pingIndexNow([fullUrl]);
+    } catch {
+      // non-fatal
+    }
+
+    // Prerender
+    const prerenderScript = getPrerenderPath();
+    if (prerenderScript) {
+      const { spawn } = await import("child_process");
+      const child = spawn("node", [prerenderScript, "--route", route], {
+        detached: true, stdio: "ignore", cwd: process.cwd(), env: process.env,
+      });
+      child.unref();
+    }
+
+    // Update suggestion verification_log to reflect publication
+    await db.execute(sql`
+      UPDATE seo_suggestions
+      SET verification_log = verification_log || ${'✓ Страница опубликована: ' + route + '\n'},
+          updated_at = NOW()
+      WHERE type = 'new_page' AND verification_log LIKE ${'%/p/' + slug + '%'} AND status = 'applied'
+    `);
+
+    logger.info({ slug, route }, "[seo-autopilot] Landing page published manually");
+    return res.json({ ok: true, message: `Страница опубликована: ${route}` });
+  } catch (err) {
+    logger.error({ err, slug }, "[seo-autopilot] publish landing page failed");
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+/* ── applyNewPage: AI-generate landing page and publish at /p/:slug ── */
+async function applyNewPage(
+  suggestionId: number,
+  slug: string,
+  proposedTitle: string,
+  proposedDesc: string,
+  keywords: string[],
+  reasoning: string,
+): Promise<void> {
+  const route = `/p/${slug}`;
+  let verificationLog = "";
+
+  try {
+    // Step 1: Generate content via AI
+    const pageData = await aiGenerateLandingPage(proposedTitle || reasoning, proposedDesc, keywords);
+
+    if (!pageData) {
+      // Fallback: create minimal page from proposed title/desc
+      const fallbackParagraphs = [
+        `${proposedTitle || "Официальный дилер Дебрянск Авто"} в Брянске — надёжный выбор для покупки или сервиса автомобиля. ` +
+        `Наши специалисты помогут подобрать оптимальный вариант с учётом ваших пожеланий и бюджета.`,
+        `Мы предлагаем широкую программу кредитования и трейд-ин — ваш старый автомобиль зачитается в счёт нового. ` +
+        `Оформление занимает минимум времени, все документы готовятся в день обращения.`,
+        `Сервисный центр «Дебрянск Авто» работает ежедневно. Запишитесь на консультацию или тест-драйв онлайн — ` +
+        `мы перезвоним в удобное для вас время.`,
+      ];
+      const fallbackFaq = [
+        { q: "Как записаться на консультацию?", a: "Позвоните по телефону +7 (4832) 77-77-70 или оставьте заявку на сайте — менеджер свяжется в ближайшее время." },
+        { q: "Доступен ли трейд-ин?", a: "Да, мы принимаем автомобили в трейд-ин. Бесплатная оценка на месте, зачёт стоимости при покупке нового авто." },
+        { q: "Работает ли кредитование?", a: "Да, действуют программы кредитования от ведущих банков. Уточните условия у менеджера." },
+      ];
+      await db.execute(sql`
+        INSERT INTO seo_landing_pages
+          (slug, route, meta_title, meta_description, h1, paragraphs, faq_items, is_published, updated_at)
+        VALUES
+          (${slug}, ${route}, ${proposedTitle || null}, ${proposedDesc || null},
+           ${proposedTitle || null}, ${JSON.stringify(fallbackParagraphs)},
+           ${JSON.stringify(fallbackFaq)}, false, NOW())
+        ON CONFLICT (slug) DO UPDATE SET
+          meta_title = EXCLUDED.meta_title, meta_description = EXCLUDED.meta_description,
+          h1 = EXCLUDED.h1, paragraphs = EXCLUDED.paragraphs,
+          faq_items = EXCLUDED.faq_items, is_published = false, updated_at = NOW()
+      `);
+      verificationLog += "⚠ AI не ответил — использован шаблонный контент\n";
+      verificationLog += `✓ Черновик страницы сохранён: /p/${slug}\n`;
+    } else {
+      await db.execute(sql`
+        INSERT INTO seo_landing_pages
+          (slug, route, meta_title, meta_description, h1, paragraphs, faq_items, is_published, updated_at)
+        VALUES
+          (${slug}, ${route}, ${pageData.meta_title || null}, ${pageData.meta_description || null},
+           ${pageData.h1 || null}, ${JSON.stringify(pageData.paragraphs ?? [])},
+           ${JSON.stringify(pageData.faq ?? [])}, false, NOW())
+        ON CONFLICT (slug) DO UPDATE SET
+          meta_title = EXCLUDED.meta_title, meta_description = EXCLUDED.meta_description,
+          h1 = EXCLUDED.h1, paragraphs = EXCLUDED.paragraphs,
+          faq_items = EXCLUDED.faq_items, is_published = false, updated_at = NOW()
+      `);
+      verificationLog += `✓ AI-контент сгенерирован (${pageData.paragraphs?.length ?? 0} абз., ${pageData.faq?.length ?? 0} FAQ)\n`;
+      verificationLog += `✓ Черновик страницы сохранён: /p/${slug}\n`;
+    }
+    verificationLog += "⏳ Требует ручного одобрения перед публикацией — нажмите «Опубликовать»\n";
+
+  } catch (err) {
+    verificationLog += `✗ Ошибка: ${String(err).slice(0, 300)}\n`;
+  }
+
+  // Final: update suggestion with result log and page link
+  await db.execute(sql`
+    UPDATE seo_suggestions
+    SET verification_log = ${verificationLog}, verified_at = NOW(), updated_at = NOW()
+    WHERE id = ${suggestionId}
+  `);
+  logger.info({ suggestionId, slug, route }, "[seo-autopilot] applyNewPage done");
 }
 
 /* ── applyTextBlock: добавить SEO-абзац в brand_page_content.service_text */
@@ -1126,6 +1639,8 @@ async function applyTextBlock(
       await pingIndexNow([`${SITE}${pageUrl}`]);
       verificationLog += "✓ IndexNow отправлен\n";
     }
+    // Prerender: brand pages are served from Puppeteer cache, not SSG
+    spawnBrandPrerenderBySlug(slug);
   } catch (err) {
     verificationLog += `✗ Ошибка: ${String(err).slice(0, 300)}\n`;
     status = "applied_with_errors";
@@ -1138,6 +1653,56 @@ async function applyTextBlock(
     WHERE id = ${suggestionId}
   `);
   logger.info({ suggestionId, slug, status }, "[seo-autopilot] applyTextBlock done");
+}
+
+/* ── applySitemap: добавить URL в STATIC_PAGES + сброс кэша + IndexNow ── */
+async function applySitemap(
+  suggestionId: number,
+  proposedValue: string,
+  pageUrl: string,
+): Promise<void> {
+  await recordApplySnapshot(suggestionId, pageUrl);
+
+  // Extract the URL from proposed_value (first non-empty line), fall back to page_url
+  const urlLine = proposedValue.split("\n").map(l => l.trim()).find(l => l.startsWith("/")) ?? pageUrl;
+
+  // Parse optional changefreq/priority hints from proposed_value
+  let changefreq = "weekly";
+  let priority = "0.7";
+  for (const line of proposedValue.split("\n")) {
+    if (line.startsWith("changefreq:")) changefreq = line.slice(11).trim();
+    if (line.startsWith("priority:"))   priority   = line.slice(9).trim();
+  }
+
+  const added = addSitemapPage(urlLine, { changefreq, priority });
+  const SITE = "https://debryansk-auto.ru";
+
+  let verificationLog = "";
+  let status: "applied" | "applied_with_errors" = "applied";
+
+  if (added) {
+    verificationLog = `URL ${urlLine} добавлен в sitemap. Кэш сброшен.`;
+    logger.info({ suggestionId, urlLine }, "[seo-autopilot] applySitemap: added to STATIC_PAGES");
+  } else {
+    verificationLog = `URL ${urlLine} уже присутствовал в sitemap — кэш сброшен для перестройки.`;
+    logger.info({ suggestionId, urlLine }, "[seo-autopilot] applySitemap: URL already in STATIC_PAGES");
+  }
+
+  // Ping IndexNow for the new URL
+  try {
+    await pingIndexNow([`${SITE}${urlLine}`]);
+    verificationLog += " IndexNow-пинг отправлен.";
+  } catch (err) {
+    verificationLog += ` IndexNow-пинг не удался: ${String(err)}`;
+    status = "applied_with_errors";
+  }
+
+  await db.execute(sql`
+    UPDATE seo_suggestions
+    SET status = ${status}, verified_at = NOW(), verification_log = ${verificationLog}, updated_at = NOW()
+    WHERE id = ${suggestionId}
+  `);
+  logger.info({ suggestionId, urlLine, status }, "[seo-autopilot] applySitemap done");
 }
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -1468,7 +2033,7 @@ async function applySuggestionBackground(id: number): Promise<void> {
       ``,
       `## SEO`,
       `- Title: [Тема] в Брянске — официальный дилер | Дебрянск Авто`,
-      `- Description: Купить [Тема] у официального дилера в Брянске. Цены от ... ₽, кредит от 0%, трейд-ин.`,
+      `- Description: Купить [Тема] у официального дилера в Брянске. Выгодные цены, кредит, трейд-ин.`,
       `- URL: ${suggestion.page_url}`,
       ``,
       `## Требования к контенту`,
@@ -1483,6 +2048,34 @@ async function applySuggestionBackground(id: number): Promise<void> {
           content_draft = ${tz}, verification_log = 'ТЗ сгенерировано автоматически'
       WHERE id = ${id}
     `);
+    return;
+  }
+
+  // SITEMAP — background apply
+  if (suggestion.type === "sitemap") {
+    await markApplied();
+    await applySitemap(id, suggestion.proposed_value, suggestion.page_url);
+    return;
+  }
+
+  // META for non-brand static pages → applyStaticMeta (page_seo_overrides)
+  if (suggestion.type === "meta" && !suggestion.page_url.startsWith("/brands/")) {
+    if (!(suggestion.page_url in STATIC_META)) {
+      logger.warn({ id, page_url: suggestion.page_url }, "[seo-autopilot] background: route not in STATIC_META, skipping applyStaticMeta");
+      return;
+    }
+    let newTitle: string | null = null;
+    let newDesc: string | null = null;
+    for (const line of suggestion.proposed_value.split("\n")) {
+      if (line.startsWith("title: ")) { const v = line.slice(7).trim(); if (v) newTitle = v; }
+      if (line.startsWith("desc: "))  { const v = line.slice(6).trim(); if (v) newDesc  = v; }
+    }
+    if (!newTitle && !newDesc) {
+      logger.warn({ id }, "[seo-autopilot] background applyStaticMeta: cannot parse meta proposed_value");
+      return;
+    }
+    await markApplied();
+    await applyStaticMeta(id, newTitle, newDesc, suggestion.page_url);
     return;
   }
 
@@ -1577,10 +2170,23 @@ router.get("/gap-runs", async (req, res) => {
     const limit  = Math.min(parseInt(String(req.query.limit  ?? "50"), 10), 200);
     const offset = Math.max(parseInt(String(req.query.offset ?? "0"),  10), 0);
     const rows = await db.execute(sql`
-      SELECT id, status, triggered_by, started_at, completed_at, duration_ms,
-             suggestions_created, wordstat_rows, webmaster_rows, error_message
-      FROM gap_runs
-      ORDER BY started_at DESC
+      SELECT
+        gr.id, gr.status, gr.triggered_by, gr.started_at, gr.completed_at, gr.duration_ms,
+        gr.suggestions_created, gr.wordstat_rows, gr.webmaster_rows, gr.error_message,
+        (
+          SELECT COUNT(*)::int
+          FROM seo_suggestions s
+          WHERE s.applied_at IS NOT NULL
+            AND s.applied_at >= gr.started_at
+            AND s.applied_at < COALESCE(
+              (SELECT gr2.started_at FROM gap_runs gr2
+               WHERE gr2.started_at > gr.started_at
+               ORDER BY gr2.started_at ASC LIMIT 1),
+              NOW()
+            )
+        ) AS applied_count
+      FROM gap_runs gr
+      ORDER BY gr.started_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `);
     const total = await db.execute(sql`SELECT COUNT(*)::int AS cnt FROM gap_runs`);
@@ -1595,24 +2201,34 @@ router.get("/gap-runs", async (req, res) => {
    ────────────────────────────────────────────────────────────────────── */
 router.get("/status", async (_req, res) => {
   try {
-    const countsRow = await db.execute(sql`
-      SELECT
-        COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
-        COUNT(*) FILTER (WHERE status = 'applied')::int AS applied,
-        COUNT(*) FILTER (WHERE status = 'applied_with_errors')::int AS errors,
-        COUNT(*) FILTER (WHERE status = 'rejected')::int AS rejected,
-        COUNT(*) FILTER (WHERE blocked_by_tech = true AND status = 'pending')::int AS blocked
-      FROM seo_suggestions
-    `);
-    const alertsRow = await db.execute(sql`
-      SELECT COUNT(*)::int AS unresolved FROM oauth_alerts WHERE status != 'resolved'
-    `);
+    const [countsRow, alertsRow, snapshotRow] = await Promise.all([
+      db.execute(sql`
+        SELECT
+          COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+          COUNT(*) FILTER (WHERE status = 'applied')::int AS applied,
+          COUNT(*) FILTER (WHERE status = 'applied_with_errors')::int AS errors,
+          COUNT(*) FILTER (WHERE status = 'rejected')::int AS rejected,
+          COUNT(*) FILTER (WHERE blocked_by_tech = true AND status = 'pending')::int AS blocked
+        FROM seo_suggestions
+      `),
+      db.execute(sql`
+        SELECT COUNT(*)::int AS unresolved FROM oauth_alerts WHERE status != 'resolved'
+      `),
+      db.execute(sql`
+        SELECT
+          (SELECT MAX(snapshot_date)::text FROM wordstat_snapshots) AS last_wordstat_date,
+          (SELECT MAX(snapshot_date)::text FROM seo_query_snapshots) AS last_webmaster_date
+      `),
+    ]);
+    const snap = snapshotRow.rows[0] as { last_wordstat_date: string | null; last_webmaster_date: string | null } | undefined;
     res.json({
       ok: true,
       counts: countsRow.rows[0],
       unresolvedAlerts: (alertsRow.rows[0] as { unresolved: number }).unresolved,
       wordstatRunning: isWordstatRunning(),
       gapRunning: isGapRunning_(),
+      lastWordstatDate: snap?.last_wordstat_date ?? null,
+      lastWebmasterDate: snap?.last_webmaster_date ?? null,
     });
   } catch (err) {
     res.status(500).json({ ok: false, error: String(err) });
