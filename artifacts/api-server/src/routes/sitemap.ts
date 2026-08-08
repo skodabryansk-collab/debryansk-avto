@@ -38,18 +38,28 @@ function url(loc: string, opts: { lastmod?: string; changefreq?: string; priorit
 }
 
 async function buildSitemap(): Promise<string> {
-  const [carsResult, newsResult, brandsResult, landingResult] = await Promise.all([
+  const [carsResult, newsResult, brandsResult, landingResult, extraResult] = await Promise.all([
     db.execute(sql`SELECT external_id, type, synced_at FROM cars ORDER BY synced_at DESC`),
     db.execute(sql`SELECT slug, updated_at FROM news ORDER BY updated_at DESC`),
     db.execute(sql`SELECT slug FROM brands WHERE slug IS NOT NULL AND slug != 's-probegom' ORDER BY name`),
     db.execute(sql`SELECT slug, updated_at FROM seo_landing_pages WHERE is_published = true ORDER BY updated_at DESC`).catch(() => ({ rows: [] })),
+    db.execute(sql`SELECT loc, changefreq, priority FROM sitemap_extra_pages ORDER BY added_at ASC`).catch(() => ({ rows: [] })),
   ]);
 
   const today = new Date().toISOString().slice(0, 10);
   const urls: string[] = [];
 
+  // Static hardcoded pages
+  const staticLocs = new Set(STATIC_PAGES.map(p => p.loc));
   for (const page of STATIC_PAGES) {
     urls.push(url(page.loc, { lastmod: today, changefreq: page.changefreq, priority: page.priority }));
+  }
+
+  // Extra pages approved via SEO Autopilot (durable, from DB)
+  for (const row of extraResult.rows as { loc: string; changefreq: string; priority: string }[]) {
+    if (!staticLocs.has(row.loc)) {
+      urls.push(url(row.loc, { lastmod: today, changefreq: row.changefreq, priority: row.priority }));
+    }
   }
 
   for (const row of carsResult.rows as { external_id: string; type: string; synced_at: string }[]) {
@@ -106,24 +116,28 @@ const FAKE_SITEMAPS = [
 ];
 
 /**
- * Add a URL to STATIC_PAGES at runtime and reset the sitemap cache.
- * Used by the SEO Autopilot when a 'sitemap' suggestion is approved.
- * Returns true if the URL was newly added, false if it was already present.
+ * Persist a URL to the sitemap_extra_pages DB table and update the in-memory
+ * cache. Safe to call multiple times for the same URL (idempotent via UPSERT).
+ * Always resets the XML cache so the next request rebuilds from scratch.
+ * Returns true if the row was newly inserted, false if it already existed.
  */
-export function addSitemapPage(
+export async function addSitemapPage(
   loc: string,
   opts: { changefreq?: string; priority?: string } = {},
-): boolean {
+): Promise<boolean> {
   const normalized = loc.startsWith("/") ? loc : `/${loc}`;
-  const already = STATIC_PAGES.some(p => p.loc === normalized);
-  if (already) return false;
-  STATIC_PAGES.push({
-    loc: normalized,
-    changefreq: opts.changefreq ?? "weekly",
-    priority: opts.priority ?? "0.7",
-  });
-  cache = null; // invalidate so next request rebuilds
-  return true;
+  const changefreq = opts.changefreq ?? "weekly";
+  const priority   = opts.priority   ?? "0.7";
+
+  const result = await db.execute(sql`
+    INSERT INTO sitemap_extra_pages (loc, changefreq, priority)
+    VALUES (${normalized}, ${changefreq}, ${priority})
+    ON CONFLICT (loc) DO NOTHING
+    RETURNING loc
+  `);
+
+  cache = null; // always invalidate — ensures next /sitemap.xml reflects current state
+  return result.rows.length > 0; // true = newly inserted
 }
 
 export function registerSitemapRoute(app: Express): void {
