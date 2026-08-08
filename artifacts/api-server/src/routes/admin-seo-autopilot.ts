@@ -1655,7 +1655,7 @@ async function applyTextBlock(
   logger.info({ suggestionId, slug, status }, "[seo-autopilot] applyTextBlock done");
 }
 
-/* ── applySitemap: добавить URL в STATIC_PAGES + сброс кэша + IndexNow ── */
+/* ── applySitemap: добавить URL в sitemap_extra_pages (DB) + IndexNow ── */
 async function applySitemap(
   suggestionId: number,
   proposedValue: string,
@@ -1663,38 +1663,49 @@ async function applySitemap(
 ): Promise<void> {
   await recordApplySnapshot(suggestionId, pageUrl);
 
-  // Extract the URL from proposed_value (first non-empty line), fall back to page_url
-  const urlLine = proposedValue.split("\n").map(l => l.trim()).find(l => l.startsWith("/")) ?? pageUrl;
+  const SITE_BASE = "https://debryansk-auto.ru";
 
-  // Parse optional changefreq/priority hints from proposed_value
-  let changefreq = "weekly";
-  let priority = "0.7";
-  for (const line of proposedValue.split("\n")) {
-    if (line.startsWith("changefreq:")) changefreq = line.slice(11).trim();
-    if (line.startsWith("priority:"))   priority   = line.slice(9).trim();
-  }
+  // Parse the XML snippet produced by seo-gap.ts, e.g.:
+  //   <url>
+  //     <loc>https://debryansk-auto.ru/corporate</loc>
+  //     <changefreq>weekly</changefreq>
+  //     <priority>0.8</priority>
+  //   </url>
+  // Fall back to page_url for all fields when XML is absent/malformed.
+  const locMatch        = proposedValue.match(/<loc>\s*https?:\/\/[^/]+(\/.+?)\s*<\/loc>/);
+  const changefreqMatch = proposedValue.match(/<changefreq>\s*(\S+?)\s*<\/changefreq>/);
+  const priorityMatch   = proposedValue.match(/<priority>\s*(\S+?)\s*<\/priority>/);
 
-  const added = addSitemapPage(urlLine, { changefreq, priority });
-  const SITE = "https://debryansk-auto.ru";
+  const urlPath  = locMatch        ? locMatch[1]        : pageUrl;
+  const changefreq = changefreqMatch ? changefreqMatch[1] : "weekly";
+  const priority   = priorityMatch   ? priorityMatch[1]   : "0.7";
 
   let verificationLog = "";
   let status: "applied" | "applied_with_errors" = "applied";
 
-  if (added) {
-    verificationLog = `URL ${urlLine} добавлен в sitemap. Кэш сброшен.`;
-    logger.info({ suggestionId, urlLine }, "[seo-autopilot] applySitemap: added to STATIC_PAGES");
-  } else {
-    verificationLog = `URL ${urlLine} уже присутствовал в sitemap — кэш сброшен для перестройки.`;
-    logger.info({ suggestionId, urlLine }, "[seo-autopilot] applySitemap: URL already in STATIC_PAGES");
+  try {
+    // Persist to DB (idempotent) and invalidate cache
+    const isNew = await addSitemapPage(urlPath, { changefreq, priority });
+    if (isNew) {
+      verificationLog = `URL ${urlPath} добавлен в sitemap (changefreq=${changefreq}, priority=${priority}). Кэш сброшен.`;
+      logger.info({ suggestionId, urlPath, changefreq, priority }, "[seo-autopilot] applySitemap: inserted into sitemap_extra_pages");
+    } else {
+      verificationLog = `URL ${urlPath} уже был в sitemap — кэш сброшен, IndexNow-пинг отправляется.`;
+      logger.info({ suggestionId, urlPath }, "[seo-autopilot] applySitemap: URL already in sitemap_extra_pages, cache invalidated");
+    }
+  } catch (err) {
+    verificationLog = `Ошибка записи в БД: ${String(err)}`;
+    status = "applied_with_errors";
+    logger.error({ err, suggestionId, urlPath }, "[seo-autopilot] applySitemap: DB write failed");
   }
 
-  // Ping IndexNow for the new URL
+  // Ping IndexNow regardless of whether the URL is new
   try {
-    await pingIndexNow([`${SITE}${urlLine}`]);
+    await pingIndexNow([`${SITE_BASE}${urlPath}`]);
     verificationLog += " IndexNow-пинг отправлен.";
   } catch (err) {
     verificationLog += ` IndexNow-пинг не удался: ${String(err)}`;
-    status = "applied_with_errors";
+    if (status === "applied") status = "applied_with_errors";
   }
 
   await db.execute(sql`
@@ -1702,7 +1713,7 @@ async function applySitemap(
     SET status = ${status}, verified_at = NOW(), verification_log = ${verificationLog}, updated_at = NOW()
     WHERE id = ${suggestionId}
   `);
-  logger.info({ suggestionId, urlLine, status }, "[seo-autopilot] applySitemap done");
+  logger.info({ suggestionId, urlPath, status }, "[seo-autopilot] applySitemap done");
 }
 
 /* ──────────────────────────────────────────────────────────────────────
