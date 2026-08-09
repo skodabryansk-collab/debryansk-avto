@@ -67,6 +67,8 @@
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
   --color-primary-border: var(--primary-border);
+  /* RGB channel for rgba() usage: rgba(var(--primary-rgb), opacity) */
+  --primary-rgb: 0, 112, 184;
 
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
