@@ -30,7 +30,7 @@ export function CarActionButtons({ car, className = "", vertical = false }: Prop
         onClick={e => { e.stopPropagation(); toggleCompare(car); }}
         className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
           comp
-            ? "bg-[#0070b8] text-white shadow-md shadow-[#0070b8]/20"
+            ? "bg-primary text-white shadow-md shadow-primary/20"
             : "bg-black/30 text-white hover:bg-black/50 backdrop-blur-sm"
         }`}
         title={comp ? "\u0423\u0431\u0440\u0430\u0442\u044c \u0438\u0437 \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f" : "\u0421\u0440\u0430\u0432\u043d\u0438\u0442\u044c"}
