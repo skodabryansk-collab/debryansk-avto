@@ -1113,7 +1113,7 @@ export default function BrandPage() {
         {/* Dark overlay (always present, stronger when image is set) */}
         <div className={`absolute inset-0 ${content?.heroImageUrl ? "bg-black/60" : "bg-transparent"}`} />
         {/* Decorative gradients */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(0,112,184,0.2),transparent_55%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(var(--primary-rgb),0.2),transparent_55%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(135,182,60,0.12),transparent_55%)]" />
         {/* Subtle grid pattern */}
         <div
