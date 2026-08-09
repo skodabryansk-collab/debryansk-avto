@@ -25,7 +25,7 @@ export default function PrivacyPage() {
               Настоящая Политика конфиденциальности и обработки персональных данных (далее — «Политика»)
               определяет порядок сбора, хранения, использования и защиты персональных данных пользователей
               сайта{" "}
-              <a href="https://debryansk-auto.ru" className="text-[#0070b8] hover:underline">
+              <a href="https://debryansk-auto.ru" className="text-primary hover:underline">
                 debryansk-auto.ru
               </a>{" "}
               (далее — «Сайт»).
@@ -51,11 +51,11 @@ export default function PrivacyPage() {
               <p><strong>Фактический адрес:</strong> 241050, г. Брянск, ул. Советская, д. 77</p>
               <p>
                 <strong>Телефон:</strong>{" "}
-                <CTPhone className="text-[#0070b8] hover:underline" phone="+7 (4832) 77-77-70">+7 (4832) 77-77-70</CTPhone>
+                <CTPhone className="text-primary hover:underline" phone="+7 (4832) 77-77-70">+7 (4832) 77-77-70</CTPhone>
               </p>
               <p>
                 <strong>Сайт:</strong>{" "}
-                <a href="https://debryansk-auto.ru" className="text-[#0070b8] hover:underline">
+                <a href="https://debryansk-auto.ru" className="text-primary hover:underline">
                   debryansk-auto.ru
                 </a>
               </p>
@@ -209,7 +209,7 @@ export default function PrivacyPage() {
                     <td className="border border-slate-200 px-3 py-2">Яндекс (Яндекс Метрика)</td>
                     <td className="border border-slate-200 px-3 py-2">Веб-аналитика, статистика посещаемости</td>
                     <td className="border border-slate-200 px-3 py-2">
-                      <a href="https://yandex.ru/legal/confidential" target="_blank" rel="noopener noreferrer" className="text-[#0070b8] hover:underline">yandex.ru/legal/confidential</a>
+                      <a href="https://yandex.ru/legal/confidential" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">yandex.ru/legal/confidential</a>
                     </td>
                   </tr>
                   <tr className="bg-slate-50">
@@ -226,7 +226,7 @@ export default function PrivacyPage() {
                     <td className="border border-slate-200 px-3 py-2">Replit Inc. (хостинг)</td>
                     <td className="border border-slate-200 px-3 py-2">Хостинг и инфраструктура Сайта</td>
                     <td className="border border-slate-200 px-3 py-2">
-                      <a href="https://replit.com/privacy" target="_blank" rel="noopener noreferrer" className="text-[#0070b8] hover:underline">replit.com/privacy</a>
+                      <a href="https://replit.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">replit.com/privacy</a>
                     </td>
                   </tr>
                 </tbody>
@@ -249,7 +249,7 @@ export default function PrivacyPage() {
             <p className="mt-2">
               Для реализации своих прав направьте письменное обращение по почтовому адресу Оператора
               или на электронную почту{" "}
-              <a href="mailto:info@debryansk-auto.ru" className="text-[#0070b8] hover:underline">
+              <a href="mailto:info@debryansk-auto.ru" className="text-primary hover:underline">
                 info@debryansk-auto.ru
               </a>.
               Срок рассмотрения обращения — не более 30 дней.
@@ -306,17 +306,17 @@ export default function PrivacyPage() {
               <p><strong>Адрес:</strong> 241050, г. Брянск, ул. Советская, д. 77</p>
               <p>
                 <strong>Телефон:</strong>{" "}
-                <CTPhone className="text-[#0070b8] hover:underline" phone="+7 (4832) 77-77-70">+7 (4832) 77-77-70</CTPhone>
+                <CTPhone className="text-primary hover:underline" phone="+7 (4832) 77-77-70">+7 (4832) 77-77-70</CTPhone>
               </p>
               <p>
                 <strong>Email:</strong>{" "}
-                <a href="mailto:info@debryansk-auto.ru" className="text-[#0070b8] hover:underline">
+                <a href="mailto:info@debryansk-auto.ru" className="text-primary hover:underline">
                   info@debryansk-auto.ru
                 </a>
               </p>
               <p>
                 <strong>Сайт:</strong>{" "}
-                <a href="https://debryansk-auto.ru/contacts" className="text-[#0070b8] hover:underline">
+                <a href="https://debryansk-auto.ru/contacts" className="text-primary hover:underline">
                   debryansk-auto.ru/contacts
                 </a>
               </p>
