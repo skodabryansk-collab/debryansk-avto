@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { Map as LeafletMap, Marker } from "leaflet";
+import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
 
 export interface DealerLocation {
   id: number;
@@ -18,8 +19,10 @@ interface LeafletMapProps {
   zoom?: number;
 }
 
+const DA_PRIMARY = "#0070b8";
+
 function makePinSvg(color: string, num: number) {
-  const isBlue = color === "#0070b8";
+  const isBlue = color === DA_PRIMARY;
   const grad = isBlue
     ? `<linearGradient id="g${num}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a8ad4"/><stop offset="100%" stop-color="#0058a0"/></linearGradient>`
     : `<linearGradient id="g${num}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a0d050"/><stop offset="100%" stop-color="#6a9228"/></linearGradient>`;
@@ -82,7 +85,7 @@ export function LeafletMapComponent({ locations, center = [53.237, 34.365], zoom
           .join("");
 
         const phoneHtml = loc.phone
-          ? `<a href="tel:${loc.phone}" style="display:inline-block;margin-top:10px;background:linear-gradient(135deg,#0070b8,#0058a0);color:#fff;padding:7px 18px;border-radius:10px;font-size:12px;font-weight:700;text-decoration:none">📞 Позвонить</a>`
+          ? `<a href="${phoneHref(loc.phone)}" style="display:inline-block;margin-top:10px;background:linear-gradient(135deg,${DA_PRIMARY},#0058a0);color:#fff;padding:7px 18px;border-radius:10px;font-size:12px;font-weight:700;text-decoration:none">📞 ${normalizePhone(loc.phone)}</a>`
           : "";
 
         const popup = L.popup({ maxWidth: 260, className: "da-popup" }).setContent(`
