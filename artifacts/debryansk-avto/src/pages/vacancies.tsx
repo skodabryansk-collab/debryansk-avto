@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useLocation } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft, MapPin, Clock, Briefcase, ChevronRight, X,
   Phone, User, CheckCircle, Star, GraduationCap, TrendingUp, Heart,
@@ -444,6 +444,7 @@ function fmtSalary(from?: number, to?: number) {
 
 /* ─── Apply modal ─────────────────────────────────────────────── */
 function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => void }) {
+  const prefersReduced = useReducedMotion();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [comment, setComment] = useState("");
@@ -482,7 +483,7 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <motion.div
-        initial={{ opacity: 0, y: 40 }}
+        initial={prefersReduced ? false : { opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 40 }}
         transition={{ duration: 0.25 }}
@@ -561,7 +562,7 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
               {fmtSalary(vacancy.salaryFrom, vacancy.salaryTo) && (
                 <div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Зарплата</p>
-                  <p className="text-xl font-extrabold text-[#0070b8]">{fmtSalary(vacancy.salaryFrom, vacancy.salaryTo)}</p>
+                  <p className="text-xl font-extrabold text-primary">{fmtSalary(vacancy.salaryFrom, vacancy.salaryTo)}</p>
                 </div>
               )}
 
@@ -590,7 +591,7 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
                     <ul className="space-y-1.5">
                       {block.items.map((item, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#0070b8] shrink-0 mt-1.5" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-1.5" />
                           {item}
                         </li>
                       ))}
@@ -602,7 +603,7 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
               {/* hh.ru link */}
               {vacancy.hhUrl && (
                 <a href={vacancy.hhUrl} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-xs text-slate-400 hover:text-[#0070b8] transition-colors">
+                  className="flex items-center gap-2 text-xs text-slate-400 hover:text-primary transition-colors">
                   <span className="w-4 h-4 rounded bg-[#d6001c] flex items-center justify-center text-white font-extrabold text-[8px] shrink-0">hh</span>
                   Открыть на hh.ru
                 </a>
@@ -616,7 +617,7 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input value={name} onChange={e => setName(e.target.value)} placeholder="Иван Иванов" required
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors" />
+                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary transition-colors" />
                   </div>
                 </div>
                 <div>
@@ -625,7 +626,7 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input value={phone} onChange={e => setPhone(formatPhone(e.target.value))} placeholder="+7 (___) ___-__-__" required
                       type="tel" inputMode="tel" maxLength={18}
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors" />
+                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary transition-colors" />
                   </div>
                 </div>
                 <div>
@@ -638,8 +639,8 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
                     onChange={e => setResumeFile(e.target.files?.[0] ?? null)}
                   />
                   {resumeFile ? (
-                    <div className="flex items-center gap-2 px-3 py-2.5 border border-[#0070b8]/30 bg-[#0070b8]/5 rounded-xl">
-                      <FileText className="w-4 h-4 text-[#0070b8] shrink-0" />
+                    <div className="flex items-center gap-2 px-3 py-2.5 border border-primary/30 bg-primary/5 rounded-xl">
+                      <FileText className="w-4 h-4 text-primary shrink-0" />
                       <span className="text-sm text-slate-700 truncate flex-1">{resumeFile.name}</span>
                       <button type="button" onClick={() => { setResumeFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
                         className="w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center shrink-0 transition-colors">
@@ -648,7 +649,7 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
                     </div>
                   ) : (
                     <button type="button" onClick={() => fileInputRef.current?.click()}
-                      className="w-full flex items-center justify-center gap-2 border border-dashed border-slate-300 hover:border-[#0070b8] hover:bg-[#0070b8]/5 rounded-xl py-3 text-sm text-slate-500 hover:text-[#0070b8] transition-all">
+                      className="w-full flex items-center justify-center gap-2 border border-dashed border-slate-300 hover:border-primary hover:bg-primary/5 rounded-xl py-3 text-sm text-slate-500 hover:text-primary transition-all">
                       <Paperclip className="w-4 h-4" />
                       Прикрепить резюме (PDF, DOC)
                     </button>
@@ -657,7 +658,7 @@ function ApplyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => voi
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Комментарий (необязательно)</label>
                   <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Расскажите немного о себе…" rows={3}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors resize-none" />
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary transition-colors resize-none" />
                 </div>
                 <button type="submit"
                   className="w-full brand-gradient text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity mt-1">
@@ -701,7 +702,7 @@ function VacancyCard({ vacancy, onOpen }: { vacancy: Vacancy; onOpen: () => void
 
       {/* Title */}
       <div>
-        <h3 className="text-base sm:text-lg font-extrabold text-slate-900 leading-snug group-hover:text-[#0070b8] transition-colors mb-2">
+        <h3 className="text-base sm:text-lg font-extrabold text-slate-900 leading-snug group-hover:text-primary transition-colors mb-2">
           {vacancy.title}
         </h3>
         {vacancy.description && (
@@ -722,7 +723,7 @@ function VacancyCard({ vacancy, onOpen }: { vacancy: Vacancy; onOpen: () => void
 
       {/* Salary */}
       {salary && (
-        <p className="text-lg sm:text-xl font-extrabold text-[#0070b8]">{salary}</p>
+        <p className="text-lg sm:text-xl font-extrabold text-primary">{salary}</p>
       )}
 
       {/* Actions */}
@@ -735,7 +736,7 @@ function VacancyCard({ vacancy, onOpen }: { vacancy: Vacancy; onOpen: () => void
         </button>
         <button
           onClick={onOpen}
-          className="px-3.5 py-2.5 rounded-xl border border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8] transition-colors text-slate-600"
+          className="px-3.5 py-2.5 rounded-xl border border-slate-200 hover:border-primary hover:text-primary transition-colors text-slate-600"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -746,6 +747,7 @@ function VacancyCard({ vacancy, onOpen }: { vacancy: Vacancy; onOpen: () => void
 
 /* ─── Main page ──────────────────────────────────────────────── */
 export default function Vacancies() {
+  const prefersReduced = useReducedMotion();
   const [, navigate] = useLocation();
   const [dept, setDept] = useState("Все отделы");
   const [activeVacancy, setActiveVacancy] = useState<Vacancy | null>(null);
@@ -759,7 +761,7 @@ export default function Vacancies() {
 
   // Fetch vacancies from hh.ru (browser-side, no CORS issues)
   const [hhVacancies, setHhVacancies] = useState<Vacancy[]>([]);
-  const [hhStatus, setHhStatus] = useState<"loading" | "ok" | "error">("loading");
+  const [hhStatus, setHhStatus] = useState<"loading" | "ok" | "error">("error");
 
   useEffect(() => {
     fetch("/api/hh-vacancies")
@@ -831,6 +833,7 @@ export default function Vacancies() {
 
   return (
     <Layout>
+      <div data-prerender-ready="true" style={{ display: "none" }} />
       <SEO
         title="Вакансии — Дебрянск Авто"
         description="Работа в автодилерском центре Брянска. Вакансии: менеджер, автоподборщик, автомеханик, автомойщик, директор."
@@ -887,8 +890,8 @@ export default function Vacancies() {
               <button key={d} onClick={() => setDept(d)}
                 className={`shrink-0 px-4 py-2 rounded-xl text-sm font-bold transition-all border whitespace-nowrap ${
                   dept === d
-                    ? "bg-[#0070b8] text-white border-[#0070b8] shadow-sm"
-                    : "bg-white text-slate-700 border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8]"
+                    ? "bg-primary text-white border-primary shadow-sm"
+                    : "bg-white text-slate-700 border-slate-200 hover:border-primary hover:text-primary"
                 }`}>
                 {d}
                 <span className={`ml-1.5 text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
@@ -914,7 +917,7 @@ export default function Vacancies() {
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                 {isLoading
                   ? Array.from({ length: 6 }).map((_, i) => (
-                      <div key={i} className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 animate-pulse space-y-3">
+                      <div key={i} className={`bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 space-y-3${prefersReduced ? "" : " animate-pulse"}`}>
                         <div className="flex justify-between">
                           <div className="h-5 w-20 bg-slate-100 rounded-full" />
                           <div className="h-4 w-16 bg-slate-100 rounded-full" />
@@ -938,14 +941,14 @@ export default function Vacancies() {
               </div>
 
               {/* Open application CTA */}
-              <div className="mt-12 sm:mt-16 bg-gradient-to-r from-[#0070b8] to-[#005fa0] rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-5">
+              <div className="mt-12 sm:mt-16 bg-gradient-to-r from-primary to-[#005fa0] rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-5">
                 <div>
                   <h3 className="text-white font-extrabold text-lg sm:text-xl mb-1">Не нашли подходящую вакансию?</h3>
                   <p className="text-blue-200 text-sm">Отправьте резюме — мы свяжемся при появлении подходящей позиции</p>
                 </div>
                 <button
                   onClick={() => setOpenApply(true)}
-                  className="shrink-0 bg-white text-[#0070b8] font-bold rounded-xl px-6 py-3 text-sm hover:bg-blue-50 transition-colors">
+                  className="shrink-0 bg-white text-primary font-bold rounded-xl px-6 py-3 text-sm hover:bg-blue-50 transition-colors">
                   Отправить резюме
                 </button>
               </div>
@@ -954,7 +957,7 @@ export default function Vacancies() {
             {/* Right column: HR News sidebar (desktop only) */}
             <div className="mt-14 sm:mt-20 lg:mt-0 lg:col-span-1">
               <div className="flex items-center gap-2 mb-4 lg:mb-6">
-                <Newspaper className="w-5 h-5 text-[#0070b8]" />
+                <Newspaper className="w-5 h-5 text-primary" />
                 <h2 className="text-xl font-extrabold text-slate-900">Кадровые новости</h2>
               </div>
 
@@ -962,7 +965,7 @@ export default function Vacancies() {
                 {hrNewsArticles.map((article, i) => (
                   <motion.article
                     key={article.id}
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={prefersReduced ? false : { opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, delay: i * 0.08 }}
                     className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
@@ -975,7 +978,7 @@ export default function Vacancies() {
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                       <div className="absolute top-2 left-2">
-                        <span className="inline-flex items-center bg-[#0070b8]/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        <span className="inline-flex items-center bg-primary/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                           {article.category}
                         </span>
                       </div>
@@ -988,13 +991,13 @@ export default function Vacancies() {
                         <Clock className="w-3 h-3" />
                         <span>{article.readTime} мин</span>
                       </div>
-                      <h3 className="font-bold text-sm text-slate-900 leading-snug group-hover:text-[#0070b8] transition-colors mb-2">
+                      <h3 className="font-bold text-sm text-slate-900 leading-snug group-hover:text-primary transition-colors mb-2">
                         {article.title}
                       </h3>
                       <p className="text-slate-500 leading-relaxed text-xs hidden lg:block">
                         {article.excerpt}
                       </p>
-                      <span className="inline-flex items-center gap-1 text-[#0070b8] text-[11px] font-bold mt-2 group-hover:underline">
+                      <span className="inline-flex items-center gap-1 text-primary text-[11px] font-bold mt-2 group-hover:underline">
                         Читать полностью <ArrowRight className="w-3 h-3" />
                       </span>
                     </div>
@@ -1019,7 +1022,7 @@ export default function Vacancies() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setOpenApply(false)} />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={prefersReduced ? false : { opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
@@ -1057,19 +1060,19 @@ export default function Vacancies() {
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input value={openName} onChange={e => setOpenName(e.target.value)} placeholder="Ваше имя" required
-                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8]" />
+                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary" />
                     </div>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input value={openPhone} onChange={e => setOpenPhone(formatPhone(e.target.value))} placeholder="+7 (___) ___-__-__" required
                         type="tel" inputMode="tel" maxLength={18}
-                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8]" />
+                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary" />
                     </div>
                     <input ref={openFileRef} type="file" accept=".pdf,.doc,.docx" className="hidden"
                       onChange={e => setOpenFile(e.target.files?.[0] ?? null)} />
                     {openFile ? (
-                      <div className="flex items-center gap-2 px-3 py-2.5 border border-[#0070b8]/30 bg-[#0070b8]/5 rounded-xl">
-                        <FileText className="w-4 h-4 text-[#0070b8] shrink-0" />
+                      <div className="flex items-center gap-2 px-3 py-2.5 border border-primary/30 bg-primary/5 rounded-xl">
+                        <FileText className="w-4 h-4 text-primary shrink-0" />
                         <span className="text-sm text-slate-700 truncate flex-1">{openFile.name}</span>
                         <button type="button" onClick={() => { setOpenFile(null); if (openFileRef.current) openFileRef.current.value = ""; }}
                           className="w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center shrink-0 transition-colors">
@@ -1078,7 +1081,7 @@ export default function Vacancies() {
                       </div>
                     ) : (
                       <button type="button" onClick={() => openFileRef.current?.click()}
-                        className="w-full flex items-center justify-center gap-2 border border-dashed border-slate-300 hover:border-[#0070b8] hover:bg-[#0070b8]/5 rounded-xl py-3 text-sm text-slate-500 hover:text-[#0070b8] transition-all">
+                        className="w-full flex items-center justify-center gap-2 border border-dashed border-slate-300 hover:border-primary hover:bg-primary/5 rounded-xl py-3 text-sm text-slate-500 hover:text-primary transition-all">
                         <Paperclip className="w-4 h-4" />
                         Прикрепить резюме (PDF, DOC)
                       </button>
@@ -1101,7 +1104,7 @@ export default function Vacancies() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setActiveHrNews(null)} />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={prefersReduced ? false : { opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
@@ -1121,7 +1124,7 @@ export default function Vacancies() {
                   <X className="w-4 h-4 text-slate-800" />
                 </button>
                 <div className="absolute bottom-4 left-4 right-4">
-                  <span className="inline-flex items-center bg-[#0070b8] text-white text-[10px] font-bold px-2.5 py-1 rounded-full mb-2">
+                  <span className="inline-flex items-center bg-primary text-white text-[10px] font-bold px-2.5 py-1 rounded-full mb-2">
                     {activeHrNews.category}
                   </span>
                   <h2 className="text-white font-extrabold text-lg sm:text-xl leading-tight">
@@ -1146,7 +1149,7 @@ export default function Vacancies() {
                       {paragraph.split("\n").map((line, lineIdx) => (
                         <React.Fragment key={lineIdx}>
                           {line.startsWith("• ") ? (
-                            <span className="block pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-[#0070b8] before:font-bold">
+                            <span className="block pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-primary before:font-bold">
                               {line.slice(2)}
                             </span>
                           ) : (
