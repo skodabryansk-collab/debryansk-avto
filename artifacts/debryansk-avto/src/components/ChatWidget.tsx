@@ -1901,8 +1901,8 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
         <div className="relative">
           {!open && (
             <>
-              <span className="absolute inset-0 rounded-2xl bg-primary/30 animate-ping" style={{ animationDuration: "2.5s" }} />
-              <span className="absolute inset-[-4px] rounded-2xl bg-primary/15 animate-ping" style={{ animationDuration: "2.5s", animationDelay: "0.4s" }} />
+              <span className="absolute inset-0 rounded-2xl bg-primary/30 motion-safe:animate-ping" style={{ animationDuration: "2.5s" }} />
+              <span className="absolute inset-[-4px] rounded-2xl bg-primary/15 motion-safe:animate-ping" style={{ animationDuration: "2.5s", animationDelay: "0.4s" }} />
             </>
           )}
 
