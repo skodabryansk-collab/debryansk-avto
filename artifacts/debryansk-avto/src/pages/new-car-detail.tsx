@@ -3,7 +3,7 @@ import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { sendWithRetry } from "@/lib/sendWithRetry";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft, Car, ChevronLeft, ChevronRight, Phone, User,
   CheckCircle, X, Calendar, Palette, Sparkles, Shield, CreditCard, ArrowLeftRight,
@@ -143,6 +143,7 @@ async function fetchReviewsAggregate(): Promise<{ avg: number; total: number; ov
 }
 
 function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void }) {
+  const prefersReduced = useReducedMotion();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -166,7 +167,7 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <motion.div
-        initial={{ opacity: 0, y: 40 }}
+        initial={prefersReduced ? false : { opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 40 }}
         className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md overflow-hidden"
@@ -188,25 +189,25 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
           <div className="p-6">
             <h3 className="text-lg font-extrabold mb-1">{car.mark} {car.model}</h3>
             {car.maxDiscount > 0 ? (
-              <p className="text-[#0070b8] font-bold text-xl mb-5">
+              <p className="text-primary font-bold text-xl mb-5">
                 от {formatPrice(car.price - car.maxDiscount)}
                 <DisclaimerBadge type="price-from-new" brandName={car.mark} model={car.model} />
               </p>
             ) : (
-              <p className="text-[#0070b8] font-bold text-xl mb-5">{formatPrice(car.price)}</p>
+              <p className="text-primary font-bold text-xl mb-5">{formatPrice(car.price)}</p>
             )}
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input value={name} onChange={e => setName(e.target.value)}
                   placeholder="Ваше имя" required
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8]" />
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary" />
               </div>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input value={phone} onChange={e => setPhone(formatPhone(e.target.value))}
                   placeholder="+7 (___) ___-__-__" required type="tel" inputMode="tel" maxLength={18}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8]" />
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary" />
               </div>
               <button type="submit"
                 className="w-full brand-gradient text-white font-bold rounded-xl py-3.5 text-sm">
@@ -249,7 +250,7 @@ function Gallery({
             <Car className="w-20 h-20" />
           </div>
         )}
-        <span className="absolute top-3 left-3 bg-[#0070b8] text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1">
+        <span className="absolute top-3 left-3 bg-primary text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1">
           <Sparkles className="w-3 h-3" /> НОВЫЙ
         </span>
         <span
@@ -285,7 +286,7 @@ function Gallery({
               key={i}
               onClick={() => { setImgIdx(i); setLightboxOpen(true); }}
               className={`shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition-all ${
-                i === imgIdx ? "border-[#0070b8]" : "border-transparent opacity-55 hover:opacity-90"
+                i === imgIdx ? "border-primary" : "border-transparent opacity-55 hover:opacity-90"
               }`}
             >
               <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
@@ -305,6 +306,7 @@ function Gallery({
 }
 
 export default function NewCarDetail() {
+  const prefersReduced = useReducedMotion();
   const [, params] = useRoute("/new-cars/:id");
   const rawId = params?.id ?? "";
   const id = decodeURIComponent(rawId);
@@ -377,7 +379,7 @@ export default function NewCarDetail() {
       <Layout>
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center text-slate-400">
-            <Car className="w-12 h-12 mx-auto mb-4 opacity-30 animate-pulse" />
+            <Car className={`w-12 h-12 mx-auto mb-4 opacity-30${prefersReduced ? "" : " animate-pulse"}`} />
             <p className="font-semibold">Загрузка...</p>
           </div>
         </div>
@@ -392,7 +394,7 @@ export default function NewCarDetail() {
           <div className="text-center text-slate-400">
             <Car className="w-12 h-12 mx-auto mb-4 opacity-30" />
             <p className="font-semibold">Автомобиль не найден</p>
-            <Link href="/new-cars" className="mt-3 inline-block text-sm font-bold text-[#0070b8] hover:underline">
+            <Link href="/new-cars" className="mt-3 inline-block text-sm font-bold text-primary hover:underline">
               Вернуться в каталог
             </Link>
           </div>
@@ -407,18 +409,18 @@ export default function NewCarDetail() {
   const salePrice = car.maxDiscount > 0 ? car.price - car.maxDiscount : car.price;
 
   const specs = [
-    { label: "Год выпуска", value: String(car.year), icon: <Calendar className="w-4 h-4 text-[#0070b8]" /> },
-    { label: "Кузов", value: car.bodyType, icon: <Car className="w-4 h-4 text-[#0070b8]" /> },
-    { label: "Цвет", value: car.color, icon: <Palette className="w-4 h-4 text-[#0070b8]" /> },
+    { label: "Год выпуска", value: String(car.year), icon: <Calendar className="w-4 h-4 text-primary" /> },
+    { label: "Кузов", value: car.bodyType, icon: <Car className="w-4 h-4 text-primary" /> },
+    { label: "Цвет", value: car.color, icon: <Palette className="w-4 h-4 text-primary" /> },
     ...(car.complectation ? [{ label: "Комплектация", value: car.complectation, icon: <Sparkles className="w-4 h-4 text-[#87b63c]" /> }] : []),
-    ...(transmission ? [{ label: "Коробка", value: transmission, icon: <span className="text-[10px] font-black text-[#0070b8]">КП</span> }] : []),
-    ...(drive ? [{ label: "Привод", value: drive, icon: <span className="text-[10px] font-black text-[#0070b8]">4×</span> }] : []),
-    ...(engine ? [{ label: "Двигатель", value: engine, icon: <span className="text-[10px] font-black text-[#0070b8]">ДВС</span> }] : []),
+    ...(transmission ? [{ label: "Коробка", value: transmission, icon: <span className="text-[10px] font-black text-primary">КП</span> }] : []),
+    ...(drive ? [{ label: "Привод", value: drive, icon: <span className="text-[10px] font-black text-primary">4×</span> }] : []),
+    ...(engine ? [{ label: "Двигатель", value: engine, icon: <span className="text-[10px] font-black text-primary">ДВС</span> }] : []),
   ].filter(s => s.value);
 
   const PriceCard = () => (
     <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-6">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-[#0070b8] mb-1.5">{car.dealer}</p>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1.5">{car.dealer}</p>
       <h1 className="text-lg sm:text-2xl font-extrabold text-slate-900 leading-tight mb-1">
         {car.mark} {car.model}
       </h1>
@@ -429,7 +431,7 @@ export default function NewCarDetail() {
         <>
           <div className="flex items-baseline gap-2 mb-0.5">
             <span className="text-xs font-bold text-slate-400 uppercase">Цена от</span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-[#0070b8]">{formatPrice(salePrice)}</span>
+            <span className="text-2xl sm:text-3xl font-extrabold text-primary">{formatPrice(salePrice)}</span>
             <DisclaimerBadge type="price-from-new" brandName={car.mark} model={car.model} />
           </div>
           <p className="text-sm text-slate-400 line-through mb-2.5">{formatPrice(car.price)}</p>
@@ -479,8 +481,8 @@ export default function NewCarDetail() {
           })}
           className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all ${
             isInCompare(car.id)
-              ? "bg-[#0070b8]/10 text-[#0070b8] border border-[#0070b8]/20"
-              : "bg-slate-50 text-slate-600 border border-slate-200 hover:border-[#0070b8]/30 hover:text-[#0070b8]"
+              ? "bg-primary/10 text-primary border border-primary/20"
+              : "bg-slate-50 text-slate-600 border border-slate-200 hover:border-primary/30 hover:text-primary"
           }`}
         >
           <Scale className="w-4 h-4" />
@@ -490,7 +492,7 @@ export default function NewCarDetail() {
       <div className="space-y-2.5">
         <button
           onClick={() => setShowTestDrive(true)}
-          className="w-full bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold rounded-xl py-3.5 text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+          className="w-full bg-gradient-to-r from-primary to-[#005a94] text-white font-bold rounded-xl py-3.5 text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
         >
           <Car className="w-4 h-4" />
           Запись на тест-драйв
@@ -511,7 +513,7 @@ export default function NewCarDetail() {
             Trade-in
           </button>
         </div>
-        <CTPhoneDesktop className="hidden lg:flex w-full items-center justify-center gap-2 border-2 border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8] text-slate-700 font-bold rounded-xl py-3 text-sm transition-colors"
+        <CTPhoneDesktop className="hidden lg:flex w-full items-center justify-center gap-2 border-2 border-slate-200 hover:border-primary hover:text-primary text-slate-700 font-bold rounded-xl py-3 text-sm transition-colors"
           phone={locationPhone} />
       </div>
       <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
@@ -639,9 +641,9 @@ export default function NewCarDetail() {
           {/* Advantages */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { icon: <Shield className="w-4 h-4 text-[#0070b8]" />, title: "Гарантия завода" },
-              { icon: <CreditCard className="w-4 h-4 text-[#0070b8]" />, title: "Автокредит" },
-              { icon: <ArrowLeftRight className="w-4 h-4 text-[#0070b8]" />, title: "Trade-in" },
+              { icon: <Shield className="w-4 h-4 text-primary" />, title: "Гарантия завода" },
+              { icon: <CreditCard className="w-4 h-4 text-primary" />, title: "Автокредит" },
+              { icon: <ArrowLeftRight className="w-4 h-4 text-primary" />, title: "Trade-in" },
             ].map((g, i) => (
               <div key={i} className="bg-white rounded-2xl border border-slate-100 p-3 flex flex-col gap-1.5">
                 {g.icon}
@@ -663,14 +665,14 @@ export default function NewCarDetail() {
                           ? <img src={c.images[0]} className="w-full h-full object-cover" loading="lazy" decoding="async" alt={`${c.mark} ${c.model}`} />
                           : <div className="w-full h-full flex items-center justify-center text-slate-200"><Car className="w-8 h-8" /></div>
                         }
-                        <span className="absolute top-2 left-2 bg-[#0070b8] text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                        <span className="absolute top-2 left-2 bg-primary text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
                           <Sparkles className="w-2.5 h-2.5" /> Новый
                         </span>
                       </div>
                       <div className="p-2.5">
                         <p className="text-xs font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
                         <p className="text-[10px] text-slate-400">{c.year}</p>
-                        <p className="text-sm font-extrabold text-[#0070b8] mt-0.5">{formatPrice(c.maxDiscount > 0 ? c.price - c.maxDiscount : c.price)}</p>
+                        <p className="text-sm font-extrabold text-primary mt-0.5">{formatPrice(c.maxDiscount > 0 ? c.price - c.maxDiscount : c.price)}</p>
                       </div>
                     </div>
                   </Link>
@@ -696,7 +698,7 @@ export default function NewCarDetail() {
                       <div className="p-2.5">
                         <p className="text-xs font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
                         <p className="text-[10px] text-slate-400">{c.year} · {formatRun(c.run)}</p>
-                        <p className="text-sm font-extrabold text-[#0070b8] mt-0.5">{formatPrice(c.price)}</p>
+                        <p className="text-sm font-extrabold text-primary mt-0.5">{formatPrice(c.price)}</p>
                       </div>
                     </div>
                   </Link>
@@ -748,9 +750,9 @@ export default function NewCarDetail() {
             {/* Advantages */}
             <div className="mt-4 grid grid-cols-3 gap-3">
               {[
-                { icon: <Shield className="w-5 h-5 text-[#0070b8]" />, title: "Гарантия завода", desc: "Официальная заводская гарантия" },
-                { icon: <CreditCard className="w-5 h-5 text-[#0070b8]" />, title: "Автокредит", desc: "Одобрение от 15 банков. Ставки от 0%" },
-                { icon: <ArrowLeftRight className="w-5 h-5 text-[#0070b8]" />, title: "Trade-in", desc: "Оценка за 30 минут. Зачёт в стоимость" },
+                { icon: <Shield className="w-5 h-5 text-primary" />, title: "Гарантия завода", desc: "Официальная заводская гарантия" },
+                { icon: <CreditCard className="w-5 h-5 text-primary" />, title: "Автокредит", desc: "Одобрение от 15 банков. Ставки от 0%" },
+                { icon: <ArrowLeftRight className="w-5 h-5 text-primary" />, title: "Trade-in", desc: "Оценка за 30 минут. Зачёт в стоимость" },
               ].map((g, i) => (
                 <div key={i} className="bg-white rounded-2xl border border-slate-100 p-4 flex flex-col gap-2">
                   {g.icon}
@@ -773,14 +775,14 @@ export default function NewCarDetail() {
                             ? <img src={c.images[0]} className="w-full h-full object-cover" loading="lazy" decoding="async" alt={`${c.mark} ${c.model}`} />
                             : <div className="w-full h-full flex items-center justify-center text-slate-200"><Car className="w-10 h-10" /></div>
                           }
-                          <span className="absolute top-2 left-2 bg-[#0070b8] text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                          <span className="absolute top-2 left-2 bg-primary text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
                             <Sparkles className="w-2.5 h-2.5" /> Новый
                           </span>
                         </div>
                         <div className="p-3">
                           <p className="text-sm font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
                           <p className="text-xs text-slate-400 mt-0.5">{c.year}</p>
-                          <p className="text-base font-extrabold text-[#0070b8] mt-1">{formatPrice(c.maxDiscount > 0 ? c.price - c.maxDiscount : c.price)}</p>
+                          <p className="text-base font-extrabold text-primary mt-1">{formatPrice(c.maxDiscount > 0 ? c.price - c.maxDiscount : c.price)}</p>
                         </div>
                       </div>
                     </Link>
@@ -806,7 +808,7 @@ export default function NewCarDetail() {
                         <div className="p-3">
                           <p className="text-sm font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
                           <p className="text-xs text-slate-400 mt-0.5">{c.year} · {formatRun(c.run)}</p>
-                          <p className="text-base font-extrabold text-[#0070b8] mt-1">{formatPrice(c.price)}</p>
+                          <p className="text-base font-extrabold text-primary mt-1">{formatPrice(c.price)}</p>
                         </div>
                       </div>
                     </Link>
@@ -829,7 +831,7 @@ export default function NewCarDetail() {
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide truncate">{car.mark} {car.model}</p>
           {car.maxDiscount > 0 ? (
             <div className="flex items-baseline gap-1.5">
-              <p className="text-base font-extrabold text-[#0070b8] leading-tight">от {formatPrice(salePrice)}</p>
+              <p className="text-base font-extrabold text-primary leading-tight">от {formatPrice(salePrice)}</p>
               <p className="text-[11px] text-slate-400 line-through">{formatPrice(car.price)}</p>
               <DisclaimerBadge type="price-from-new" brandName={car.mark} model={car.model} />
             </div>
@@ -841,7 +843,7 @@ export default function NewCarDetail() {
           phone={locationPhone} />
         <button
           onClick={() => setShowTestDrive(true)}
-          className="bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold rounded-xl px-5 py-3 text-sm shrink-0 hover:opacity-90 transition-opacity flex items-center gap-1.5"
+          className="bg-gradient-to-r from-primary to-[#005a94] text-white font-bold rounded-xl px-5 py-3 text-sm shrink-0 hover:opacity-90 transition-opacity flex items-center gap-1.5"
         >
           <Car className="w-4 h-4" />
           Тест-драйв
