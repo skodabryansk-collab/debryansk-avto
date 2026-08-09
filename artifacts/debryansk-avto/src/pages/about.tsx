@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "wouter";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Shield, Users, Award, Clock, Car, TrendingUp,
   Star, Building2, Wrench
@@ -51,6 +51,7 @@ const values = [
 
 /* ─── Page ──────────────────────────────────────────────────────────────────── */
 export default function AboutPage() {
+  const prefersReduced = useReducedMotion();
   const { data: apiBrands = [] } = useQuery({
     queryKey: ["public-brands"],
     queryFn: fetchBrands,
@@ -109,7 +110,7 @@ export default function AboutPage() {
         <section className="bg-[#0d0f14] text-white py-16 sm:py-24">
           <div className="container mx-auto px-4 sm:px-6">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={prefersReduced ? false : { opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="max-w-2xl"
             >
@@ -129,7 +130,7 @@ export default function AboutPage() {
 
             {/* Stats */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={prefersReduced ? false : { opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15 }}
               className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-10 sm:mt-14"
@@ -149,7 +150,7 @@ export default function AboutPage() {
         <section className="py-16 sm:py-24 bg-white">
           <div className="container mx-auto px-4 sm:px-6">
             <div className="text-center mb-10 sm:mb-14">
-              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Ценности</p>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-primary mb-2">Ценности</p>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Почему выбирают нас</h2>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
@@ -162,8 +163,8 @@ export default function AboutPage() {
                   transition={{ delay: i * 0.1 }}
                   className="bg-slate-50 rounded-2xl border border-slate-100 p-6 sm:p-7"
                 >
-                  <div className="w-12 h-12 bg-[#0070b8]/10 rounded-xl flex items-center justify-center mb-4">
-                    <v.icon className="w-5 h-5 text-[#0070b8]" />
+                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-4">
+                    <v.icon className="w-5 h-5 text-primary" />
                   </div>
                   <h3 className="font-bold text-slate-900 mb-2">{v.title}</h3>
                   <p className="text-sm text-slate-500 leading-relaxed">{v.desc}</p>
@@ -180,7 +181,7 @@ export default function AboutPage() {
         <section className="py-16 sm:py-24 bg-slate-50 border-t border-slate-100">
           <div className="container mx-auto px-4 sm:px-6">
             <div className="text-center mb-10 sm:mb-14">
-              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Бренды</p>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-primary mb-2">Бренды</p>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Все бренды нашей группы</h2>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5">
@@ -195,7 +196,7 @@ export default function AboutPage() {
                 >
                   <p className="text-lg font-black text-slate-900">{b.name}</p>
                   {b.isServiceOnly && (
-                    <span className="mt-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-[#0070b8] bg-[#0070b8]/10 border border-[#0070b8]/20 rounded-md px-1.5 py-0.5 leading-none">
+                    <span className="mt-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/20 rounded-md px-1.5 py-0.5 leading-none">
                       Сервис
                     </span>
                   )}
@@ -206,7 +207,7 @@ export default function AboutPage() {
         </section>
 
         {/* CTA */}
-        <section className="py-16 sm:py-24 bg-[#0070b8] text-white">
+        <section className="py-16 sm:py-24 bg-primary text-white">
           <div className="container mx-auto px-4 sm:px-6 text-center">
             <h2 className="text-2xl sm:text-3xl font-black mb-4">
               Станьте частью территории автомобилей
@@ -215,7 +216,7 @@ export default function AboutPage() {
               Выберите свой идеальный автомобиль в каталоге дилерских центров Дебрянск Авто
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link href="/new-cars" className="inline-flex items-center justify-center gap-2 bg-white text-[#0070b8] font-bold px-6 py-3.5 rounded-xl hover:bg-slate-100 transition-colors">
+              <Link href="/new-cars" className="inline-flex items-center justify-center gap-2 bg-white text-primary font-bold px-6 py-3.5 rounded-xl hover:bg-slate-100 transition-colors">
                 <Car className="w-4 h-4" />
                 Новые автомобили
               </Link>
