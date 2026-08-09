@@ -23,8 +23,8 @@ function CarInfoCard({ result, onClear }: { result: VinLookupResult; onClear: ()
   const { brand, model, year, engine, power } = result.carInfo;
   const inCatalog = (result.modifications?.length ?? 0) > 0;
   return (
-    <div className="mt-2 flex items-center gap-3 bg-[#0070b8]/5 border border-[#0070b8]/20 rounded-xl px-4 py-3">
-      <Car className="w-4 h-4 text-[#0070b8] shrink-0" />
+    <div className="mt-2 flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
+      <Car className="w-4 h-4 text-primary shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-slate-800">
           {brand} {model}{year ? `, ${year} г.` : ""}
@@ -76,7 +76,7 @@ export function VinGrzInput({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             maxLength={20}
-            className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-10 text-sm font-medium text-slate-800 placeholder:text-slate-300 hover:border-[#0070b8]/50 focus:border-[#0070b8] outline-none transition-colors uppercase"
+            className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-10 text-sm font-medium text-slate-800 placeholder:text-slate-300 hover:border-primary/50 focus:border-primary outline-none transition-colors uppercase"
           />
           {s.input && (
             <button
@@ -90,7 +90,7 @@ export function VinGrzInput({
         <button
           onClick={s.search}
           disabled={!s.input.trim() || s.loading}
-          className="inline-flex items-center gap-2 bg-[#0070b8] hover:bg-[#005a94] disabled:bg-slate-100 disabled:text-slate-300 text-white font-bold px-5 py-3 rounded-xl text-sm transition-colors shrink-0"
+          className="inline-flex items-center gap-2 bg-primary hover:bg-[#005a94] disabled:bg-slate-100 disabled:text-slate-300 text-white font-bold px-5 py-3 rounded-xl text-sm transition-colors shrink-0"
         >
           {s.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
           Найти
