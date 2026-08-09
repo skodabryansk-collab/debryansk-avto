@@ -56,7 +56,7 @@ const DEFAULT: BonusData = {
     { level: 3, name: "Уровень 3", threshold: 100000, percent: 7,  color: "#3b82f6" },
     { level: 4, name: "Уровень 4", threshold: 150000, percent: 8,  color: "#f59e0b" },
     { level: 5, name: "Уровень 5", threshold: 200000, percent: 9,  color: "#f97316" },
-    { level: 6, name: "Максимум",  threshold: 250000, percent: 10, color: "#0070b8" },
+    { level: 6, name: "Максимум",  threshold: 250000, percent: 10, color: "var(--color-primary)" },
   ],
   redemption_rules: [
     "Техническое обслуживание и текущий ремонт — до 10%",
@@ -184,9 +184,9 @@ export default function BonusProgramPage() {
       <nav className="bg-slate-50 border-b border-slate-100" aria-label="Навигация">
         <div className="container mx-auto px-4 sm:px-6 py-2.5">
           <ol className="flex items-center gap-1.5 text-xs text-slate-500 flex-wrap">
-            <li><Link href="/" className="hover:text-[#0070b8] transition-colors">Главная</Link></li>
+            <li><Link href="/" className="hover:text-primary transition-colors">Главная</Link></li>
             <li><ChevronRight className="w-3 h-3 shrink-0" /></li>
-            <li><Link href="/service" className="hover:text-[#0070b8] transition-colors">Сервис</Link></li>
+            <li><Link href="/service" className="hover:text-primary transition-colors">Сервис</Link></li>
             <li><ChevronRight className="w-3 h-3 shrink-0" /></li>
             <li className="text-slate-800 font-medium">Бонусная программа</li>
           </ol>
@@ -194,7 +194,7 @@ export default function BonusProgramPage() {
       </nav>
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <section className="relative bg-gradient-to-br from-[#0d1b2e] via-[#0a2540] to-[#0070b8] text-white py-16 sm:py-24 overflow-hidden">
+      <section className="relative bg-gradient-to-br from-[#0d1b2e] via-[#0a2540] to-primary text-white py-16 sm:py-24 overflow-hidden">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(ellipse_at_top_right,#ffffff_0%,transparent_60%)]" />
         <div className="container mx-auto px-4 sm:px-6 relative z-10 max-w-3xl text-center">
           <span className="inline-block bg-white/10 text-white/80 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
@@ -208,7 +208,7 @@ export default function BonusProgramPage() {
           </p>
           <div className="mt-8">
             <CTPhone
-              className="inline-flex items-center gap-2 bg-white text-[#0070b8] font-bold px-7 py-3.5 rounded-full hover:bg-white/90 transition-colors shadow-lg text-sm"
+              className="inline-flex items-center gap-2 bg-white text-primary font-bold px-7 py-3.5 rounded-full hover:bg-white/90 transition-colors shadow-lg text-sm"
               phone="+7 (4832) 77-77-70">
               Узнать подробности
             </CTPhone>
@@ -219,7 +219,7 @@ export default function BonusProgramPage() {
       {/* ── Perks ────────────────────────────────────────────────────── */}
       <section className="py-14 sm:py-20 bg-white">
         <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-[#0070b8] mb-2 text-center">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-primary mb-2 text-center">
             Программа
           </p>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-center mb-10">
@@ -283,7 +283,7 @@ export default function BonusProgramPage() {
       </section>
 
       {/* ── Customer journey ───────────────────────────────────────────── */}
-      <section className="py-14 sm:py-20 bg-[#0070b8] text-white border-t border-white/10">
+      <section className="py-14 sm:py-20 bg-primary text-white border-t border-white/10">
         <div className="container mx-auto px-4 sm:px-6 max-w-5xl">
           <p className="text-[11px] font-bold uppercase tracking-widest text-white/50 mb-2 text-center">
             Ваша выгода по бонусной программе
@@ -318,8 +318,8 @@ export default function BonusProgramPage() {
             </div>
           </div>
           <div className="bg-white rounded-2xl p-6 sm:p-8 text-center shadow-lg">
-            <p className="text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Итого ваша выгода</p>
-            <p className="text-4xl sm:text-5xl font-extrabold text-[#0070b8] mb-2">6 000 ₽</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">Итого ваша выгода</p>
+            <p className="text-4xl sm:text-5xl font-extrabold text-primary mb-2">6 000 ₽</p>
             <p className="text-sm text-slate-500 max-w-md mx-auto">Сумма выгоды за 3 года обслуживания (только списания бонусов на ТО)</p>
           </div>
           <p className="mt-4 text-center text-xs text-white/40">
@@ -331,7 +331,7 @@ export default function BonusProgramPage() {
       {/* ── Discount levels ──────────────────────────────────────────── */}
       <section className="py-14 sm:py-20 bg-slate-50 border-t border-slate-100">
         <div className="container mx-auto px-4 sm:px-6 max-w-4xl">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-[#0070b8] mb-2 text-center">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-primary mb-2 text-center">
             Уровни
           </p>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-center mb-10">
@@ -373,7 +373,7 @@ export default function BonusProgramPage() {
         <div className="container mx-auto px-4 sm:px-6 max-w-4xl">
           <div className="grid md:grid-cols-2 gap-10 items-center">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-[#0070b8] mb-2">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-primary mb-2">
                 Применение
               </p>
               <h2 className="text-2xl sm:text-3xl font-extrabold mb-4">
@@ -385,20 +385,20 @@ export default function BonusProgramPage() {
               <ul className="space-y-3">
                 {d.redemption_rules.map((rule, i) => (
                   <li key={i} className="flex items-start gap-3 text-sm text-slate-700">
-                    <CheckCircle className="w-4.5 h-4.5 text-[#0070b8] shrink-0 mt-0.5" style={{ width: 18, height: 18 }} />
+                    <CheckCircle className="w-4.5 h-4.5 text-primary shrink-0 mt-0.5" style={{ width: 18, height: 18 }} />
                     {rule}
                   </li>
                 ))}
               </ul>
             </div>
-            <div className="bg-gradient-to-br from-[#0070b8]/5 to-[#0070b8]/10 rounded-2xl p-8 border border-[#0070b8]/10">
-              <p className="text-4xl font-extrabold text-[#0070b8] mb-2">до 10%</p>
+            <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl p-8 border border-primary/10">
+              <p className="text-4xl font-extrabold text-primary mb-2">до 10%</p>
               <p className="text-slate-700 font-bold mb-1">максимальное списание</p>
               <p className="text-sm text-slate-500">
                 До 10% стоимости заказ-наряда можно оплатить бонусами. Базовый уровень — 5%.
               </p>
-              <div className="mt-6 pt-6 border-t border-[#0070b8]/15">
-                <p className="text-4xl font-extrabold text-[#0070b8] mb-2">10%</p>
+              <div className="mt-6 pt-6 border-t border-primary/15">
+                <p className="text-4xl font-extrabold text-primary mb-2">10%</p>
                 <p className="text-slate-700 font-bold mb-1">начисление за сервис</p>
                 <p className="text-sm text-slate-500">
                   10% от суммы любого заказ-наряда зачисляется на ваш счёт автоматически.
@@ -412,7 +412,7 @@ export default function BonusProgramPage() {
       {/* ── Bonus actions ────────────────────────────────────────────── */}
       <section className="py-14 sm:py-20 bg-slate-50 border-t border-slate-100">
         <div className="container mx-auto px-4 sm:px-6 max-w-3xl">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-[#0070b8] mb-2 text-center">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-primary mb-2 text-center">
             Начисление
           </p>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-center mb-10">
@@ -423,7 +423,7 @@ export default function BonusProgramPage() {
               <AccordionItem
                 key={i}
                 value={`action-${i}`}
-                className="border border-slate-200 rounded-xl px-4 sm:px-5 data-[state=open]:border-[#0070b8]/30 bg-white transition-colors"
+                className="border border-slate-200 rounded-xl px-4 sm:px-5 data-[state=open]:border-primary/30 bg-white transition-colors"
               >
                 <AccordionTrigger className="text-left text-sm sm:text-base font-bold hover:no-underline py-4">
                   {action.title}
@@ -432,7 +432,7 @@ export default function BonusProgramPage() {
                   <ul className="space-y-2">
                     {action.items.map((item, j) => (
                       <li key={j} className="flex items-start gap-2.5 text-sm text-slate-600">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#0070b8] shrink-0 mt-1.5" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-1.5" />
                         {item}
                       </li>
                     ))}
@@ -466,7 +466,7 @@ export default function BonusProgramPage() {
       {d.full_rules_sections.length > 0 && (
         <section className="py-14 sm:py-20 bg-slate-50 border-t border-slate-100">
           <div className="container mx-auto px-4 sm:px-6 max-w-3xl">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[#0070b8] mb-2 text-center">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-primary mb-2 text-center">
               Документ
             </p>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-center mb-10">
@@ -477,7 +477,7 @@ export default function BonusProgramPage() {
                 <AccordionItem
                   key={i}
                   value={`rule-${i}`}
-                  className="border border-slate-200 rounded-xl px-4 sm:px-5 data-[state=open]:border-[#0070b8]/30 bg-white"
+                  className="border border-slate-200 rounded-xl px-4 sm:px-5 data-[state=open]:border-primary/30 bg-white"
                 >
                   <AccordionTrigger className="text-left text-sm font-bold hover:no-underline py-4">
                     {section.title}
@@ -486,7 +486,7 @@ export default function BonusProgramPage() {
                     <ol className="space-y-2.5 list-none">
                       {section.items.map((item, j) => (
                         <li key={j} className="flex items-start gap-2.5 text-sm text-slate-600">
-                          <span className="text-[#0070b8] font-bold text-xs shrink-0 mt-0.5">
+                          <span className="text-primary font-bold text-xs shrink-0 mt-0.5">
                             {String(j + 1).padStart(2, "0")}
                           </span>
                           {item}
@@ -505,7 +505,7 @@ export default function BonusProgramPage() {
       )}
 
       {/* ── CTA ──────────────────────────────────────────────────────── */}
-      <section className="py-14 sm:py-20 bg-[#0070b8] text-white border-t border-white/10">
+      <section className="py-14 sm:py-20 bg-primary text-white border-t border-white/10">
         <div className="container mx-auto px-4 sm:px-6 max-w-2xl text-center">
           <h2 className="text-2xl sm:text-3xl font-extrabold mb-3">
             Стать участником бесплатно
@@ -515,7 +515,7 @@ export default function BonusProgramPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <CTPhone
-              className="inline-flex items-center justify-center gap-2 bg-white text-[#0070b8] font-bold px-7 py-3.5 rounded-full hover:bg-white/90 transition-colors shadow-md text-sm"
+              className="inline-flex items-center justify-center gap-2 bg-white text-primary font-bold px-7 py-3.5 rounded-full hover:bg-white/90 transition-colors shadow-md text-sm"
               phone="+7 (4832) 77-77-70">
               +7 (4832) 77-77-70
             </CTPhone>
