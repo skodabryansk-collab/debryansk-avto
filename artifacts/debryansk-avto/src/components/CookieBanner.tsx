@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Link } from "wouter";
 import { X } from "lucide-react";
 
 const STORAGE_KEY = "cookie_consent_accepted";
 
 export default function CookieBanner() {
+  const prefersReduced = useReducedMotion();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export default function CookieBanner() {
     <AnimatePresence>
       {visible && (
         <motion.div
-          initial={{ y: 100, opacity: 0 }}
+          initial={prefersReduced ? false : { y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 100, opacity: 0 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
