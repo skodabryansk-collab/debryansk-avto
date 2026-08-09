@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { motion, useInView } from "framer-motion";
+import { motion, useInView, useReducedMotion } from "framer-motion";
 import { Helmet } from "react-helmet-async";
 
 /* ── Types ────────────────────────────────────────────── */
@@ -69,12 +69,13 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 const FadeIn = ({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) => {
+  const prefersReduced = useReducedMotion();
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-40px 0px" });
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 16 }}
+      initial={prefersReduced ? false : { opacity: 0, y: 16 }}
       animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
       transition={{ duration: 0.45, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
       className={className}
