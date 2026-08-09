@@ -920,7 +920,7 @@ export default function ServicePage() {
             <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-14">
 
               {/* Иконка */}
-              <div className="shrink-0 w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-gradient-to-br from-primary/30 to-[#0040a0]/20 border border-primary/30 flex items-center justify-center shadow-[0_0_40px_rgba(0,112,184,0.2)]">
+              <div className="shrink-0 w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-gradient-to-br from-primary/30 to-[#0040a0]/20 border border-primary/30 flex items-center justify-center shadow-[0_0_40px_rgba(var(--primary-rgb),0.2)]">
                 <Gift className="w-12 h-12 sm:w-14 sm:h-14 text-primary" />
               </div>
 
@@ -950,7 +950,7 @@ export default function ServicePage() {
               <div className="shrink-0 flex flex-col items-center gap-2">
                 <a
                   href="/service/bonus"
-                  className="inline-flex items-center gap-2.5 bg-primary hover:bg-[#005fa0] text-white font-bold px-8 py-4 rounded-2xl transition-all hover:shadow-[0_0_28px_rgba(0,112,184,0.45)] text-base whitespace-nowrap"
+                  className="inline-flex items-center gap-2.5 bg-primary hover:bg-[#005fa0] text-white font-bold px-8 py-4 rounded-2xl transition-all hover:shadow-[0_0_28px_rgba(var(--primary-rgb),0.45)] text-base whitespace-nowrap"
                 >
                   <Gift className="w-5 h-5" />
                   Узнать подробнее
