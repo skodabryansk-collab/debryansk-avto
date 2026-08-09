@@ -17,7 +17,7 @@ export default function FaqBlock({ pageSlug, title = "\u0427\u0430\u0441\u0442\u
         <div className="container mx-auto px-4 sm:px-6 max-w-3xl">
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-12 bg-slate-100 rounded-xl animate-pulse" />
+              <div key={i} className="h-12 bg-slate-100 rounded-xl motion-safe:animate-pulse" />
             ))}
           </div>
         </div>
