@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   TrendingUp, Clock, Shield, BadgeCheck,
   Phone, MessageSquare, Car, Gauge, CheckCircle,
