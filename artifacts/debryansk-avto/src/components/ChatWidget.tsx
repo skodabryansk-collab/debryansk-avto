@@ -158,9 +158,9 @@ function StreamingDots({ queryHint }: { queryHint?: string }) {
   return (
     <div className="flex items-center gap-2 py-0.5">
       <span className="flex items-center gap-1 shrink-0">
-        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 motion-safe:animate-bounce" style={{ animationDelay: "0ms" }} />
+        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 motion-safe:animate-bounce" style={{ animationDelay: "150ms" }} />
+        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 motion-safe:animate-bounce" style={{ animationDelay: "300ms" }} />
       </span>
       <span className="text-xs text-slate-400 font-medium transition-all">{msgs[idx]}</span>
     </div>
@@ -192,7 +192,7 @@ function MessageContent({ text, isStreaming, queryHint }: { text: string; isStre
                     <span>
                       {renderInline(l.slice(2))}
                       {isStreaming && isLastItem && (
-                        <span className="inline-block w-[2px] h-[1em] bg-primary animate-pulse ml-0.5 align-middle rounded-sm" />
+                        <span className="inline-block w-[2px] h-[1em] bg-primary motion-safe:animate-pulse ml-0.5 align-middle rounded-sm" />
                       )}
                     </span>
                   </li>
@@ -210,7 +210,7 @@ function MessageContent({ text, isStreaming, queryHint }: { text: string; isStre
                   {li > 0 && <br />}
                   {renderInline(line)}
                   {isStreaming && isLastLine && (
-                    <span className="inline-block w-[2px] h-[1em] bg-primary animate-pulse ml-0.5 align-middle rounded-sm" />
+                    <span className="inline-block w-[2px] h-[1em] bg-primary motion-safe:animate-pulse ml-0.5 align-middle rounded-sm" />
                   )}
                 </React.Fragment>
               );
@@ -221,9 +221,9 @@ function MessageContent({ text, isStreaming, queryHint }: { text: string; isStre
       {isStreaming && (
         <div className="flex items-center gap-1 pt-0.5">
           <span className="text-[11px] text-slate-400 leading-none">Навигатор печатает</span>
-          <span className="w-1 h-1 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: "0ms" }} />
-          <span className="w-1 h-1 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: "150ms" }} />
-          <span className="w-1 h-1 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: "300ms" }} />
+          <span className="w-1 h-1 rounded-full bg-primary/50 motion-safe:animate-bounce" style={{ animationDelay: "0ms" }} />
+          <span className="w-1 h-1 rounded-full bg-primary/50 motion-safe:animate-bounce" style={{ animationDelay: "150ms" }} />
+          <span className="w-1 h-1 rounded-full bg-primary/50 motion-safe:animate-bounce" style={{ animationDelay: "300ms" }} />
         </div>
       )}
     </div>
@@ -1653,7 +1653,7 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
               <div className="flex items-center gap-3 px-4 py-3.5">
                 <div
                   className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
-                  style={{ background: "linear-gradient(135deg, var(--color-primary) 0%, #005a96 100%)", boxShadow: "0 6px 16px rgba(0,112,184,0.28)" }}
+                  style={{ background: "linear-gradient(135deg, var(--color-primary) 0%, #005a96 100%)", boxShadow: "0 6px 16px rgba(var(--primary-rgb),0.28)" }}
                 >
                   <Compass className="w-5 h-5 text-white" />
                 </div>
@@ -1784,9 +1784,9 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
                         <Compass className="w-4 h-4 text-white" />
                       </div>
                       <div className="bg-white px-4 py-3 flex items-center gap-1.5 shadow-[0_2px_10px_rgba(0,0,0,0.07)] border border-slate-100" style={{ borderRadius: "4px 18px 18px 18px" }}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 motion-safe:animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 motion-safe:animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 motion-safe:animate-bounce" style={{ animationDelay: "300ms" }} />
                       </div>
                     </div>
                   )}
@@ -1845,7 +1845,7 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
                       disabled={!input.trim() || loading}
                       whileTap={{ scale: 0.92 }}
                       className="w-10 h-10 rounded-2xl flex items-center justify-center text-white transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-                      style={{ background: "linear-gradient(135deg, var(--color-primary) 0%, #005a96 100%)", boxShadow: "0 4px 12px rgba(0,112,184,0.3)" }}
+                      style={{ background: "linear-gradient(135deg, var(--color-primary) 0%, #005a96 100%)", boxShadow: "0 4px 12px rgba(var(--primary-rgb),0.3)" }}
                     >
                       <Send className="w-4 h-4" />
                     </motion.button>
