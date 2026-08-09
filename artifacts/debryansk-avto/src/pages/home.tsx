@@ -59,7 +59,7 @@ import logoJetour from "../assets/logos/logo-jetour.svg";
 
 /* ── Fallback photos for DealerMap (used when photoUrl not set in DB) ── */
 const DEALER_FALLBACK_PHOTOS = [dealerTenet, dealerOmoda, dealerMb, dealerHaval];
-const DEALER_COLORS = ["#0070b8", "#87b63c", "#0070b8", "#87b63c"];
+const DEALER_COLORS = ["var(--color-primary)", "#87b63c", "var(--color-primary)", "#87b63c"];
 
 interface LocationBrandItem {
   id: number;
@@ -182,8 +182,10 @@ const modalConfigs: Record<ModalType, ModalConfig> = {
 
 /* ── Modal component ─────────────────────────────────────── */
 function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
+  const prefersReduced = useReducedMotion();
   const cfg = modalConfigs[type];
   const { toast } = useToast();
+  const containerRef = useRef<HTMLDivElement>(null);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: { name: "", phone: "", message: "" },
@@ -200,6 +202,26 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  // Focus trap: focus first element on mount, keep Tab inside dialog
+  useEffect(() => {
+    const getFocusable = () => Array.from(
+      containerRef.current?.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      ) ?? []
+    ).filter(el => !el.hasAttribute("disabled"));
+    getFocusable()[0]?.focus();
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const els = getFocusable();
+      if (!els.length) return;
+      const first = els[0], last = els[els.length - 1];
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last.focus(); } }
+      else { if (document.activeElement === last) { e.preventDefault(); first.focus(); } }
+    };
+    window.addEventListener("keydown", trap);
+    return () => window.removeEventListener("keydown", trap);
   }, []);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -223,7 +245,7 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
     <AnimatePresence>
       <motion.div
         className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        initial={prefersReduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         onClick={onClose}
       >
         {/* Backdrop */}
@@ -231,8 +253,12 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
 
         {/* Sheet */}
         <motion.div
+          ref={containerRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
           className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
-          initial={{ y: 80, opacity: 0 }}
+          initial={prefersReduced ? false : { y: 80, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 80, opacity: 0 }}
           transition={{ type: "spring", damping: 28, stiffness: 320 }}
@@ -246,11 +272,11 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
           </div>
 
           <div className="p-6 sm:p-8">
-            <button onClick={onClose}
-              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+            <button onClick={onClose} aria-label="Закрыть"
+              className="absolute top-5 right-5 w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
               <X className="w-4 h-4 text-slate-500" />
             </button>
-            <h2 className="text-2xl font-extrabold mb-1">{cfg.title}</h2>
+            <h2 id="modal-title" className="text-2xl font-extrabold mb-1">{cfg.title}</h2>
             <p className="text-slate-500 text-sm mb-6">{cfg.subtitle}</p>
 
             <Form {...form}>
@@ -260,7 +286,7 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
                     <FormLabel className="text-slate-600 font-semibold">Имя</FormLabel>
                     <FormControl>
                       <Input placeholder="Ваше имя" {...field}
-                        className="bg-slate-50 border-slate-200 rounded-xl h-12 focus-visible:ring-[#0070b8]" />
+                        className="bg-slate-50 border-slate-200 rounded-xl h-12 focus-visible:ring-primary" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -272,7 +298,7 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
                       <Input placeholder="+7 (___) ___-__-__" {...field}
                         type="tel" inputMode="tel" maxLength={18}
                         onChange={e => field.onChange(formatPhone(e.target.value))}
-                        className="bg-slate-50 border-slate-200 rounded-xl h-12 focus-visible:ring-[#0070b8]" />
+                        className="bg-slate-50 border-slate-200 rounded-xl h-12 focus-visible:ring-primary" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -283,7 +309,7 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
                       <FormLabel className="text-slate-600 font-semibold">Комментарий</FormLabel>
                       <FormControl>
                         <Textarea placeholder={cfg.placeholder} {...field}
-                          className="bg-slate-50 border-slate-200 rounded-xl min-h-[80px] focus-visible:ring-[#0070b8] resize-none" />
+                          className="bg-slate-50 border-slate-200 rounded-xl min-h-[80px] focus-visible:ring-primary resize-none" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -317,10 +343,10 @@ const HomeNewsSection = () => {
       <div className="container mx-auto px-4 sm:px-6">
         <FadeIn className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 sm:mb-10 gap-3">
           <div>
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Будьте в курсе</p>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-primary mb-2">Будьте в курсе</p>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Новости</h2>
           </div>
-          <Link href="/news" className="flex items-center gap-2 text-[#0070b8] font-bold hover:gap-3 transition-all text-sm whitespace-nowrap">
+          <Link href="/news" className="flex items-center gap-2 text-primary font-bold hover:gap-3 transition-all text-sm whitespace-nowrap">
             Все новости <ArrowRight className="w-4 h-4" />
           </Link>
         </FadeIn>
@@ -330,11 +356,11 @@ const HomeNewsSection = () => {
               <Link href={`/news/${n.slug}`} className="block bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
                 <div className="h-44 sm:h-48 overflow-hidden relative">
                   {n.image && <img src={n.image} alt={n.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />}
-                  {n.category && <span className="absolute top-3 left-3 px-2.5 py-1 bg-[#0070b8] text-white text-[11px] font-bold rounded-full">{n.category}</span>}
+                  {n.category && <span className="absolute top-3 left-3 px-2.5 py-1 bg-primary text-white text-[11px] font-bold rounded-full">{n.category}</span>}
                 </div>
                 <div className="p-5">
                   {n.publishedAt && <p className="text-xs font-semibold text-slate-400 mb-2">{new Date(n.publishedAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}</p>}
-                  <h3 className="font-extrabold text-base leading-snug mb-2 group-hover:text-[#0070b8] transition-colors">{n.title}</h3>
+                  <h3 className="font-extrabold text-base leading-snug mb-2 group-hover:text-primary transition-colors">{n.title}</h3>
                   <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">{n.excerpt ?? ""}</p>
                 </div>
               </Link>
@@ -349,22 +375,25 @@ const HomeNewsSection = () => {
 const FadeIn = ({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-60px" });
+  const prefersReduced = useReducedMotion();
   return (
     <motion.div ref={ref}
-      initial={{ opacity: 0, y: 20 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-      transition={{ duration: 0.5, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
+      initial={{ opacity: prefersReduced ? 1 : 0, y: prefersReduced ? 0 : 20 }}
+      animate={prefersReduced ? { opacity: 1, y: 0 } : isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+      transition={{ duration: prefersReduced ? 0 : 0.5, delay: prefersReduced ? 0 : delay, ease: [0.21, 0.47, 0.32, 0.98] }}
       className={className}>
       {children}
     </motion.div>
   );
 };
 
-const StatCounter = ({ value, label, suffix = "", color = "text-[#0070b8]" }: { value: number; label: string; suffix?: string; color?: string }) => {
+const StatCounter = ({ value, label, suffix = "", color = "text-primary" }: { value: number; label: string; suffix?: string; color?: string }) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
+  const prefersReduced = useReducedMotion();
   const [count, setCount] = useState(0);
   useEffect(() => {
+    if (prefersReduced) { setCount(value); return; }
     if (!isInView) return;
     let start = 0;
     const increment = value / (1800 / 16);
@@ -374,7 +403,7 @@ const StatCounter = ({ value, label, suffix = "", color = "text-[#0070b8]" }: { 
       else { setCount(Math.floor(start)); }
     }, 16);
     return () => clearInterval(timer);
-  }, [isInView, value]);
+  }, [isInView, value, prefersReduced]);
   return (
     <div ref={ref} className="bg-white/5 border border-white/10 p-5 sm:p-7 rounded-2xl hover:bg-white/10 transition-colors">
       <div className={`text-3xl sm:text-4xl font-black mb-1 ${color}`}>{count.toLocaleString("ru-RU")}{suffix}</div>
@@ -386,8 +415,10 @@ const StatCounter = ({ value, label, suffix = "", color = "text-[#0070b8]" }: { 
 const AboutStat = ({ value, suffix = "", label, sub, color, className = "" }: { value: number; suffix?: string; label: string; sub?: string; color: string; className?: string }) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
+  const prefersReduced = useReducedMotion();
   const [count, setCount] = useState(0);
   useEffect(() => {
+    if (prefersReduced) { setCount(value); return; }
     if (!isInView) return;
     let start = 0;
     const increment = value / (1600 / 16);
@@ -397,7 +428,7 @@ const AboutStat = ({ value, suffix = "", label, sub, color, className = "" }: { 
       else { setCount(Math.floor(start)); }
     }, 16);
     return () => clearInterval(timer);
-  }, [isInView, value]);
+  }, [isInView, value, prefersReduced]);
   return (
     <div ref={ref} className={className}>
       <div className="text-3xl sm:text-4xl font-extrabold mb-1" style={{ color }}>
@@ -419,7 +450,7 @@ const makeServiceCategories = (brandsCount: number) => [
     cta: "Подобрать автомобиль",
     ctaModal: "buy" as ModalType,
     icon: Car,
-    color: "#0070b8",
+    color: "var(--color-primary)",
     items: [
       { icon: Car,            title: "Новые автомобили",       desc: `Официальные дилеры ${brandsCount} брендов. Широкий выбор в наличии и под заказ.`,          modal: "buy" as ModalType },
       { icon: RotateCcw,      title: "Автомобили с пробегом",  desc: "Проверенные авто с юридической чистотой и историей обслуживания.",             modal: "buy" as ModalType },
@@ -461,6 +492,7 @@ const makeServiceCategories = (brandsCount: number) => [
 
 /* ── UsedCarsSection (carousel) ──────────────────────────── */
 function UsedCarsSection() {
+  const prefersReduced = useReducedMotion();
   const { data: cars = [], isLoading } = useQuery({
     queryKey: ["home-used-cars"],
     queryFn: fetchHomeCars,
@@ -468,7 +500,7 @@ function UsedCarsSection() {
   });
 
   const skeletons = Array.from({ length: 6 }).map((_, i) => (
-    <div key={i} className="snap-start shrink-0 w-full bg-slate-50 rounded-2xl overflow-hidden animate-pulse">
+    <div key={i} className={`snap-start shrink-0 w-full bg-slate-50 rounded-2xl overflow-hidden${prefersReduced ? "" : " animate-pulse"}`}>
       <div className="h-40 bg-slate-200" />
       <div className="p-4 space-y-2">
         <div className="h-3 bg-slate-200 rounded w-3/4" />
@@ -492,6 +524,7 @@ function UsedCarsSection() {
 
 /* ── SpecialOffersSection ───────────────────────────────── */
 function SpecialOffersSection({ onOpenModal }: { onOpenModal: (type: ModalType) => void }) {
+  const prefersReduced = useReducedMotion();
   const { data: cars = [], isLoading } = useQuery({
     queryKey: ["home-special-offers"],
     queryFn: fetchSpecialOffers,
@@ -499,7 +532,7 @@ function SpecialOffersSection({ onOpenModal }: { onOpenModal: (type: ModalType) 
   });
 
   const skeletons = Array.from({ length: 6 }).map((_, i) => (
-    <div key={i} className="snap-start shrink-0 w-full bg-slate-50 rounded-2xl overflow-hidden animate-pulse">
+    <div key={i} className={`snap-start shrink-0 w-full bg-slate-50 rounded-2xl overflow-hidden${prefersReduced ? "" : " animate-pulse"}`}>
       <div className="h-40 bg-slate-200" />
       <div className="p-4 space-y-2">
         <div className="h-3 bg-slate-200 rounded w-3/4" />
@@ -527,7 +560,7 @@ function SpecialOffersSection({ onOpenModal }: { onOpenModal: (type: ModalType) 
           <div className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
           <div className="absolute top-2.5 left-2.5 flex flex-col items-start gap-1">
             {car.maxDiscount > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white bg-[#0070b8]/90 whitespace-nowrap">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white bg-primary/90 whitespace-nowrap">
                 −{fmtPrice(car.maxDiscount)}
               </span>
             )}
@@ -541,16 +574,16 @@ function SpecialOffersSection({ onOpenModal }: { onOpenModal: (type: ModalType) 
             <>
               <div className="flex items-baseline gap-2 mb-0.5">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">от</span>
-                <span className="text-[#0070b8] font-extrabold text-lg">{fmtPrice(salePrice)}</span>
+                <span className="text-primary font-extrabold text-lg">{fmtPrice(salePrice)}</span>
               </div>
               <p className="text-xs text-slate-400 line-through mb-3">{fmtPrice(car.price)}</p>
             </>
           ) : (
-            <p className="text-[#0070b8] font-extrabold text-lg mb-3">{fmtPrice(car.price)}</p>
+            <p className="text-primary font-extrabold text-lg mb-3">{fmtPrice(car.price)}</p>
           )}
           <button
             onClick={e => { e.stopPropagation(); onOpenModal("offer"); }}
-            className="w-full py-2 sm:py-2.5 rounded-xl border-2 border-slate-200 text-xs sm:text-sm font-bold text-slate-600 hover:border-[#0070b8] hover:text-[#0070b8] transition-colors mt-auto">
+            className="w-full py-2 sm:py-2.5 rounded-xl border-2 border-slate-200 text-xs sm:text-sm font-bold text-slate-600 hover:border-primary hover:text-primary transition-colors mt-auto">
             Оставить заявку
           </button>
         </div>
@@ -832,7 +865,7 @@ export default function Home() {
       )}
 
       <SEO
-        title="Дебрянск Авто — Территория Автомобилей"
+        title="Дебрянск Авто | Территория Автомобилей"
         description={`Группа компаний ${apiBrands.length || 13} брендов в Брянске. Продажа, сервис и финансирование с 2011 года. Новые автомобили и авто с пробегом.`}
         canonical="/"
         jsonLd={[
@@ -861,7 +894,7 @@ export default function Home() {
               <CTPhone className="text-xs sm:text-sm font-bold text-white/70 hover:text-white transition-colors"
                 phone={headerPhone} />
               <Button size="sm"
-                className="h-7 sm:h-8 px-3 sm:px-4 brand-gradient border-0 text-white font-bold rounded-lg text-[11px] sm:text-xs hover:opacity-90"
+                className="h-7 sm:h-8 px-3 sm:px-4 brand-gradient border-0 text-white font-bold rounded-xl text-[11px] sm:text-xs hover:opacity-90"
                 onClick={() => openModal("callback")}>
                 Заказать звонок
               </Button>
@@ -899,34 +932,40 @@ export default function Home() {
               <button
                 onMouseEnter={() => setCarsDropdown(true)}
                 onClick={() => setCarsDropdown(v => !v)}
-                className="flex items-center gap-1 px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCarsDropdown(v => !v); }
+                  if (e.key === "Escape") setCarsDropdown(false);
+                }}
+                aria-haspopup="true"
+                aria-expanded={carsDropdown}
+                className="flex items-center gap-1 px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-xl transition-all">
                 Автомобили <ChevronDown className={`w-3.5 h-3.5 transition-transform ${carsDropdown ? "rotate-180" : ""}`} />
               </button>
               {carsDropdown && (
                 <div className="absolute top-full left-0 mt-1 w-44 bg-[#1a1d23] border border-white/10 rounded-xl shadow-xl py-1 z-50">
                   <Link href="/new-cars" onClick={() => setCarsDropdown(false)}
                     className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white/70 hover:text-white hover:bg-white/8 transition-colors">
-                    <Car className="w-4 h-4 text-[#0070b8]" /> Новые автомобили
+                    <Car className="w-4 h-4 text-primary" /> Новые автомобили
                   </Link>
                   <Link href="/cars" onClick={() => setCarsDropdown(false)}
                     className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white/70 hover:text-white hover:bg-white/8 transition-colors">
-                    <RotateCcw className="w-4 h-4 text-[#0070b8]" /> С пробегом
+                    <RotateCcw className="w-4 h-4 text-primary" /> С пробегом
                   </Link>
                 </div>
               )}
             </div>
             {[["О группе","about","/about"],["Для бизнеса","corporate","/corporate"],["Услуги","services","/service"],["Бонусы","bonus","/service/bonus"],["Выкуп","buyout","/buyout"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
               <Link key={id} href={href}
-                className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+                className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-xl transition-all">
                 {label}
               </Link>
             ))}
             <Link href="/vacancies"
-              className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+              className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-xl transition-all">
               Вакансии
             </Link>
             <Link href="/news"
-              className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+              className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-xl transition-all">
               Новости
             </Link>
           </nav>
@@ -935,7 +974,7 @@ export default function Home() {
 
           <div className="hidden lg:flex items-center gap-2 mr-3">
             <Link href="/favorites"
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-xl transition-all">
               <Heart className="w-4 h-4" />
               <span>Избранное</span>
               {favCount > 0 && (
@@ -943,11 +982,11 @@ export default function Home() {
               )}
             </Link>
             <Link href="/compare"
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-xl transition-all">
               <Scale className="w-4 h-4" />
               <span>Сравнить</span>
               {compCount > 0 && (
-                <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{compCount}</span>
+                <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{compCount}</span>
               )}
             </Link>
           </div>
@@ -960,17 +999,17 @@ export default function Home() {
         {/* Mobile menu dropdown */}
         <AnimatePresence>
           {mobileMenuOpen && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
+            <motion.div initial={reducedMotion ? false : { height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
               className="overflow-hidden border-t border-white/[0.07] bg-[#111317]">
               <div className="px-4 py-3 flex flex-col gap-0.5">
                 <Link href="/new-cars" onClick={() => setMobileMenuOpen(false)}
                   className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors flex items-center gap-2">
-                  <Car className="w-4 h-4 text-[#0070b8]" /> Новые автомобили
+                  <Car className="w-4 h-4 text-primary" /> Новые автомобили
                 </Link>
                 <Link href="/cars" onClick={() => setMobileMenuOpen(false)}
                   className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors flex items-center gap-2">
-                  <RotateCcw className="w-4 h-4 text-[#0070b8]" /> Автомобили с пробегом
+                  <RotateCcw className="w-4 h-4 text-primary" /> Автомобили с пробегом
                 </Link>
                 {[["О группе","about","/about"],["Для бизнеса","corporate","/corporate"],["Услуги","services","/service"],["Бонусы","bonus","/service/bonus"],["Выкуп","buyout","/buyout"],["Контакты","contacts","/contacts"]].map(([label, id, href]) => (
                   href.startsWith("/") ? (
@@ -999,15 +1038,15 @@ export default function Home() {
                 </Link>
                 <Link href="/compare"
                   className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block flex items-center gap-2">
-                  <Scale className="w-4 h-4" /> Сравнить {compCount > 0 && <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{compCount}</span>}
+                  <Scale className="w-4 h-4" /> Сравнить {compCount > 0 && <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{compCount}</span>}
                 </Link>
                 <div className="pt-3 flex items-center justify-between">
-                  <CTPhone className="text-base font-bold text-[#0070b8]" phone={headerPhone} />
+                  <CTPhone className="text-base font-bold text-primary" phone={headerPhone} />
                   <div className="flex gap-2">
-                    <a href="#" className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center hover:bg-[#0070b8] transition-colors">
+                    <a href="https://vk.com/debryanskavto" aria-label="ВКонтакте" target="_blank" rel="noopener noreferrer" className="w-11 h-11 rounded-full bg-white/8 flex items-center justify-center hover:bg-primary transition-colors">
                       <SiVk size={14} />
                     </a>
-                    <a href="#" className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center hover:bg-[#0070b8] transition-colors">
+                    <a href="https://t.me/debryanskavto" aria-label="Telegram" target="_blank" rel="noopener noreferrer" className="w-11 h-11 rounded-full bg-white/8 flex items-center justify-center hover:bg-primary transition-colors">
                       <SiTelegram size={14} />
                     </a>
                   </div>
@@ -1046,12 +1085,11 @@ export default function Home() {
 
             {/* Badge */}
             <motion.div
-              initial={{ opacity: 0, y: -12 }}
+              initial={reducedMotion ? false : { opacity: 0, y: -12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.15 }}
               className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 backdrop-blur-sm rounded-full text-[10px] sm:text-xs font-bold tracking-widest uppercase text-white/70 mb-5 sm:mb-7 border border-white/15"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-[#87b63c] shrink-0 animate-pulse" />
               Группа компаний
             </motion.div>
 
@@ -1076,18 +1114,18 @@ export default function Home() {
 
             {/* Subtitle */}
             <motion.p
-              initial={{ opacity: 0, y: 16 }}
+              initial={reducedMotion ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.4 }}
               className="text-sm sm:text-base md:text-lg text-white/55 leading-relaxed max-w-md font-medium mb-8 sm:mb-10"
             >
-              {apiBrands.length} брендов · 4 дилерских центра · Брянск.<br className="hidden sm:block" />{" "}
+              {apiBrands.length} брендов · 4 дилерских центра<br className="hidden sm:block" />{" "}
               Продажа, сервис и финансирование с 2011 года.
             </motion.p>
 
             {/* Quick-action tiles */}
             <motion.div
-              initial={{ opacity: 0, y: 16 }}
+              initial={reducedMotion ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.55, delay: 0.55 }}
               className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 w-full max-w-3xl"
@@ -1101,7 +1139,7 @@ export default function Home() {
                 const cls = "bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl px-4 py-3.5 sm:px-5 sm:py-4 text-left hover:bg-white/18 hover:border-white/28 transition-all group active:scale-[0.98]";
                 const inner = (
                   <>
-                    <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-[#0070b8] mb-2 group-hover:text-[#87b63c] transition-colors" />
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary mb-2 group-hover:text-[#87b63c] transition-colors" />
                     <div className="font-bold text-white text-xs sm:text-sm leading-tight">{label}</div>
                     <div className="text-white/40 text-[10px] sm:text-xs mt-0.5 leading-snug">{sub}</div>
                   </>
@@ -1133,7 +1171,7 @@ export default function Home() {
               { label: "С пробегом",   modal: null,                     href: "/cars" },
               { label: "Сервис",       modal: null,                     href: "/service" },
             ].map(({ label, modal, href }) => {
-              const cls = "shrink-0 px-4 sm:px-6 py-3.5 sm:py-4 text-xs sm:text-sm font-bold text-slate-500 hover:text-[#0070b8] hover:border-b-2 hover:border-[#0070b8] border-b-2 border-transparent transition-all whitespace-nowrap";
+              const cls = "shrink-0 px-4 sm:px-6 py-3.5 sm:py-4 text-xs sm:text-sm font-bold text-slate-500 hover:text-primary hover:border-b-2 hover:border-primary border-b-2 border-transparent transition-all whitespace-nowrap";
               return href
                 ? <Link key={label} href={href} className={cls}>{label}</Link>
                 : <button key={label} onClick={() => modal && openModal(modal)} className={cls}>{label}</button>;
@@ -1162,13 +1200,13 @@ export default function Home() {
                     style={{ aspectRatio: "5/3" }}
                   >
                     {/* Card base */}
-                    <div className="absolute inset-0 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] border border-slate-200/60 group-hover:shadow-[0_12px_40px_rgba(0,112,184,0.18),inset_0_1px_0_rgba(255,255,255,0.9)] group-hover:border-[#0070b8]/20 transition-all duration-500" />
+                    <div className="absolute inset-0 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] border border-slate-200/60 group-hover:shadow-[0_12px_40px_rgba(0,112,184,0.18),inset_0_1px_0_rgba(255,255,255,0.9)] group-hover:border-primary/20 transition-all duration-500" />
                     {/* Gradient sheen */}
                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30" />
                     {/* Hover glow */}
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#0070b8]/5 via-transparent to-emerald-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/5 via-transparent to-emerald-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     {/* Top accent line */}
-                    <div className="absolute top-0 left-4 right-4 h-[2px] bg-gradient-to-r from-transparent via-[#0070b8]/30 to-transparent rounded-full opacity-60 group-hover:opacity-100 group-hover:via-[#0070b8]/50 transition-all duration-500" />
+                    <div className="absolute top-0 left-4 right-4 h-[2px] bg-gradient-to-r from-transparent via-primary/30 to-transparent rounded-full opacity-60 group-hover:opacity-100 group-hover:via-primary/50 transition-all duration-500" />
                     {/* Content */}
                     <div className="relative z-10 w-full h-full flex flex-col items-center justify-center p-4 sm:p-5">
                       {b.logoUrl ? (
@@ -1183,30 +1221,30 @@ export default function Home() {
                             onError={e => { e.currentTarget.style.display = "none"; }}
                           />
                           {b.subName && (
-                            <span className="mt-1 text-[10px] sm:text-xs font-black tracking-widest uppercase text-slate-500 group-hover:text-[#0070b8] transition-colors duration-300">
+                            <span className="mt-1 text-[10px] sm:text-xs font-black tracking-widest uppercase text-slate-500 group-hover:text-primary transition-colors duration-300">
                               {b.subName}
                             </span>
                           )}
                         </>
                       ) : (
                         <div className="flex flex-col items-center justify-center h-full">
-                          <Car className="w-8 h-8 sm:w-10 sm:h-10 text-[#0070b8]/70 mb-1.5 group-hover:text-[#0070b8] group-hover:scale-110 transition-all duration-300" />
-                          <span className="text-xs sm:text-sm font-bold text-slate-600 group-hover:text-[#0070b8] text-center leading-tight transition-colors duration-300">{b.name}</span>
+                          <Car className="w-8 h-8 sm:w-10 sm:h-10 text-primary/70 mb-1.5 group-hover:text-primary group-hover:scale-110 transition-all duration-300" />
+                          <span className="text-xs sm:text-sm font-bold text-slate-600 group-hover:text-primary text-center leading-tight transition-colors duration-300">{b.name}</span>
                         </div>
                       )}
                       {/* Arrow */}
-                      <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-[#0070b8]/0 group-hover:bg-[#0070b8]/10 flex items-center justify-center transition-all duration-300">
-                        <ArrowUpRight className="w-4 h-4 text-[#0070b8] opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0" />
+                      <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-primary/0 group-hover:bg-primary/10 flex items-center justify-center transition-all duration-300">
+                        <ArrowUpRight className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0" />
                       </div>
                       {/* Service badge */}
                       {b.isServiceOnly && (
-                        <span className="absolute bottom-2.5 left-3 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-[#0070b8] bg-[#0070b8]/10 border border-[#0070b8]/20 rounded-md px-1.5 py-0.5 leading-none">
+                        <span className="absolute bottom-2.5 left-3 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/20 rounded-md px-1.5 py-0.5 leading-none">
                           Сервис
                         </span>
                       )}
                       {/* Car count badge */}
                       {!b.isServiceOnly && !!b.carCount && b.carCount > 0 && (
-                        <span className="absolute bottom-2.5 right-3 text-[9px] sm:text-[10px] font-semibold text-slate-400 group-hover:text-[#0070b8] transition-colors duration-300 leading-none">
+                        <span className="absolute bottom-2.5 right-3 text-[9px] sm:text-[10px] font-semibold text-slate-400 group-hover:text-primary transition-colors duration-300 leading-none">
                           {b.carCount} авто
                         </span>
                       )}
@@ -1273,7 +1311,7 @@ export default function Home() {
               <p className="text-slate-300 text-sm sm:text-base leading-relaxed mb-8 max-w-md">
                 Группа компаний с {apiBrands.length} официальными брендами.
                 Продажа новых автомобилей, авто с пробегом,
-                сервис и финансирование — всё в одном холдинге.
+                сервис и финансирование: всё в одном холдинге.
               </p>
               <button
                 onClick={() => openModal("callback")}
@@ -1299,13 +1337,13 @@ export default function Home() {
                     style={{ background: `radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,112,184,0.12) 0%, transparent 60%)` }} />
                   <div className="relative p-6 sm:p-8">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-xl bg-[#0070b8]/20 flex items-center justify-center">
-                        <Building2 className="w-5 h-5 text-[#0070b8]" />
+                      <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                        <Building2 className="w-5 h-5 text-primary" />
                       </div>
                       <div className="text-sm text-slate-400">С 2011 года в Брянске</div>
                     </div>
                     <div className="text-4xl sm:text-5xl font-extrabold text-white mb-2">
-                      15<span className="text-[#0070b8]">+</span>
+                      15<span className="text-primary">+</span>
                     </div>
                     <div className="text-base font-bold text-white">лет на рынке</div>
                   </div>
@@ -1336,8 +1374,8 @@ export default function Home() {
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
                       style={{ background: `radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,112,184,0.12) 0%, transparent 60%)` }} />
                     <div className="relative p-5 sm:p-6">
-                      <div className="w-10 h-10 rounded-xl bg-[#0070b8]/20 flex items-center justify-center mb-3">
-                        <Sparkles className="w-5 h-5 text-[#0070b8]" />
+                      <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center mb-3">
+                        <Sparkles className="w-5 h-5 text-primary" />
                       </div>
                       <div className="text-3xl sm:text-4xl font-extrabold text-white mb-1">
                         {apiBrands.length || 9}
@@ -1360,13 +1398,13 @@ export default function Home() {
 
           {/* Section header */}
           <FadeIn className="mb-10 sm:mb-14">
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2 sm:mb-3">Что мы предлагаем</p>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-primary mb-2 sm:mb-3">Что мы предлагаем</p>
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-8">
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 leading-tight">
                 Наши услуги
               </h2>
               <p className="text-sm sm:text-base text-slate-500 max-w-sm sm:text-right leading-relaxed">
-                Всё для вашего автомобиля —<br className="hidden sm:block" /> от покупки до обслуживания и финансирования.
+                Всё для вашего автомобиля:<br className="hidden sm:block" /> от покупки до обслуживания и финансирования.
               </p>
             </div>
           </FadeIn>
@@ -1434,7 +1472,7 @@ export default function Home() {
             <div className="bg-[#0d0f14] rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-5">
               <div>
                 <p className="font-extrabold text-white text-lg sm:text-xl mb-1">Не нашли нужную услугу?</p>
-                <p className="text-slate-400 text-sm">Позвоните или оставьте заявку — ответим в течение 5 минут</p>
+                <p className="text-slate-400 text-sm">Позвоните или оставьте заявку, ответим в течение 5 минут</p>
               </div>
               <Button
                 className="brand-gradient text-white font-bold rounded-2xl px-8 py-3 hover:opacity-90 shrink-0 border-0 text-sm"
@@ -1452,9 +1490,8 @@ export default function Home() {
       <section id="dealers" className="py-16 sm:py-24 md:py-32 bg-slate-50">
         <div className="container mx-auto px-4 sm:px-6">
           <FadeIn className="mb-8 sm:mb-10">
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2 sm:mb-3">Где мы находимся</p>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Территория центров в городе</h2>
-            <p className="text-slate-500 mt-2 text-sm sm:text-base">4 локации в Брянске — более 11 торгово-сервисных точек</p>
+            <p className="text-slate-500 mt-2 text-sm sm:text-base">4 локации в Брянске, более 11 торгово-сервисных точек</p>
           </FadeIn>
 
           <div ref={mapSectionRef} className="relative isolate z-0 w-full h-[400px] sm:h-[500px] md:h-[600px] rounded-2xl overflow-hidden border border-slate-200 shadow-lg">
@@ -1475,7 +1512,7 @@ export default function Home() {
                     }}
                     className={`w-full text-left bg-white rounded-2xl border p-4 sm:p-5 transition-all ${
                       isActive
-                        ? "border-[#0070b8] shadow-[0_0_0_2px_rgba(0,112,184,0.18)] shadow-md"
+                        ? "border-primary shadow-[0_0_0_2px_rgba(0,112,184,0.18)] shadow-md"
                         : "border-slate-100 hover:shadow-md hover:border-slate-200"
                     }`}
                   >
@@ -1506,7 +1543,7 @@ export default function Home() {
                           ))}
                         </div>
                         {loc.phone && (
-                          <CTPhone className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0070b8] hover:text-[#0058a0] transition-colors mt-3"
+                          <CTPhone className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-[#0058a0] transition-colors mt-3"
                             phone={normalizePhone(loc.phone) || loc.phone}>
                             <Phone className="w-3.5 h-3.5" />
                             {normalizePhone(loc.phone) || loc.phone}
@@ -1546,7 +1583,6 @@ export default function Home() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
           >
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#87b63c] mb-2 sm:mb-3">Обратная связь</p>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white">Свяжитесь с нами</h2>
           </motion.div>
 
@@ -1566,12 +1602,12 @@ export default function Home() {
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
                     style={{ background: `radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,112,184,0.12) 0%, transparent 60%)` }} />
                   <div className="relative p-6 sm:p-8 flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-[#0070b8]/20 flex items-center justify-center shrink-0">
-                      <Phone className="w-5 h-5 text-[#0070b8]" />
+                    <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center shrink-0">
+                      <Phone className="w-5 h-5 text-primary" />
                     </div>
                     <div>
                       <div className="text-xs font-bold text-slate-400 uppercase mb-1">Телефон</div>
-                      <CTPhone className="text-xl sm:text-2xl font-extrabold text-white hover:text-[#0070b8] transition-colors"
+                      <CTPhone className="text-xl sm:text-2xl font-extrabold text-white hover:text-primary transition-colors"
                         phone={headerPhone} />
                     </div>
                   </div>
@@ -1618,7 +1654,7 @@ export default function Home() {
                         <FormLabel className="text-slate-300 text-sm font-semibold">Имя</FormLabel>
                         <FormControl>
                           <Input placeholder="Ваше имя" {...field}
-                            className="bg-white/10 border-white/15 text-white placeholder:text-slate-500 rounded-xl h-11 sm:h-12 focus-visible:ring-[#0070b8] focus-visible:ring-offset-0" />
+                            className="bg-white/10 border-white/15 text-white placeholder:text-slate-500 rounded-xl h-11 sm:h-12 focus-visible:ring-primary focus-visible:ring-offset-0" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1630,7 +1666,7 @@ export default function Home() {
                           <Input placeholder="+7 (___) ___-__-__" {...field}
                             type="tel" inputMode="tel" maxLength={18}
                             onChange={e => field.onChange(formatPhone(e.target.value))}
-                            className="bg-white/10 border-white/15 text-white placeholder:text-slate-500 rounded-xl h-11 sm:h-12 focus-visible:ring-[#0070b8] focus-visible:ring-offset-0" />
+                            className="bg-white/10 border-white/15 text-white placeholder:text-slate-500 rounded-xl h-11 sm:h-12 focus-visible:ring-primary focus-visible:ring-offset-0" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1640,7 +1676,7 @@ export default function Home() {
                         <FormLabel className="text-slate-300 text-sm font-semibold">Сообщение (необязательно)</FormLabel>
                         <FormControl>
                           <Textarea placeholder="Ваш вопрос или пожелание" {...field}
-                            className="bg-white/10 border-white/15 text-white placeholder:text-slate-500 rounded-xl min-h-[80px] sm:min-h-[90px] focus-visible:ring-[#0070b8] focus-visible:ring-offset-0 resize-none" />
+                            className="bg-white/10 border-white/15 text-white placeholder:text-slate-500 rounded-xl min-h-[80px] sm:min-h-[90px] focus-visible:ring-primary focus-visible:ring-offset-0 resize-none" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1666,7 +1702,7 @@ export default function Home() {
         <div className="container mx-auto px-4 sm:px-6">
           <div
             className="relative overflow-hidden rounded-2xl px-6 py-5 sm:px-8 sm:py-6 flex flex-col sm:flex-row items-start sm:items-center gap-4"
-            style={{ background: "linear-gradient(135deg, #0070b8 0%, #005a96 60%, #004880 100%)" }}
+            style={{ background: "linear-gradient(135deg, var(--color-primary) 0%, #005a96 60%, #004880 100%)" }}
           >
             {/* Subtle decorative ring */}
             <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full border-[20px] border-white/5 pointer-events-none" />
@@ -1678,7 +1714,7 @@ export default function Home() {
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white font-extrabold text-base sm:text-lg leading-tight">Навигатор — AI‑помощник по выбору авто</p>
+              <p className="text-white font-extrabold text-base sm:text-lg leading-tight">Навигатор: AI‑помощник по выбору авто</p>
               <p className="text-white/70 text-xs sm:text-sm mt-0.5">Подберёт автомобиль по бюджету, расскажет об условиях кредита и трейд-ин, запишет на тест-драйв</p>
             </div>
             <button
@@ -1686,7 +1722,7 @@ export default function Home() {
                 const event = new CustomEvent("navigator:open");
                 window.dispatchEvent(event);
               }}
-              className="shrink-0 bg-white text-[#0070b8] font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-white/90 transition-colors whitespace-nowrap flex items-center gap-2"
+              className="shrink-0 bg-white text-primary font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-white/90 transition-colors whitespace-nowrap flex items-center gap-2"
             >
               <Navigation className="w-4 h-4" />
               Спросить Навигатора
@@ -1709,7 +1745,7 @@ export default function Home() {
                 <input
                   type="email"
                   placeholder="Ваш email"
-                  className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#0070b8]/50 transition-colors"
+                  className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50 transition-colors"
                 />
                 <Button className="brand-gradient border-0 text-white font-bold rounded-xl px-6 hover:opacity-90 shrink-0">
                   Подписаться
@@ -1733,10 +1769,10 @@ export default function Home() {
                 Территория Автомобилей. Группа компаний с {apiBrands.length || 13} брендами в Брянске с 2011 года.
               </p>
               <div className="flex gap-2.5">
-                <a href="#" aria-label="ВКонтакте" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#0070b8] transition-colors group">
+                <a href="https://vk.com/debryanskavto" aria-label="ВКонтакте" target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary transition-colors group">
                   <SiVk className="text-white/40 group-hover:text-white" size={15} />
                 </a>
-                <a href="#" aria-label="Telegram" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#0070b8] transition-colors group">
+                <a href="https://t.me/debryanskavto" aria-label="Telegram" target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary transition-colors group">
                   <SiTelegram className="text-white/40 group-hover:text-white" size={15} />
                 </a>
               </div>
@@ -1744,17 +1780,17 @@ export default function Home() {
             <div>
               <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Каталог</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="/new-cars" className="hover:text-[#0070b8] transition-colors">Новые автомобили</a></li>
-                <li><a href="/cars" className="hover:text-[#0070b8] transition-colors">Автомобили с пробегом</a></li>
-                <li><a href="/buyout" className="hover:text-[#0070b8] transition-colors">Выкуп и комиссия</a></li>
-                <li><a href="/compare" className="hover:text-[#0070b8] transition-colors">Сравнение авто</a></li>
+                <li><a href="/new-cars" className="hover:text-primary transition-colors">Новые автомобили</a></li>
+                <li><a href="/cars" className="hover:text-primary transition-colors">Автомобили с пробегом</a></li>
+                <li><a href="/buyout" className="hover:text-primary transition-colors">Выкуп и комиссия</a></li>
+                <li><a href="/compare" className="hover:text-primary transition-colors">Сравнение авто</a></li>
               </ul>
             </div>
             <div>
               <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Услуги</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="/service" className="hover:text-[#0070b8] transition-colors">Сервис и ТО</a></li>
-                <li><a href="/about" className="hover:text-[#0070b8] transition-colors">О группе</a></li>
+                <li><a href="/service" className="hover:text-primary transition-colors">Сервис и ТО</a></li>
+                <li><a href="/about" className="hover:text-primary transition-colors">О группе</a></li>
                 {[
                   { label: "Haval City", href: "/new-cars?dealer=Haval%20City" },
                   { label: "Haval Pro", href: "/new-cars?dealer=Haval%20Pro" },
@@ -1766,7 +1802,7 @@ export default function Home() {
                   { label: "Jeland", href: "/new-cars?dealer=Jeland" },
                 ].map(b => (
                   <li key={b.label}>
-                    <a href={b.href} className="hover:text-[#0070b8] transition-colors">{b.label}</a>
+                    <a href={b.href} className="hover:text-primary transition-colors">{b.label}</a>
                   </li>
                 ))}
               </ul>
@@ -1774,14 +1810,14 @@ export default function Home() {
             <div>
               <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Компания</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="/contacts" className="hover:text-[#0070b8] transition-colors">Контакты</a></li>
-                <li><a href="/vacancies" className="hover:text-[#0070b8] transition-colors">Вакансии</a></li>
-                <li><a href="/news" className="hover:text-[#0070b8] transition-colors">Новости</a></li>
+                <li><a href="/contacts" className="hover:text-primary transition-colors">Контакты</a></li>
+                <li><a href="/vacancies" className="hover:text-primary transition-colors">Вакансии</a></li>
+                <li><a href="/news" className="hover:text-primary transition-colors">Новости</a></li>
               </ul>
             </div>
           </div>
           <div className="pt-6 sm:pt-8 border-t border-white/[0.07] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-            <p>© {new Date().getFullYear()} Дебрянск Авто — Территория Автомобилей</p>
+            <p>© {new Date().getFullYear()} Дебрянск Авто · Территория Автомобилей</p>
             <a href="/privacy" className="hover:text-white transition-colors">Политика конфиденциальности</a>
           </div>
         </div>
