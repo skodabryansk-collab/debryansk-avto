@@ -105,7 +105,7 @@ export default function HomeCarousel({
         <div className="flex items-end justify-between mb-5 sm:mb-8 md:mb-10">
           <div>
             {subtitle && (
-              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-1 sm:mb-1.5">
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-primary mb-1 sm:mb-1.5">
                 {subtitle}
               </p>
             )}
@@ -120,21 +120,21 @@ export default function HomeCarousel({
               <button
                 onClick={prev}
                 disabled={page === 0}
-                className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center hover:border-[#0070b8] hover:text-[#0070b8] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center hover:border-primary hover:text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 onClick={next}
                 disabled={page >= pages - 1}
-                className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center hover:border-[#0070b8] hover:text-[#0070b8] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center hover:border-primary hover:text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
             <Link
               href={viewAllLink}
-              className="flex items-center gap-1.5 text-[#0070b8] font-bold text-sm hover:gap-2.5 transition-all"
+              className="flex items-center gap-1.5 text-primary font-bold text-sm hover:gap-2.5 transition-all"
             >
               {viewAllLabel} <ChevronRight className="w-4 h-4" />
             </Link>
@@ -164,7 +164,7 @@ export default function HomeCarousel({
                   onClick={() => goToMobilePage(i)}
                   className={`h-2 rounded-full transition-all ${
                     i === mobilePage
-                      ? "w-[18px] bg-[#0070b8]"
+                      ? "w-[18px] bg-primary"
                       : "w-2 bg-slate-300 hover:bg-slate-400"
                   }`}
                   aria-label={`Страница ${i + 1}`}
@@ -197,7 +197,7 @@ export default function HomeCarousel({
                   onClick={() => goToPage(i)}
                   className={`h-2 rounded-full transition-all ${
                     i === page
-                      ? "w-[18px] bg-[#0070b8]"
+                      ? "w-[18px] bg-primary"
                       : "w-2 bg-slate-300 hover:bg-slate-400"
                   }`}
                   aria-label={`Страница ${i + 1}`}
@@ -211,7 +211,7 @@ export default function HomeCarousel({
         <div className="flex justify-center mt-5 md:hidden">
           <Link
             href={viewAllLink}
-            className="flex items-center gap-2 bg-[#0070b8] text-white font-bold text-sm px-6 py-3 rounded-xl hover:bg-[#005a9a] transition-colors"
+            className="flex items-center gap-2 bg-primary text-white font-bold text-sm px-6 py-3 rounded-xl hover:bg-[#005a9a] transition-colors"
           >
             {viewAllLabel} <ChevronRight className="w-4 h-4" />
           </Link>
