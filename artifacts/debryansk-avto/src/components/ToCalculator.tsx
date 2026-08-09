@@ -44,7 +44,7 @@ function SelectField({ label, value, options, onChange, disabled, placeholder }:
       <div className="relative">
         <select value={value} onChange={e => onChange(e.target.value)} disabled={disabled}
           className={`w-full appearance-none rounded-xl border px-4 py-3 pr-10 text-sm font-medium bg-white transition-colors outline-none
-            ${disabled ? "text-slate-300 border-slate-100 cursor-not-allowed" : "text-slate-800 border-slate-200 hover:border-[#0070b8]/50 focus:border-[#0070b8] cursor-pointer"}`}>
+            ${disabled ? "text-slate-300 border-slate-100 cursor-not-allowed" : "text-slate-800 border-slate-200 hover:border-primary/50 focus:border-primary cursor-pointer"}`}>
           <option value="">{placeholder}</option>
           {options.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
@@ -64,7 +64,7 @@ function ToSelectField({ label, value, entries, onChange, disabled, placeholder 
       <div className="relative">
         <select value={value} onChange={e => onChange(e.target.value)} disabled={disabled}
           className={`w-full appearance-none rounded-xl border px-4 py-3 pr-10 text-sm font-medium bg-white transition-colors outline-none
-            ${disabled ? "text-slate-300 border-slate-100 cursor-not-allowed" : "text-slate-800 border-slate-200 hover:border-[#0070b8]/50 focus:border-[#0070b8] cursor-pointer"}`}>
+            ${disabled ? "text-slate-300 border-slate-100 cursor-not-allowed" : "text-slate-800 border-slate-200 hover:border-primary/50 focus:border-primary cursor-pointer"}`}>
           <option value="">{placeholder}</option>
           {entries.map(e => <option key={e.TO} value={e.TO}>{e.TO} — {e.Mileage.toLocaleString("ru-RU")} км</option>)}
         </select>
@@ -76,8 +76,8 @@ function ToSelectField({ label, value, entries, onChange, disabled, placeholder 
 
 function CostBreakdown({ entry }: { entry: VinTOEntry | TOEntry }) {
   return (
-    <div className="bg-gradient-to-r from-[#0070b8]/5 to-[#87b63c]/5 border border-[#0070b8]/15 rounded-2xl p-5 sm:p-6">
-      <p className="text-[11px] font-bold uppercase tracking-widest text-[#0070b8] mb-4">
+    <div className="bg-gradient-to-r from-primary/5 to-[#87b63c]/5 border border-primary/15 rounded-2xl p-5 sm:p-6">
+      <p className="text-[11px] font-bold uppercase tracking-widest text-primary mb-4">
         Расчёт стоимости — {entry.TO} ({entry.Mileage.toLocaleString("ru-RU")} км)
       </p>
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
@@ -89,7 +89,7 @@ function CostBreakdown({ entry }: { entry: VinTOEntry | TOEntry }) {
           <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Запчасти</div>
           <div className="text-sm sm:text-lg font-extrabold text-slate-900 whitespace-nowrap">{fmt(entry.SumSpareParts)}</div>
         </div>
-        <div className="bg-[#0070b8] rounded-xl p-3 sm:p-4 border border-[#0070b8]">
+        <div className="bg-primary rounded-xl p-3 sm:p-4 border border-primary">
           <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-blue-200 mb-1.5">Итого</div>
           <div className="text-sm sm:text-lg font-extrabold text-white whitespace-nowrap">{fmt(entry.TotalSum)}</div>
         </div>
@@ -107,7 +107,7 @@ function CostBreakdown({ entry }: { entry: VinTOEntry | TOEntry }) {
           </div>
           <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-[#87b63c]/20">
             <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Начислят баллов</div>
-            <div className="text-sm sm:text-base font-extrabold text-[#0070b8] whitespace-nowrap">+{fmt(Math.round(entry.TotalSum * 0.1))}</div>
+            <div className="text-sm sm:text-base font-extrabold text-primary whitespace-nowrap">+{fmt(Math.round(entry.TotalSum * 0.1))}</div>
           </div>
         </div>
         <p className="text-[10px] text-slate-400 leading-relaxed">
@@ -153,20 +153,20 @@ function BookingForm({ onSend }: { onSend: (name: string, phone: string) => Prom
         <div className="flex flex-col gap-1.5">
           <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Ваше имя</label>
           <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Имя"
-            className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-800 placeholder:text-slate-300 hover:border-[#0070b8]/50 focus:border-[#0070b8] outline-none transition-colors" />
+            className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-800 placeholder:text-slate-300 hover:border-primary/50 focus:border-primary outline-none transition-colors" />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Телефон *</label>
           <input type="tel" value={phone} onChange={e => setPhone(formatPhone(e.target.value))}
             onBlur={() => setPhoneTouched(true)} placeholder="+7 (___) ___-__-__"
             className={`rounded-xl border px-4 py-3 text-sm font-medium text-slate-800 placeholder:text-slate-300 outline-none transition-colors
-              ${phoneTouched && !isPhoneValid(phone) ? "border-red-300" : "border-slate-200 hover:border-[#0070b8]/50 focus:border-[#0070b8]"}`} />
+              ${phoneTouched && !isPhoneValid(phone) ? "border-red-300" : "border-slate-200 hover:border-primary/50 focus:border-primary"}`} />
           {phoneTouched && !isPhoneValid(phone) && <span className="text-xs text-red-500">Введите корректный номер</span>}
         </div>
       </div>
       {error && <p className="text-sm text-red-500 mt-3">{error}</p>}
       <button type="submit" disabled={sending || !isPhoneValid(phone)}
-        className="mt-4 inline-flex items-center gap-2 bg-[#0070b8] hover:bg-[#005a94] disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors">
+        className="mt-4 inline-flex items-center gap-2 bg-primary hover:bg-[#005a94] disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors">
         {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Отправляем...</> : <><Send className="w-4 h-4" /> Записаться на ТО</>}
       </button>
     </form>
@@ -185,7 +185,7 @@ function VinResultPanel({ result, onClear }: { result: VinLookupResult; onClear:
   if (!mods.length) return null;
 
   return (
-    <div className="rounded-2xl border border-[#0070b8]/20 bg-[#0070b8]/3 overflow-hidden">
+    <div className="rounded-2xl border border-primary/20 bg-primary/3 overflow-hidden">
       <div className="p-5 space-y-4">
         {mods.length > 1 && (
           <div>
@@ -193,7 +193,7 @@ function VinResultPanel({ result, onClear }: { result: VinLookupResult; onClear:
             <div className="flex flex-wrap gap-2">
               {mods.map((m, i) => (
                 <button key={m.name} onClick={() => { setModIdx(i); setToKey(m.entries[0]?.TO ?? ""); setCalculated(false); }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${modIdx === i ? "bg-[#0070b8] text-white border-[#0070b8]" : "bg-white text-slate-600 border-slate-200 hover:border-[#0070b8]/50"}`}>
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${modIdx === i ? "bg-primary text-white border-primary" : "bg-white text-slate-600 border-slate-200 hover:border-primary/50"}`}>
                   {m.engine || m.name}{m.power > 0 ? `, ${m.power} л.с.` : ""}
                 </button>
               ))}
@@ -206,7 +206,7 @@ function VinResultPanel({ result, onClear }: { result: VinLookupResult; onClear:
             <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 block mb-2">Вид ТО</label>
             <div className="relative">
               <select value={toKey} onChange={e => { setToKey(e.target.value); setCalculated(false); }}
-                className="w-full appearance-none rounded-xl border border-slate-200 px-4 py-3 pr-10 text-sm font-medium text-slate-800 hover:border-[#0070b8]/50 focus:border-[#0070b8] outline-none transition-colors bg-white">
+                className="w-full appearance-none rounded-xl border border-slate-200 px-4 py-3 pr-10 text-sm font-medium text-slate-800 hover:border-primary/50 focus:border-primary outline-none transition-colors bg-white">
                 {mod.entries.map(e => <option key={e.TO} value={e.TO}>{e.TO} — {e.Mileage.toLocaleString("ru-RU")} км</option>)}
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -311,11 +311,11 @@ export default function ToCalculator({ brandName }: { brandName: string }) {
         <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-60px" }} transition={{ duration: 0.5 }}>
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-2xl bg-[#0070b8] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center">
               <Calculator className="w-5 h-5 text-white" />
             </div>
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-[#0070b8]">Техническое обслуживание</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-primary">Техническое обслуживание</p>
               <h2 className="text-2xl font-extrabold text-slate-900">Калькулятор стоимости ТО</h2>
             </div>
           </div>
@@ -365,7 +365,7 @@ export default function ToCalculator({ brandName }: { brandName: string }) {
                     <input type="text" inputMode="numeric" maxLength={4} value={year}
                       onChange={e => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
                       placeholder="Например: 2023"
-                      className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-800 placeholder:text-slate-300 hover:border-[#0070b8]/50 focus:border-[#0070b8] outline-none transition-colors" />
+                      className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-800 placeholder:text-slate-300 hover:border-primary/50 focus:border-primary outline-none transition-colors" />
                   </div>
                 </div>
 
