@@ -22,6 +22,7 @@ interface TargetCar {
 interface TradeInModalProps {
   onClose: () => void;
   targetCar?: TargetCar;
+  dealer?: string;
 }
 
 interface CmItem { id: string; name: string }
@@ -45,7 +46,7 @@ interface EstimateResult {
   message?: string;
 }
 
-export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
+export function TradeInModal({ onClose, targetCar, dealer }: TradeInModalProps) {
   const [submitted, setSubmitted] = useState(false);
   const [estimateResult, setEstimateResult] = useState<EstimateResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -246,6 +247,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
         if (targetCar.price) fd.append("targetPrice", String(targetCar.price));
         fd.append("targetIsNew", targetCar.isNew ? "да" : "нет");
       }
+      if (dealer) fd.append("dealer", dealer);
       await fetch("/api/send-email", { method: "POST", body: fd });
     } catch (_) {}
 
@@ -412,7 +414,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                           {bodies.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
                         {bodiesLoading
-                          ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                           : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                         }
                       </div>
@@ -438,7 +440,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                           {years.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                         {yearsLoading
-                          ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                           : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                         }
                       </div>
@@ -479,7 +481,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                                 {(modOptions?.engineVolumes ?? []).map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
                               </select>
                               {modOptionsLoading
-                                ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                                 : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                               }
                             </div>
@@ -501,7 +503,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                                 {filteredDriveItems.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                               </select>
                               {modOptionsLoading
-                                ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                                 : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                               }
                             </div>
@@ -523,7 +525,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                                 {filteredPowerItems.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                               </select>
                               {modOptionsLoading
-                                ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                                 : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                               }
                             </div>
@@ -545,7 +547,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                                 {filteredGearItems.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
                               </select>
                               {modOptionsLoading
-                                ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                                 : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                               }
                             </div>
@@ -586,7 +588,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                               {(modOptions?.complectations ?? []).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                             </select>
                             {modOptionsLoading
-                              ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                              ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                               : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                             }
                           </div>
@@ -684,7 +686,7 @@ export function TradeInModal({ onClose, targetCar }: TradeInModalProps) {
                   className="w-full h-12 bg-gradient-to-r from-[#d97706] to-[#b45309] hover:from-[#b45309] hover:to-[#92400e] text-white font-semibold text-base shadow-lg shadow-[#d97706]/25 transition-all duration-300 hover:shadow-xl hover:shadow-[#d97706]/30 hover:-translate-y-0.5 disabled:opacity-50"
                 >
                   {loading ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="w-4 h-4 mr-2 motion-safe:animate-spin" />
                   ) : (
                     <Calculator className="w-4 h-4 mr-2" />
                   )}
