@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "wouter";
-import { motion } from "framer-motion";
-import { ArrowLeft, Calendar, ArrowRight, Clock, Newspaper } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Calendar, ArrowRight, Clock, Newspaper } from "lucide-react";
 import SEO from "@/components/SEO";
 import Layout from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
@@ -33,17 +33,72 @@ function formatDate(dateStr: string) {
 
 function ArticleCard({ article, index }: { article: NewsArticle; index: number }) {
   const isFeatured = index === 0;
+  const prefersReduced = useReducedMotion();
+
+  if (isFeatured) {
+    return (
+      <motion.article
+        initial={prefersReduced ? false : { opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: prefersReduced ? 0 : 0.4 }}
+        className="group relative rounded-2xl overflow-hidden sm:col-span-2 sm:row-span-2 min-h-[400px]"
+      >
+        <Link href={`/news/${article.slug}`} className="block absolute inset-0">
+          {/* Full-bleed image */}
+          <picture className="absolute inset-0 w-full h-full">
+            {article.imageMobile && (
+              <source media="(max-width: 639px)" srcSet={article.imageMobile} />
+            )}
+            <img
+              src={article.image ?? ""}
+              alt={article.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+            />
+          </picture>
+
+          {/* Gradient overlay — transparent top, dark bottom */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+
+          {/* Category badge — glass pill on image */}
+          <div className="absolute top-4 left-4">
+            <span className="inline-flex items-center bg-white/20 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded-full border border-white/25">
+              {article.category ?? "Новости"}
+            </span>
+          </div>
+
+          {/* Text content at bottom */}
+          <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-7">
+            <div className="flex items-center gap-2 text-[11px] text-white/65 mb-2.5">
+              <Calendar className="w-3 h-3" />
+              <span>{article.publishedAt ? formatDate(article.publishedAt) : ""}</span>
+              <span className="w-0.5 h-0.5 rounded-full bg-white/40" />
+              <Clock className="w-3 h-3" />
+              <span>{article.readTime ?? 3} мин</span>
+            </div>
+            <h3 className="font-bold text-xl sm:text-2xl leading-snug text-white mb-2 group-hover:text-white/90 transition-colors">
+              {article.title}
+            </h3>
+            <p className="text-white/70 text-sm leading-relaxed line-clamp-2 max-w-lg">
+              {article.excerpt ?? ""}
+            </p>
+            <span className="inline-flex items-center gap-1.5 text-white/90 text-xs font-bold mt-3.5 group-hover:gap-2.5 transition-all duration-200">
+              Читать дальше <ArrowRight className="w-3 h-3" />
+            </span>
+          </div>
+        </Link>
+      </motion.article>
+    );
+  }
+
   return (
     <motion.article
-      initial={{ opacity: 0, y: 20 }}
+      initial={prefersReduced ? false : { opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.08 }}
-      className={`group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow ${
-        isFeatured ? "sm:col-span-2 sm:row-span-2" : ""
-      }`}
+      transition={{ duration: prefersReduced ? 0 : 0.4, delay: prefersReduced ? 0 : index * 0.07 }}
+      className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow"
     >
       <Link href={`/news/${article.slug}`}>
-        <div className={`relative overflow-hidden ${isFeatured ? "h-48 sm:h-64" : "h-40"}`}>
+        <div className="relative overflow-hidden h-40">
           <picture>
             {article.imageMobile && (
               <source media="(max-width: 639px)" srcSet={article.imageMobile} />
@@ -51,18 +106,17 @@ function ArticleCard({ article, index }: { article: NewsArticle; index: number }
             <img
               src={article.image ?? ""}
               alt={article.title}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
           </picture>
-          <div className="absolute top-3 left-3">
-            <span className="inline-flex items-center bg-[#0070b8]/90 text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
-              {article.category ?? "Новости"}
-            </span>
-          </div>
         </div>
       </Link>
       <div className="p-4 sm:p-5">
         <div className="flex items-center gap-2 text-[11px] text-slate-400 mb-2">
+          <span className="text-primary font-bold">{article.category ?? "Новости"}</span>
+          <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
           <Calendar className="w-3 h-3" />
           <span>{article.publishedAt ? formatDate(article.publishedAt) : ""}</span>
           <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
@@ -70,16 +124,14 @@ function ArticleCard({ article, index }: { article: NewsArticle; index: number }
           <span>{article.readTime ?? 3} мин</span>
         </div>
         <Link href={`/news/${article.slug}`}>
-          <h3 className={`font-bold text-slate-900 leading-snug group-hover:text-[#0070b8] transition-colors mb-2 ${
-            isFeatured ? "text-lg sm:text-xl" : "text-sm sm:text-base"
-          }`}>
+          <h3 className="font-bold text-sm sm:text-base text-slate-900 leading-snug group-hover:text-primary transition-colors mb-2">
             {article.title}
           </h3>
         </Link>
-        <p className={`text-slate-500 leading-relaxed ${isFeatured ? "text-sm" : "text-xs sm:text-sm"}`}>
+        <p className="text-slate-500 text-xs sm:text-sm leading-relaxed">
           {article.excerpt ?? ""}
         </p>
-        <Link href={`/news/${article.slug}`} className="inline-flex items-center gap-1 text-[#0070b8] text-xs font-bold mt-3 hover:underline">
+        <Link href={`/news/${article.slug}`} className="inline-flex items-center gap-1 text-primary text-xs font-bold mt-3 hover:underline">
           Читать дальше <ArrowRight className="w-3 h-3" />
         </Link>
       </div>
@@ -88,6 +140,7 @@ function ArticleCard({ article, index }: { article: NewsArticle; index: number }
 }
 
 export default function NewsPage() {
+  const prefersReduced = useReducedMotion();
   const { data: newsArticles = [], isLoading } = useQuery({
     queryKey: ["public-news"],
     queryFn: fetchNews,
@@ -153,22 +206,27 @@ export default function NewsPage() {
         {/* Title */}
         <div className="mb-6">
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 flex items-center gap-3">
-            <Newspaper className="w-7 h-7 text-[#0070b8]" />
+            <Newspaper className="w-7 h-7 text-primary" aria-hidden="true" />
             Новости авторынка
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            Актуальные материалы о автомобилях, финансировании и сервисе
+            Актуальные материалы об автомобилях, финансировании и сервисе
           </p>
         </div>
 
         {/* Category filters */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div
+          role="group"
+          aria-label="Фильтр по категориям"
+          className="flex flex-wrap gap-2 mb-6"
+        >
           <button
             onClick={() => setActiveCategory("Все")}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+            aria-pressed={activeCategory === "Все"}
+            className={`px-3 py-2.5 rounded-full text-xs font-bold transition-all min-h-[44px] ${
               activeCategory === "Все"
-                ? "bg-[#0070b8] text-white"
-                : "bg-white text-slate-600 border border-slate-200 hover:border-[#0070b8]"
+                ? "bg-primary text-white"
+                : "bg-white text-slate-600 border border-slate-200 hover:border-primary"
             }`}
           >
             Все
@@ -177,10 +235,11 @@ export default function NewsPage() {
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+              aria-pressed={activeCategory === cat}
+              className={`px-3 py-2.5 rounded-full text-xs font-bold transition-all min-h-[44px] ${
                 activeCategory === cat
-                  ? "bg-[#0070b8] text-white"
-                  : "bg-white text-slate-600 border border-slate-200 hover:border-[#0070b8]"
+                  ? "bg-primary text-white"
+                  : "bg-white text-slate-600 border border-slate-200 hover:border-primary"
               }`}
             >
               {cat}
@@ -192,7 +251,7 @@ export default function NewsPage() {
         {isLoading && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl border border-slate-100 overflow-hidden animate-pulse">
+              <div key={i} className={`bg-white rounded-2xl border border-slate-100 overflow-hidden ${prefersReduced ? "" : "animate-pulse"}`}>
                 <div className="h-40 bg-slate-100" />
                 <div className="p-4 space-y-2">
                   <div className="h-3 bg-slate-100 rounded w-3/4" />
@@ -215,7 +274,7 @@ export default function NewsPage() {
 
         {!isLoading && filtered.length === 0 && (
           <div className="text-center py-16 text-slate-400">
-            <Newspaper className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <Newspaper className="w-12 h-12 mx-auto mb-3 opacity-30" aria-hidden="true" />
             <p className="font-semibold">Новостей в этой категории пока нет</p>
           </div>
         )}
