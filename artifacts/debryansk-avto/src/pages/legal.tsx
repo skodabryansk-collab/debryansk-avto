@@ -74,11 +74,11 @@ export default function LegalPage() {
           <section className="pt-2">
             <p className="text-slate-500 text-sm">
               По вопросам сотрудничества и документам:{" "}
-              <a href="mailto:info@debryansk-auto.ru" className="text-[#0070b8] hover:underline">
+              <a href="mailto:info@debryansk-auto.ru" className="text-primary hover:underline">
                 info@debryansk-auto.ru
               </a>{" "}
               или{" "}
-              <CTPhone className="text-[#0070b8] hover:underline" phone="+7 (4832) 77-77-70">+7 (4832) 77-77-70</CTPhone>.
+              <CTPhone className="text-primary hover:underline" phone="+7 (4832) 77-77-70">+7 (4832) 77-77-70</CTPhone>.
             </p>
           </section>
 
@@ -103,7 +103,7 @@ function RowPhone({ label, phone, display }: { label: string; phone: string; dis
   return (
     <div className="flex flex-col sm:flex-row sm:gap-4">
       <span className="text-slate-500 shrink-0 sm:w-48">{label}:</span>
-      <CTPhone className="font-medium text-[#0070b8] hover:underline" phone={display}>{display}</CTPhone>
+      <CTPhone className="font-medium text-primary hover:underline" phone={display}>{display}</CTPhone>
     </div>
   );
 }
@@ -112,15 +112,15 @@ function DocLink({ href, label, desc }: { href: string; label: string; desc: str
   return (
     <a
       href={href}
-      className="flex items-start gap-3 p-4 bg-white border border-slate-200 rounded-xl hover:border-[#0070b8] hover:shadow-sm transition-all group"
+      className="flex items-start gap-3 p-4 bg-white border border-slate-200 rounded-xl hover:border-primary hover:shadow-sm transition-all group"
     >
-      <div className="w-9 h-9 rounded-lg bg-[#0070b8]/10 flex items-center justify-center shrink-0 group-hover:bg-[#0070b8]/20 transition-colors">
-        <svg className="w-4 h-4 text-[#0070b8]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+        <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       </div>
       <div>
-        <p className="font-semibold text-slate-800 text-sm group-hover:text-[#0070b8] transition-colors">{label}</p>
+        <p className="font-semibold text-slate-800 text-sm group-hover:text-primary transition-colors">{label}</p>
         <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
       </div>
     </a>
