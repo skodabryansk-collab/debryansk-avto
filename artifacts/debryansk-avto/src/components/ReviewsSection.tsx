@@ -165,7 +165,7 @@ export const ReviewsSection = () => {
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {skeletons.map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl border border-slate-100 p-5 animate-pulse">
+              <div key={i} className="bg-white rounded-2xl border border-slate-100 p-5 motion-safe:animate-pulse">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-slate-100 rounded-full" />
                   <div className="flex-1">
