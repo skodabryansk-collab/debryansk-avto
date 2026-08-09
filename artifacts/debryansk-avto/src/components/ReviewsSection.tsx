@@ -143,7 +143,7 @@ export const ReviewsSection = () => {
 
         {/* Header */}
         <FadeIn className="mb-6 sm:mb-10">
-          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Нам доверяют</p>
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-primary mb-2">Нам доверяют</p>
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Отзывы покупателей</h2>
           {!isLoading && overallCount > 0 && (
             <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -197,7 +197,7 @@ export const ReviewsSection = () => {
                     <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5 h-full flex flex-col hover:shadow-md transition-shadow">
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-[#0070b8]/20 to-[#87b63c]/20 flex items-center justify-center text-sm font-bold text-[#0070b8] shrink-0">
+                          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-primary/20 to-[#87b63c]/20 flex items-center justify-center text-sm font-bold text-primary shrink-0">
                             {review.author.charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0">
@@ -219,7 +219,7 @@ export const ReviewsSection = () => {
                       </p>
                       {longText && (
                         <button
-                          className="text-[11px] font-semibold text-[#0070b8] hover:underline mt-2 text-left"
+                          className="text-[11px] font-semibold text-primary hover:underline mt-2 text-left"
                           onClick={() => setExpanded(e => ({ ...e, [review.id]: !isExp }))}
                         >
                           {isExp ? "Свернуть" : "Читать полностью"}
@@ -235,7 +235,7 @@ export const ReviewsSection = () => {
               <div className="mt-8 flex justify-center">
                 <button
                   onClick={() => setVisibleCount(c => c + 6)}
-                  className="px-6 py-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:border-[#0070b8]/40 hover:text-[#0070b8] transition-colors"
+                  className="px-6 py-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:border-primary/40 hover:text-primary transition-colors"
                 >
                   Показать ещё · {Math.min(6, reviews.length - visibleCount)} отзывов
                 </button>
@@ -248,7 +248,7 @@ export const ReviewsSection = () => {
                     href="https://yandex.ru/maps/org/debryansk_avto/1127547147/reviews/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-semibold text-[#0070b8] hover:underline"
+                    className="font-semibold text-primary hover:underline"
                   >
                     Яндекс Картах
                   </a>
@@ -257,7 +257,7 @@ export const ReviewsSection = () => {
                     href="https://2gis.ru/bryansk/firm/70000001085543814/tab/reviews"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-semibold text-[#0070b8] hover:underline"
+                    className="font-semibold text-primary hover:underline"
                   >
                     2ГИС
                   </a>
