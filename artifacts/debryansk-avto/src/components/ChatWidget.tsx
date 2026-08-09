@@ -158,9 +158,9 @@ function StreamingDots({ queryHint }: { queryHint?: string }) {
   return (
     <div className="flex items-center gap-2 py-0.5">
       <span className="flex items-center gap-1 shrink-0">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#0070b8]/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-        <span className="w-1.5 h-1.5 rounded-full bg-[#0070b8]/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-        <span className="w-1.5 h-1.5 rounded-full bg-[#0070b8]/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "0ms" }} />
+        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "150ms" }} />
+        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "300ms" }} />
       </span>
       <span className="text-xs text-slate-400 font-medium transition-all">{msgs[idx]}</span>
     </div>
@@ -188,11 +188,11 @@ function MessageContent({ text, isStreaming, queryHint }: { text: string; isStre
                 const isLastItem = isLast && li === listItems.length - 1;
                 return (
                   <li key={li} className="flex gap-1.5 items-start">
-                    <span className="text-[#0070b8] font-bold mt-0.5 shrink-0">•</span>
+                    <span className="text-primary font-bold mt-0.5 shrink-0">•</span>
                     <span>
                       {renderInline(l.slice(2))}
                       {isStreaming && isLastItem && (
-                        <span className="inline-block w-[2px] h-[1em] bg-[#0070b8] animate-pulse ml-0.5 align-middle rounded-sm" />
+                        <span className="inline-block w-[2px] h-[1em] bg-primary animate-pulse ml-0.5 align-middle rounded-sm" />
                       )}
                     </span>
                   </li>
@@ -210,7 +210,7 @@ function MessageContent({ text, isStreaming, queryHint }: { text: string; isStre
                   {li > 0 && <br />}
                   {renderInline(line)}
                   {isStreaming && isLastLine && (
-                    <span className="inline-block w-[2px] h-[1em] bg-[#0070b8] animate-pulse ml-0.5 align-middle rounded-sm" />
+                    <span className="inline-block w-[2px] h-[1em] bg-primary animate-pulse ml-0.5 align-middle rounded-sm" />
                   )}
                 </React.Fragment>
               );
@@ -221,9 +221,9 @@ function MessageContent({ text, isStreaming, queryHint }: { text: string; isStre
       {isStreaming && (
         <div className="flex items-center gap-1 pt-0.5">
           <span className="text-[11px] text-slate-400 leading-none">Навигатор печатает</span>
-          <span className="w-1 h-1 rounded-full bg-[#0070b8]/50 animate-bounce" style={{ animationDelay: "0ms" }} />
-          <span className="w-1 h-1 rounded-full bg-[#0070b8]/50 animate-bounce" style={{ animationDelay: "150ms" }} />
-          <span className="w-1 h-1 rounded-full bg-[#0070b8]/50 animate-bounce" style={{ animationDelay: "300ms" }} />
+          <span className="w-1 h-1 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: "0ms" }} />
+          <span className="w-1 h-1 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: "150ms" }} />
+          <span className="w-1 h-1 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: "300ms" }} />
         </div>
       )}
     </div>
@@ -259,7 +259,7 @@ function CarCard({ car }: { car: ChatCarItem }) {
   return (
     <a
       href={car.path}
-      className="flex bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden hover:border-[#0070b8]/40 hover:shadow-md transition-all duration-200 group"
+      className="flex bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden hover:border-primary/40 hover:shadow-md transition-all duration-200 group"
     >
       <div className="w-[90px] shrink-0 bg-slate-100 overflow-hidden relative" style={{ height: 72 }}>
         {car.image ? (
@@ -297,7 +297,7 @@ function CarCard({ car }: { car: ChatCarItem }) {
             </span>
           )}
         </div>
-        <p className="text-[13px] font-black text-[#0070b8] mt-1 leading-tight">
+        <p className="text-[13px] font-black text-primary mt-1 leading-tight">
           {showFrom && <span className="text-[9px] font-semibold text-slate-400 mr-0.5">от</span>}
           {formatPrice(displayPrice)}
         </p>
@@ -315,7 +315,7 @@ function ActionButton({ action, onAction }: { action: string; onAction: (a: stri
     return (
       <button
         onClick={() => onAction("callback")}
-        className="mt-3 inline-flex items-center gap-2 bg-[#0070b8] hover:bg-[#005fa0] text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors shadow-sm"
+        className="mt-3 inline-flex items-center gap-2 bg-primary hover:bg-[#005fa0] text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors shadow-sm"
       >
         <Phone className="w-3.5 h-3.5" />
         Заказать звонок
@@ -363,6 +363,7 @@ function ContactFormCard({ base, history }: { base: string; history?: Message[] 
       fd.append("type", "callback");
       fd.append("name", name.trim());
       fd.append("phone", phone.trim());
+      if (pageCarContext?.brand) fd.append("brand", pageCarContext.brand);
       fd.append("source", "Навигатор (чат)");
       if (history?.length) fd.append("chatHistory", formatHistoryForEmail(history));
       const res = await fetch(`${base}/api/send-email`, { method: "POST", body: fd });
@@ -383,7 +384,7 @@ function ContactFormCard({ base, history }: { base: string; history?: Message[] 
         value={name}
         onChange={e => setName(e.target.value)}
         required
-        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-[#0070b8]/50 bg-white placeholder:text-slate-300"
+        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-primary/50 bg-white placeholder:text-slate-300"
       />
       <input
         placeholder="+7 (___) ___-__-__"
@@ -391,13 +392,13 @@ function ContactFormCard({ base, history }: { base: string; history?: Message[] 
         value={phone}
         onChange={e => setPhone(formatPhone(e.target.value))}
         required
-        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-[#0070b8]/50 bg-white placeholder:text-slate-300"
+        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-primary/50 bg-white placeholder:text-slate-300"
       />
       {error && <p className="text-[10px] text-red-500">{error}</p>}
       <button
         type="submit"
         disabled={submitting || !name.trim() || !isPhoneValid(phone)}
-        className="w-full text-xs font-bold text-white bg-[#0070b8] hover:bg-[#005fa0] disabled:opacity-50 rounded-lg py-2 transition-colors"
+        className="w-full text-xs font-bold text-white bg-primary hover:bg-[#005fa0] disabled:opacity-50 rounded-lg py-2 transition-colors"
       >
         {submitting ? "Отправка…" : "Отправить"}
       </button>
@@ -438,6 +439,7 @@ function TestDriveFormCard({ base, prefillModel, history }: { base: string; pref
       fd.append("type", "testdrive");
       fd.append("name", name.trim());
       fd.append("phone", phone.trim());
+      if (pageCarContext?.brand) fd.append("brand", pageCarContext.brand);
       if (model.trim()) fd.append("model", model.trim());
       if (date) fd.append("preferredDate", date);
       if (time) fd.append("preferredTime", time);
@@ -586,7 +588,7 @@ function ServiceFormCard({ base, history }: { base: string; history?: Message[] 
       <select
         value={locationId}
         onChange={e => setLocationId(e.target.value)}
-        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-[#0070b8]/50 bg-white"
+        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-primary/50 bg-white"
       >
         <option value="">Выберите сервисный центр *</option>
         {locations.map(loc => (
@@ -598,7 +600,7 @@ function ServiceFormCard({ base, history }: { base: string; history?: Message[] 
         value={name}
         onChange={e => setName(e.target.value)}
         required
-        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-[#0070b8]/50 bg-white placeholder:text-slate-300"
+        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-primary/50 bg-white placeholder:text-slate-300"
       />
       <input
         placeholder="+7 (___) ___-__-__"
@@ -606,19 +608,19 @@ function ServiceFormCard({ base, history }: { base: string; history?: Message[] 
         value={phone}
         onChange={e => setPhone(formatPhone(e.target.value))}
         required
-        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-[#0070b8]/50 bg-white placeholder:text-slate-300"
+        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-primary/50 bg-white placeholder:text-slate-300"
       />
       <input
         placeholder="Что нужно сделать? (необязательно)"
         value={comment}
         onChange={e => setComment(e.target.value)}
-        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-[#0070b8]/50 bg-white placeholder:text-slate-300"
+        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-primary/50 bg-white placeholder:text-slate-300"
       />
       {error && <p className="text-[10px] text-red-500">{error}</p>}
       <button
         type="submit"
         disabled={submitting || !name.trim() || !isPhoneValid(phone) || !locationId}
-        className="w-full text-xs font-bold text-white bg-[#0070b8] hover:bg-[#005fa0] disabled:opacity-50 rounded-lg py-2 transition-colors"
+        className="w-full text-xs font-bold text-white bg-primary hover:bg-[#005fa0] disabled:opacity-50 rounded-lg py-2 transition-colors"
       >
         {submitting ? "Отправка…" : "Записаться на сервис"}
       </button>
@@ -654,6 +656,7 @@ function CreditFormCard({ base, prefillModel, history }: { base: string; prefill
       fd.append("type", "credit");
       fd.append("name", name.trim());
       fd.append("phone", phone.trim());
+      if (pageCarContext?.brand) fd.append("brand", pageCarContext.brand);
       if (model.trim()) fd.append("model", model.trim());
       fd.append("source", "Навигатор (чат)");
       if (history?.length) fd.append("chatHistory", formatHistoryForEmail(history));
@@ -675,7 +678,7 @@ function CreditFormCard({ base, prefillModel, history }: { base: string; prefill
         value={name}
         onChange={e => setName(e.target.value)}
         required
-        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-[#0070b8]/50 bg-white placeholder:text-slate-300"
+        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-primary/50 bg-white placeholder:text-slate-300"
       />
       <input
         placeholder="+7 (___) ___-__-__"
@@ -683,19 +686,19 @@ function CreditFormCard({ base, prefillModel, history }: { base: string; prefill
         value={phone}
         onChange={e => setPhone(formatPhone(e.target.value))}
         required
-        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-[#0070b8]/50 bg-white placeholder:text-slate-300"
+        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-primary/50 bg-white placeholder:text-slate-300"
       />
       <input
         placeholder="Интересующая модель (необязательно)"
         value={model}
         onChange={e => setModel(e.target.value)}
-        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-[#0070b8]/50 bg-white placeholder:text-slate-300"
+        className="w-full text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-primary/50 bg-white placeholder:text-slate-300"
       />
       {error && <p className="text-[10px] text-red-500">{error}</p>}
       <button
         type="submit"
         disabled={submitting || !name.trim() || !isPhoneValid(phone)}
-        className="w-full text-xs font-bold text-white bg-[#0070b8] hover:bg-[#005fa0] disabled:opacity-50 rounded-lg py-2 transition-colors"
+        className="w-full text-xs font-bold text-white bg-primary hover:bg-[#005fa0] disabled:opacity-50 rounded-lg py-2 transition-colors"
       >
         {submitting ? "Отправка…" : "Рассчитать кредит"}
       </button>
@@ -888,6 +891,7 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
       // 2. Send lead / email
       const fd = new FormData();
       fd.append("type", "buyout");
+      fd.append("dealer", "Супонево");
       fd.append("brand", brandName);
       fd.append("model", modelName);
       fd.append("year", year);
@@ -919,8 +923,8 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
     }
   };
 
-  const selectCls = "text-xs rounded-lg border border-slate-200 px-2 py-2 outline-none focus:border-[#0070b8]/50 bg-white text-slate-700 disabled:opacity-50 w-full";
-  const inputCls  = "text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-[#0070b8]/50 bg-white placeholder:text-slate-300 w-full";
+  const selectCls = "text-xs rounded-lg border border-slate-200 px-2 py-2 outline-none focus:border-primary/50 bg-white text-slate-700 disabled:opacity-50 w-full";
+  const inputCls  = "text-xs rounded-lg border border-slate-200 px-2.5 py-2 outline-none focus:border-primary/50 bg-white placeholder:text-slate-300 w-full";
   const canSubmit = brandId && modelId && year && mileage && name.trim() && phone.trim();
 
   const chatMods = modOptions?.modifications ?? [];
@@ -1150,16 +1154,16 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
 function ConsentScreen({ onConsent, onDecline }: { onConsent: () => void; onDecline: () => void }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-7 text-center gap-5">
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#0070b8]/10 to-[#0070b8]/20 flex items-center justify-center">
-        <Shield className="w-8 h-8 text-[#0070b8]" />
+      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center">
+        <Shield className="w-8 h-8 text-primary" />
       </div>
       <div>
         <p className="text-sm font-bold text-slate-800 mb-2">Согласие на обработку данных</p>
         <p className="text-xs text-slate-500 leading-relaxed">
           Чтобы улучшать качество ответов, мы сохраняем историю вашей переписки с Навигатором. Нажимая «Согласен», вы принимаете{" "}
-          <a href="/privacy" className="text-[#0070b8] underline underline-offset-2">политику конфиденциальности</a>{" "}
+          <a href="/privacy" className="text-primary underline underline-offset-2">политику конфиденциальности</a>{" "}
           ООО «Дебрянск Авто» (ИНН&nbsp;3250521481) и даёте согласие на обработку персональных данных согласно ФЗ-152.{" "}
-          <a href="/legal" className="text-[#0070b8] underline underline-offset-2">Реквизиты оператора</a>.
+          <a href="/legal" className="text-primary underline underline-offset-2">Реквизиты оператора</a>.
         </p>
       </div>
       <div className="flex gap-2.5 w-full">
@@ -1171,7 +1175,7 @@ function ConsentScreen({ onConsent, onDecline }: { onConsent: () => void; onDecl
         </button>
         <button
           onClick={onConsent}
-          className="flex-1 text-xs text-white font-bold bg-[#0070b8] hover:bg-[#005fa0] rounded-xl py-2.5 transition-colors shadow-sm"
+          className="flex-1 text-xs text-white font-bold bg-primary hover:bg-[#005fa0] rounded-xl py-2.5 transition-colors shadow-sm"
         >
           Согласен
         </button>
@@ -1645,11 +1649,11 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
             {/* Header — Variant B: white with accent top bar */}
             <div className="shrink-0">
               {/* 4px brand gradient bar */}
-              <div className="h-[4px]" style={{ background: "linear-gradient(90deg, #0070b8 0%, #87b63c 100%)" }} />
+              <div className="h-[4px]" style={{ background: "linear-gradient(90deg, var(--color-primary) 0%, #87b63c 100%)" }} />
               <div className="flex items-center gap-3 px-4 py-3.5">
                 <div
                   className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
-                  style={{ background: "linear-gradient(135deg, #0070b8 0%, #005a96 100%)", boxShadow: "0 6px 16px rgba(0,112,184,0.28)" }}
+                  style={{ background: "linear-gradient(135deg, var(--color-primary) 0%, #005a96 100%)", boxShadow: "0 6px 16px rgba(0,112,184,0.28)" }}
                 >
                   <Compass className="w-5 h-5 text-white" />
                 </div>
@@ -1692,7 +1696,7 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
                       {msg.role === "assistant" && (
                         <div
                           className="w-8 h-8 rounded-2xl flex items-center justify-center shrink-0 shadow-sm"
-                          style={{ background: "linear-gradient(135deg, #0070b8 0%, #005a96 100%)" }}
+                          style={{ background: "linear-gradient(135deg, var(--color-primary) 0%, #005a96 100%)" }}
                         >
                           <Compass className="w-4 h-4 text-white" />
                         </div>
@@ -1706,7 +1710,7 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
                               : "bg-white text-slate-700 shadow-[0_2px_10px_rgba(0,0,0,0.07)] border border-slate-100"
                           }`}
                           style={msg.role === "user"
-                            ? { background: "linear-gradient(135deg, #0070b8 0%, #005a96 100%)", borderRadius: "18px 4px 18px 18px" }
+                            ? { background: "linear-gradient(135deg, var(--color-primary) 0%, #005a96 100%)", borderRadius: "18px 4px 18px 18px" }
                             : { borderRadius: "4px 18px 18px 18px" }
                           }
                         >
@@ -1750,7 +1754,7 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
                                 <button
                                   key={qa.action}
                                   onClick={() => handleQuickAction(msg, qa.action, qa.label)}
-                                  className="w-full text-left text-xs px-3 py-2 rounded-xl border border-[#0070b8]/25 hover:border-[#0070b8]/50 hover:bg-[#0070b8]/5 text-slate-600 font-medium transition-all"
+                                  className="w-full text-left text-xs px-3 py-2 rounded-xl border border-primary/25 hover:border-primary/50 hover:bg-primary/5 text-slate-600 font-medium transition-all"
                                 >
                                   {qa.label}
                                 </button>
@@ -1775,14 +1779,14 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
                     <div className="flex items-start gap-2.5 justify-start">
                       <div
                         className="w-8 h-8 rounded-2xl flex items-center justify-center shrink-0 shadow-sm"
-                        style={{ background: "linear-gradient(135deg, #0070b8 0%, #005a96 100%)" }}
+                        style={{ background: "linear-gradient(135deg, var(--color-primary) 0%, #005a96 100%)" }}
                       >
                         <Compass className="w-4 h-4 text-white" />
                       </div>
                       <div className="bg-white px-4 py-3 flex items-center gap-1.5 shadow-[0_2px_10px_rgba(0,0,0,0.07)] border border-slate-100" style={{ borderRadius: "4px 18px 18px 18px" }}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#0070b8]/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#0070b8]/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#0070b8]/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "300ms" }} />
                       </div>
                     </div>
                   )}
@@ -1797,7 +1801,7 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
                           <button
                             key={q}
                             onClick={() => sendMessage(q)}
-                            className="text-xs font-semibold px-3.5 py-2 rounded-full border border-[#0070b8]/20 hover:border-[#0070b8]/50 hover:bg-[#0070b8]/6 text-[#0070b8] transition-all"
+                            className="text-xs font-semibold px-3.5 py-2 rounded-full border border-primary/20 hover:border-primary/50 hover:bg-primary/6 text-primary transition-all"
                           >
                             {q}
                           </button>
@@ -1816,7 +1820,7 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
                       key={q}
                       onClick={() => sendMessage(q)}
                       disabled={loading}
-                      className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-[#0070b8]/20 hover:border-[#0070b8]/50 hover:bg-[#0070b8]/6 text-[#0070b8] whitespace-nowrap shrink-0 transition-all disabled:opacity-40"
+                      className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-primary/20 hover:border-primary/50 hover:bg-primary/6 text-primary whitespace-nowrap shrink-0 transition-all disabled:opacity-40"
                     >
                       {q}
                     </button>
@@ -1834,14 +1838,14 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
                       placeholder="Написать сообщение..."
                       disabled={loading}
                       maxLength={500}
-                      className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 outline-none focus:border-[#0070b8]/50 focus:ring-2 focus:ring-[#0070b8]/10 placeholder:text-slate-400 disabled:opacity-60 transition-all"
+                      className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 placeholder:text-slate-400 disabled:opacity-60 transition-all"
                     />
                     <motion.button
                       type="submit"
                       disabled={!input.trim() || loading}
                       whileTap={{ scale: 0.92 }}
                       className="w-10 h-10 rounded-2xl flex items-center justify-center text-white transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-                      style={{ background: "linear-gradient(135deg, #0070b8 0%, #005a96 100%)", boxShadow: "0 4px 12px rgba(0,112,184,0.3)" }}
+                      style={{ background: "linear-gradient(135deg, var(--color-primary) 0%, #005a96 100%)", boxShadow: "0 4px 12px rgba(0,112,184,0.3)" }}
                     >
                       <Send className="w-4 h-4" />
                     </motion.button>
@@ -1878,7 +1882,7 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
                     }
                   }
                 }}
-                className="relative max-w-[220px] bg-white text-slate-800 text-xs font-semibold px-4 py-2.5 rounded-2xl rounded-br-sm shadow-lg border border-slate-200 hover:border-[#0070b8]/40 hover:shadow-xl transition-all text-left leading-snug"
+                className="relative max-w-[220px] bg-white text-slate-800 text-xs font-semibold px-4 py-2.5 rounded-2xl rounded-br-sm shadow-lg border border-slate-200 hover:border-primary/40 hover:shadow-xl transition-all text-left leading-snug"
               >
                 {promo.text}
                 <button
@@ -1897,8 +1901,8 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
         <div className="relative">
           {!open && (
             <>
-              <span className="absolute inset-0 rounded-2xl bg-[#0070b8]/30 animate-ping" style={{ animationDuration: "2.5s" }} />
-              <span className="absolute inset-[-4px] rounded-2xl bg-[#0070b8]/15 animate-ping" style={{ animationDuration: "2.5s", animationDelay: "0.4s" }} />
+              <span className="absolute inset-0 rounded-2xl bg-primary/30 animate-ping" style={{ animationDuration: "2.5s" }} />
+              <span className="absolute inset-[-4px] rounded-2xl bg-primary/15 animate-ping" style={{ animationDuration: "2.5s", animationDelay: "0.4s" }} />
             </>
           )}
 
@@ -1907,7 +1911,7 @@ export default function ChatWidget({ onOpenCallback }: { onOpenCallback?: () => 
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="relative flex items-center gap-2.5 text-white font-bold text-sm px-4 py-3 rounded-2xl shadow-xl transition-colors"
-            style={{ background: open ? "#005fa0" : "linear-gradient(135deg, #0070b8 0%, #005a96 100%)" }}
+            style={{ background: open ? "#005fa0" : "linear-gradient(135deg, var(--color-primary) 0%, #005a96 100%)" }}
             aria-label="Открыть чат Навигатор"
           >
             <Compass className="w-5 h-5 shrink-0" />
