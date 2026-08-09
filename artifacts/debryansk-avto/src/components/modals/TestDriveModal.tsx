@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { X, Car, Phone, User, Calendar, Clock, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,10 +18,11 @@ interface TestDriveModalProps {
     complectation?: string;
     modification?: string;
   };
+  dealer?: string;
   onClose: () => void;
 }
 
-export function TestDriveModal({ car, onClose }: TestDriveModalProps) {
+export function TestDriveModal({ car, dealer, onClose }: TestDriveModalProps) {
   const [submitted, setSubmitted] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -32,7 +34,7 @@ export function TestDriveModal({ car, onClose }: TestDriveModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.phone.trim()) return;
+    if (!formData.name.trim() || !isPhoneValid(formData.phone)) return;
     try {
       const fd = new FormData();
       fd.append("type", "testdrive");
@@ -45,6 +47,7 @@ export function TestDriveModal({ car, onClose }: TestDriveModalProps) {
       fd.append("carModel", car.model);
       fd.append("carYear", String(car.year));
       fd.append("carPrice", String(car.price));
+      if (dealer) fd.append("dealer", dealer);
       await fetch("/api/send-email", { method: "POST", body: fd });
     } catch (_) {}
     setSubmitted(true);
@@ -96,7 +99,7 @@ export function TestDriveModal({ car, onClose }: TestDriveModalProps) {
               </p>
               <Button
                 onClick={onClose}
-                className="mt-6 w-full h-12 bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold rounded-xl hover:opacity-90"
+                className="mt-6 w-full h-12 bg-gradient-to-r from-primary to-[#005a94] text-white font-bold rounded-xl hover:opacity-90"
               >
                 Закрыть
               </Button>
@@ -145,7 +148,7 @@ export function TestDriveModal({ car, onClose }: TestDriveModalProps) {
                       value={formData.name}
                       onChange={(e) => handleChange("name", e.target.value)}
                       required
-                      className="h-11 border-slate-200 focus:border-[#0070b8] focus:ring-[#0070b8]/20"
+                      className="h-11 border-slate-200 focus:border-primary focus:ring-primary/20"
                     />
                   </div>
 
@@ -156,11 +159,13 @@ export function TestDriveModal({ car, onClose }: TestDriveModalProps) {
                     </Label>
                     <Input
                       type="tel"
+                      inputMode="tel"
                       placeholder="+7 (___) ___-__-__"
                       value={formData.phone}
-                      onChange={(e) => handleChange("phone", e.target.value)}
+                      onChange={(e) => handleChange("phone", formatPhone(e.target.value))}
                       required
-                      className="h-11 border-slate-200 focus:border-[#0070b8] focus:ring-[#0070b8]/20"
+                      maxLength={18}
+                      className="h-11 border-slate-200 focus:border-primary focus:ring-primary/20"
                     />
                   </div>
 
@@ -175,7 +180,7 @@ export function TestDriveModal({ car, onClose }: TestDriveModalProps) {
                         value={formData.date}
                         onChange={(e) => handleChange("date", e.target.value)}
                         required
-                        className="h-11 border-slate-200 focus:border-[#0070b8] focus:ring-[#0070b8]/20"
+                        className="h-11 border-slate-200 focus:border-primary focus:ring-primary/20"
                       />
                     </div>
                     <div className="space-y-2">
@@ -188,7 +193,7 @@ export function TestDriveModal({ car, onClose }: TestDriveModalProps) {
                         value={formData.time}
                         onChange={(e) => handleChange("time", e.target.value)}
                         required
-                        className="h-11 border-slate-200 focus:border-[#0070b8] focus:ring-[#0070b8]/20"
+                        className="h-11 border-slate-200 focus:border-primary focus:ring-primary/20"
                       />
                     </div>
                   </div>
@@ -199,13 +204,13 @@ export function TestDriveModal({ car, onClose }: TestDriveModalProps) {
                       placeholder="Какой автомобиль вас интересует, какие вопросы..."
                       value={formData.comment}
                       onChange={(e) => handleChange("comment", e.target.value)}
-                      className="min-h-[80px] border-slate-200 focus:border-[#0070b8] focus:ring-[#0070b8]/20 resize-none"
+                      className="min-h-[80px] border-slate-200 focus:border-primary focus:ring-primary/20 resize-none"
                     />
                   </div>
 
                   <Button
                     type="submit"
-                    className="w-full h-12 bg-gradient-to-r from-[#0070b8] to-[#005a94] hover:from-[#005a94] hover:to-[#004a7a] text-white font-semibold text-base shadow-lg shadow-[#0070b8]/25 transition-all duration-300 hover:shadow-xl hover:shadow-[#0070b8]/30 hover:-translate-y-0.5"
+                    className="w-full h-12 bg-gradient-to-r from-primary to-[#005a94] hover:from-[#005a94] hover:to-[#004a7a] text-white font-semibold text-base shadow-lg shadow-primary/25 transition-all duration-300 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5"
                   >
                     <Car className="w-4 h-4 mr-2" />
                     Записаться на тест-драйв
