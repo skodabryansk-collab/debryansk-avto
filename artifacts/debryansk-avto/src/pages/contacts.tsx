@@ -3,7 +3,7 @@ import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
 import { Link } from "wouter";
 import { CTPhone } from "@/components/CTPhone";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft, MapPin, Phone, Clock, Mail, Navigation,
   MessageSquare, CheckCircle, Send
@@ -14,7 +14,7 @@ import Layout from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
 import { YandexMap, type YandexMapHandle } from "@/components/YandexMap";
 
-const DEALER_COLORS = ["#0070b8", "#87b63c", "#0070b8", "#87b63c"];
+const DEALER_COLORS = ["var(--color-primary)", "#87b63c", "var(--color-primary)", "#87b63c"];
 
 interface LocationBrandItem {
   id: number; name: string; logoUrl: string | null;
@@ -85,7 +85,7 @@ function FeedbackForm() {
         <p className="text-slate-500 text-sm">Мы получили ваше сообщение. Менеджер свяжется с вами в ближайшее время.</p>
         <button
           onClick={() => setSent(false)}
-          className="mt-4 text-[#0070b8] text-sm font-bold hover:underline"
+          className="mt-4 text-primary text-sm font-bold hover:underline"
         >
           Отправить ещё
         </button>
@@ -102,7 +102,7 @@ function FeedbackForm() {
             type="text"
             value={form.name}
             onChange={e => setForm({ ...form, name: e.target.value })}
-            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#0070b8]/50 transition-colors"
+            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50 transition-colors"
             placeholder="Ваше имя"
           />
         </div>
@@ -112,7 +112,7 @@ function FeedbackForm() {
             type="tel" inputMode="tel" maxLength={18}
             value={form.phone}
             onChange={e => setForm({ ...form, phone: formatPhone(e.target.value) })}
-            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#0070b8]/50 transition-colors"
+            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50 transition-colors"
             placeholder="+7 (___) ___-__-__"
           />
         </div>
@@ -123,7 +123,7 @@ function FeedbackForm() {
           type="email"
           value={form.email}
           onChange={e => setForm({ ...form, email: e.target.value })}
-          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#0070b8]/50 transition-colors"
+          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50 transition-colors"
           placeholder="email@example.com"
         />
       </div>
@@ -133,14 +133,14 @@ function FeedbackForm() {
           value={form.message}
           onChange={e => setForm({ ...form, message: e.target.value })}
           rows={4}
-          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#0070b8]/50 transition-colors resize-none"
+          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50 transition-colors resize-none"
           placeholder="Что вас интересует?"
         />
       </div>
       <button
         type="submit"
         disabled={loading}
-        className="w-full bg-[#0070b8] text-white font-bold py-3.5 rounded-xl hover:bg-[#005a94] transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+        className="w-full bg-primary text-white font-bold py-3.5 rounded-xl hover:bg-[#005a94] transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
       >
         {loading ? (
           <>
@@ -163,6 +163,7 @@ function FeedbackForm() {
 
 /* ─── Page ────────────────────────────────────────────────────────────────────────────────────── */
 export default function ContactsPage() {
+  const prefersReduced = useReducedMotion();
   const yandexMapRef = React.useRef<YandexMapHandle>(null);
 
   const { data: locations = [], isLoading } = useQuery({
@@ -257,6 +258,7 @@ export default function ContactsPage() {
 
   return (
     <Layout>
+      {!isLoading && <div data-prerender-ready="true" style={{ display: "none" }} />}
       <SEO
         title="Контакты Дебрянск Авто — дилерские центры в Брянске"
         description="Адреса, телефоны, часы работы автосалонов Дебрянск Авто в Брянске. Оставьте заявку онлайн."
@@ -272,7 +274,7 @@ export default function ContactsPage() {
         {/* Title */}
         <div className="mb-8 sm:mb-10">
           <motion.h1
-            initial={{ opacity: 0, y: 12 }}
+            initial={prefersReduced ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-2xl sm:text-3xl font-black text-slate-900"
           >
@@ -285,24 +287,24 @@ export default function ContactsPage() {
 
         {/* Quick contact bar */}
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
+          initial={prefersReduced ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 sm:mb-10"
         >
           <div className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center gap-4">
-            <div className="w-12 h-12 bg-[#0070b8]/10 rounded-xl flex items-center justify-center shrink-0">
-              <Phone className="w-5 h-5 text-[#0070b8]" />
+            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+              <Phone className="w-5 h-5 text-primary" />
             </div>
             <div>
               <p className="text-xs text-slate-400 font-semibold uppercase">Телефон</p>
-              <CTPhone className="text-lg font-bold text-slate-900 hover:text-[#0070b8] transition-colors"
+              <CTPhone className="text-lg font-bold text-slate-900 hover:text-primary transition-colors"
                 phone={headerPhone} />
             </div>
           </div>
           <div className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center gap-4">
-            <div className="w-12 h-12 bg-[#0070b8]/10 rounded-xl flex items-center justify-center shrink-0">
-              <Clock className="w-5 h-5 text-[#0070b8]" />
+            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5 text-primary" />
             </div>
             <div>
               <p className="text-xs text-slate-400 font-semibold uppercase">Режим работы</p>
@@ -310,12 +312,12 @@ export default function ContactsPage() {
             </div>
           </div>
           <div className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center gap-4">
-            <div className="w-12 h-12 bg-[#0070b8]/10 rounded-xl flex items-center justify-center shrink-0">
-              <Mail className="w-5 h-5 text-[#0070b8]" />
+            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+              <Mail className="w-5 h-5 text-primary" />
             </div>
             <div>
               <p className="text-xs text-slate-400 font-semibold uppercase">Email</p>
-              <a href="mailto:info@debryansk-auto.ru" className="text-sm font-bold text-slate-900 hover:text-[#0070b8] transition-colors">
+              <a href="mailto:info@debryansk-auto.ru" className="text-sm font-bold text-slate-900 hover:text-primary transition-colors">
                 info@debryansk-auto.ru
               </a>
             </div>
@@ -325,10 +327,10 @@ export default function ContactsPage() {
         {/* Map */}
         {dealerMapLocations.length > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: 12 }}
+            initial={prefersReduced ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="mb-8 sm:mb-10 rounded-2xl overflow-hidden border border-slate-200 shadow-sm"
+            className="relative isolate z-0 mb-8 sm:mb-10 rounded-2xl overflow-hidden border border-slate-200 shadow-sm"
             style={{ height: 420 }}
           >
             <YandexMap ref={yandexMapRef} locations={dealerMapLocations} />
@@ -343,10 +345,10 @@ export default function ContactsPage() {
             {locations.map((loc, i) => (
               <motion.div
                 key={loc.id}
-                initial={{ opacity: 0, y: 12 }}
+                initial={prefersReduced ? false : { opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 + i * 0.06 }}
-                className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 cursor-pointer hover:border-[#0070b8]/30 transition-colors"
+                className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 cursor-pointer hover:border-primary/30 transition-colors"
                 onClick={() => yandexMapRef.current?.openLocation(loc.id)}
               >
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
@@ -366,7 +368,7 @@ export default function ContactsPage() {
                     </div>
                   </div>
                   <CTPhone
-                    className="text-[#0070b8] font-bold text-sm hover:underline shrink-0"
+                    className="text-primary font-bold text-sm hover:underline shrink-0"
                     phone={normalizePhone(loc.phone) || loc.phone || ""}>
                     {normalizePhone(loc.phone) || "—"}
                   </CTPhone>
@@ -398,7 +400,7 @@ export default function ContactsPage() {
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 sticky top-24">
               <div className="flex items-center gap-2 mb-4">
-                <MessageSquare className="w-5 h-5 text-[#0070b8]" />
+                <MessageSquare className="w-5 h-5 text-primary" />
                 <h2 className="text-lg font-bold text-slate-900">Написать нам</h2>
               </div>
               <p className="text-sm text-slate-500 mb-5">
