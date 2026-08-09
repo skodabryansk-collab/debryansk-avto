@@ -1,4 +1,47 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap');
+/* Manrope — self-hosted, no Google Fonts CDN */
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('/fonts/manrope/manrope-300.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/manrope/manrope-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/manrope/manrope-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/manrope/manrope-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/manrope/manrope-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('/fonts/manrope/manrope-800.woff2') format('woff2');
+}
+
 @import "leaflet/dist/leaflet.css";
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -86,7 +129,7 @@
   --popover-foreground: 220 10% 15%;
   --popover-border: 220 10% 90%;
 
-  /* Brand accent: Deep Blue #0070b8 */
+  /* Brand accent: Deep Blue (primary) */
   --primary: 203 100% 36%;
   --primary-foreground: 0 0% 100%;
 
@@ -184,18 +227,18 @@ html {
 }
 
 .gradient-text {
-  background: linear-gradient(90deg, #0070b8 0%, #87b63c 100%);
+  background: linear-gradient(90deg, var(--color-primary) 0%, #87b63c 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .brand-gradient {
-  background: linear-gradient(135deg, #0070b8 0%, #87b63c 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #87b63c 100%);
 }
 
 .brand-gradient-text {
-  background: linear-gradient(135deg, #0070b8 0%, #87b63c 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #87b63c 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
