@@ -231,8 +231,8 @@ function injectMeta(html, title, description, canonical, ogImage, h1, jsonLd) {
 
 function buildNewsGridHtml(articles) {
   if (!articles || articles.length === 0) return "";
-  const cards = articles.map(a => {
-    const cat = esc(a.category || "\u041d\u043e\u0432\u043e\u0441\u0442\u0438");
+  const cards = articles.map((a, i) => {
+    const cat = esc(a.category || "Новости");
     const title = esc(a.title);
     const excerpt = esc((a.excerpt || "").substring(0, 140));
     const slug = esc(a.slug);
@@ -241,27 +241,53 @@ function buildNewsGridHtml(articles) {
       ? new Date(a.published_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })
       : "";
     const readTime = a.read_time ?? 3;
+
+    if (i === 0) {
+      // Featured card — full-bleed overlay (matches React ArticleCard isFeatured)
+      return `
+      <article class="group relative rounded-2xl overflow-hidden sm:col-span-2 sm:row-span-2 min-h-[400px]">
+        <a href="/news/${slug}" class="block absolute inset-0">
+          <picture class="absolute inset-0 w-full h-full">
+            <img src="${img}" alt="${title}" class="w-full h-full object-cover" />
+          </picture>
+          <div class="absolute inset-0" style="background:linear-gradient(to top,rgba(0,0,0,.85) 0%,rgba(0,0,0,.25) 50%,rgba(0,0,0,.1) 100%)"></div>
+          <div class="absolute top-4 left-4">
+            <span style="background:rgba(255,255,255,.2);backdrop-filter:blur(4px)" class="inline-flex items-center text-white text-[10px] font-bold px-2.5 py-1 rounded-full border border-white/25">${cat}</span>
+          </div>
+          <div class="absolute bottom-0 left-0 right-0 p-5">
+            <div class="flex items-center gap-2 text-[11px] mb-2.5" style="color:rgba(255,255,255,.65)">
+              <span>${dateStr}</span>
+              <span class="w-0.5 h-0.5 rounded-full" style="background:rgba(255,255,255,.4)"></span>
+              <span>${readTime} мин</span>
+            </div>
+            <h3 class="font-bold text-xl leading-snug text-white mb-2">${title}</h3>
+            <p class="text-sm leading-relaxed line-clamp-2" style="color:rgba(255,255,255,.7)">${excerpt}</p>
+            <span class="inline-flex items-center gap-1.5 text-xs font-bold mt-3.5" style="color:rgba(255,255,255,.9)">Читать дальше →</span>
+          </div>
+        </a>
+      </article>`;
+    }
+
+    // Regular card
     return `
-      <article class="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+      <article class="group bg-white rounded-2xl border border-slate-100 overflow-hidden">
         <a href="/news/${slug}">
-          <div class="h-40 overflow-hidden">
+          <div class="relative overflow-hidden h-40">
             <img src="${img}" alt="${title}" class="w-full h-full object-cover" loading="lazy" decoding="async" />
           </div>
         </a>
         <div class="p-4">
-          <span class="inline-flex items-center bg-[#0070b8]/90 text-white text-[10px] font-bold px-2.5 py-1 rounded-full">${cat}</span>
-          <div class="flex items-center gap-2 text-[11px] text-slate-400 mt-2 mb-2">
+          <div class="flex items-center gap-2 text-[11px] text-slate-400 mb-2">
             <span>${dateStr}</span>
             <span class="w-0.5 h-0.5 rounded-full bg-slate-300"></span>
-            <span>${readTime} \u043c\u0438\u043d</span>
+            <span>${readTime} мин</span>
           </div>
+          <span class="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full mb-1.5" style="background:var(--color-primary,#0070b8);color:#fff">${cat}</span>
           <a href="/news/${slug}">
-            <h3 class="font-bold text-slate-900 text-sm leading-snug hover:text-[#0070b8] transition-colors mb-1">${title}</h3>
+            <h3 class="font-semibold text-slate-900 text-sm leading-snug mb-1">${title}</h3>
           </a>
           <p class="text-slate-500 text-xs leading-relaxed">${excerpt}</p>
-          <a href="/news/${slug}" class="inline-flex items-center gap-1 text-[#0070b8] text-xs font-bold mt-2 hover:underline">
-            \u0427\u0438\u0442\u0430\u0442\u044c \u0434\u0430\u043b\u044c\u0448\u0435 <span aria-hidden="true">\u2192</span>
-          </a>
+          <a href="/news/${slug}" class="inline-flex items-center gap-1 text-xs font-bold mt-2" style="color:var(--color-primary,#0070b8)">Читать дальше →</a>
         </div>
       </article>`;
   }).join("");
