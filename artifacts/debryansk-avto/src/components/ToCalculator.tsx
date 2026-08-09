@@ -167,7 +167,7 @@ function BookingForm({ onSend }: { onSend: (name: string, phone: string) => Prom
       {error && <p className="text-sm text-red-500 mt-3">{error}</p>}
       <button type="submit" disabled={sending || !isPhoneValid(phone)}
         className="mt-4 inline-flex items-center gap-2 bg-primary hover:bg-[#005a94] disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors">
-        {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Отправляем...</> : <><Send className="w-4 h-4" /> Записаться на ТО</>}
+        {sending ? <><Loader2 className="w-4 h-4 motion-safe:animate-spin" /> Отправляем...</> : <><Send className="w-4 h-4" /> Записаться на ТО</>}
       </button>
     </form>
   );
