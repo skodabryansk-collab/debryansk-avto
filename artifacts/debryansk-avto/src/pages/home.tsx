@@ -1200,7 +1200,7 @@ export default function Home() {
                     style={{ aspectRatio: "5/3" }}
                   >
                     {/* Card base */}
-                    <div className="absolute inset-0 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] border border-slate-200/60 group-hover:shadow-[0_12px_40px_rgba(0,112,184,0.18),inset_0_1px_0_rgba(255,255,255,0.9)] group-hover:border-primary/20 transition-all duration-500" />
+                    <div className="absolute inset-0 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] border border-slate-200/60 group-hover:shadow-[0_12px_40px_rgba(var(--primary-rgb),0.18),inset_0_1px_0_rgba(255,255,255,0.9)] group-hover:border-primary/20 transition-all duration-500" />
                     {/* Gradient sheen */}
                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30" />
                     {/* Hover glow */}
@@ -1269,14 +1269,14 @@ export default function Home() {
           <div className="absolute inset-0 opacity-40"
             style={{
               background: `
-                radial-gradient(ellipse 60% 50% at 20% 80%, rgba(0,112,184,0.15) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 50% at 20% 80%, rgba(var(--primary-rgb),0.15) 0%, transparent 70%),
                 radial-gradient(ellipse 50% 40% at 80% 20%, rgba(135,182,60,0.10) 0%, transparent 70%),
-                radial-gradient(ellipse 40% 60% at 50% 50%, rgba(0,112,184,0.05) 0%, transparent 60%)
+                radial-gradient(ellipse 40% 60% at 50% 50%, rgba(var(--primary-rgb),0.05) 0%, transparent 60%)
               `
             }} />
           <div className="absolute inset-0"
             style={{
-              background: `linear-gradient(180deg, rgba(10,12,16,0) 0%, rgba(0,112,184,0.03) 50%, rgba(10,12,16,0) 100%)`
+              background: `linear-gradient(180deg, rgba(10,12,16,0) 0%, rgba(var(--primary-rgb),0.03) 50%, rgba(10,12,16,0) 100%)`
             }} />
         </div>
 
@@ -1334,7 +1334,7 @@ export default function Home() {
                   bg-gradient-to-br from-white/[0.08] via-white/[0.03] to-transparent
                   backdrop-blur-xl hover:border-white/[0.18] transition-all duration-500">
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
-                    style={{ background: `radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,112,184,0.12) 0%, transparent 60%)` }} />
+                    style={{ background: `radial-gradient(ellipse 80% 60% at 50% 0%, rgba(var(--primary-rgb),0.12) 0%, transparent 60%)` }} />
                   <div className="relative p-6 sm:p-8">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
@@ -1372,7 +1372,7 @@ export default function Home() {
                     bg-gradient-to-br from-white/[0.08] via-white/[0.03] to-transparent
                     backdrop-blur-xl hover:border-white/[0.18] transition-all duration-500">
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
-                      style={{ background: `radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,112,184,0.12) 0%, transparent 60%)` }} />
+                      style={{ background: `radial-gradient(ellipse 80% 60% at 50% 0%, rgba(var(--primary-rgb),0.12) 0%, transparent 60%)` }} />
                     <div className="relative p-5 sm:p-6">
                       <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center mb-3">
                         <Sparkles className="w-5 h-5 text-primary" />
@@ -1512,7 +1512,7 @@ export default function Home() {
                     }}
                     className={`w-full text-left bg-white rounded-2xl border p-4 sm:p-5 transition-all ${
                       isActive
-                        ? "border-primary shadow-[0_0_0_2px_rgba(0,112,184,0.18)] shadow-md"
+                        ? "border-primary shadow-[0_0_0_2px_rgba(var(--primary-rgb),0.18)] shadow-md"
                         : "border-slate-100 hover:shadow-md hover:border-slate-200"
                     }`}
                   >
@@ -1565,9 +1565,9 @@ export default function Home() {
           <div className="absolute inset-0 opacity-40"
             style={{
               background: `
-                radial-gradient(ellipse 60% 50% at 80% 80%, rgba(0,112,184,0.15) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 50% at 80% 80%, rgba(var(--primary-rgb),0.15) 0%, transparent 70%),
                 radial-gradient(ellipse 50% 40% at 20% 20%, rgba(135,182,60,0.10) 0%, transparent 70%),
-                radial-gradient(ellipse 40% 60% at 50% 50%, rgba(0,112,184,0.05) 0%, transparent 60%)
+                radial-gradient(ellipse 40% 60% at 50% 50%, rgba(var(--primary-rgb),0.05) 0%, transparent 60%)
               `
             }} />
           <div className="absolute inset-0 opacity-[0.03]"
@@ -1600,7 +1600,7 @@ export default function Home() {
                   bg-gradient-to-br from-white/[0.08] via-white/[0.03] to-transparent
                   backdrop-blur-xl hover:border-white/[0.18] transition-all duration-500">
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
-                    style={{ background: `radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,112,184,0.12) 0%, transparent 60%)` }} />
+                    style={{ background: `radial-gradient(ellipse 80% 60% at 50% 0%, rgba(var(--primary-rgb),0.12) 0%, transparent 60%)` }} />
                   <div className="relative p-6 sm:p-8 flex items-start gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center shrink-0">
                       <Phone className="w-5 h-5 text-primary" />
