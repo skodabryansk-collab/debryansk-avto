@@ -92,7 +92,7 @@ export function VinGrzInput({
           disabled={!s.input.trim() || s.loading}
           className="inline-flex items-center gap-2 bg-primary hover:bg-[#005a94] disabled:bg-slate-100 disabled:text-slate-300 text-white font-bold px-5 py-3 rounded-xl text-sm transition-colors shrink-0"
         >
-          {s.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+          {s.loading ? <Loader2 className="w-4 h-4 motion-safe:animate-spin" /> : <Search className="w-4 h-4" />}
           Найти
         </button>
       </div>
