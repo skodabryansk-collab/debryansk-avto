@@ -121,9 +121,10 @@ async function fetchCmExpertPredict(params: {
 
 /* ── FadeIn helper ──────────────────────────────────────────── */
 function FadeIn({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
+  const prefersReduced = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={prefersReduced ? false : { opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
       transition={{ duration: 0.5, delay }}
@@ -464,7 +465,7 @@ function BuyoutForm() {
                         <option value="">{modOptionsLoading ? "Загрузка…" : "Не указан"}</option>
                         {(modOptions?.engineVolumes ?? []).map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
                       </select>
-                      {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                      {modOptionsLoading ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
                     </div>
                   </div>
                 )}
@@ -478,7 +479,7 @@ function BuyoutForm() {
                         <option value="">{modOptionsLoading ? "Загрузка…" : "Не указан"}</option>
                         {filteredDriveItems.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                       </select>
-                      {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                      {modOptionsLoading ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
                     </div>
                   </div>
                 )}
@@ -492,7 +493,7 @@ function BuyoutForm() {
                         <option value="">{modOptionsLoading ? "Загрузка…" : "Не указана"}</option>
                         {filteredPowerItems.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                       </select>
-                      {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                      {modOptionsLoading ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
                     </div>
                   </div>
                 )}
@@ -506,7 +507,7 @@ function BuyoutForm() {
                         <option value="">{modOptionsLoading ? "Загрузка…" : "Не указан"}</option>
                         {filteredGearItems.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
                       </select>
-                      {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                      {modOptionsLoading ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
                     </div>
                   </div>
                 )}
@@ -521,7 +522,7 @@ function BuyoutForm() {
                       <option value="">{modOptionsLoading ? "Загрузка…" : "Не указана"}</option>
                       {(modOptions?.complectations ?? []).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
-                    {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                    {modOptionsLoading ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
                   </div>
                 </div>
               )}
