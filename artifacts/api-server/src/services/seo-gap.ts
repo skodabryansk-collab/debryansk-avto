@@ -56,7 +56,7 @@ const EASE: Record<string, number> = {
 
 /* ── Page size thresholds for tech gap detection (bytes) ─────────────── */
 const TECH_THRESHOLDS: Record<string, number> = {
-  brand: 50_000,
+  brand: 35_000,  // was 50k — /brands/s-probegom has no new-car catalog so weighs ~49KB (real content)
   car: 30_000,
   default: 20_000,
 };
