@@ -3,7 +3,7 @@ import FaqBlock from "@/components/FaqBlock";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   Car, Filter, ChevronLeft, ChevronRight, ArrowLeft, X,
   Gauge, Calendar, Palette, Phone, User, CheckCircle, SlidersHorizontal,
@@ -120,7 +120,8 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
+          aria-label="Закрыть"
+          className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2"
         >
           <X className="w-4 h-4 text-slate-600" />
         </button>
@@ -168,29 +169,31 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
 
               <form onSubmit={handleSubmit} className="space-y-3">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Ваше имя</label>
+                  <label htmlFor="lead-name" className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Ваше имя</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
+                      id="lead-name"
                       value={name}
                       onChange={e => setName(e.target.value)}
                       placeholder="Иван Иванов"
                       required
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors"
+                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2 transition-colors"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Телефон</label>
+                  <label htmlFor="lead-phone" className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Телефон</label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
+                      id="lead-phone"
                       type="tel" inputMode="tel" maxLength={18}
                       value={phone}
                       onChange={e => setPhone(formatPhone(e.target.value))}
                       placeholder="+7 (___) ___-__-__"
                       required
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors"
+                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2 transition-colors"
                     />
                   </div>
                 </div>
@@ -220,6 +223,7 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
   const transmission = parseTransmission(car.modification);
   const drive = parseDrive(car.modification);
   const { favorites, compare, isFavorite, isInCompare, toggleFavorite, toggleCompare } = useCarStorage();
+  const reduceMotion = useReducedMotion();
   const fav = isFavorite(car.id);
   const comp = isInCompare(car.id);
 
@@ -232,8 +236,8 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
 
   return (
     <motion.article
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+      whileInView={reduceMotion ? undefined : { opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
       transition={{ duration: 0.4 }}
       className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow group flex flex-col cursor-pointer"
@@ -247,6 +251,8 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
           <img
             src={img}
             alt={`${car.mark} ${car.model} ${car.year}${car.color ? `, ${car.color}` : ""}, ${formatRun(car.run)}`}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
@@ -258,13 +264,15 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
           <>
             <button
               onClick={e => { e.stopPropagation(); setImgIdx(i => (i - 1 + imgs.length) % imgs.length); }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center transition-colors"
+              aria-label="Предыдущее фото"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
               <ChevronLeft className="w-4 h-4 text-white" />
             </button>
             <button
               onClick={e => { e.stopPropagation(); setImgIdx(i => (i + 1) % imgs.length); }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center transition-colors"
+              aria-label="Следующее фото"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
               <ChevronRight className="w-4 h-4 text-white" />
             </button>
@@ -277,7 +285,9 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
         <div className="absolute top-2 right-2 flex flex-col gap-1.5 z-10">
           <button
             onClick={e => { e.stopPropagation(); toggleFavorite(storedCar); }}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+            aria-label={fav ? "Убрать из избранного" : "В избранное"}
+            aria-pressed={fav}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white ${
               fav
                 ? "bg-red-500 text-white shadow-md shadow-red-500/20"
                 : "bg-black/30 text-white hover:bg-black/50 backdrop-blur-sm"
@@ -288,7 +298,9 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
           </button>
           <button
             onClick={e => { e.stopPropagation(); toggleCompare(storedCar); }}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+            aria-label={comp ? "Убрать из сравнения" : "Сравнить"}
+            aria-pressed={comp}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white ${
               comp
                 ? "bg-[#0070b8] text-white shadow-md shadow-[#0070b8]/20"
                 : "bg-black/30 text-white hover:bg-black/50 backdrop-blur-sm"
@@ -307,7 +319,16 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
 
       <div className="p-4 flex flex-col flex-1">
         <h3 className="font-extrabold text-base leading-snug mb-0.5">
-          {car.mark} {car.model}
+          <Link
+            href={`/cars/${encodeURIComponent(car.id)}`}
+            onClick={e => {
+              e.stopPropagation();
+              fetch(`/api/cars/views/used/${encodeURIComponent(car.id)}`, { method: "POST" }).catch(() => {});
+            }}
+            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2 rounded"
+          >
+            {car.mark} {car.model}
+          </Link>
         </h3>
         {car.modification && (
           <p className="text-xs text-slate-400 mb-3 leading-snug line-clamp-1">{car.modification}</p>
@@ -570,7 +591,10 @@ export default function UsedCars() {
           </div>
           <button
             onClick={() => setFiltersOpen(v => !v)}
-            className={`lg:hidden flex items-center gap-2 px-3.5 py-2 rounded-xl border text-sm font-bold transition-all shrink-0 ${
+            aria-expanded={filtersOpen}
+            aria-haspopup="dialog"
+            aria-controls="filters-drawer"
+            className={`lg:hidden flex items-center gap-2 px-3.5 py-2 rounded-xl border text-sm font-bold transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2 ${
               filtersOpen || activeCount > 0 ? "bg-[#0070b8] text-white border-[#0070b8]" : "bg-white text-slate-700 border-slate-200"
             }`}
           >
@@ -594,6 +618,10 @@ export default function UsedCars() {
                 onClick={() => setFiltersOpen(false)}
               />
               <motion.div
+                id="filters-drawer"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Фильтры"
                 initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 30, stiffness: 300 }}
                 className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col"
@@ -606,7 +634,7 @@ export default function UsedCars() {
                       <span className="text-[10px] font-black text-white bg-[#0070b8] rounded-full w-5 h-5 flex items-center justify-center">{activeCount}</span>
                     )}
                   </div>
-                  <button onClick={() => setFiltersOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                  <button autoFocus onClick={() => setFiltersOpen(false)} aria-label="Закрыть фильтры" className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2">
                     <X className="w-4 h-4 text-slate-600" />
                   </button>
                 </div>
@@ -648,7 +676,8 @@ export default function UsedCars() {
               <select
                 value={sortBy}
                 onChange={e => { setSortBy(e.target.value as typeof sortBy); setPage(1); }}
-                className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 bg-white focus:outline-none focus:border-[#0070b8] shrink-0"
+                aria-label="Сортировка"
+                className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 bg-white focus:outline-none focus:border-[#0070b8] focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2 shrink-0"
               >
                 <option value="popular">Популярные</option>
                 <option value="price_asc">Цена: по возрастанию</option>
@@ -707,8 +736,8 @@ export default function UsedCars() {
 
                 {totalPages > 1 && (
                   <div className="flex items-center justify-center gap-2 mt-10">
-                    <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-                      className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:border-[#0070b8] transition-colors">
+                    <button disabled={page === 1} onClick={() => setPage(p => p - 1)} aria-label="Предыдущая страница"
+                      className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:border-[#0070b8] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2">
                       <ChevronLeft className="w-4 h-4" />
                     </button>
                     {Array.from({ length: totalPages }).map((_, i) => {
@@ -725,8 +754,8 @@ export default function UsedCars() {
                       if (Math.abs(p - page) === 2) return <span key={p} className="text-slate-300">…</span>;
                       return null;
                     })}
-                    <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)}
-                      className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:border-[#0070b8] transition-colors">
+                    <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} aria-label="Следующая страница"
+                      className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:border-[#0070b8] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2">
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
