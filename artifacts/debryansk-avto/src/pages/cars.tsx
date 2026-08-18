@@ -3,7 +3,7 @@ import FaqBlock from "@/components/FaqBlock";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Car, Filter, ChevronLeft, ChevronRight, ArrowLeft, X,
   Gauge, Calendar, Palette, Phone, User, CheckCircle, SlidersHorizontal,
@@ -87,7 +87,6 @@ function formatRun(km: number) {
 }
 
 function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
-  const prefersReduced = useReducedMotion();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -112,7 +111,7 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <motion.div
-        initial={prefersReduced ? false : { opacity: 0, scale: 0.95, y: 20 }}
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
         transition={{ duration: 0.2 }}
@@ -163,7 +162,7 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
             <div className="p-6">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-base font-extrabold">Оставить заявку</h3>
-                <span className="text-lg font-extrabold text-primary">{formatPrice(car.price)}</span>
+                <span className="text-lg font-extrabold text-[#0070b8]">{formatPrice(car.price)}</span>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-3">
@@ -176,7 +175,7 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
                       onChange={e => setName(e.target.value)}
                       placeholder="Иван Иванов"
                       required
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary transition-colors"
+                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors"
                     />
                   </div>
                 </div>
@@ -190,7 +189,7 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
                       onChange={e => setPhone(formatPhone(e.target.value))}
                       placeholder="+7 (___) ___-__-__"
                       required
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary transition-colors"
+                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors"
                     />
                   </div>
                 </div>
@@ -246,7 +245,7 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
         {img ? (
           <img
             src={img}
-            alt={`${car.mark} ${car.model}`}
+            alt={`${car.mark} ${car.model} ${car.year}${car.color ? `, ${car.color}` : ""}, ${formatRun(car.run)}`}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
@@ -290,7 +289,7 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
             onClick={e => { e.stopPropagation(); toggleCompare(storedCar); }}
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
               comp
-                ? "bg-primary text-white shadow-md shadow-primary/20"
+                ? "bg-[#0070b8] text-white shadow-md shadow-[#0070b8]/20"
                 : "bg-black/30 text-white hover:bg-black/50 backdrop-blur-sm"
             }`}
             title={comp ? "\u0423\u0431\u0440\u0430\u0442\u044c \u0438\u0437 \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f" : "\u0421\u0440\u0430\u0432\u043d\u0438\u0442\u044c"}
@@ -315,22 +314,22 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
 
         <div className="grid grid-cols-2 gap-1.5 mb-3">
           <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg px-2 py-1.5">
-            <Calendar className="w-3 h-3 text-primary shrink-0" />
+            <Calendar className="w-3 h-3 text-[#0070b8] shrink-0" />
             <span className="text-[11px] font-bold text-slate-700">{car.year}</span>
           </div>
           <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg px-2 py-1.5">
-            <Gauge className="w-3 h-3 text-primary shrink-0" />
+            <Gauge className="w-3 h-3 text-[#0070b8] shrink-0" />
             <span className="text-[11px] font-bold text-slate-700">{formatRun(car.run)}</span>
           </div>
           {transmission && (
             <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg px-2 py-1.5">
-              <span className="text-[9px] font-black text-primary shrink-0">КП</span>
+              <span className="text-[9px] font-black text-[#0070b8] shrink-0">КП</span>
               <span className="text-[11px] font-bold text-slate-700">{transmission}</span>
             </div>
           )}
           {drive && (
             <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg px-2 py-1.5">
-              <span className="text-[9px] font-black text-primary shrink-0">4×</span>
+              <span className="text-[9px] font-black text-[#0070b8] shrink-0">4×</span>
               <span className="text-[11px] font-bold text-slate-700">{drive}</span>
             </div>
           )}
@@ -352,7 +351,7 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
             <>
               <div className="flex items-baseline gap-2 mb-0.5">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Цена от</span>
-                <span className="text-xl font-extrabold text-primary">
+                <span className="text-xl font-extrabold text-[#0070b8]">
                   {formatPrice(car.price - car.maxDiscount)}
                 </span>
                 <DisclaimerBadge type="price-from-used" />
@@ -422,7 +421,6 @@ const TRANSMISSIONS = ["Любая", "Автомат", "Механика", "Ро
 const DRIVES = ["Любой", "Полный", "Передний"];
 
 export default function UsedCars() {
-  const prefersReduced = useReducedMotion();
   const { favorites, compare } = useCarStorage();
   const { data: cars = [], isLoading, isError, refetch } = useQuery<CarRecord[]>({
     queryKey: ["used-cars"],
@@ -505,7 +503,7 @@ export default function UsedCars() {
           {availableMarks.map(m => (
             <button key={m} onClick={() => go(() => setFilterMark(m))}
               className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterMark === m ? "bg-primary text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                filterMark === m ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >{m}</button>
           ))}
@@ -517,11 +515,11 @@ export default function UsedCars() {
         <div className="flex gap-2 items-center">
           <input type="number" value={priceMin} onChange={e => go(() => setPriceMin(e.target.value))}
             placeholder="от"
-            className="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary transition-colors" />
+            className="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#0070b8] transition-colors" />
           <span className="text-slate-300 shrink-0">—</span>
           <input type="number" value={priceMax} onChange={e => go(() => setPriceMax(e.target.value))}
             placeholder="до"
-            className="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary transition-colors" />
+            className="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#0070b8] transition-colors" />
         </div>
       </div>
 
@@ -531,7 +529,7 @@ export default function UsedCars() {
           {BODY_TYPES.map(t => (
             <button key={t} onClick={() => go(() => setFilterBodyType(t))}
               className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterBodyType === t ? "bg-primary text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                filterBodyType === t ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >{t}</button>
           ))}
@@ -544,7 +542,7 @@ export default function UsedCars() {
           {TRANSMISSIONS.map(t => (
             <button key={t} onClick={() => go(() => setFilterTransmission(t))}
               className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterTransmission === t ? "bg-primary text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                filterTransmission === t ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >{t}</button>
           ))}
@@ -557,7 +555,7 @@ export default function UsedCars() {
           {DRIVES.map(d => (
             <button key={d} onClick={() => go(() => setFilterDrive(d))}
               className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterDrive === d ? "bg-primary text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                filterDrive === d ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >{d}</button>
           ))}
@@ -613,7 +611,7 @@ export default function UsedCars() {
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <div className="flex items-start justify-between mb-5 sm:mb-8 gap-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-primary mb-1">Сток</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-1">Сток</p>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Автомобили с пробегом</h1>
             {!isLoading && (
               <p className="text-sm font-semibold text-slate-400 mt-1">{filtered.length} авто</p>
@@ -622,7 +620,7 @@ export default function UsedCars() {
           <button
             onClick={() => setFiltersOpen(v => !v)}
             className={`lg:hidden flex items-center gap-2 px-3.5 py-2 rounded-xl border text-sm font-bold transition-all shrink-0 ${
-              filtersOpen || activeCount > 0 ? "bg-primary text-white border-primary" : "bg-white text-slate-700 border-slate-200"
+              filtersOpen || activeCount > 0 ? "bg-[#0070b8] text-white border-[#0070b8]" : "bg-white text-slate-700 border-slate-200"
             }`}
           >
             <SlidersHorizontal className="w-4 h-4" />
@@ -640,21 +638,21 @@ export default function UsedCars() {
           {filtersOpen && (
             <>
               <motion.div
-                initial={prefersReduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="lg:hidden fixed inset-0 bg-black/40 z-40"
                 onClick={() => setFiltersOpen(false)}
               />
               <motion.div
-                initial={prefersReduced ? false : { y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+                initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 30, stiffness: 300 }}
                 className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col"
               >
                 <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
                   <div className="flex items-center gap-2">
-                    <Filter className="w-4 h-4 text-primary" />
+                    <Filter className="w-4 h-4 text-[#0070b8]" />
                     <span className="font-extrabold text-sm">Фильтры</span>
                     {activeCount > 0 && (
-                      <span className="text-[10px] font-black text-white bg-primary rounded-full w-5 h-5 flex items-center justify-center">{activeCount}</span>
+                      <span className="text-[10px] font-black text-white bg-[#0070b8] rounded-full w-5 h-5 flex items-center justify-center">{activeCount}</span>
                     )}
                   </div>
                   <button onClick={() => setFiltersOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
@@ -679,10 +677,10 @@ export default function UsedCars() {
           <aside className="hidden lg:block w-60 xl:w-64 shrink-0">
             <div className="bg-white rounded-2xl border border-slate-100 p-5 sticky top-[72px]">
               <div className="flex items-center gap-2 mb-5 pb-4 border-b border-slate-100">
-                <Filter className="w-4 h-4 text-primary" />
+                <Filter className="w-4 h-4 text-[#0070b8]" />
                 <span className="font-extrabold text-sm text-slate-800">Фильтры</span>
                 {activeCount > 0 && (
-                  <span className="ml-auto text-[10px] font-black text-white bg-primary rounded-full w-5 h-5 flex items-center justify-center">
+                  <span className="ml-auto text-[10px] font-black text-white bg-[#0070b8] rounded-full w-5 h-5 flex items-center justify-center">
                     {activeCount}
                   </span>
                 )}
@@ -699,7 +697,7 @@ export default function UsedCars() {
               <select
                 value={sortBy}
                 onChange={e => { setSortBy(e.target.value as typeof sortBy); setPage(1); }}
-                className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 bg-white focus:outline-none focus:border-primary shrink-0"
+                className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 bg-white focus:outline-none focus:border-[#0070b8] shrink-0"
               >
                 <option value="popular">Популярные</option>
                 <option value="price_asc">Цена: по возрастанию</option>
@@ -712,7 +710,7 @@ export default function UsedCars() {
             {isLoading && (
               <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className={`bg-white rounded-2xl border border-slate-100 overflow-hidden${prefersReduced ? "" : " animate-pulse"}`}>
+                  <div key={i} className="bg-white rounded-2xl border border-slate-100 overflow-hidden animate-pulse">
                     <div className="h-48 bg-slate-200" />
                     <div className="p-4 space-y-3">
                       <div className="h-4 bg-slate-200 rounded w-3/4" />
@@ -731,7 +729,7 @@ export default function UsedCars() {
                 <p className="text-sm mt-1">Проверьте соединение и попробуйте ещё раз</p>
                 <button
                   onClick={() => refetch()}
-                  className="mt-4 px-5 py-2 bg-primary text-white text-sm font-semibold rounded-full hover:bg-[#005a94] transition-colors"
+                  className="mt-4 px-5 py-2 bg-[#0070b8] text-white text-sm font-semibold rounded-full hover:bg-[#005a94] transition-colors"
                 >
                   Повторить
                 </button>
@@ -744,7 +742,7 @@ export default function UsedCars() {
                   <div className="text-center py-20 text-slate-400">
                     <Car className="w-12 h-12 mx-auto mb-4 opacity-30" />
                     <p className="font-semibold">Ничего не найдено</p>
-                    <button onClick={resetFilters} className="mt-3 text-sm font-bold text-primary hover:underline">
+                    <button onClick={resetFilters} className="mt-3 text-sm font-bold text-[#0070b8] hover:underline">
                       Сбросить фильтры
                     </button>
                   </div>
@@ -759,7 +757,7 @@ export default function UsedCars() {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-center gap-2 mt-10">
                     <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-                      className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:border-primary transition-colors">
+                      className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:border-[#0070b8] transition-colors">
                       <ChevronLeft className="w-4 h-4" />
                     </button>
                     {Array.from({ length: totalPages }).map((_, i) => {
@@ -768,7 +766,7 @@ export default function UsedCars() {
                         return (
                           <button key={p} onClick={() => setPage(p)}
                             className={`w-9 h-9 rounded-full text-sm font-bold transition-all ${
-                              page === p ? "bg-primary text-white" : "border border-slate-200 text-slate-600 hover:border-primary"
+                              page === p ? "bg-[#0070b8] text-white" : "border border-slate-200 text-slate-600 hover:border-[#0070b8]"
                             }`}
                           >{p}</button>
                         );
@@ -777,7 +775,7 @@ export default function UsedCars() {
                       return null;
                     })}
                     <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)}
-                      className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:border-primary transition-colors">
+                      className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:border-[#0070b8] transition-colors">
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
