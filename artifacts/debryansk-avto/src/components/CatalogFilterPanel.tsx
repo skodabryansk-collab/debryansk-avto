@@ -42,7 +42,7 @@ interface CatalogFilterPanelProps {
 }
 
 const rangeInputClass =
-  "flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#0070b8] transition-colors";
+  "flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#0070b8] focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2 transition-colors";
 
 /**
  * Универсальная панель фильтров каталога (новые и б/у авто).
@@ -57,12 +57,32 @@ export default function CatalogFilterPanel({ sections, activeCount, onReset }: C
             {section.label}
           </div>
           {section.kind === "pills" ? (
-            <div className="flex flex-wrap gap-1.5">
+            <div
+              role="radiogroup"
+              aria-label={section.label}
+              className="flex flex-wrap gap-1.5"
+              onKeyDown={e => {
+                if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"].includes(e.key)) return;
+                e.preventDefault();
+                const dir = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1;
+                const idx = section.options.indexOf(section.value);
+                const next = section.options[(idx + dir + section.options.length) % section.options.length];
+                section.onSelect(next);
+                const group = e.currentTarget;
+                requestAnimationFrame(() => {
+                  const target = group.querySelector<HTMLButtonElement>('[aria-checked="true"]');
+                  target?.focus();
+                });
+              }}
+            >
               {section.options.map(option => (
                 <button
                   key={option}
+                  role="radio"
+                  aria-checked={section.value === option}
+                  tabIndex={section.value === option ? 0 : -1}
                   onClick={() => section.onSelect(option)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2 ${
                     section.value === option
                       ? `${section.activeClass ?? "bg-[#0070b8]"} text-white`
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -79,6 +99,7 @@ export default function CatalogFilterPanel({ sections, activeCount, onReset }: C
                 value={section.min}
                 onChange={e => section.onMinChange(e.target.value)}
                 placeholder="от"
+                aria-label={`${section.label}: от`}
                 className={rangeInputClass}
               />
               <span className="text-slate-300 shrink-0">—</span>
@@ -87,6 +108,7 @@ export default function CatalogFilterPanel({ sections, activeCount, onReset }: C
                 value={section.max}
                 onChange={e => section.onMaxChange(e.target.value)}
                 placeholder="до"
+                aria-label={`${section.label}: до`}
                 className={rangeInputClass}
               />
             </div>
@@ -97,7 +119,7 @@ export default function CatalogFilterPanel({ sections, activeCount, onReset }: C
       {activeCount > 0 && (
         <button
           onClick={onReset}
-          className="flex items-center gap-1.5 text-sm font-bold text-rose-500 hover:text-rose-600 transition-colors"
+          className="flex items-center gap-1.5 text-sm font-bold text-rose-500 hover:text-rose-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2 rounded-lg"
         >
           <X className="w-3.5 h-3.5" /> Сбросить ({activeCount})
         </button>
