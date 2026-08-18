@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   TrendingUp, Clock, Shield, BadgeCheck,
   Phone, MessageSquare, Car, Gauge, CheckCircle,
@@ -121,10 +121,9 @@ async function fetchCmExpertPredict(params: {
 
 /* ── FadeIn helper ──────────────────────────────────────────── */
 function FadeIn({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
-  const prefersReduced = useReducedMotion();
   return (
     <motion.div
-      initial={prefersReduced ? false : { opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
       transition={{ duration: 0.5, delay }}
@@ -354,7 +353,7 @@ function BuyoutForm() {
     toast({ title: "Заявка принята!", description: "Перезвоним в течение 15 минут" });
   };
 
-  const inputCls   = "w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm";
+  const inputCls   = "w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#0070b8] focus:ring-1 focus:ring-[#0070b8] outline-none text-sm";
   const selectCls  = `${inputCls} bg-white`;
   const labelCls   = "text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5";
 
@@ -373,7 +372,7 @@ function BuyoutForm() {
         </div>
         <h3 className="text-xl font-extrabold mb-2">Заявка принята!</h3>
         <p className="text-slate-500 mb-4 text-sm">Наш менеджер перезвонит вам в течение 15 минут для обсуждения условий.</p>
-        <button onClick={resetForm} className="text-primary font-bold hover:underline text-sm">
+        <button onClick={resetForm} className="text-[#0070b8] font-bold hover:underline text-sm">
           Отправить ещё одну заявку
         </button>
       </div>
@@ -384,13 +383,13 @@ function BuyoutForm() {
     <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-100">
       {/* Step indicator */}
       <div className="flex items-center gap-2 mb-6">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step === 1 ? "bg-primary text-white" : "bg-[#87b63c] text-white"}`}>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step === 1 ? "bg-[#0070b8] text-white" : "bg-[#87b63c] text-white"}`}>
           {step === 1 ? "1" : <CheckCircle className="w-4 h-4" />}
         </div>
         <div className="h-1 w-8 rounded-full bg-slate-200 overflow-hidden">
           <div className={`h-full rounded-full transition-all ${step === 2 ? "w-full bg-[#87b63c]" : "w-0"}`} />
         </div>
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step === 2 ? "bg-primary text-white" : "bg-slate-200 text-slate-400"}`}>2</div>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step === 2 ? "bg-[#0070b8] text-white" : "bg-slate-200 text-slate-400"}`}>2</div>
       </div>
 
       <h3 className="text-lg font-extrabold mb-1">
@@ -465,7 +464,7 @@ function BuyoutForm() {
                         <option value="">{modOptionsLoading ? "Загрузка…" : "Не указан"}</option>
                         {(modOptions?.engineVolumes ?? []).map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
                       </select>
-                      {modOptionsLoading ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                      {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
                     </div>
                   </div>
                 )}
@@ -479,7 +478,7 @@ function BuyoutForm() {
                         <option value="">{modOptionsLoading ? "Загрузка…" : "Не указан"}</option>
                         {filteredDriveItems.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                       </select>
-                      {modOptionsLoading ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                      {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
                     </div>
                   </div>
                 )}
@@ -493,7 +492,7 @@ function BuyoutForm() {
                         <option value="">{modOptionsLoading ? "Загрузка…" : "Не указана"}</option>
                         {filteredPowerItems.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                       </select>
-                      {modOptionsLoading ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                      {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
                     </div>
                   </div>
                 )}
@@ -507,7 +506,7 @@ function BuyoutForm() {
                         <option value="">{modOptionsLoading ? "Загрузка…" : "Не указан"}</option>
                         {filteredGearItems.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
                       </select>
-                      {modOptionsLoading ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                      {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
                     </div>
                   </div>
                 )}
@@ -522,7 +521,7 @@ function BuyoutForm() {
                       <option value="">{modOptionsLoading ? "Загрузка…" : "Не указана"}</option>
                       {(modOptions?.complectations ?? []).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
-                    {modOptionsLoading ? <Loader2 className="w-4 h-4 motion-safe:animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
+                    {modOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" /> : <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />}
                   </div>
                 </div>
               )}
@@ -586,7 +585,7 @@ function BuyoutForm() {
             type="button"
             onClick={handleCalculate}
             disabled={priceLoading}
-            className="w-full bg-primary hover:bg-[#005a94] text-white font-bold rounded-xl py-3 text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full bg-[#0070b8] hover:bg-[#005a94] text-white font-bold rounded-xl py-3 text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {priceLoading ? "Расчитываем…" : "Рассчитать стоимость"}
           </button>
@@ -654,7 +653,7 @@ function BuyoutForm() {
             >
               Изменить
             </button>
-            <button type="submit" className="flex-1 bg-primary hover:bg-[#005a94] text-white font-bold rounded-xl py-3 text-sm transition-colors">
+            <button type="submit" className="flex-1 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold rounded-xl py-3 text-sm transition-colors">
               Отправить заявку
             </button>
           </div>
@@ -691,7 +690,7 @@ const services = [
   {
     icon: TrendingUp,
     tag: "Выгоднее",
-    tagColor: "bg-primary/10 text-primary",
+    tagColor: "bg-[#0070b8]/10 text-[#0070b8]",
     title: "Комиссионная продажа",
     subtitle: "Максимальная цена — без хлопот",
     desc: "Мы размещаем автомобиль на всех ведущих площадках: Авито, Авто.ру, Дром и нашем сайте. У нас одна из крупнейших автоплощадок в Брянске. По согласованию подготовим автомобиль к продаже. Доступна продажа в кредит для покупателей. Реклама, показы, переговоры, оформление — наша работа. Вы получаете деньги после сделки.",
@@ -706,9 +705,9 @@ const services = [
       "Деньги сразу после продажи",
     ],
     note: "",
-    accentColor: "border-primary",
-    iconBg: "bg-primary/10",
-    iconColor: "text-primary",
+    accentColor: "border-[#0070b8]",
+    iconBg: "bg-[#0070b8]/10",
+    iconColor: "text-[#0070b8]",
   },
 ];
 
@@ -784,7 +783,7 @@ function BuyoutNav() {
                 if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); setActive(item.id); }
               }}
               className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all ${
-                active === item.id ? "bg-primary text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
+                active === item.id ? "bg-[#0070b8] text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
               }`}
             >
               {item.label}
@@ -799,7 +798,7 @@ function BuyoutNav() {
   );
 }
 
-async function fetchBuyoutLocations(): Promise<Array<{ hours: string | null }>> {
+async function fetchBuyoutLocations(): Promise<Array<{ title: string; phone: string | null; hours: string | null }>> {
   const r = await fetch("/api/locations");
   if (!r.ok) return [];
   const j = await r.json();
@@ -826,8 +825,12 @@ export default function BuyoutPage() {
     return (unique.length >= 1 ? unique[0] as string : null) ?? "Ежедневно 9:00–21:00";
   }, [buyoutLocations]);
 
+  const suponePhone = buyoutLocations.find(l =>
+    l.title?.toLowerCase().includes("супонево")
+  )?.phone ?? null;
+
   return (
-    <Layout>
+    <Layout overridePhone={suponePhone}>
       <SEO
         title="Выкуп и комиссия — Дебрянск Авто"
         description="Срочный выкуп автомобилей за наличные и комиссионная продажа в Брянске. Оценка бесплатно, деньги в день сделки. Официальный дилер."
@@ -875,7 +878,7 @@ export default function BuyoutPage() {
       <section id="services" className="py-12 sm:py-16 bg-[#f8f9fb]">
         <div className="container mx-auto px-4 sm:px-6">
           <FadeIn className="mb-8 sm:mb-10">
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-primary mb-2">Услуги</p>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Услуги</p>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Два пути. Одна цель — ваша выгода.</h2>
           </FadeIn>
           <div className="grid sm:grid-cols-2 gap-5 sm:gap-6">
@@ -913,15 +916,15 @@ export default function BuyoutPage() {
       <section className="py-12 sm:py-16 bg-white border-t border-slate-100">
         <div className="container mx-auto px-4 sm:px-6">
           <FadeIn className="mb-8 sm:mb-10">
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-primary mb-2">Почему мы</p>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Почему мы</p>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Группа компаний с 15-летней историей</h2>
           </FadeIn>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {whyUs.map((w, i) => (
               <FadeIn key={w.title} delay={i * 0.08}>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <w.icon className="w-5 h-5 text-primary" />
+                  <div className="w-10 h-10 rounded-xl bg-[#0070b8]/10 flex items-center justify-center shrink-0">
+                    <w.icon className="w-5 h-5 text-[#0070b8]" />
                   </div>
                   <div>
                     <h3 className="font-extrabold text-sm mb-1">{w.title}</h3>
@@ -938,7 +941,7 @@ export default function BuyoutPage() {
       <section className="py-12 sm:py-16 bg-white border-t border-slate-100">
         <div className="container mx-auto px-4 sm:px-6 max-w-3xl">
           <FadeIn className="mb-6">
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-primary mb-2">Гид</p>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Гид</p>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Как продать автомобиль в Брянске быстро и выгодно</h2>
           </FadeIn>
           <FadeIn delay={0.08} className="space-y-4">
@@ -959,7 +962,7 @@ export default function BuyoutPage() {
       <section id="process" className="py-12 sm:py-16 bg-[#f8f9fb] border-t border-slate-100">
         <div className="container mx-auto px-4 sm:px-6">
           <FadeIn className="mb-8 sm:mb-10">
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-primary mb-2">Процесс</p>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Процесс</p>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">Четыре шага — и автомобиль продан</h2>
           </FadeIn>
           <div className="grid sm:grid-cols-4 gap-4">
@@ -992,16 +995,16 @@ export default function BuyoutPage() {
           <div className="grid lg:grid-cols-5 gap-8 items-start">
             <div className="lg:col-span-2">
               <FadeIn>
-                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-primary mb-2">Заявка</p>
+                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-2">Заявка</p>
                 <h2 className="text-2xl sm:text-3xl font-extrabold mb-4">Рассчитайте стоимость вашего автомобиля</h2>
                 <p className="text-sm text-slate-500 leading-relaxed mb-6">
                   Заполните данные — система покажет диапазон цен, а наш специалист перезвонит и подтвердит предложение. Оценка бесплатно, без обязательств.
                 </p>
                 <div className="space-y-4">
-                  <CTPhone className="flex items-center gap-3 text-sm font-bold text-slate-700 hover:text-primary transition-colors"
+                  <CTPhone className="flex items-center gap-3 text-sm font-bold text-slate-700 hover:text-[#0070b8] transition-colors"
                     phone={headerPhone}>
-                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <Phone className="w-4 h-4 text-primary" />
+                    <div className="w-9 h-9 rounded-xl bg-[#0070b8]/10 flex items-center justify-center">
+                      <Phone className="w-4 h-4 text-[#0070b8]" />
                     </div>
                     {headerPhone}
                   </CTPhone>
