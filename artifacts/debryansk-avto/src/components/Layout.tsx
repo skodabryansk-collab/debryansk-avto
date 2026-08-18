@@ -120,7 +120,7 @@ function CallbackModal({ onClose }: { onClose: () => void }) {
 }
 
 /* ── Layout ──────────────────────────────────────────────────── */
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout({ children, overridePhone }: { children: React.ReactNode; overridePhone?: string | null }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [callbackOpen, setCallbackOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -139,8 +139,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     queryFn: () => fetch("/api/settings").then(r => r.json()).then(j => j.data as Record<string, string>),
     staleTime: 5 * 60 * 1000,
   });
-  const headerPhone = normalizePhone(siteSettings?.header_phone) || "+7 (4832) 77-77-70";
-  const headerPhoneTel = phoneHref(siteSettings?.header_phone) || "tel:+74832777770";
+  const headerPhone = (overridePhone ? normalizePhone(overridePhone) : null)
+    || normalizePhone(siteSettings?.header_phone)
+    || "+7 (4832) 77-77-70";
+  const headerPhoneTel = (overridePhone ? phoneHref(overridePhone) : null)
+    || phoneHref(siteSettings?.header_phone)
+    || "tel:+74832777770";
 
   const { data: locationsData = [] } = useQuery<Array<{ id: number; title: string; address: string; phone: string | null; hours: string | null; mapX: number | null; mapY: number | null }>>({
     queryKey: ["locations"],
@@ -322,15 +326,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   >
                     <Link href="/new-cars"
                       onClick={() => setCarsDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-primary transition-colors"
+                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
                     >
-                      <Car className="w-4 h-4 text-primary" />
+                      <Car className="w-4 h-4 text-[#0070b8]" />
                       Новые автомобили
                     </Link>
                     <div className="mx-4 border-t border-slate-100" />
                     <Link href="/cars"
                       onClick={() => setCarsDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-primary transition-colors"
+                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
                     >
                       <Car className="w-4 h-4 text-slate-400" />
                       Автомобили с пробегом
@@ -363,7 +367,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   >
                     <Link href="/service"
                       onClick={() => setServicesDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-primary transition-colors"
+                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
                     >
                       <Wrench className="w-4 h-4 text-slate-400" />
                       Сервис и ТО
@@ -371,9 +375,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     <div className="mx-4 border-t border-slate-100" />
                     <Link href="/service/bonus"
                       onClick={() => setServicesDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-primary transition-colors"
+                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
                     >
-                      <Gift className="w-4 h-4 text-primary" />
+                      <Gift className="w-4 h-4 text-[#0070b8]" />
                       Бонусная программа
                     </Link>
                   </motion.div>
@@ -438,7 +442,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Scale className="w-4 h-4" />
               <span>Сравнить</span>
               {compCount > 0 && (
-                <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{compCount}</span>
+                <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{compCount}</span>
               )}
             </Link>
           </div>
@@ -481,7 +485,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <Wrench className="w-4 h-4 opacity-60" /> Сервис и ТО
                 </Link>
                 <Link href="/service/bonus" onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 text-base font-semibold py-3 border-b border-white/[0.07] text-primary hover:text-white transition-colors">
+                  className="flex items-center gap-2 text-base font-semibold py-3 border-b border-white/[0.07] text-[#0070b8] hover:text-white transition-colors">
                   <Gift className="w-4 h-4" /> Бонусы
                 </Link>
                 <Link href="/vacancies"
@@ -498,15 +502,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
                 <Link href="/compare"
                   className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors block flex items-center gap-2">
-                  <Scale className="w-4 h-4" /> Сравнить {compCount > 0 && <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{compCount}</span>}
+                  <Scale className="w-4 h-4" /> Сравнить {compCount > 0 && <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{compCount}</span>}
                 </Link>
                 <div className="pt-3 flex items-center justify-between">
-                  <CTPhone className="text-base font-bold text-primary" phone={headerPhone} />
+                  <CTPhone className="text-base font-bold text-[#0070b8]" phone={headerPhone} />
                   <div className="flex gap-2">
-                    <a href="#" className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center hover:bg-primary transition-colors">
+                    <a href="#" className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center hover:bg-[#0070b8] transition-colors">
                       <SiVk size={14} />
                     </a>
-                    <a href="#" className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center hover:bg-primary transition-colors">
+                    <a href="#" className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center hover:bg-[#0070b8] transition-colors">
                       <SiTelegram size={14} />
                     </a>
                   </div>
@@ -540,10 +544,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 Официальный мультибрендовый дилер в Брянске с&nbsp;2011&nbsp;года.
               </p>
               <div className="flex gap-2.5">
-                <a href="#" aria-label="ВКонтакте" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary transition-colors group">
+                <a href="#" aria-label="ВКонтакте" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#0070b8] transition-colors group">
                   <SiVk className="text-white/40 group-hover:text-white" size={15} />
                 </a>
-                <a href="#" aria-label="Telegram" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary transition-colors group">
+                <a href="#" aria-label="Telegram" className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#0070b8] transition-colors group">
                   <SiTelegram className="text-white/40 group-hover:text-white" size={15} />
                 </a>
               </div>
@@ -553,11 +557,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div>
               <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Каталог</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/new-cars" className="hover:text-primary transition-colors">Новые автомобили</Link></li>
-                <li><Link href="/cars" className="hover:text-primary transition-colors">Автомобили с пробегом</Link></li>
-                <li><Link href="/buyout" className="hover:text-primary transition-colors">Выкуп и комиссия</Link></li>
-                <li><Link href="/favorites" className="hover:text-primary transition-colors">Избранное</Link></li>
-                <li><Link href="/compare" className="hover:text-primary transition-colors">Сравнение авто</Link></li>
+                <li><Link href="/new-cars" className="hover:text-[#0070b8] transition-colors">Новые автомобили</Link></li>
+                <li><Link href="/cars" className="hover:text-[#0070b8] transition-colors">Автомобили с пробегом</Link></li>
+                <li><Link href="/buyout" className="hover:text-[#0070b8] transition-colors">Выкуп и комиссия</Link></li>
+                <li><Link href="/favorites" className="hover:text-[#0070b8] transition-colors">Избранное</Link></li>
+                <li><Link href="/compare" className="hover:text-[#0070b8] transition-colors">Сравнение авто</Link></li>
               </ul>
             </div>
 
@@ -565,13 +569,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div>
               <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Бренды</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/brands/omoda" className="hover:text-primary transition-colors">OMODA</Link></li>
-                <li><Link href="/brands/jaecoo" className="hover:text-primary transition-colors">JAECOO</Link></li>
-                <li><Link href="/brands/tenet" className="hover:text-primary transition-colors">Tenet</Link></li>
-                <li><Link href="/brands/jetour" className="hover:text-primary transition-colors">Jetour</Link></li>
-                <li><Link href="/brands/soueast" className="hover:text-primary transition-colors">Soueast</Link></li>
-                <li><Link href="/brands/haval-city" className="hover:text-primary transition-colors">HAVAL City</Link></li>
-                <li><Link href="/brands/haval-pro" className="hover:text-primary transition-colors">HAVAL Pro</Link></li>
+                <li><Link href="/brands/omoda" className="hover:text-[#0070b8] transition-colors">OMODA</Link></li>
+                <li><Link href="/brands/jaecoo" className="hover:text-[#0070b8] transition-colors">JAECOO</Link></li>
+                <li><Link href="/brands/tenet" className="hover:text-[#0070b8] transition-colors">Tenet</Link></li>
+                <li><Link href="/brands/jetour" className="hover:text-[#0070b8] transition-colors">Jetour</Link></li>
+                <li><Link href="/brands/soueast" className="hover:text-[#0070b8] transition-colors">Soueast</Link></li>
+                <li><Link href="/brands/haval-city" className="hover:text-[#0070b8] transition-colors">HAVAL City</Link></li>
+                <li><Link href="/brands/haval-pro" className="hover:text-[#0070b8] transition-colors">HAVAL Pro</Link></li>
               </ul>
             </div>
 
@@ -579,13 +583,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div>
               <h4 className="font-bold mb-4 text-[10px] sm:text-xs tracking-widest uppercase text-white/70">Компания</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/about" className="hover:text-primary transition-colors">О группе</Link></li>
-                <li><Link href="/contacts" className="hover:text-primary transition-colors">Контакты</Link></li>
-                <li><Link href="/news" className="hover:text-primary transition-colors">Новости</Link></li>
-                <li><Link href="/vacancies" className="hover:text-primary transition-colors">Вакансии</Link></li>
-                <li><Link href="/service" className="hover:text-primary transition-colors">Сервис и ТО</Link></li>
-                <li><Link href="/service/bonus" className="hover:text-primary transition-colors">Бонусная программа</Link></li>
-                <li><Link href="/corporate" className="hover:text-primary transition-colors">Корпоративным клиентам</Link></li>
+                <li><Link href="/about" className="hover:text-[#0070b8] transition-colors">О группе</Link></li>
+                <li><Link href="/contacts" className="hover:text-[#0070b8] transition-colors">Контакты</Link></li>
+                <li><Link href="/news" className="hover:text-[#0070b8] transition-colors">Новости</Link></li>
+                <li><Link href="/vacancies" className="hover:text-[#0070b8] transition-colors">Вакансии</Link></li>
+                <li><Link href="/service" className="hover:text-[#0070b8] transition-colors">Сервис и ТО</Link></li>
+                <li><Link href="/service/bonus" className="hover:text-[#0070b8] transition-colors">Бонусная программа</Link></li>
+                <li><Link href="/corporate" className="hover:text-[#0070b8] transition-colors">Корпоративным клиентам</Link></li>
               </ul>
             </div>
 
