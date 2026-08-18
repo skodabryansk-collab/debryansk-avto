@@ -16,6 +16,8 @@ import { CreditModal } from "@/components/modals/CreditModal";
 import { TradeInModal } from "@/components/modals/TradeInModal";
 import Layout from "@/components/Layout";
 import CatalogFilterPanel, { BODY_TYPE_NAMES, TRANSMISSIONS, DRIVES, type FilterSection } from "@/components/CatalogFilterPanel";
+import { SortPopover } from "@/components/SortPopover";
+import { ActiveFilters, type ActiveFilterChip } from "@/components/ActiveFilters";
 
 interface CarRecord {
   id: string;
@@ -265,14 +267,14 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
             <button
               onClick={e => { e.stopPropagation(); setImgIdx(i => (i - 1 + imgs.length) % imgs.length); }}
               aria-label="Предыдущее фото"
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white opacity-0 group-hover:opacity-100"
             >
               <ChevronLeft className="w-4 h-4 text-white" />
             </button>
             <button
               onClick={e => { e.stopPropagation(); setImgIdx(i => (i + 1) % imgs.length); }}
               aria-label="Следующее фото"
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white opacity-0 group-hover:opacity-100"
             >
               <ChevronRight className="w-4 h-4 text-white" />
             </button>
@@ -669,23 +671,33 @@ export default function UsedCars() {
           </aside>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-5 gap-3">
+            <div className="flex items-center justify-between mb-3 gap-3">
               <span className="text-sm text-slate-500 font-medium">
                 {isLoading ? "Загрузка..." : `${filtered.length} авто`}
               </span>
-              <select
+              <SortPopover
                 value={sortBy}
-                onChange={e => { setSortBy(e.target.value as typeof sortBy); setPage(1); }}
-                aria-label="Сортировка"
-                className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 bg-white focus:outline-none focus:border-[#0070b8] focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2 shrink-0"
-              >
-                <option value="popular">Популярные</option>
-                <option value="price_asc">Цена: по возрастанию</option>
-                <option value="price_desc">Цена: по убыванию</option>
-                <option value="year_desc">Год: сначала новее</option>
-                <option value="run_asc">Пробег: меньше</option>
-              </select>
+                onChange={v => { setSortBy(v); setPage(1); }}
+                options={[
+                  { value: "popular", label: "Популярные" },
+                  { value: "price_asc", label: "Цена: по возрастанию" },
+                  { value: "price_desc", label: "Цена: по убыванию" },
+                  { value: "year_desc", label: "Год: сначала новее" },
+                  { value: "run_asc", label: "Пробег: меньше" },
+                ]}
+              />
             </div>
+            <ActiveFilters
+              chips={[
+                filterMark !== "Все марки" ? { key: "mark", label: filterMark, onRemove: () => go(() => setFilterMark("Все марки")) } : null,
+                filterBodyType !== "Все типы кузова" ? { key: "body", label: filterBodyType, onRemove: () => go(() => setFilterBodyType("Все типы кузова")) } : null,
+                filterTransmission !== "Любая" ? { key: "trans", label: filterTransmission, onRemove: () => go(() => setFilterTransmission("Любая")) } : null,
+                filterDrive !== "Любой" ? { key: "drive", label: filterDrive, onRemove: () => go(() => setFilterDrive("Любой")) } : null,
+                priceMin ? { key: "pmin", label: `от ${priceMin} ₽`, onRemove: () => go(() => setPriceMin("")) } : null,
+                priceMax ? { key: "pmax", label: `до ${priceMax} ₽`, onRemove: () => go(() => setPriceMax("")) } : null,
+              ].filter((c): c is NonNullable<typeof c> => c !== null)}
+              onReset={resetFilters}
+            />
 
             {isLoading && (
               <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
