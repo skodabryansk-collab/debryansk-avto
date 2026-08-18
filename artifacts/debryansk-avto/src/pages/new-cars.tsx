@@ -16,6 +16,7 @@ import { TestDriveModal } from "@/components/modals/TestDriveModal";
 import { CreditModal } from "@/components/modals/CreditModal";
 import { TradeInModal } from "@/components/modals/TradeInModal";
 import Layout from "@/components/Layout";
+import CatalogFilterPanel, { BODY_TYPE_NAMES, TRANSMISSIONS, DRIVES, type FilterSection } from "@/components/CatalogFilterPanel";
 
 interface NewCarRecord {
   id: string;
@@ -397,19 +398,7 @@ function NewCarCard({ car, onTestDrive }: { car: NewCarRecord; onTestDrive: (car
 
 const PAGE_SIZE = 12;
 
-const BODY_TYPES = [
-  "Все типы",
-  "Внедорожник 5 дв.",
-  "Внедорожник 3 дв.",
-  "Седан",
-  "Хэтчбек 5 дв.",
-  "Универсал 5 дв.",
-  "Лифтбек",
-  "Минивэн",
-  "Пикап",
-];
-const TRANSMISSIONS = ["Любая", "Робот", "Автомат", "Механика", "Вариатор"];
-const DRIVES = ["Любой", "Полный", "Передний"];
+const BODY_TYPES = ["Все типы", ...BODY_TYPE_NAMES];
 const DEALERS = ["Все дилеры", "Jaecoo", "Omoda", "Tenet", "Haval City", "Haval Pro", "Jetour", "Soueast", "Jeland"];
 
 export default function NewCars() {
@@ -525,109 +514,59 @@ export default function NewCars() {
     !!priceMax,
   ].filter(Boolean).length;
 
-  const FilterContent = () => (
-    <div className="space-y-6">
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Наличие</div>
-        <div className="flex flex-wrap gap-1.5">
-          {["Все", "В наличии", "На заказ"].map(a => (
-            <button key={a} onClick={() => go(() => setFilterAvailability(a))}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterAvailability === a ? "bg-[#87b63c] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{a}</button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Дилер / Бренд</div>
-        <div className="flex flex-wrap gap-1.5">
-          {DEALERS.map(d => (
-            <button key={d} onClick={() => go(() => { setFilterDealer(d); setFilterModel("Все модели"); })}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterDealer === d ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{d}</button>
-          ))}
-        </div>
-      </div>
-
-      {availableModels.length > 2 && (
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Модель</div>
-          <div className="flex flex-wrap gap-1.5">
-            {availableModels.map(m => (
-              <button key={m} onClick={() => go(() => setFilterModel(m))}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                  filterModel === m ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >{m}</button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Цена, ₽</div>
-        <div className="flex gap-2 items-center">
-          <input type="number" value={priceMin} onChange={e => go(() => setPriceMin(e.target.value))}
-            placeholder="от"
-            className="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#0070b8] transition-colors" />
-          <span className="text-slate-300 shrink-0">—</span>
-          <input type="number" value={priceMax} onChange={e => go(() => setPriceMax(e.target.value))}
-            placeholder="до"
-            className="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#0070b8] transition-colors" />
-        </div>
-      </div>
-
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Тип кузова</div>
-        <div className="flex flex-wrap gap-1.5">
-          {BODY_TYPES.map(t => (
-            <button key={t} onClick={() => go(() => setFilterBodyType(t))}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterBodyType === t ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{t}</button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Коробка передач</div>
-        <div className="flex flex-wrap gap-1.5">
-          {TRANSMISSIONS.map(t => (
-            <button key={t} onClick={() => go(() => setFilterTransmission(t))}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterTransmission === t ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{t}</button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Привод</div>
-        <div className="flex flex-wrap gap-1.5">
-          {DRIVES.map(d => (
-            <button key={d} onClick={() => go(() => setFilterDrive(d))}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterDrive === d ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{d}</button>
-          ))}
-        </div>
-      </div>
-
-      {activeCount > 0 && (
-        <button onClick={resetFilters}
-          className="flex items-center gap-1.5 text-sm font-bold text-rose-500 hover:text-rose-600 transition-colors">
-          <X className="w-3.5 h-3.5" /> Сбросить ({activeCount})
-        </button>
-      )}
-    </div>
-  );
+  const filterSections: FilterSection[] = [
+    {
+      kind: "pills",
+      label: "Наличие",
+      options: ["Все", "В наличии", "На заказ"],
+      value: filterAvailability,
+      onSelect: a => go(() => setFilterAvailability(a)),
+      activeClass: "bg-[#87b63c]",
+    },
+    {
+      kind: "pills",
+      label: "Дилер / Бренд",
+      options: DEALERS,
+      value: filterDealer,
+      onSelect: d => go(() => { setFilterDealer(d); setFilterModel("Все модели"); }),
+    },
+    ...(availableModels.length > 2 ? [{
+      kind: "pills" as const,
+      label: "Модель",
+      options: availableModels,
+      value: filterModel,
+      onSelect: (m: string) => go(() => setFilterModel(m)),
+    }] : []),
+    {
+      kind: "range",
+      label: "Цена, ₽",
+      min: priceMin,
+      max: priceMax,
+      onMinChange: v => go(() => setPriceMin(v)),
+      onMaxChange: v => go(() => setPriceMax(v)),
+    },
+    {
+      kind: "pills",
+      label: "Тип кузова",
+      options: BODY_TYPES,
+      value: filterBodyType,
+      onSelect: t => go(() => setFilterBodyType(t)),
+    },
+    {
+      kind: "pills",
+      label: "Коробка передач",
+      options: TRANSMISSIONS,
+      value: filterTransmission,
+      onSelect: t => go(() => setFilterTransmission(t)),
+    },
+    {
+      kind: "pills",
+      label: "Привод",
+      options: DRIVES,
+      value: filterDrive,
+      onSelect: d => go(() => setFilterDrive(d)),
+    },
+  ];
 
   const itemListJsonLd = !isLoading && filtered.length > 0 ? {
     "@type": "ItemList",
@@ -749,7 +688,7 @@ export default function NewCars() {
                   </button>
                 </div>
                 <div className="overflow-y-auto flex-1 p-5">
-                  <FilterContent />
+                  <CatalogFilterPanel sections={filterSections} activeCount={activeCount} onReset={resetFilters} />
                 </div>
                 <div className="p-4 border-t border-slate-100 shrink-0">
                   <button onClick={() => setFiltersOpen(false)}
@@ -774,7 +713,7 @@ export default function NewCars() {
                   </span>
                 )}
               </div>
-              <FilterContent />
+              <CatalogFilterPanel sections={filterSections} activeCount={activeCount} onReset={resetFilters} />
             </div>
           </aside>
 
