@@ -15,6 +15,7 @@ import DisclaimerBadge from "@/components/DisclaimerBadge";
 import { CreditModal } from "@/components/modals/CreditModal";
 import { TradeInModal } from "@/components/modals/TradeInModal";
 import Layout from "@/components/Layout";
+import CatalogFilterPanel, { BODY_TYPE_NAMES, TRANSMISSIONS, DRIVES, type FilterSection } from "@/components/CatalogFilterPanel";
 
 interface CarRecord {
   id: string;
@@ -405,20 +406,7 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
 
 const PAGE_SIZE = 12;
 
-const BODY_TYPES = [
-  "Все типы кузова",
-  "Внедорожник 5 дв.",
-  "Внедорожник 3 дв.",
-  "Седан",
-  "Хэтчбек 5 дв.",
-  "Универсал 5 дв.",
-  "Лифтбек",
-  "Минивэн",
-  "Пикап",
-  "Купе",
-];
-const TRANSMISSIONS = ["Любая", "Автомат", "Механика", "Робот", "Вариатор"];
-const DRIVES = ["Любой", "Полный", "Передний"];
+const BODY_TYPES = ["Все типы кузова", ...BODY_TYPE_NAMES, "Купе"];
 
 export default function UsedCars() {
   const { favorites, compare } = useCarStorage();
@@ -495,81 +483,44 @@ export default function UsedCars() {
     !!priceMax,
   ].filter(Boolean).length;
 
-  const FilterContent = () => (
-    <div className="space-y-6">
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Марка</div>
-        <div className="flex flex-wrap gap-1.5">
-          {availableMarks.map(m => (
-            <button key={m} onClick={() => go(() => setFilterMark(m))}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterMark === m ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{m}</button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Цена, ₽</div>
-        <div className="flex gap-2 items-center">
-          <input type="number" value={priceMin} onChange={e => go(() => setPriceMin(e.target.value))}
-            placeholder="от"
-            className="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#0070b8] transition-colors" />
-          <span className="text-slate-300 shrink-0">—</span>
-          <input type="number" value={priceMax} onChange={e => go(() => setPriceMax(e.target.value))}
-            placeholder="до"
-            className="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#0070b8] transition-colors" />
-        </div>
-      </div>
-
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Тип кузова</div>
-        <div className="flex flex-wrap gap-1.5">
-          {BODY_TYPES.map(t => (
-            <button key={t} onClick={() => go(() => setFilterBodyType(t))}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterBodyType === t ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{t}</button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Коробка передач</div>
-        <div className="flex flex-wrap gap-1.5">
-          {TRANSMISSIONS.map(t => (
-            <button key={t} onClick={() => go(() => setFilterTransmission(t))}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterTransmission === t ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{t}</button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Привод</div>
-        <div className="flex flex-wrap gap-1.5">
-          {DRIVES.map(d => (
-            <button key={d} onClick={() => go(() => setFilterDrive(d))}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                filterDrive === d ? "bg-[#0070b8] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{d}</button>
-          ))}
-        </div>
-      </div>
-
-      {activeCount > 0 && (
-        <button onClick={resetFilters}
-          className="flex items-center gap-1.5 text-sm font-bold text-rose-500 hover:text-rose-600 transition-colors">
-          <X className="w-3.5 h-3.5" /> Сбросить ({activeCount})
-        </button>
-      )}
-    </div>
-  );
+  const filterSections: FilterSection[] = [
+    {
+      kind: "pills",
+      label: "Марка",
+      options: availableMarks,
+      value: filterMark,
+      onSelect: m => go(() => setFilterMark(m)),
+    },
+    {
+      kind: "range",
+      label: "Цена, ₽",
+      min: priceMin,
+      max: priceMax,
+      onMinChange: v => go(() => setPriceMin(v)),
+      onMaxChange: v => go(() => setPriceMax(v)),
+    },
+    {
+      kind: "pills",
+      label: "Тип кузова",
+      options: BODY_TYPES,
+      value: filterBodyType,
+      onSelect: t => go(() => setFilterBodyType(t)),
+    },
+    {
+      kind: "pills",
+      label: "Коробка передач",
+      options: TRANSMISSIONS,
+      value: filterTransmission,
+      onSelect: t => go(() => setFilterTransmission(t)),
+    },
+    {
+      kind: "pills",
+      label: "Привод",
+      options: DRIVES,
+      value: filterDrive,
+      onSelect: d => go(() => setFilterDrive(d)),
+    },
+  ];
 
   const itemListJsonLd = !isLoading && filtered.length > 0 ? {
     "@type": "ItemList",
@@ -660,7 +611,7 @@ export default function UsedCars() {
                   </button>
                 </div>
                 <div className="overflow-y-auto flex-1 p-5">
-                  <FilterContent />
+                  <CatalogFilterPanel sections={filterSections} activeCount={activeCount} onReset={resetFilters} />
                 </div>
                 <div className="p-4 border-t border-slate-100 shrink-0">
                   <button onClick={() => setFiltersOpen(false)}
@@ -685,7 +636,7 @@ export default function UsedCars() {
                   </span>
                 )}
               </div>
-              <FilterContent />
+              <CatalogFilterPanel sections={filterSections} activeCount={activeCount} onReset={resetFilters} />
             </div>
           </aside>
 
