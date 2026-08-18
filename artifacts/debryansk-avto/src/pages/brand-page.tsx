@@ -1,358 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import {
-  MapPin, Phone, Clock, ArrowRight, Car, Wrench,
-  ChevronLeft, Calendar, Palette,
-  Sparkles, CheckCircle, ExternalLink, X, User,
-  Shield, Settings, Star, ChevronDown, Navigation, Tag,
-  Gauge, FileText, Package, Zap, RefreshCw, Share2,
-} from "lucide-react";
-import Layout from "@/components/Layout";
-import SEO from "@/components/SEO";
-import FaqBlock from "@/components/FaqBlock";
-import ToCalculator from "@/components/ToCalculator";
-import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
-import { normalizePhone, phoneHref } from "@/lib/normalizePhone";
-import { YandexMap, type DealerLocation } from "@/components/YandexMap";
-import { CTPhone } from "@/components/CTPhone";
-
-/* ─── Service icon map ───────────────────────────────────── */
-const SERVICE_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  Wrench, Settings, Shield, Car, Gauge, Zap, Clock, Star,
-  FileText, Package, CheckCircle, RefreshCw,
-};
-
-/* ─── Types ──────────────────────────────────────────────── */
-interface BrandPageData {
-  brand: {
-    id: number;
-    name: string;
-    slug: string;
-    logoUrl: string | null;
-    websiteUrl: string | null;
-    bgColor: string | null;
-    subName: string | null;
-    isServiceOnly: boolean;
-  };
-  content: {
-    description: string | null;
-    serviceText: string | null;
-    promoText: string | null;
-    metaTitle: string | null;
-    metaDescription: string | null;
-    heroImageUrl: string | null;
-    heroImageMobileUrl: string | null;
-    faq: Array<{ question: string; answer: string; include_in_schema?: boolean }> | null;
-    promotions: Array<{ slug?: string; title: string; description: string; image?: string; badge?: string; expiresAt?: string; buttonText?: string; buttonUrl?: string; isActive?: boolean }> | null;
-    models: Array<{ id?: string; feedDealer: string; feedModel: string; displayName: string; image?: string; description?: string; badge?: string; isActive?: boolean; sort?: number }> | null;
-    services: Array<{ id?: string; icon: string; title: string; description?: string; sort?: number }> | null;
-  } | null;
-  locations: Array<{
-    id: number;
-    title: string;
-    address: string;
-    phone: string | null;
-    hours: string | null;
-    map_x: number | null;
-    map_y: number | null;
-    is_service: boolean;
-  }>;
-  cars: Array<{
-    id: string;
-    mark: string;
-    model: string;
-    modification: string;
-    complectation: string;
-    year: number;
-    price: number;
-    color: string;
-    body_type: string;
-    availability: string;
-    url: string;
-    images: string[];
-    dealer: string;
-    max_discount: number;
-    credit_discount: number;
-    tradein_discount: number;
-  }>;
-  news: Array<{
-    id: number;
-    title: string;
-    excerpt: string | null;
-    category: string | null;
-    image: string | null;
-    published_at: string | null;
-    slug: string;
-  }>;
-}
-
-async function fetchBrandPage(slug: string): Promise<BrandPageData> {
-  const r = await fetch(`/api/brands/${slug}`);
-  if (!r.ok) throw new Error("Brand not found");
-  const json = await r.json();
-  if (!json.ok) throw new Error(json.error ?? "Error");
-  return json.data as BrandPageData;
-}
-
-/* ─── Helpers ────────────────────────────────────────────── */
-function fmtPrice(p: number) {
-  return p.toLocaleString("ru-RU") + " ₽";
-}
-
-function cleanModelName(raw: string): string {
-  return raw.replace(/,\s*[IVX]+.*$/, "").trim();
-}
-
-function FadeIn({
-  children,
-  delay = 0,
-  className = "",
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  className?: string;
-}) {
-  const prefersReduced = useReducedMotion();
-  return (
-    <motion.div
-      initial={prefersReduced ? false : { opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.5, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
-      className={className}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-/* ─── Section label ──────────────────────────────────────── */
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[11px] font-bold uppercase tracking-widest text-primary mb-2">
-      {children}
-    </p>
-  );
-}
-
-/* ─── Service CTA Modal ──────────────────────────────────── */
-function ServiceModal({
-  brandName,
-  onClose,
-}: {
-  brandName: string;
-  onClose: () => void;
-}) {
-  const prefersReduced = useReducedMotion();
-  const [phone, setPhone] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [sending, setSending] = useState(false);
-
-  const [error, setError] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!isPhoneValid(phone)) return;
-    setSending(true);
-    setError(false);
-    try {
-      const fd = new FormData();
-      fd.append("type", "service");
-      fd.append("phone", phone);
-      fd.append("brand", brandName);
-      fd.append("source", `Брендовая страница ${brandName}`);
-      const r = await fetch("/api/send-email", { method: "POST", body: fd });
-      if (!r.ok) {
-        setError(true);
-        setSending(false);
-        return;
-      }
-      setSubmitted(true);
-    } catch {
-      setError(true);
-    }
-    setSending(false);
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <motion.div
-        initial={prefersReduced ? false : { y: 60, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="h-1 bg-gradient-to-r from-primary to-[#87b63c]" />
-        <div className="flex justify-center pt-3 sm:hidden">
-          <div className="w-10 h-1 bg-slate-200 rounded-full" />
-        </div>
-        <div className="p-6 sm:p-8">
-          <button
-            onClick={onClose}
-            className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors"
-          >
-            <X className="w-4 h-4 text-slate-500" />
-          </button>
-          {submitted ? (
-            <div className="text-center py-4">
-              <CheckCircle className="w-14 h-14 text-[#87b63c] mx-auto mb-4" />
-              <h3 className="text-xl font-extrabold mb-2">Заявка принята!</h3>
-              <p className="text-slate-500 text-sm">
-                Мы перезвоним и согласуем удобное время.
-              </p>
-              <button
-                onClick={onClose}
-                className="mt-6 w-full bg-gradient-to-r from-primary to-[#005a94] text-white font-bold rounded-xl py-3 text-sm hover:opacity-90"
-              >
-                Закрыть
-              </button>
-            </div>
-          ) : (
-            <>
-              <h2 className="text-xl font-extrabold mb-1">Запись на ТО</h2>
-              <p className="text-slate-500 text-sm mb-5">
-                {brandName} — Дебрянск Авто, Брянск
-              </p>
-              <form onSubmit={handleSubmit} className="space-y-3">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">
-                    Ваш телефон
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type="tel"
-                      inputMode="tel"
-                      maxLength={18}
-                      value={phone}
-                      onChange={(e) => setPhone(formatPhone(e.target.value))}
-                      placeholder="+7 (___) ___-__-__"
-                      required
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary transition-colors"
-                    />
-                  </div>
-                </div>
-                {error && (
-                  <p className="text-xs text-red-500 text-center">
-                    Не удалось отправить заявку. Попробуйте ещё раз.
-                  </p>
-                )}
-                <button
-                  type="submit"
-                  disabled={sending}
-                  className="w-full bg-gradient-to-r from-primary to-[#005a94] text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity disabled:opacity-60"
-                >
-                  {sending ? "Отправляем…" : "Записаться на ТО"}
-                </button>
-                <p className="text-[10px] text-slate-400 text-center">
-                  Нажимая кнопку, вы соглашаетесь с{" "}
-                  <Link href="/privacy" className="underline">
-                    политикой конфиденциальности
-                  </Link>
-                </p>
-              </form>
-            </>
-          )}
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-/* ─── Promo modal ────────────────────────────────────────── */
-function PromoModal({
-  promo,
-  brandName,
-  locationPhone,
-  onClose,
-}: {
-  promo: { slug?: string; title: string; description: string; image?: string; badge?: string; expiresAt?: string; buttonText?: string; buttonUrl?: string };
-  brandName: string;
-  locationPhone?: string | null;
-  onClose: () => void;
-}) {
-  const prefersReduced = useReducedMotion();
-  const [showForm, setShowForm] = useState(false);
-  const [phone, setPhone] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  async function handleShare() {
-    if (!promo.slug) return;
-    const url = `${window.location.origin}/promotions/${promo.slug}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: promo.title, url });
-        return;
-      } catch {
-        /* user cancelled or unsupported, fall through to copy */
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* clipboard unavailable */
-    }
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!isPhoneValid(phone)) return;
-    setSending(true);
-    setError(false);
-    try {
-      const fd = new FormData();
-      fd.append("type", "promo");
-      fd.append("phone", phone);
-      fd.append("brand", brandName);
-      fd.append("source", `Акция: ${promo.title} — ${brandName}`);
-      const r = await fetch("/api/send-email", { method: "POST", body: fd });
-      if (!r.ok) { setError(true); setSending(false); return; }
-      setSubmitted(true);
-    } catch {
-      setError(true);
-      setSending(false);
-    }
-  }
-
-  const btnText = promo.buttonText || "Оставить заявку";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <motion.div
-        initial={prefersReduced ? false : { y: 60, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 60, opacity: 0 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="relative z-10 w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl max-h-[92vh] flex flex-col"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="h-1 bg-gradient-to-r from-primary to-[#87b63c]" />
-        <button onClick={onClose} className="absolute top-4 right-4 z-20 w-8 h-8 bg-white/90 hover:bg-slate-100 rounded-full flex items-center justify-center transition-colors shadow-sm">
-          <X className="w-4 h-4 text-slate-600" />
-        </button>
-        {promo.slug && (
-          <button
-            onClick={handleShare}
-            className="absolute top-4 right-14 z-20 h-8 px-3 bg-white/90 hover:bg-slate-100 rounded-full flex items-center gap-1.5 transition-colors shadow-sm text-xs font-semibold text-slate-600"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            {copied ? "Скопировано" : "Поделиться"}
-          </button>
-        )}
-        {promo.image && (
-          <div className="w-full h-48 sm:h-56 shrink-0 overflow-hidden">
+nk-0 overflow-hidden">
             <img src={promo.image} alt={promo.title} className="w-full h-full object-cover" loading="lazy" />
           </div>
         )}
@@ -371,7 +17,7 @@ function PromoModal({
             )}
             {locationPhone && (
               <CTPhone
-                className="ml-auto inline-flex items-center gap-1.5 bg-primary/10 text-primary font-bold px-3 py-1 rounded-full text-xs hover:bg-primary/20 transition-colors"
+                className="ml-auto inline-flex items-center gap-1.5 bg-[#0070b8]/10 text-[#0070b8] font-bold px-3 py-1 rounded-full text-xs hover:bg-[#0070b8]/20 transition-colors"
                 phone={normalizePhone(locationPhone) || locationPhone}>
                 <Phone className="w-3 h-3" />
                 {normalizePhone(locationPhone) || locationPhone}
@@ -400,7 +46,7 @@ function PromoModal({
                 </a>
               )}
               <button onClick={() => setShowForm(true)}
-                className="flex-1 bg-gradient-to-r from-primary to-[#005a94] text-white font-bold px-5 py-3 rounded-xl text-sm hover:opacity-90 transition-opacity">
+                className="flex-1 bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold px-5 py-3 rounded-xl text-sm hover:opacity-90 transition-opacity">
                 {btnText}
               </button>
             </div>
@@ -415,13 +61,13 @@ function PromoModal({
                   <input type="tel" inputMode="tel" maxLength={18}
                     value={phone} onChange={e => setPhone(formatPhone(e.target.value))}
                     placeholder="+7 (___) ___-__-__" required
-                    className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary transition-colors"
+                    className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors"
                   />
                 </div>
               </div>
               {error && <p className="text-xs text-red-500 text-center">Не удалось отправить. Попробуйте ещё раз.</p>}
               <button type="submit" disabled={sending || !isPhoneValid(phone)}
-                className="w-full bg-gradient-to-r from-primary to-[#005a94] text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity disabled:opacity-60">
+                className="w-full bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity disabled:opacity-60">
                 {sending ? "Отправляем…" : "Отправить заявку"}
               </button>
               <p className="text-[10px] text-slate-400 text-center">
@@ -438,7 +84,6 @@ function PromoModal({
 
 /* ─── Callback section ───────────────────────────────────── */
 function CallbackSection({ brandName }: { brandName: string }) {
-  const prefersReduced = useReducedMotion();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [comment, setComment] = useState("");
@@ -467,12 +112,12 @@ function CallbackSection({ brandName }: { brandName: string }) {
   }
 
   return (
-    <section id="section-callback" className="scroll-mt-24 py-16 sm:py-24 bg-gradient-to-br from-primary via-[#005a94] to-[#004a7a]">
+    <section id="section-callback" className="scroll-mt-24 py-16 sm:py-24 bg-gradient-to-br from-[#0070b8] via-[#005a94] to-[#004a7a]">
       <div className="container mx-auto px-4 sm:px-6 max-w-2xl">
         {submitted ? (
           <div className="text-center py-8">
             <motion.div
-              initial={prefersReduced ? false : { scale: 0 }}
+              initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 200, damping: 15 }}
             >
@@ -642,7 +287,7 @@ function AnchorNav({
               onClick={() => scrollTo(id)}
               className={`shrink-0 px-4 py-3.5 text-sm font-bold transition-colors border-b-2 whitespace-nowrap ${
                 active === id
-                  ? "border-primary text-primary"
+                  ? "border-[#0070b8] text-[#0070b8]"
                   : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
@@ -726,12 +371,12 @@ function ModelCard({
           {minPrice ? (
             <div className="mb-1.5">
               <div className="text-[9px] text-slate-400 uppercase tracking-wide">от</div>
-              <div className="text-[11px] sm:text-sm font-extrabold text-primary leading-tight">{fmtPrice(minPrice)}</div>
+              <div className="text-[11px] sm:text-sm font-extrabold text-[#0070b8] leading-tight">{fmtPrice(minPrice)}</div>
             </div>
           ) : (
             <div className="text-[10px] text-slate-400 font-medium mb-1.5">Уточнить цену</div>
           )}
-          <span className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-primary group-hover:gap-2 transition-all">
+          <span className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-[#0070b8] group-hover:gap-2 transition-all">
             Смотреть <ArrowRight className="w-3 h-3" />
           </span>
         </div>
@@ -769,7 +414,7 @@ function BrandCarCard({ car }: { car: BrandPageData["cars"][number] }) {
             <Car className="w-12 h-12" />
           </div>
         )}
-        <span className="absolute top-2 left-2 bg-primary text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
+        <span className="absolute top-2 left-2 bg-[#0070b8] text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
           <Sparkles className="w-2.5 h-2.5" /> НОВЫЙ
         </span>
       </div>
@@ -784,7 +429,7 @@ function BrandCarCard({ car }: { car: BrandPageData["cars"][number] }) {
         )}
         <div className="flex gap-1.5 mb-2 flex-wrap">
           <span className="flex items-center gap-1 bg-slate-50 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700">
-            <Calendar className="w-3 h-3 text-primary" />
+            <Calendar className="w-3 h-3 text-[#0070b8]" />
             {car.year}
           </span>
           {car.body_type && (
@@ -797,7 +442,7 @@ function BrandCarCard({ car }: { car: BrandPageData["cars"][number] }) {
         <div className="mt-auto">
           {car.max_discount > 0 ? (
             <>
-              <div className="text-base font-extrabold text-primary">
+              <div className="text-base font-extrabold text-[#0070b8]">
                 {fmtPrice(car.price - car.max_discount)}
               </div>
               <div className="text-xs text-slate-400 line-through">
@@ -871,7 +516,7 @@ function BrandStockCarousel({ cars }: { cars: BrandPageData["cars"] }) {
                 onClick={() => goToPage(i)}
                 className={`h-2 rounded-full transition-all ${
                   i === page
-                    ? "w-[18px] bg-primary"
+                    ? "w-[18px] bg-[#0070b8]"
                     : "w-2 bg-slate-300 hover:bg-slate-400"
                 }`}
                 aria-label={`Страница ${i + 1}`}
@@ -892,7 +537,6 @@ function BrandStockCarousel({ cars }: { cars: BrandPageData["cars"] }) {
 
 /* ─── Main component ─────────────────────────────────────── */
 export default function BrandPage() {
-  const prefersReduced = useReducedMotion();
   const params = useParams<{ slug: string }>();
   const slug = params.slug ?? "";
   const [serviceModal, setServiceModal] = useState(false);
@@ -909,7 +553,7 @@ export default function BrandPage() {
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full motion-safe:animate-spin" />
+          <div className="w-8 h-8 border-2 border-[#0070b8] border-t-transparent rounded-full animate-spin" />
         </div>
       </Layout>
     );
@@ -924,7 +568,7 @@ export default function BrandPage() {
           <h2 className="text-2xl font-extrabold text-slate-700">
             Бренд не найден
           </h2>
-          <Link href="/" className="text-primary font-bold hover:underline">
+          <Link href="/" className="text-[#0070b8] font-bold hover:underline">
             ← На главную
           </Link>
         </div>
@@ -1068,7 +712,7 @@ export default function BrandPage() {
       : null;
 
   return (
-    <Layout>
+    <Layout overridePhone={loc?.phone}>
       <div data-prerender-ready="true" style={{ display: "none" }} />
       <SEO
         title={metaTitle}
@@ -1113,7 +757,7 @@ export default function BrandPage() {
         {/* Dark overlay (always present, stronger when image is set) */}
         <div className={`absolute inset-0 ${content?.heroImageUrl ? "bg-black/60" : "bg-transparent"}`} />
         {/* Decorative gradients */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(var(--primary-rgb),0.2),transparent_55%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(0,112,184,0.2),transparent_55%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(135,182,60,0.12),transparent_55%)]" />
         {/* Subtle grid pattern */}
         <div
@@ -1136,7 +780,7 @@ export default function BrandPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-8 sm:gap-12">
             {brand.logoUrl && (
               <motion.div
-                initial={prefersReduced ? false : { opacity: 0, scale: 0.9 }}
+                initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.5 }}
                 className="w-28 h-20 sm:w-36 sm:h-24 bg-white/10 rounded-2xl flex items-center justify-center p-4 border border-white/10 shrink-0 backdrop-blur-sm"
@@ -1152,7 +796,7 @@ export default function BrandPage() {
             )}
             <div>
               <motion.p
-                initial={prefersReduced ? false : { opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
                 className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#87b63c] mb-2"
@@ -1160,7 +804,7 @@ export default function BrandPage() {
                 {isServiceOnly ? "Авторизованный сервис в Брянске" : "Официальный дилер в Брянске"}
               </motion.p>
               <motion.h2
-                initial={prefersReduced ? false : { opacity: 0, y: 14 }}
+                initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.08 }}
                 className="text-4xl sm:text-5xl md:text-6xl font-black text-white leading-none mb-3 tracking-tight"
@@ -1168,10 +812,10 @@ export default function BrandPage() {
                 {brandName}
               </motion.h2>
               <motion.p
-                initial={prefersReduced ? false : { opacity: 0, y: 14 }}
+                initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.16 }}
-                className="text-lg sm:text-xl font-bold text-primary"
+                className="text-lg sm:text-xl font-bold text-[#0070b8]"
               >
                 {territory}
               </motion.p>
@@ -1179,7 +823,7 @@ export default function BrandPage() {
           </div>
 
           <motion.div
-            initial={prefersReduced ? false : { opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.28 }}
             className="flex flex-col sm:flex-row flex-wrap gap-3 mt-10"
@@ -1188,7 +832,7 @@ export default function BrandPage() {
               <>
                 <button
                   onClick={() => setServiceModal(true)}
-                  className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-[#005a94] text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-colors shadow-lg shadow-primary/30"
+                  className="inline-flex items-center justify-center gap-2 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-colors shadow-lg shadow-[#0070b8]/30"
                 >
                   <Wrench className="w-4 h-4" /> Записаться на ТО
                 </button>
@@ -1208,7 +852,7 @@ export default function BrandPage() {
                       .getElementById("section-models")
                       ?.scrollIntoView({ behavior: "smooth", block: "start" })
                   }
-                  className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-[#005a94] text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-colors shadow-lg shadow-primary/30"
+                  className="inline-flex items-center justify-center gap-2 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold px-6 py-3.5 rounded-xl text-sm transition-colors shadow-lg shadow-[#0070b8]/30"
                 >
                   Смотреть модели <ChevronDown className="w-4 h-4" />
                 </button>
@@ -1278,8 +922,8 @@ export default function BrandPage() {
                 return (
                   <FadeIn key={i} delay={i * 0.06}>
                     <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow h-full">
-                      <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
-                        <IconComponent className="w-5 h-5 text-primary" />
+                      <div className="w-11 h-11 rounded-xl bg-[#0070b8]/10 flex items-center justify-center mb-3">
+                        <IconComponent className="w-5 h-5 text-[#0070b8]" />
                       </div>
                       <h3 className="font-extrabold text-slate-900 text-sm mb-1.5">{svc.title}</h3>
                       {svc.description && (
@@ -1293,7 +937,7 @@ export default function BrandPage() {
             <FadeIn className="mt-10">
               <button
                 onClick={() => setServiceModal(true)}
-                className="inline-flex items-center gap-2 bg-primary hover:bg-[#005a94] text-white font-bold px-7 py-3.5 rounded-xl text-sm transition-colors shadow-lg shadow-primary/30"
+                className="inline-flex items-center gap-2 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold px-7 py-3.5 rounded-xl text-sm transition-colors shadow-lg shadow-[#0070b8]/30"
               >
                 <Phone className="w-4 h-4" /> Записаться на обслуживание
               </button>
@@ -1315,7 +959,7 @@ export default function BrandPage() {
             {uniqueModels.length > 0 && (
               <a
                 href={`/new-cars?dealer=${encodeURIComponent(brandName)}`}
-                className="flex items-center gap-2 text-primary font-bold hover:gap-3 transition-all text-sm whitespace-nowrap"
+                className="flex items-center gap-2 text-[#0070b8] font-bold hover:gap-3 transition-all text-sm whitespace-nowrap"
               >
                 Все в каталоге <ArrowRight className="w-4 h-4" />
               </a>
@@ -1360,7 +1004,7 @@ export default function BrandPage() {
               </div>
               <a
                 href={`/new-cars?dealer=${encodeURIComponent(brandName)}`}
-                className="flex items-center gap-2 text-primary font-bold hover:gap-3 transition-all text-sm whitespace-nowrap"
+                className="flex items-center gap-2 text-[#0070b8] font-bold hover:gap-3 transition-all text-sm whitespace-nowrap"
               >
                 Все {cars.length} авт. <ArrowRight className="w-4 h-4" />
               </a>
@@ -1371,7 +1015,7 @@ export default function BrandPage() {
             <FadeIn className="text-center mt-8">
               <a
                 href={`/new-cars?dealer=${encodeURIComponent(brandName)}`}
-                className="inline-flex items-center gap-2 bg-primary hover:bg-[#005a94] text-white font-bold px-7 py-3 rounded-xl text-sm transition-colors"
+                className="inline-flex items-center gap-2 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold px-7 py-3 rounded-xl text-sm transition-colors"
               >
                 Смотреть все {cars.length} автомобилей <ArrowRight className="w-4 h-4" />
               </a>
@@ -1391,7 +1035,7 @@ export default function BrandPage() {
                 Актуальные предложения по {brandName} — свяжитесь с нами
               </p>
               <CTPhone
-                className="inline-flex items-center gap-2 bg-primary text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-[#005a94] transition-colors"
+                className="inline-flex items-center gap-2 bg-[#0070b8] text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-[#005a94] transition-colors"
                 phone="+7 (4832) 63-10-00">
                 <Phone className="w-4 h-4" /> Узнать наличие
               </CTPhone>
@@ -1402,7 +1046,7 @@ export default function BrandPage() {
 
       {/* ── Акции ─────────────────────────────────────────── */}
       {hasPromotions && (
-        <section id="section-promotions" className="scroll-mt-24 py-14 sm:py-20 bg-gradient-to-br from-primary/5 via-white to-[#87b63c]/5 border-b border-slate-100">
+        <section id="section-promotions" className="scroll-mt-24 py-14 sm:py-20 bg-gradient-to-br from-[#0070b8]/5 via-white to-[#87b63c]/5 border-b border-slate-100">
           <div className="container mx-auto px-4 sm:px-6">
             <FadeIn>
               <SectionLabel>Акции</SectionLabel>
@@ -1422,8 +1066,8 @@ export default function BrandPage() {
                         <img src={promo.image} alt={promo.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
                       </div>
                     ) : (
-                      <div className="aspect-[16/9] bg-gradient-to-br from-primary/8 to-[#87b63c]/8 flex items-center justify-center shrink-0">
-                        <Tag className="w-10 h-10 text-primary/25" />
+                      <div className="aspect-[16/9] bg-gradient-to-br from-[#0070b8]/8 to-[#87b63c]/8 flex items-center justify-center shrink-0">
+                        <Tag className="w-10 h-10 text-[#0070b8]/25" />
                       </div>
                     )}
                     <div className="p-5 flex flex-col flex-1">
@@ -1440,13 +1084,13 @@ export default function BrandPage() {
                           </span>
                         )}
                       </div>
-                      <h3 className="font-extrabold text-slate-900 text-base leading-snug mb-2 group-hover:text-primary transition-colors">
+                      <h3 className="font-extrabold text-slate-900 text-base leading-snug mb-2 group-hover:text-[#0070b8] transition-colors">
                         {promo.title}
                       </h3>
                       <p className="text-slate-500 text-sm leading-relaxed line-clamp-2 mb-4 flex-1">
                         {promo.description}
                       </p>
-                      <div className="flex items-center gap-1.5 text-primary font-bold text-sm">
+                      <div className="flex items-center gap-1.5 text-[#0070b8] font-bold text-sm">
                         Подробнее <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                       </div>
                     </div>
@@ -1519,7 +1163,7 @@ export default function BrandPage() {
       </section>
 
       {/* ── TO Calculator ─────────────────────────────────── */}
-      <ToCalculator brandName={brandName} />
+      <ToCalculator brandName={brandName} cmToBrandId={brand.cmToBrandId ?? null} />
 
       {/* ── FAQ ───────────────────────────────────────────── */}
       <FaqBlock pageSlug={`brands/${brand.slug}`} />
@@ -1553,11 +1197,11 @@ export default function BrandPage() {
                     )}
                     <div className="flex flex-col flex-1 p-4">
                       {item.category && (
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#0070b8] mb-1.5">
                           {item.category}
                         </span>
                       )}
-                      <h3 className="font-extrabold text-slate-900 text-sm leading-snug mb-2 line-clamp-2 group-hover:text-primary transition-colors">
+                      <h3 className="font-extrabold text-slate-900 text-sm leading-snug mb-2 line-clamp-2 group-hover:text-[#0070b8] transition-colors">
                         {item.title}
                       </h3>
                       {item.excerpt && (
@@ -1571,7 +1215,7 @@ export default function BrandPage() {
                             {new Date(item.published_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
                           </span>
                         )}
-                        <ArrowRight className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <ArrowRight className="w-4 h-4 text-[#0070b8] opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </div>
                   </Link>
@@ -1604,7 +1248,7 @@ export default function BrandPage() {
                       brands: [brandName],
                       lat: loc.map_x,
                       lng: loc.map_y,
-                      color: "var(--color-primary)",
+                      color: "#0070b8",
                       phone: loc.phone ?? undefined,
                       hours: loc.hours ?? undefined,
                     } satisfies DealerLocation]}
@@ -1619,8 +1263,8 @@ export default function BrandPage() {
                 </h3>
                 <div className="space-y-4 text-sm">
                   <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                      <MapPin className="w-4 h-4 text-primary" />
+                    <div className="w-9 h-9 rounded-xl bg-[#0070b8]/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <MapPin className="w-4 h-4 text-[#0070b8]" />
                     </div>
                     <div>
                       <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
@@ -1634,15 +1278,15 @@ export default function BrandPage() {
 
                   {loc.phone && (
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                        <Phone className="w-4 h-4 text-primary" />
+                      <div className="w-9 h-9 rounded-xl bg-[#0070b8]/10 flex items-center justify-center shrink-0">
+                        <Phone className="w-4 h-4 text-[#0070b8]" />
                       </div>
                       <div>
                         <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
                           Телефон
                         </div>
                         <CTPhone
-                          className="font-extrabold text-primary hover:underline text-base"
+                          className="font-extrabold text-[#0070b8] hover:underline text-base"
                           phone={normalizePhone(loc.phone) || loc.phone} />
                       </div>
                     </div>
@@ -1650,8 +1294,8 @@ export default function BrandPage() {
 
                   {loc.hours && (
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                        <Clock className="w-4 h-4 text-primary" />
+                      <div className="w-9 h-9 rounded-xl bg-[#0070b8]/10 flex items-center justify-center shrink-0">
+                        <Clock className="w-4 h-4 text-[#0070b8]" />
                       </div>
                       <div>
                         <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
@@ -1670,7 +1314,7 @@ export default function BrandPage() {
                     href={mapLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-6 inline-flex items-center gap-2 bg-primary hover:bg-[#005a94] text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors"
+                    className="mt-6 inline-flex items-center gap-2 bg-[#0070b8] hover:bg-[#005a94] text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors"
                   >
                     <Navigation className="w-4 h-4" /> Построить маршрут
                   </a>
