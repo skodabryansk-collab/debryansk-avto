@@ -4,6 +4,7 @@ import path from "path";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { getPrerenderCache, isSsgRoute } from "./prerender";
 
 const BOT_UA =
   /googlebot|yandexbot|bingbot|duckduckbot|facebookexternalhit|twitterbot|telegrambot|whatsapp|slackbot|linkedinbot|applebot|baiduspider|ia_archiver|vkshare|odklbot|yandex.com\/bots|yandexadnet|yandeximages|yandexscreenshot|yandexwebmaster|msnbot|seznambot|serpstatbot|ahrefsbot|semrushbot|dotbot|mj12bot|petalbot|screamingfrog|lighthouse|claude|anthropic|squirrel|squirrelscan/i;
@@ -11,68 +12,94 @@ const BOT_UA =
 const SITE = "https://debryansk-auto.ru";
 const DEFAULT_OG_IMAGE = `${SITE}/opengraph.jpg`;
 
+const DEFAULT_ROBOTS = "index, follow, max-snippet:-1, max-image-preview:large";
+
 const DEFAULT_META = {
   title: "Дебрянск Авто — официальный автосалон в Брянске | Продажа, сервис, кредит",
   description: "Официальный дилер Haval, Jetour, OMODA, JAECOO, Soueast, Volkswagen, SKODA, EXEED, Tenet и Mercedes-Benz в Брянске. 4 дилерских центра. Продажа, сервис и финансирование с 2011 года.",
   h1: "Дебрянск Авто — официальный дилер автомобилей в Брянске",
+  robots: DEFAULT_ROBOTS,
 };
 
-const STATIC_META: Record<string, { title: string; description: string; h1: string }> = {
+export const STATIC_META: Record<string, { title: string; description: string; h1: string; robots?: string }> = {
   "/": DEFAULT_META,
   "/new-cars": {
-    title: "Новые автомобили в Брянске — каталог и цены | Дебрянск Авто",
-    description: "Купите новый автомобиль у официального дилера в Брянске. Большой выбор авто в наличии, кредит, trade-in, гарантийное обслуживание.",
+    title: "Новые автомобили в Брянске — Дебрянск Авто",
+    description: "Новые автомобили 14 брендов у официальных дилеров Брянска. Выгодное кредитование, специальные программы, гарантия производителя. Дебрянск Авто.",
     h1: "Новые автомобили в Брянске",
+    robots: DEFAULT_ROBOTS,
   },
   "/cars": {
-    title: "Автомобили с пробегом в Брянске — каталог | Дебрянск Авто",
-    description: "Проверенные автомобили с пробегом у официального дилера «Дебрянск Авто» в Брянске. Кредит, трейд-ин, гарантия качества.",
+    title: "Автомобили с пробегом в Брянске — Дебрянск Авто",
+    description: "Купить авто с пробегом в Брянске. Выгодные цены, проверенные автомобили, кредит, трейд-ин. Дебрянск Авто — 14 брендов.",
     h1: "Автомобили с пробегом в Брянске",
+    robots: DEFAULT_ROBOTS,
   },
   "/service": {
     title: "Сервисное обслуживание автомобилей в Брянске — ТО, ремонт, запчасти | Дебрянск Авто",
     description: "Официальный сервис Haval, Jetour, OMODA, JAECOO, Soueast, Volkswagen, SKODA, EXEED и других брендов в Брянске. Онлайн-запись, оригинальные запчасти, гарантийный ремонт.",
     h1: "Сервисное обслуживание автомобилей в Брянске",
+    robots: DEFAULT_ROBOTS,
   },
   "/buyout": {
     title: "Выкуп и комиссионная продажа авто в Брянске | Дебрянск Авто",
     description: "Срочный выкуп автомобиля за 30 минут или комиссионная продажа по максимальной цене. Оценка бесплатно, оплата в день сделки. Официальный дилер «Дебрянск Авто».",
     h1: "Выкуп и комиссионная продажа автомобилей в Брянске",
+    robots: DEFAULT_ROBOTS,
   },
   "/news": {
     title: "Новости автосалона Дебрянск Авто в Брянске",
     description: "Актуальные новости об автомобилях, акциях и скидках от группы компаний «Дебрянск Авто» — официального мультибрендового дилера в Брянске.",
     h1: "Новости Дебрянск Авто",
+    robots: DEFAULT_ROBOTS,
   },
   "/about": {
     title: "О компании Дебрянск Авто — группа компаний 9 БР",
     description: "«Дебрянск Авто» — официальный мультибрендовый дилер в Брянске с 2011 года. 10 брендов: Haval, Jetour, OMODA, Jaecoo, Soueast. 4 дилерских центра.",
     h1: "О компании Дебрянск Авто",
+    robots: DEFAULT_ROBOTS,
   },
   "/contacts": {
     title: "Контакты дилерских центров Дебрянск Авто в Брянске",
     description: "Адреса и телефоны 4 дилерских центров «Дебрянск Авто» в Брянске: Советская, Литейная, Московский, Супонево. Звоните: +7 (4832) 77-77-70.",
     h1: "Контакты дилерских центров Дебрянск Авто",
+    robots: DEFAULT_ROBOTS,
   },
   "/vacancies": {
     title: "Вакансии дилера «Дебрянск Авто» — работа в Брянске",
     description: "Актуальные вакансии в автодилерских центрах «Дебрянск Авто». Менеджеры, механики, администраторы. Обучение и карьерный рост.",
     h1: "Вакансии в Дебрянск Авто",
+    robots: DEFAULT_ROBOTS,
   },
   "/legal": {
     title: "Юридическая информация и реквизиты | Дебрянск Авто",
     description: "Реквизиты ООО «Дебрянск Авто»: ИНН, КПП, ОГРН, банковские реквизиты, юридический адрес и данные генерального директора.",
     h1: "Юридическая информация",
+    robots: DEFAULT_ROBOTS,
   },
   "/privacy": {
     title: "Политика конфиденциальности и обработки персональных данных | Дебрянск Авто",
     description: "Политика конфиденциальности ООО «Дебрянск Авто» — порядок сбора, хранения и защиты персональных данных пользователей сайта debryansk-auto.ru (ФЗ-152).",
     h1: "Политика конфиденциальности и обработки персональных данных",
+    robots: DEFAULT_ROBOTS,
   },
   "/service/bonus": {
     title: "Бонусная программа — Дебрянск Авто | Копите и тратьте бонусы",
     description: "Бонусная программа автодилера «Дебрянск Авто» в Брянске. Начисление 10% от суммы заказ-наряда. Списание от 5% до 10% по накопительным уровням.",
     h1: "Бонусная программа Дебрянск Авто",
+    robots: DEFAULT_ROBOTS,
+  },
+  "/corporate": {
+    title: "Корпоративным клиентам — Дебрянск Авто | Автомобили для бизнеса в Брянске",
+    description: "Официальный дилер «Дебрянск Авто» для юридических лиц и ИП. Корпоративные скидки, полный НДС 20%, лизинг, trade-in, персональный менеджер. Брянск.",
+    h1: "Корпоративное обслуживание в Дебрянск Авто",
+    robots: DEFAULT_ROBOTS,
+  },
+  "/promotions": {
+    title: "Акции и спецпредложения — Дебрянск Авто | Брянск",
+    description: "Актуальные акции на покупку автомобилей от официального дилера Дебрянск Авто в Брянске. Скидки, выгодный кредит, трейд-ин бонусы.",
+    h1: "Акции и спецпредложения Дебрянск Авто",
+    robots: DEFAULT_ROBOTS,
   },
 };
 
@@ -82,22 +109,36 @@ const distPath =
 
 const ssgCache: Map<string, string> = new Map();
 
-function getSsgHtml(route: string): string | null {
-  if (ssgCache.has(route)) return ssgCache.get(route)!;
+function getSsgHtml(route: string, bypassCache = false): string | null {
+  // "/" is dynamic (promotions/brands rendered by Puppeteer into GCS cache),
+  // NOT a truly-static SSG file. Prefer the live Puppeteer snapshot from
+  // cache.pages over the bare dist/public/index.html SPA shell, which has
+  // no real content and previously caused Googlebot to see an empty page.
+  //
+  // EXCEPTION: when the prerender crawler itself is requesting "/" (identified
+  // via the x-prerender-bot header, bypassCache=true), it must NOT be served
+  // its own previous snapshot back — that creates a self-perpetuating loop
+  // where a broken capture (e.g. stale JS bundle hash) can never self-heal
+  // because Puppeteer never sees the live SPA shell to re-render from.
+  if (route === "/" && !bypassCache) {
+    const cached = getPrerenderCache().pages.get("/");
+    if (cached) return cached;
+  }
+  if (!bypassCache && ssgCache.has(route)) return ssgCache.get(route)!;
   try {
     // Map route to SSG file path: /service -> dist/public/service/index.html
     const filePath = route === "/"
       ? path.join(distPath, "index.html")
       : path.join(distPath, route.replace(/^\//, ""), "index.html");
     const html = readFileSync(filePath, "utf-8");
-    ssgCache.set(route, html);
+    if (!bypassCache) ssgCache.set(route, html);
     return html;
   } catch {
     // Fallback to root index.html for routes without SSG
     try {
       const rootPath = path.join(distPath, "index.html");
       const html = readFileSync(rootPath, "utf-8");
-      ssgCache.set(route, html);
+      if (!bypassCache) ssgCache.set(route, html);
       return html;
     } catch {
       return null;
@@ -209,6 +250,7 @@ function injectMeta(
   extraJsonLd?: string,
   robots?: string,
   breadcrumbLd?: string,
+  ogType?: string,
 ): string {
   let result = html;
 
@@ -262,17 +304,23 @@ function injectMeta(
     `<meta property="og:url" content="${canonical}" />`,
     `<meta property="og:image" content="${ogImage}" />`,
     `<meta property="og:site_name" content="Дебрянск Авто" />`,
-    `<meta property="og:type" content="website" />`,
+    `<meta property="og:type" content="${ogType || "website"}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${title}" />`,
     `<meta name="twitter:description" content="${description}" />`,
     `<meta name="twitter:image" content="${ogImage}" />`,
   ].join("\n    ");
 
+  const beforeViewport = result;
   result = result.replace(
-    /(<meta name="viewport"[^>]*\/>)/,
+    /(<meta name="viewport"[^>]*\/?>)/,
     `$1\n    ${metaBlock}`
   );
+  // Fallback: if viewport tag not found (Puppeteer may omit self-closing slash),
+  // insert the meta block right after <head>
+  if (result === beforeViewport) {
+    result = result.replace("<head>", `<head>\n    ${metaBlock}`);
+  }
 
   // Inject LCP image preload + schema.org JSON-LD before </head>
   const ldScripts = [
@@ -288,6 +336,7 @@ function injectMeta(
     /<div id="root"><\/div>/,
     `<div id="root"></div>
     <main aria-label="Основной контент" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">
+      <h1>${h1}</h1>
       <nav aria-label="Основная навигация">
         <a href="/new-cars">Новые автомобили в Брянске</a>
         <a href="/cars">Автомобили с пробегом в Брянске</a>
@@ -322,15 +371,115 @@ function injectMeta(
   return result;
 }
 
-async function resolveMeta(
-  pathStr: string,
-): Promise<{ title: string; description: string; canonical: string; ogImage: string; h1: string; jsonLd?: string; robots?: string; breadcrumbLd?: string } | null> {
-  const meta = STATIC_META[pathStr];
-  if (meta) {
+type MetaResult = { title: string; description: string; canonical: string; ogImage: string; h1: string; jsonLd?: string; robots?: string; breadcrumbLd?: string; bodyHtml?: string; ogType?: string };
+
+/** Escape HTML special characters for safe injection into attributes and text. */
+function esc(s: string | number | null): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function fmtRub(price: number): string {
+  return new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency: "RUB",
+    maximumFractionDigits: 0,
+  }).format(price);
+}
+
+type NewCarRow = { external_id: string; brand: string; model: string; year: number; price: number; max_discount: number | null; image_url: string | null; color: string | null };
+type UsedCarRow = { external_id: string; brand: string; model: string; year: number; price: number; image_url: string | null; mileage: number | null };
+
+function buildNewCarsGridHtml(cars: NewCarRow[]): string {
+  if (!cars.length) return "";
+  const cards = cars.map(c => {
+    const rawPrice = Number(c.price);
+    const disc = Number(c.max_discount) || 0;
+    const salePrice = Math.max(0, rawPrice - disc);
+    const priceLabel = disc > 0 ? `от ${esc(fmtRub(salePrice))}` : esc(fmtRub(rawPrice));
+    const name = esc(`${c.brand} ${c.model} ${c.year}`);
+    const id = encodeURIComponent(c.external_id);
+    const img = c.image_url
+      ? `<img src="${esc(c.image_url)}" alt="Фото ${name}" loading="lazy" width="320" height="200" />`
+      : "";
+    return `<article><a href="/new-cars/${id}">${img}<h2>${name}</h2><p>${priceLabel}</p></a></article>`;
+  }).join("\n");
+  return `<section aria-label="Новые автомобили в Брянске">\n${cards}\n</section>`;
+}
+
+function buildUsedCarsGridHtml(cars: UsedCarRow[]): string {
+  if (!cars.length) return "";
+  const cards = cars.map(c => {
+    const priceStr = esc(fmtRub(Number(c.price)));
+    const run = c.mileage ? ` · ${Math.round(c.mileage / 1000)} тыс. км` : "";
+    const name = esc(`${c.brand} ${c.model} ${c.year}`);
+    const id = encodeURIComponent(c.external_id);
+    const img = c.image_url
+      ? `<img src="${esc(c.image_url)}" alt="Фото ${name}" loading="lazy" width="320" height="200" />`
+      : "";
+    return `<article><a href="/cars/${id}">${img}<h2>${name}</h2><p>${priceStr}${run}</p></a></article>`;
+  }).join("\n");
+  return `<section aria-label="Автомобили с пробегом в Брянске">\n${cards}\n</section>`;
+}
+
+/** Internal resolver — returns route-specific metadata without DB overrides. */
+async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
+  const staticMeta = STATIC_META[pathStr];
+  if (staticMeta) {
     const extra: Record<string, string> = {};
     if (pathStr === "/contacts") extra.jsonLd = CONTACT_PAGE_SCHEMA;
-    const breadcrumbLd = buildBreadcrumbList(pathStr, meta.title);
-    return { ...meta, canonical: `${SITE}${pathStr}`, ogImage: DEFAULT_OG_IMAGE, breadcrumbLd, ...extra };
+    const breadcrumbLd = buildBreadcrumbList(pathStr, staticMeta.title);
+    const ogImageMap: Record<string, string> = {
+      "/service": `${SITE}/api/og-image/service.png`,
+      "/service/bonus": `${SITE}/api/og-image/bonus.png`,
+      "/vacancies": `${SITE}/api/og-image/vacancies.png`,
+      "/buyout": `${SITE}/api/og-image/buyout.png`,
+      "/new-cars": `${SITE}/api/og-image/catalog/new.png`,
+      "/cars": `${SITE}/api/og-image/catalog/used.png`,
+      "/corporate": `${SITE}/api/og-image/corporate.png`,
+    };
+    const isServiceRoute = pathStr.startsWith("/service/");
+    const ogImage = ogImageMap[pathStr]
+      ?? (isServiceRoute ? `${SITE}/api/og-image/service.png` : DEFAULT_OG_IMAGE);
+    const base: MetaResult = { ...staticMeta, canonical: `${SITE}${pathStr}`, ogImage, breadcrumbLd, ...extra };
+
+    // For catalog pages: inject a bot-readable car grid so Googlebot/Yandex
+    // can discover and index individual car listings (the React catalog is
+    // client-side only and invisible to crawlers without this injection).
+    if (pathStr === "/new-cars") {
+      try {
+        const r = await db.execute(sql`
+          SELECT external_id, brand, model, year, price, max_discount, image_url, color
+          FROM cars WHERE type = 'new'
+          ORDER BY popularity_score DESC NULLS LAST, price ASC
+          LIMIT 100
+        `);
+        if (r.rows.length > 0) {
+          base.bodyHtml = buildNewCarsGridHtml(r.rows as NewCarRow[]);
+        }
+      } catch {
+        // DB error — serve page without grid rather than failing
+      }
+    } else if (pathStr === "/cars") {
+      try {
+        const r = await db.execute(sql`
+          SELECT external_id, brand, model, year, price, image_url, mileage
+          FROM cars WHERE type = 'used'
+          ORDER BY popularity_score DESC NULLS LAST, price ASC
+          LIMIT 100
+        `);
+        if (r.rows.length > 0) {
+          base.bodyHtml = buildUsedCarsGridHtml(r.rows as UsedCarRow[]);
+        }
+      } catch {
+        // DB error — serve page without grid
+      }
+    }
+
+    return base;
   }
 
   // Brand pages: /brands/:slug
@@ -346,7 +495,7 @@ async function resolveMeta(
       const metaDesc = row.meta_description;
       const metaTitle = row.meta_title;
       const title = metaTitle
-        ? `${metaTitle} | Дебрянск Авто`
+        ? (metaTitle.includes("Дебрянск") ? metaTitle.trim() : `${metaTitle.trim()} | Дебрянск Авто`)
         : `${row.name} в Брянске — ${isService ? "официальный сервис" : "официальный дилер"} | Дебрянск Авто`;
       const description = metaDesc
         ? metaDesc
@@ -362,7 +511,7 @@ async function resolveMeta(
         title,
         description,
         canonical: `${SITE}/brands/${slug}`,
-        ogImage: DEFAULT_OG_IMAGE,
+        ogImage: `${SITE}/api/og-image/brand/${slug}.png`,
         h1,
         breadcrumbLd,
       };
@@ -374,19 +523,32 @@ async function resolveMeta(
   if (newsMatch) {
     const slug = newsMatch[1];
     const result = await db.execute(
-      sql`SELECT title, slug, excerpt FROM news WHERE slug = ${slug} LIMIT 1`
+      sql`SELECT title, slug, excerpt, image, images, published_at, content FROM news WHERE slug = ${slug} LIMIT 1`
     );
-    const row = result.rows[0] as { title: string; slug: string; excerpt: string | null } | undefined;
+    const row = result.rows[0] as {
+      title: string; slug: string; excerpt: string | null;
+      image: string | null; images: string[] | null;
+      published_at: string | null; content: string | null;
+    } | undefined;
     if (row) {
       const newsDesc = row.excerpt
         ? (row.excerpt.length > 155 ? row.excerpt.slice(0, 152) + "…" : row.excerpt)
         : "Актуальная новость автомобильного рынка от дилерского центра «Дебрянск Авто» в Брянске.";
+      // Use article's own image for og:image — prefer first gallery image, fall back to cover image
+      const articleImage = (row.images && row.images.length > 0 ? row.images[0] : null) || row.image || DEFAULT_OG_IMAGE;
+      const articleImageFull = articleImage.startsWith("http") ? articleImage : `${SITE}${articleImage}`;
+      const datePublished = row.published_at
+        ? new Date(row.published_at).toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0];
       const newsArticleSchema = JSON.stringify({
         "@context": "https://schema.org",
         "@type": "NewsArticle",
         "headline": row.title,
         "description": newsDesc,
         "url": `${SITE}/news/${slug}`,
+        "image": articleImageFull,
+        "datePublished": datePublished,
+        "dateModified": datePublished,
         "publisher": {
           "@type": "Organization",
           "name": "Дебрянск Авто",
@@ -397,19 +559,80 @@ async function resolveMeta(
           "name": "Редакция Дебрянск Авто",
           "url": "https://debryansk-auto.ru/about"
         },
-        "datePublished": new Date().toISOString().split("T")[0],
         "inLanguage": "ru"
       });
       const breadcrumbLd = buildBreadcrumbList(pathStr, row.title);
+      // Inject article body text as hidden block so bots can read content
+      const bodyHtml = row.content
+        ? `<article aria-label="${row.title}" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">` +
+          `<h1>${row.title}</h1>` +
+          row.content.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "").slice(0, 8000) +
+          `</article>`
+        : undefined;
       return {
         title: `${row.title} | Дебрянск Авто`,
         description: newsDesc,
         canonical: `${SITE}/news/${slug}`,
-        ogImage: DEFAULT_OG_IMAGE,
+        ogImage: articleImageFull,
+        ogType: "article",
         h1: row.title,
         jsonLd: newsArticleSchema,
         breadcrumbLd,
+        bodyHtml,
       };
+    }
+  }
+
+  // Promotion pages: /promotions/:slug
+  const promoMatch = pathStr.match(/^\/promotions\/([^\/]+)$/);
+  if (promoMatch) {
+    const slug = promoMatch[1];
+    const result = await db.execute(
+      sql`SELECT title, slug, description, image, expires_at, is_active FROM promotions WHERE slug = ${slug} LIMIT 1`
+    );
+    const row = result.rows[0] as { title: string; slug: string; description: string | null; image: string | null; expires_at: string | null; is_active: boolean } | undefined;
+    if (row) {
+      const isExpired = !!row.expires_at && new Date(row.expires_at) < new Date();
+      const rawDesc = row.description || `Акция «${row.title}» от официального дилера Дебрянск Авто в Брянске.`;
+      const promoDesc = rawDesc.length > 155 ? rawDesc.slice(0, 152) + "…" : rawDesc;
+      const breadcrumbLd = buildBreadcrumbList(pathStr, row.title);
+      return {
+        title: `${row.title}${isExpired || !row.is_active ? " (акция завершена)" : ""} | Дебрянск Авто`,
+        description: promoDesc,
+        canonical: `${SITE}/promotions/${slug}`,
+        ogImage: row.image || DEFAULT_OG_IMAGE,
+        h1: row.title,
+        breadcrumbLd,
+        robots: (isExpired || !row.is_active) ? "noindex, follow" : undefined,
+      };
+    }
+  }
+
+  // SEO landing pages: /p/:slug
+  const landingMatch = pathStr.match(/^\/p\/([^\/]+)$/);
+  if (landingMatch) {
+    const slug = landingMatch[1];
+    try {
+      const result = await db.execute(sql`
+        SELECT meta_title, meta_description, h1 FROM seo_landing_pages
+        WHERE slug = ${slug} AND is_published = true LIMIT 1
+      `);
+      const row = result.rows[0] as { meta_title: string | null; meta_description: string | null; h1: string | null } | undefined;
+      if (row) {
+        const title = row.meta_title || `${slug} — Дебрянск Авто`;
+        const description = row.meta_description || `Официальный дилер «Дебрянск Авто» в Брянске.`;
+        const h1 = row.h1 || title;
+        const breadcrumbLd = buildBreadcrumbList(pathStr, title);
+        return {
+          title, description, h1,
+          canonical: `${SITE}/p/${slug}`,
+          ogImage: DEFAULT_OG_IMAGE,
+          robots: DEFAULT_ROBOTS,
+          breadcrumbLd,
+        };
+      }
+    } catch {
+      // DB error — fall through to null
     }
   }
 
@@ -452,11 +675,13 @@ async function resolveMeta(
       const description = `Купите ${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} в Брянске. Цена ${priceLabel}. Арт. №${stockNum}. Официальный дилер «Дебрянск Авто» — +7 (4832) 77-77-70.`;
       const robots = "index, follow, max-snippet:-1, max-image-preview:large";
       const breadcrumbLd = buildBreadcrumbList(pathStr, title);
+      const ogType = type === "new" ? "new" : "used";
+      const ogId = encodeURIComponent(row.external_id);
       return {
         title,
         description,
         canonical: `${SITE}${pathStr}`,
-        ogImage: row.image_url || DEFAULT_OG_IMAGE,
+        ogImage: `${SITE}/api/og-image/car/${ogType}/${ogId}.png`,
         h1,
         robots,
         breadcrumbLd,
@@ -467,12 +692,59 @@ async function resolveMeta(
   return null;
 }
 
+/**
+ * Public API — resolves route metadata and applies DB-layer overrides from
+ * `page_seo_overrides` as the final step. Overrides are applied regardless of
+ * which branch resolved the base metadata (STATIC_META, brands, news, cars…).
+ * Empty/null override values are ignored so they never blank out base metadata.
+ */
+export async function resolveMeta(
+  pathStr: string,
+): Promise<MetaResult | null> {
+  const base = await resolveMetaBase(pathStr);
+  if (!base) return null;
+
+  try {
+    const ov = await db.execute(sql`
+      SELECT meta_title, meta_description FROM page_seo_overrides WHERE route = ${pathStr} LIMIT 1
+    `);
+    if (ov.rows.length > 0) {
+      const row = ov.rows[0] as { meta_title: string | null; meta_description: string | null };
+      // Only apply non-empty values — an absent key should not blank out base metadata
+      if (row.meta_title)       base.title       = row.meta_title;
+      if (row.meta_description) base.description = row.meta_description;
+    }
+  } catch {
+    // page_seo_overrides may not exist yet on first boot; silently ignore
+  }
+
+  return base;
+}
+
+function buildNotFoundHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Страница не найдена — Дебрянск Авто</title>
+  <meta name="robots" content="noindex, follow" />
+  <link rel="canonical" href="${SITE}/404" />
+</head>
+<body>
+  <h1>Страница не найдена</h1>
+  <p>Запрашиваемая страница не существует. <a href="${SITE}/">Вернуться на главную</a>.</p>
+</body>
+</html>`;
+}
+
 export function seoMetaMiddleware(
   req: Request,
   res: Response,
   next: NextFunction,
 ): void {
   const ua = (req.headers["user-agent"] ?? "") as string;
+  const isBot = BOT_UA.test(ua);
 
   // Skip static files
   if (/\.\w{2,10}$/.test(req.path)) {
@@ -480,23 +752,54 @@ export function seoMetaMiddleware(
     return;
   }
 
-  const route = req.path || "/";
+  const route = (req.path || "/").replace(/\/$/, "") || "/";
+  const bypassCache = req.headers["x-prerender-bot"] === "1";
+
+  // Non-SSG dynamic routes (e.g. /new-cars, /cars, /brands/*, car details) are
+  // prerendered by Puppeteer. When the prerender crawler itself is asking,
+  // do NOT inject server-side meta — otherwise React Helmet adds a second set
+  // and the captured snapshot ends up with duplicate title/description/OG tags.
+  // Let React Helmet be the single source of truth for these pages.
+  if (bypassCache && !isSsgRoute(route)) {
+    next();
+    return;
+  }
 
   resolveMeta(route)
     .then((meta) => {
       if (!meta) {
+        // Unknown route — return a real 404 for crawlers so it does not look
+        // like a soft-404 copy of the homepage. Browsers still get the SPA shell
+        // via the downstream fallback so React can render a client-side 404 page.
+        if (isBot) {
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+          res.status(404).send(buildNotFoundHtml());
+          logger.info({ route, ua: ua.substring(0, 40) }, "seoMeta: served 404 for unknown route");
+          return;
+        }
         next();
         return;
       }
-      const html = getSsgHtml(route);
+      const html = getSsgHtml(route, bypassCache);
       if (!html) {
         next();
         return;
       }
-      const enriched = injectMeta(html, meta.title, meta.description, meta.canonical, meta.ogImage, meta.h1, meta.jsonLd, meta.robots, meta.breadcrumbLd);
+      let enriched = injectMeta(html, meta.title, meta.description, meta.canonical, meta.ogImage, meta.h1, meta.jsonLd, meta.robots, meta.breadcrumbLd, meta.ogType);
+      // For catalog pages (/new-cars, /cars): inject a bot-readable car grid before </body>
+      // so Googlebot/Yandex can discover individual car listings from the catalog page.
+      // Regular browsers see only the React app; the static grid is below #root (ignored by React).
+      if (meta.bodyHtml) {
+        enriched = enriched.replace("</body>", `${meta.bodyHtml}\n</body>`);
+      }
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader("X-SeoMeta", "1");
-      res.setHeader("Cache-Control", "public, max-age=300");
+      // Never let the browser cache this response for prerender-bot requests — the
+      // crawler must always hit the network for a fresh live shell, otherwise Chrome's
+      // disk cache can silently serve back a stale captured snapshot without even
+      // triggering request interception, re-perpetuating a broken capture forever.
+      res.setHeader("Cache-Control", bypassCache ? "no-store" : "public, max-age=300");
       res.status(200).send(enriched);
       logger.info({ route, ua: ua.substring(0, 40) }, "seoMeta: served enriched HTML");
     })
