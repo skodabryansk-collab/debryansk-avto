@@ -82,7 +82,7 @@ export default function CatalogFilterPanel({ sections, activeCount, onReset }: C
                   aria-checked={section.value === option}
                   tabIndex={section.value === option ? 0 : -1}
                   onClick={() => section.onSelect(option)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2 ${
+                  className={`px-4 py-2.5 rounded-full text-[11px] font-bold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2 ${
                     section.value === option
                       ? `${section.activeClass ?? "bg-[#0070b8]"} text-white`
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
