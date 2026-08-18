@@ -58,6 +58,40 @@ export default defineConfig({
     // don't get MIME-type errors for already-referenced files.
     // HTML files are cleaned separately via the prebuild script.
     emptyOutDir: false,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // React core — always loaded, cache aggressively
+          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
+            return "vendor-react";
+          }
+          // TanStack Query — loaded on every page via QueryClientProvider
+          if (id.includes("node_modules/@tanstack/")) {
+            return "vendor-query";
+          }
+          // Framer Motion — heavy animation library
+          if (id.includes("node_modules/framer-motion")) {
+            return "vendor-motion";
+          }
+          // Radix UI + lucide icons — UI primitives used across all pages
+          if (id.includes("node_modules/@radix-ui/") || id.includes("node_modules/lucide-react")) {
+            return "vendor-ui";
+          }
+          // Leaflet map — only used on contacts/brand pages
+          if (id.includes("node_modules/leaflet") || id.includes("node_modules/react-leaflet")) {
+            return "vendor-map";
+          }
+          // Recharts — only used in admin/analytics, but if present in frontend:
+          if (id.includes("node_modules/recharts")) {
+            return "vendor-charts";
+          }
+          // Wouter router — small but shared
+          if (id.includes("node_modules/wouter")) {
+            return "vendor-router";
+          }
+        },
+      },
+    },
   },
   server: {
     port,
