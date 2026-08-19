@@ -1,6 +1,57 @@
 import type { Request, Response, NextFunction } from "express";
 import { logger } from "../lib/logger";
 
+const SITE = "https://debryansk-auto.ru";
+
+/** Return dynamic OG-image URL for brand/car routes, or null for other routes. */
+function resolveOgImageUrl(route: string): string | null {
+  const brand = route.match(/^\/brands\/([^/]+)$/);
+  if (brand) return `${SITE}/api/og-image/brand/${brand[1]}.png`;
+  const carNew = route.match(/^\/new-cars\/([^/]+)$/);
+  if (carNew) return `${SITE}/api/og-image/car/new/${carNew[1]}.png`;
+  const carUsed = route.match(/^\/cars\/([^/]+)$/);
+  if (carUsed) return `${SITE}/api/og-image/car/used/${carUsed[1]}.png`;
+  if (route === "/service") return `${SITE}/api/og-image/service.png`;
+  if (route === "/service/bonus") return `${SITE}/api/og-image/bonus.png`;
+  if (route.startsWith("/service/")) return `${SITE}/api/og-image/service.png`;
+  if (route === "/vacancies") return `${SITE}/api/og-image/vacancies.png`;
+  if (route === "/buyout") return `${SITE}/api/og-image/buyout.png`;
+  if (route === "/new-cars") return `${SITE}/api/og-image/catalog/new.png`;
+  if (route === "/cars") return `${SITE}/api/og-image/catalog/used.png`;
+  return null;
+}
+
+const DEFAULT_ROBOTS = "index, follow, max-snippet:-1, max-image-preview:large";
+
+/** Replace robots meta with the current DEFAULT_ROBOTS directive. */
+function patchRobotsMeta(html: string): string {
+  const hasRobots = /<meta\s+name="robots"\s+content="[^"]*"/i.test(html);
+  if (hasRobots) {
+    return html.replace(
+      /<meta\s+name="robots"\s+content="[^"]*"/gi,
+      `<meta name="robots" content="${DEFAULT_ROBOTS}"`,
+    );
+  }
+  // Tag absent — inject before </head>
+  const inject = `<meta name="robots" content="${DEFAULT_ROBOTS}" />`;
+  return html.replace("</head>", `${inject}</head>`);
+}
+
+/** Replace or inject og:image + twitter:image with the dynamic URL in prerendered HTML. */
+function patchOgImage(html: string, route: string): string {
+  const url = resolveOgImageUrl(route);
+  if (!url) return html;
+  const hasOgImage = /<meta\s+property="og:image"/i.test(html);
+  if (hasOgImage) {
+    return html
+      .replace(/(<meta\s+property="og:image"\s+content=")[^"]*"/g, `$1${url}"`)
+      .replace(/(<meta\s+name="twitter:image"\s+content=")[^"]*"/g, `$1${url}"`);
+  }
+  // Tag absent — inject before </head>
+  const inject = `<meta property="og:image" content="${url}" /><meta name="twitter:image" content="${url}" />`;
+  return html.replace("</head>", `${inject}</head>`);
+}
+
 const BOT_UA =
   /googlebot|yandexbot|bingbot|duckduckbot|facebookexternalhit|twitterbot|telegrambot|whatsapp|slackbot|linkedinbot|applebot|baiduspider|ia_archiver|vkshare|odklbot|claude|anthropic|squirrel|squirrelscan|screamingfrog|ahrefs|semrush|mj12bot|dotbot/i;
 
@@ -42,7 +93,7 @@ export function setCurrentAssetTags(html: string): void {
 // index-*.js <script> tag and index-*.css <link> tag; everything else in the
 // cached HTML is left untouched. Runs on every cached-page request
 // (PRERENDER_ALL=true means every visitor), so it must stay O(1) regex work.
-function rewriteAssetTagsToCurrent(html: string): string {
+export function rewriteAssetTagsToCurrent(html: string): string {
   let out = html;
   if (currentAssetTags.script) {
     out = out.replace(/<script[^>]*\ssrc="\/assets\/index-[^"]*\.js"[^>]*><\/script>/, currentAssetTags.script);
@@ -57,13 +108,18 @@ function rewriteAssetTagsToCurrent(html: string): string {
 // "/" added here so the prerender middleware always falls through to seoMeta for the home page,
 // which reads dist/public/index.html with the current build's CSS hash (never stale GCS cache).
 const SSG_ROUTES = new Set([
-  "/", "/vacancies", "/contacts", "/legal", "/privacy",
+  "/", "/legal", "/privacy",
+  // These static pages have SSG-generated HTML with correct meta — always pass through
+  // to seoMetaMiddleware even when a Puppeteer snapshot exists in the cache.
+  "/about", "/contacts", "/promotions",
+  "/service", "/service/bonus", "/buyout", "/vacancies", "/corporate", "/new-cars", "/cars",
 ]);
-function isSsgRoute(route: string): boolean {
+export function isSsgRoute(route: string): boolean {
   if (SSG_ROUTES.has(route)) return true;
   // /brands/* — NOT SSG: prerender.mjs renders them via Puppeteer and stores in GCS cache.
   // When cache is empty (new brand not yet crawled), middleware falls through to next()
   // which serves the SPA shell — same as normal user, no 500/empty response.
+  if (route === "/news") return true; // news list page has SSG-generated article grid
   if (route.startsWith("/news/")) return true;
   if (route.startsWith("/promotions/")) return true;
   return false;
@@ -73,7 +129,7 @@ export function getPrerenderCache(): PrerenderCacheState {
   return cache;
 }
 
-export async function loadPrerenderCacheFromGCS(): Promise<void> {
+export async function loadPrerenderCacheFromDisk(): Promise<void> {
   if (process.env.PRERENDER_ENABLED !== "true") return;
   try {
     const { loadAllPrerendered } = await import("../lib/prerenderStorage");
@@ -89,12 +145,15 @@ export async function loadPrerenderCacheFromGCS(): Promise<void> {
     }
     logger.info(
       { added, total: cache.pages.size },
-      "prerender: cache loaded from GCS (SSG routes preserved)",
+      "prerender: cache loaded from disk (SSG routes preserved)",
     );
   } catch (err) {
-    logger.warn({ err }, "prerender: failed to load cache from GCS");
+    logger.warn({ err }, "prerender: failed to load cache from disk");
   }
 }
+
+/** @deprecated Use loadPrerenderCacheFromDisk instead */
+export const loadPrerenderCacheFromGCS = loadPrerenderCacheFromDisk;
 
 export function updatePrerenderCache(route: string, html: string): void {
   cache.pages.set(route, html);
@@ -104,6 +163,12 @@ export function updatePrerenderCache(route: string, html: string): void {
 export function deletePrerenderCache(route: string): void {
   cache.pages.delete(route);
   cache.gone.add(route);
+}
+
+export function invalidatePrerenderCache(route: string): void {
+  cache.pages.delete(route);
+  // Do NOT add to cache.gone — we want the next bot request to fall through
+  // to seoMeta middleware and get fresh meta tags from the DB.
 }
 
 export function prerenderMiddleware(
@@ -134,7 +199,7 @@ export function prerenderMiddleware(
     return;
   }
 
-  const route = req.path || "/";
+  const route = (req.path || "/").replace(/\/$/, "") || "/";
   console.log(
     `[DEBUG] path=${route}, ua=${ua.substring(0, 50)}, cached=${cache.pages.has(route)}, isGone=${cache.gone.has(route)}`,
   );
@@ -160,16 +225,29 @@ export function prerenderMiddleware(
       next();
       return;
     }
-    // Dynamic routes (car detail pages) already have full meta from Helmet
+    // Dynamic routes (brands, car detail pages): React Helmet sets og:title correctly
+    // at Puppeteer-render time, but document.title in the serialized DOM stays as
+    // the SPA shell default ("Дебрянск Авто — официальный автосалон…").
+    // Fix: sync <title> from og:title so Googlebot/Yandex sees the correct title in SERPs.
     const dedupedHtml = html.replace(/(<title>[^<]*<\/title>)(<title>[^<]*<\/title>)+/, "$1");
     // Cached snapshot may have been captured under a previous build — swap
     // its baked-in asset tags for the current build's so we never serve a
     // reference to a JS/CSS file that a later deploy has already deleted.
     const freshHtml = rewriteAssetTagsToCurrent(dedupedHtml);
+    // Update og:image / twitter:image to dynamic PNG for brand/car pages
+    const patchedOgHtml = patchOgImage(freshHtml, route);
+    // Always patch robots to current DEFAULT_ROBOTS (cached HTML may have stale directive)
+    let patchedHtml = patchRobotsMeta(patchedOgHtml);
+    // Sync <title> from og:title (og:title is set correctly by React Helmet at render time;
+    // document.title stays as the SPA shell default until JS runs in the browser).
+    const ogTitleMatch = patchedHtml.match(/meta\s+property="og:title"\s+content="([^"]+)"/i);
+    if (ogTitleMatch) {
+      patchedHtml = patchedHtml.replace(/<title>[^<]*<\/title>/, `<title>${ogTitleMatch[1]}</title>`);
+    }
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("X-Prerendered", "1");
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.status(200).send(freshHtml);
+    res.status(200).send(patchedHtml);
     return;
   }
 
