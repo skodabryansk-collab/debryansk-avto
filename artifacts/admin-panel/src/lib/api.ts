@@ -55,9 +55,13 @@ export function getDashboardTrends() { return api<DashboardTrends & { ok: boolea
 /* News */
 export interface NewsItem {
   id: number; title: string; excerpt: string; content: string; category: string;
-  image: string; imageMobile: string | null; slug: string; publishedAt: string; readTime: number;
+  image: string; imageMobile: string | null;
+  /** Up to 5 gallery images. images[0] is the main/preview image. */
+  images?: string[];
+  slug: string; publishedAt: string; readTime: number;
   brandId: number | null;
   brandIds: number[];
+  sectionVacancies: boolean;
   createdAt: string; updatedAt: string;
 }
 export function getNews() { return api<{ data: NewsItem[] }>("GET", "/admin/news").then(r => r.data); }
@@ -99,7 +103,12 @@ export function deleteDealer(id: number) { return api<{ ok: true }>("DELETE", `/
 
 /* Brands */
 export interface Brand {
-  id: number; name: string; slug: string | null; websiteUrl: string | null; logoUrl: string | null; isServiceOnly: boolean; carMark: string | null; createdAt: string;
+  id: number; name: string; slug: string | null; websiteUrl: string | null; logoUrl: string | null; isServiceOnly: boolean; carMark: string | null; cmToBrandId: string | null; createdAt: string;
+}
+
+export function getCmBrands(): Promise<Array<{ id: string; name: string }>> {
+  return api<{ ok: boolean; data: Array<{ id: string; name: string }> }>("GET", "/car-catalog/cm-brands")
+    .then(r => r.data ?? []);
 }
 
 export function getCarMarks(): Promise<string[]> {
@@ -114,6 +123,29 @@ export function getBrand(id: number) { return api<Brand>("GET", `/admin/brands/$
 export function createBrand(data: Omit<Brand, "id" | "createdAt" | "carMark"> & { carMark?: string | null }) { return api<Brand>("POST", "/admin/brands", data); }
 export function updateBrand(id: number, data: Partial<Brand>) { return api<Brand>("PUT", `/admin/brands/${id}`, data); }
 export function deleteBrand(id: number) { return api<{ ok: true }>("DELETE", `/admin/brands/${id}`); }
+
+export interface BrandPrerenderScanItem {
+  id: number; name: string; slug: string; route: string;
+  status: "ok" | "broken" | "no_cache";
+}
+export interface BrandPrerenderScanResult {
+  total: number; broken: number; noCache: number; ok: number;
+  items: BrandPrerenderScanItem[];
+}
+export interface BrandPrerenderFixResult {
+  ok: boolean; fixed: number; message: string;
+  items: Array<{ slug: string; route: string; name: string }>;
+  urls: string[];
+}
+export function scanBrandPrerender(): Promise<BrandPrerenderScanResult> {
+  return api<BrandPrerenderScanResult>("GET", "/admin/brands/scan-prerender");
+}
+export function fixBrokenBrandPrerender(): Promise<BrandPrerenderFixResult> {
+  return api<BrandPrerenderFixResult>("POST", "/admin/brands/fix-broken");
+}
+export function rerenderBrandSlug(slug: string): Promise<{ ok: boolean; slug: string; route: string; url: string; message: string }> {
+  return api("POST", `/admin/brands/${slug}/prerender`);
+}
 
 /* Brand page content */
 export interface BrandAdvantage { icon: string; text: string; }
@@ -299,17 +331,25 @@ export function getSyncStatus() {
 }
 
 /* Cache rebuild */
+export interface OpStatus {
+  status: "idle" | "running";
+  startedAt: string | null;
+  lastRanAt: string | null;
+  completedAt: string | null;
+  lastStatus: "success" | "error" | null;
+  lastExitCode: number | null;
+}
 export function rebuildCache() {
   return api<{ status: string; message: string }>("POST", "/admin/cache/rebuild");
 }
 export function getRebuildStatus() {
-  return api<{ status: "idle" | "running" }>("GET", "/admin/cache/rebuild/status");
+  return api<OpStatus>("GET", "/admin/cache/rebuild/status");
 }
 export function runPrerender() {
   return api<{ status: string; message: string }>("POST", "/admin/cache/prerender");
 }
 export function getPrerenderStatus() {
-  return api<{ status: "idle" | "running" }>("GET", "/admin/cache/prerender/status");
+  return api<OpStatus>("GET", "/admin/cache/prerender/status");
 }
 export function prerenderRoute(route: string) {
   return api<{ ok: true; route: string; message: string }>("POST", "/admin/cache/prerender/route", { route });
@@ -671,6 +711,9 @@ export interface ManagerItem {
   brands: string[] | null;
   registrationPending: boolean | null;
   createdAt: string | null;
+  lastLoginAt: string | null;
+  quotesCount: number;
+  lastQuoteAt: string | null;
 }
 
 export function getManagers() {
@@ -749,6 +792,26 @@ export interface MetrikaOnlineResult {
   ok: boolean;
   online: number | null;
 }
+export type VisitorActivityMetric = "visits" | "leads" | "calls" | "answered" | "missed";
+export type VisitorActivityMode = "average" | "total";
+export interface VisitorActivityCell {
+  dayOfWeek: number;
+  hour: number;
+  value: number;
+}
+export interface VisitorActivityResult {
+  ok: boolean;
+  period: "today" | "7d" | "30d";
+  mode: VisitorActivityMode;
+  date1: string;
+  date2: string;
+  cells: Record<VisitorActivityMetric, VisitorActivityCell[]>;
+  sources: {
+    visits: { ok: boolean; error: string | null };
+    leads: { ok: boolean; error: string | null };
+    calls: { ok: boolean; error: string | null };
+  };
+}
 
 export function getMetrikaSummary(period: "today" | "7d" | "30d") {
   return api<MetrikaSummaryResult>("GET", `/admin/metrika/summary?period=${period}`);
@@ -764,6 +827,9 @@ export function getMetrikaPages(date1: string, date2: string) {
 }
 export function getMetrikaOnline() {
   return api<MetrikaOnlineResult>("GET", "/admin/metrika/online");
+}
+export function getVisitorActivity(period: "today" | "7d" | "30d", mode: VisitorActivityMode) {
+  return api<VisitorActivityResult>("GET", `/admin/metrika/activity?period=${period}&mode=${mode}`);
 }
 
 export interface LiveOnlineResult {
@@ -802,6 +868,10 @@ export function generateArticle(topic: string, keywords?: string[]) {
   return api<{ ok: boolean; data: ArticleDraft }>("POST", "/admin/seo/generate-article", { topic, keywords }).then(r => r.data);
 }
 
+export function generateArticleImage(title: string, excerpt: string, topic: string) {
+  return api<{ ok: boolean; url: string }>("POST", "/admin/seo/generate-article-image", { title, excerpt, topic }).then(r => r.url);
+}
+
 /* ── SEO Autopilot ────────────────────────────────────────────────────── */
 export interface SeoSuggestion {
   id: number;
@@ -816,6 +886,7 @@ export interface SeoSuggestion {
   ease: number;
   status: string;
   blocked_by_tech: boolean;
+  is_anchor_boosted: boolean;
   applied_at: string | null;
   verified_at: string | null;
   verification_log: string | null;
@@ -854,6 +925,13 @@ export interface AnchorSuggestion {
   total_shows: number;
   total_clicks: number;
   snapshot_date: string;
+}
+
+export function getSeoPositionHistory(queryText: string) {
+  return api<{ ok: boolean; data: { date: string; position: number }[] }>(
+    "GET",
+    `/admin/seo-positions/history?query=${encodeURIComponent(queryText)}`
+  );
 }
 
 export function getAnchorQueries() {
@@ -908,8 +986,36 @@ export function getSeoAutopilotSuggestions(params?: {
   );
 }
 
-export function applySeoSuggestion(id: number) {
-  return api<{ ok: boolean; message: string }>("POST", `/admin/seo-autopilot/suggestions/${id}/apply`);
+export function publishLandingPage(slug: string) {
+  return api<{ ok: boolean; message: string }>("PATCH", `/admin/seo-autopilot/new-page/${slug}/publish`);
+}
+
+export interface LandingDraft {
+  slug: string;
+  route: string;
+  meta_title: string;
+  meta_description: string;
+  h1: string;
+  paragraphs: string[];
+  faq_items: { q: string; a: string }[];
+  is_published: boolean;
+  updated_at: string;
+}
+
+export function getLandingDraft(slug: string) {
+  return api<{ ok: boolean; data: LandingDraft }>("GET", `/admin/seo-autopilot/landing-draft/${slug}`);
+}
+
+export function updateLandingDraft(slug: string, data: Omit<LandingDraft, "slug" | "route" | "is_published" | "updated_at">) {
+  return api<{ ok: boolean; message: string }>("PATCH", `/admin/seo-autopilot/landing-draft/${slug}`, data);
+}
+
+export function applySeoSuggestion(id: number, overrideValue?: string) {
+  return api<{ ok: boolean; message: string }>(
+    "POST",
+    `/admin/seo-autopilot/suggestions/${id}/apply`,
+    overrideValue != null ? { overrideValue } : undefined,
+  );
 }
 
 export function rejectSeoSuggestion(id: number, reason?: string) {
@@ -935,6 +1041,8 @@ export function getSeoAutopilotStatus() {
     unresolvedAlerts: number;
     wordstatRunning: boolean;
     gapRunning: boolean;
+    lastWordstatDate: string | null;
+    lastWebmasterDate: string | null;
   }>("GET", "/admin/seo-autopilot/status");
 }
 
@@ -954,6 +1062,7 @@ export interface GapRun {
   completed_at: string | null;
   duration_ms: number | null;
   suggestions_created: number | null;
+  applied_count: number | null;
   wordstat_rows: number | null;
   webmaster_rows: number | null;
   error_message: string | null;
@@ -989,4 +1098,291 @@ export function cleanupDuplicateModelFaqs(dryRun = false) {
 
 export function resetAndRerunGap() {
   return api<{ ok: boolean; deleted: number; gapStarted: boolean; message: string }>("POST", "/admin/seo-autopilot/reset-and-rerun");
+}
+
+/* ─── Prerender Monitor ──────────────────────────────────────────────────── */
+
+export interface PrerenderEntry {
+  route: string;
+  size_bytes: number | null;
+  mtime: string | null;
+  status: "fresh" | "stale" | "very_stale" | "missing";
+}
+
+export interface PrerenderEntriesResult {
+  entries: PrerenderEntry[];
+  total: number;
+}
+
+export function getPrerenderEntries() {
+  return api<PrerenderEntriesResult>("GET", "/admin/cache/prerender/entries");
+}
+
+export function getPrerenderEntryStatus() {
+  return api<{
+    status: "running" | "idle";
+    startedAt: string | null;
+    completedAt: string | null;
+    lastStatus: "success" | "error" | null;
+    lastExitCode: number | null;
+  }>("GET", "/admin/cache/prerender/status");
+}
+
+export function rebuildPrerenderRoute(route: string) {
+  return api<{ ok: boolean; route: string; message: string }>("POST", "/admin/cache/prerender/route", { route });
+}
+
+export function rebuildPrerenderBulk(routes: string[]) {
+  return api<{ ok: boolean; count: number; message: string }>("POST", "/admin/cache/prerender/bulk", { routes });
+}
+
+export interface ServerHealth {
+  uptime_seconds: number;
+  memory_rss: number;
+  memory_heap_used: number;
+  memory_heap_total: number;
+  node_version: string;
+  pm2_restarts: number | null;
+  pm2_uptime_ms: number | null;
+  pm2_status: string | null;
+}
+
+export function getServerHealth() {
+  return api<ServerHealth>("GET", "/admin/cache/server-health");
+}
+
+/* ── AI Image Studio ─────────────────────────────────────────────────────── */
+export interface AiSession {
+  id: number;
+  title: string;
+  model: string;
+  admin_login: string;
+  admin_user_id: number | null;
+  user_full_name: string | null;
+  preview_url: string | null;
+  message_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AiMessage {
+  id: number;
+  session_id: number;
+  role: "user" | "assistant";
+  prompt: string | null;
+  image_urls: string[] | null;
+  result_url: string | null;
+  input_tokens: number | null;
+  input_text_tokens: number | null;
+  input_image_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface AiStatsData {
+  sessions: number;
+  requests: number;
+  tokens: { inputText: number; inputImage: number; output: number; total: number };
+  topUsers: Array<{ admin_login: string; full_name: string; total_tokens: number; requests: number }>;
+  byModel: Array<{ model: string; count: number }>;
+}
+
+export function getAiSessions() {
+  return api<{ ok: true; data: AiSession[] }>("GET", "/admin/ai-images/sessions");
+}
+
+export function createAiSession(data: { title?: string; model?: string }) {
+  return api<{ ok: true; data: AiSession }>("POST", "/admin/ai-images/sessions", data);
+}
+
+export function getAiMessages(sessionId: number) {
+  return api<{ ok: true; session: AiSession; data: AiMessage[] }>("GET", `/admin/ai-images/sessions/${sessionId}/messages`);
+}
+
+export async function generateAiImage(sessionId: number, formData: FormData): Promise<{ ok: true; message: AiMessage }> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/admin/ai-images/sessions/${sessionId}/generate`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Generation failed" })) as { ok: boolean; error?: string; message?: AiMessage };
+    // Return error message if server sent one (502 with message body)
+    if (err.message) return { ok: true, message: err.message };
+    throw new Error((err as { error?: string }).error || `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<{ ok: true; message: AiMessage }>;
+}
+
+export function deleteAiSession(id: number) {
+  return api<{ ok: true }>("DELETE", `/admin/ai-images/sessions/${id}`);
+}
+
+export function getAiStats() {
+  return api<AiStatsData & { ok: true }>("GET", "/admin/ai-images/stats");
+}
+
+export interface BrandLogo {
+  url: string;
+  instructions: string | null;
+  position: "northwest" | "northeast" | "southwest" | "southeast";
+  size_pct: number;
+}
+
+export function getBrandLogo() {
+  return api<{ ok: true; data: BrandLogo | null }>(
+    "GET", "/admin/ai-images/brand-assets/logo",
+  );
+}
+
+export async function uploadBrandLogo(file: File): Promise<{ ok: true; data: BrandLogo }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`${API_BASE}/admin/ai-images/brand-assets/logo`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: fd,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Upload failed" })) as { error?: string };
+    throw new Error(err.error ?? "Upload failed");
+  }
+  return res.json() as Promise<{ ok: true; data: BrandLogo }>;
+}
+
+export function updateBrandLogoSettings(settings: { position?: string; size_pct?: number }) {
+  return api<{ ok: true }>("PATCH", "/admin/ai-images/brand-assets/logo/settings", settings);
+}
+
+export function deleteBrandLogo() {
+  return api<{ ok: true }>("DELETE", "/admin/ai-images/brand-assets/logo");
+}
+
+export interface BrandFont {
+  name: string;
+  url: string;
+}
+
+export function getBrandFonts() {
+  return api<{ ok: true; data: BrandFont[] }>("GET", "/admin/ai-images/brand-assets/fonts");
+}
+
+export async function uploadBrandFont(file: File, name: string): Promise<{ ok: true; data: BrandFont }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("name", name);
+  const res = await fetch(`${API_BASE}/admin/ai-images/brand-assets/fonts`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: fd,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Upload failed" })) as { error?: string };
+    throw new Error(err.error ?? "Upload failed");
+  }
+  return res.json() as Promise<{ ok: true; data: BrandFont }>;
+}
+
+export function deleteBrandFont(name: string) {
+  return api<{ ok: true }>("DELETE", `/admin/ai-images/brand-assets/fonts/${encodeURIComponent(name)}`);
+}
+
+export function upscaleImage(url: string, scale: 2 | 4 = 4) {
+  return api<{ ok: true; data: { url: string; width: number; height: number } }>(
+    "POST", "/admin/ai-images/upscale", { url, scale },
+  );
+}
+
+/* ── Logo Variants ─────────────────────────────────────────── */
+export interface LogoVariant {
+  id: number;
+  name: string;
+  url: string;
+  created_at: string;
+}
+
+export function getLogoVariants() {
+  return api<{ ok: true; data: LogoVariant[] }>("GET", "/admin/ai-images/logo-variants");
+}
+
+export async function uploadLogoVariant(file: File, name: string): Promise<{ ok: true; data: LogoVariant }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("name", name);
+  const res = await fetch(`${API_BASE}/admin/ai-images/logo-variants`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: fd,
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({}) ) as {error?:string}; throw new Error(e.error ?? "Upload failed"); }
+  return res.json() as Promise<{ ok: true; data: LogoVariant }>;
+}
+
+export function deleteLogoVariant(id: number) {
+  return api<{ ok: true }>("DELETE", `/admin/ai-images/logo-variants/${id}`);
+}
+
+/* ── System Prompts ─────────────────────────────────────────── */
+export interface SystemPrompt {
+  id: number;
+  name: string;
+  content: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export function getSystemPrompts() {
+  return api<{ ok: true; data: SystemPrompt[] }>("GET", "/admin/ai-images/system-prompts");
+}
+
+export function createSystemPrompt(name: string, content: string, is_default = false) {
+  return api<{ ok: true; data: SystemPrompt }>("POST", "/admin/ai-images/system-prompts", { name, content, is_default });
+}
+
+export function updateSystemPrompt(id: number, updates: Partial<Pick<SystemPrompt, "name" | "content" | "is_default">>) {
+  return api<{ ok: true; data: SystemPrompt }>("PATCH", `/admin/ai-images/system-prompts/${id}`, updates);
+}
+
+export function deleteSystemPrompt(id: number) {
+  return api<{ ok: true }>("DELETE", `/admin/ai-images/system-prompts/${id}`);
+}
+
+/* ── TO Catalog Feeds ───────────────────────────────────────── */
+export interface ToCatalogFeed {
+  id: number;
+  url: string;
+  brandNames: string[];
+  lastSyncedAt: string | null;
+  lastCount: number | null;
+  createdAt: string;
+}
+
+export function getToCatalogFeeds() {
+  return api<{ ok: true; feeds: ToCatalogFeed[] }>("GET", "/admin/to-catalog/feeds");
+}
+export function addToCatalogFeed(url: string, brandNames: string[]) {
+  return api<{ ok: true; feed: ToCatalogFeed }>("POST", "/admin/to-catalog/feeds", { url, brandNames });
+}
+export function updateToCatalogFeed(id: number, url: string, brandNames: string[]) {
+  return api<{ ok: true; feed: ToCatalogFeed }>("PUT", `/admin/to-catalog/feeds/${id}`, { url, brandNames });
+}
+export function deleteToCatalogFeed(id: number) {
+  return api<{ ok: true }>("DELETE", `/admin/to-catalog/feeds/${id}`);
+}
+export function syncToCatalogFeed(id: number) {
+  return api<{ ok: true; count: number; brands: string[] }>("POST", `/admin/to-catalog/feeds/${id}/sync`);
+}
+export function syncAllToCatalogFeeds() {
+  return api<{ ok: true; results: Array<{ feedId: number; brands: string[]; count?: number; error?: string }> }>(
+    "POST", "/admin/to-catalog/feeds/sync-all"
+  );
+}
+
+/* ── Brand font with brand association ─────────────────────── */
+export interface BrandFontWithBrand extends BrandFont {
+  brand?: string;
 }
