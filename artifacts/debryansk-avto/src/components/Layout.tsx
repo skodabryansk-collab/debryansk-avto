@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
+import { ymGoal } from "@/lib/ym";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -15,6 +16,7 @@ import logoPng from "@/assets/logo-optimized.webp";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import ChatWidget from "@/components/ChatWidget";
+import { MOBILE_STICKY_SCROLL_Y, StickyMobileBar } from "@/components/StickyMobileBar";
 
 function parseHoursSpec(raw: string | null | undefined): object[] | null {
   if (!raw) return null;
@@ -55,7 +57,8 @@ function CallbackModal({ onClose }: { onClose: () => void }) {
       fd.append("type", "callback");
       fd.append("name", name);
       fd.append("phone", phone);
-      await fetch("/api/send-email", { method: "POST", body: fd });
+      const res = await fetch("/api/send-email", { method: "POST", body: fd });
+      if (res.ok) ymGoal("callback_submit");
     } catch (_) {}
     setLoading(false);
     setSent(true);
@@ -124,6 +127,7 @@ export default function Layout({ children, overridePhone }: { children: React.Re
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [callbackOpen, setCallbackOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [mobileStickyVisible, setMobileStickyVisible] = useState(false);
   const [carsDropdownOpen, setCarsDropdownOpen] = useState(false);
   const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -226,7 +230,11 @@ export default function Layout({ children, overridePhone }: { children: React.Re
   }, [locationsData, reviewStats, brandsCount]);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 80);
+    const onScroll = () => {
+      setScrolled(window.scrollY > 80);
+      setMobileStickyVisible(window.scrollY >= MOBILE_STICKY_SCROLL_Y);
+    };
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -269,8 +277,10 @@ export default function Layout({ children, overridePhone }: { children: React.Re
                 phone={headerPhone} />
               <Button size="sm"
                 data-callback-trigger
-                className="h-7 sm:h-8 px-3 sm:px-4 brand-gradient border-0 text-white font-bold rounded-lg text-[11px] sm:text-xs hover:opacity-90"
-                onClick={() => setCallbackOpen(true)}>
+                className={`h-7 sm:h-8 px-3 sm:px-4 brand-gradient border-0 text-white font-bold rounded-lg text-[11px] sm:text-xs hover:opacity-90 ${
+                  mobileStickyVisible ? "hidden sm:inline-flex" : ""
+                }`}
+                onClick={() => { setCallbackOpen(true); ymGoal("callback_open"); }}>
                 Заказать звонок
               </Button>
             </div>
@@ -524,8 +534,8 @@ export default function Layout({ children, overridePhone }: { children: React.Re
       {/* Spacer for fixed header */}
       <div className="h-[6.25rem]" />
 
-      {/* Main content */}
-      <main className="flex-1">
+      {/* Main content — extra bottom padding on mobile so sticky bar never covers content */}
+      <main className="flex-1 pb-[68px] md:pb-0">
         {children}
       </main>
 
@@ -612,7 +622,14 @@ export default function Layout({ children, overridePhone }: { children: React.Re
       </AnimatePresence>
 
       {/* Navigator AI chat widget */}
-      <ChatWidget onOpenCallback={() => setCallbackOpen(true)} />
+      <ChatWidget mobileStickyBar onOpenCallback={() => setCallbackOpen(true)} />
+
+      {/* Sticky mobile CTA bar */}
+      <StickyMobileBar
+        phone={headerPhone}
+        onCallbackOpen={() => setCallbackOpen(true)}
+      />
+
     </div>
   );
 }
