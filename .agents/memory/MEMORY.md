@@ -61,3 +61,4 @@
 - [H1 injection for bots](seo-h1-injection.md) — SPA shell has no H1; inject via hidden <main> block in injectMeta(); regex /<h1 class="sr-only">/ never matched shell.
 - [SEO center prod vs dev DB](seo-center-prod-db.md) — seo_suggestions/gap_runs/wordstat_snapshots are EMPTY in Replit dev DB; prod VPS has full data. Always query VPS via DATABASE_URL from /opt/debryansk/.env for real SEO center state.
 - [Workflow restart port ownership](workflow-restart-port-ownership.md) — a stale API process can survive restart and keep serving old code on port 8080; verify listener ownership before testing.
+- [VPS SSH transient refusal](vps-ssh-transient-refusal.md) — if Timeweb accepts one connection then refuses the next, use one ControlMaster session and a staged tar deploy.
