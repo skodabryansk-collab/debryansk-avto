@@ -4,7 +4,7 @@ import path from "path";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
-import { getPrerenderCache, isSsgRoute } from "./prerender";
+import { getPrerenderCache, isSsgRoute, rewriteAssetTagsToCurrent } from "./prerender";
 
 const BOT_UA =
   /googlebot|yandexbot|bingbot|duckduckbot|facebookexternalhit|twitterbot|telegrambot|whatsapp|slackbot|linkedinbot|applebot|baiduspider|ia_archiver|vkshare|odklbot|yandex.com\/bots|yandexadnet|yandeximages|yandexscreenshot|yandexwebmaster|msnbot|seznambot|serpstatbot|ahrefsbot|semrushbot|dotbot|mj12bot|petalbot|screamingfrog|lighthouse|claude|anthropic|squirrel|squirrelscan/i;
@@ -122,7 +122,9 @@ function getSsgHtml(route: string, bypassCache = false): string | null {
   // because Puppeteer never sees the live SPA shell to re-render from.
   if (route === "/" && !bypassCache) {
     const cached = getPrerenderCache().pages.get("/");
-    if (cached) return cached;
+    // Homepage content is kept as a Puppeteer snapshot, but its hashed asset
+    // names must always match the build currently deployed to the VPS.
+    if (cached) return rewriteAssetTagsToCurrent(cached);
   }
   if (!bypassCache && ssgCache.has(route)) return ssgCache.get(route)!;
   try {
