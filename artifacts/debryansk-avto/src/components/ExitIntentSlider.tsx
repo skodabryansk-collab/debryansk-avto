@@ -94,7 +94,7 @@ export function ExitIntentSlider({ open, onClose }: ExitIntentSliderProps) {
               // Mobile: full-width bottom-sheet
               "bottom-0 left-0 right-0 rounded-t-2xl",
               // Desktop: compact bottom-right card
-              "sm:bottom-6 sm:right-6 sm:left-auto sm:w-[360px] sm:rounded-2xl",
+              "sm:bottom-[6.5rem] sm:right-6 sm:left-auto sm:w-[360px] sm:rounded-2xl",
               "bg-[#111317] text-white",
               "border border-white/[0.10] shadow-2xl",
             ].join(" ")}
