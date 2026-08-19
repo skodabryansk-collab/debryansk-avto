@@ -17,7 +17,9 @@ function isCommercialRoute(path: string): boolean {
     path.startsWith("/new-cars/") ||
     path === "/cars" ||
     path.startsWith("/cars/") ||
-    path.startsWith("/brands/")
+    path.startsWith("/brands/") ||
+    path === "/buyout" ||
+    path.startsWith("/buyout/")
   );
 }
 
