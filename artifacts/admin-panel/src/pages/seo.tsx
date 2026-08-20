@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getSeoAudit, runSeoAudit, clearPrerenderCache, requestYandexRecrawl, generateBrandDescriptions, rebuildCache, prerenderRoute, prerenderBulk, getPrerenderStatus, getRebuildStatus, runPrerender,
-  getRouteHealth, repairRoute,
+  getRouteHealth, repairRoute, startManifestRepair, getManifestRepairStatus,
   type SeoPageItem, type GeneratedBrandDescription, type OpStatus, type RouteHealthItem,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -245,6 +245,11 @@ export default function SeoPage() {
     queryKey: ["route-health"],
     queryFn: getRouteHealth,
   });
+  const { data: manifestRepairStatus } = useQuery({
+    queryKey: ["manifest-repair-status"],
+    queryFn: getManifestRepairStatus,
+    refetchInterval: (query) => query.state.data?.status === "running" ? 2000 : false,
+  });
 
   const repairMutation = useMutation({
     mutationFn: (route: string) => repairRoute(route),
@@ -257,10 +262,36 @@ export default function SeoPage() {
       toast({ title: "Ошибка восстановления", description: err.message, variant: "destructive" });
     },
   });
+  const manifestRepairMutation = useMutation({
+    mutationFn: startManifestRepair,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["manifest-repair-status"] });
+      toast({ title: "Массовое обновление запущено", description: `${data.total} snapshot’ов будут проверены и дополнены manifest.` });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Ошибка массового обновления", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const previousManifestRepairStatus = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const current = manifestRepairStatus?.status;
+    if (previousManifestRepairStatus.current === "running" && (current === "completed" || current === "failed")) {
+      queryClient.invalidateQueries({ queryKey: ["route-health"] });
+      auditMutation.mutate();
+      if (current === "failed") {
+        toast({ title: "Массовое обновление завершилось с ошибкой", description: "Проверьте результаты в блоке технического здоровья.", variant: "destructive" });
+      }
+    }
+    previousManifestRepairStatus.current = current;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manifestRepairStatus?.status]);
 
   const technicalIssues: RouteHealthItem[] = (routeHealth?.items ?? []).filter(
     (i) => i.status !== "ok" || i.issueSummary.length > 0
   );
+  const needsManifestCount = (routeHealth?.items ?? []).filter((i) => i.status === "needs_manifest").length;
+  const manifestRunning = manifestRepairStatus?.status === "running";
 
   const items = audit?.items ?? [];
   const cacheProblemItems = items.filter((i) =>
@@ -424,6 +455,48 @@ export default function SeoPage() {
             </span>
           )}
         </div>
+        {needsManifestCount > 0 && (
+          <div className="mx-4 my-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-amber-900">Старые snapshot’ы требуют manifest: {needsManifestCount}</div>
+                <div className="mt-1 text-xs text-amber-800">
+                  HTML страниц сохранён. Операция проверит его и добавит только служебный manifest-файл, не удаляя кэш.
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={manifestRunning || manifestRepairMutation.isPending}
+                onClick={() => {
+                  if (window.confirm(`Добавить manifest для ${needsManifestCount} корректных snapshot’ов? Рабочий HTML удаляться не будет.`)) {
+                    manifestRepairMutation.mutate();
+                  }
+                }}
+                className="border-amber-300 text-amber-800 hover:bg-amber-100"
+              >
+                {manifestRunning ? "Обновление..." : manifestRepairMutation.isPending ? "Запуск..." : `Исправить массово (${needsManifestCount})`}
+              </Button>
+            </div>
+            {manifestRunning && manifestRepairStatus && (
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-amber-800">
+                  <span>Обработано {manifestRepairStatus.processed} из {manifestRepairStatus.total}</span>
+                  <span>Исправлено: {manifestRepairStatus.fixed}</span>
+                </div>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-amber-200">
+                  <div
+                    className="h-full bg-amber-600 transition-all"
+                    style={{ width: `${manifestRepairStatus.total ? (manifestRepairStatus.processed / manifestRepairStatus.total) * 100 : 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {!manifestRunning && manifestRepairStatus?.status === "completed" && manifestRepairStatus.fixed > 0 && (
+              <div className="mt-2 text-xs text-emerald-700">Завершено: добавлено manifest — {manifestRepairStatus.fixed}, ошибок — {manifestRepairStatus.failed}.</div>
+            )}
+          </div>
+        )}
         {routeHealthLoading ? (
           <div className="px-4 py-3 text-sm text-slate-500">Загрузка...</div>
         ) : technicalIssues.length === 0 ? (
@@ -463,13 +536,15 @@ export default function SeoPage() {
                           ? "bg-emerald-100 text-emerald-700"
                           : item.status === "error"
                           ? "bg-red-100 text-red-700"
+                          : item.status === "needs_manifest"
+                          ? "bg-amber-100 text-amber-800"
                           : item.status === "redirect"
                           ? "bg-amber-100 text-amber-700"
                           : item.status === "timeout"
                           ? "bg-orange-100 text-orange-700"
                           : "bg-slate-100 text-slate-600"
                       }`}>
-                        {item.status}
+                        {item.status === "needs_manifest" ? "нужен manifest" : item.status}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-xs text-slate-700 max-w-xs truncate" title={item.issueSummary}>
@@ -494,11 +569,11 @@ export default function SeoPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => repairMutation.mutate(item.route)}
-                        disabled={repairMutation.isPending}
+                        disabled={repairMutation.isPending || item.status === "needs_manifest"}
                         className="border-amber-200 text-amber-700 hover:bg-amber-50"
                       >
                         <Hammer className="w-3.5 h-3.5 mr-1.5" />
-                        Починить
+                        {item.status === "needs_manifest" ? "Массово выше" : "Починить"}
                       </Button>
                     </td>
                   </tr>
