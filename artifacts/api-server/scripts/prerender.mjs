@@ -73,13 +73,18 @@ function validateSnapshot(route, html) {
   if (!title || title === "Дебрянск Авто") errors.push("missing title");
   if (!getMeta(html, "name", "description")) errors.push("missing description");
   if (canonical !== `https://debryansk-auto.ru${route}`) errors.push("wrong canonical");
-  if (!getMeta(html, "name", "robots")) errors.push("missing robots");
+  const robots = getMeta(html, "name", "robots");
+  if (!robots) errors.push("missing robots");
+  else if (/\bnoindex\b|\bnone\b|\bnofollow\b/i.test(robots)) errors.push("non-indexable robots");
+  if (["Бренд не найден", "Страница не найдена", "Page not found", "404 Not Found"].some((marker) => html.includes(marker))) {
+    errors.push("error page marker");
+  }
+  if (html.includes("data-loading")) errors.push("loading shell");
   if (route.startsWith("/brands/")) {
-    if (html.includes("Бренд не найден")) errors.push("brand error page");
     if (!/<h1[\s>]/i.test(html)) errors.push("missing H1");
     if (!/<script[^>]+application\/ld\+json/i.test(html)) errors.push("missing JSON-LD");
   }
-  return { valid: errors.length === 0, errors, title, canonical, robots: getMeta(html, "name", "robots") };
+  return { valid: errors.length === 0, errors, title, canonical, robots };
 }
 
 async function getRoutes() {
@@ -202,8 +207,12 @@ async function processRoute(page, route) {
     }
 
     const validation = validateSnapshot(route, cleanHtml);
-    if (route.startsWith("/brands/") && (!readyMarkerFound || response?.status() !== 200)) {
-      validation.errors.push(!readyMarkerFound ? "brand data did not become ready" : `HTTP ${response?.status()}`);
+    if (response?.status() !== 200) {
+      validation.errors.push(`HTTP ${response?.status()}`);
+      validation.valid = false;
+    }
+    if (route.startsWith("/brands/") && !readyMarkerFound) {
+      validation.errors.push("brand data did not become ready");
       validation.valid = false;
     }
     if (!validation.valid) {
