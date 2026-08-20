@@ -791,9 +791,13 @@ export function seoMetaMiddleware(
       let enriched = injectMeta(html, meta.title, meta.description, meta.canonical, meta.ogImage, meta.h1, meta.jsonLd, meta.robots, meta.breadcrumbLd, meta.ogType);
       // For catalog pages (/new-cars, /cars): inject a bot-readable car grid before </body>
       // so Googlebot/Yandex can discover individual car listings from the catalog page.
-      // Regular browsers see only the React app; the static grid is below #root (ignored by React).
+      // It sits outside #root, after the React app/footer, therefore always hide it
+      // inline so it cannot surface as unstyled cards for regular visitors.
       if (meta.bodyHtml) {
-        enriched = enriched.replace("</body>", `${meta.bodyHtml}\n</body>`);
+        enriched = enriched.replace(
+          "</body>",
+          `<div data-seo-catalog-grid="true" style="display:none" aria-hidden="true">${meta.bodyHtml}</div>\n</body>`,
+        );
       }
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader("X-SeoMeta", "1");
