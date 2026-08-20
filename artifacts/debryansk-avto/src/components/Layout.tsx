@@ -288,7 +288,7 @@ export default function Layout({ children, overridePhone }: { children: React.Re
         </div>
 
         {/* Main nav row */}
-        <div className="container mx-auto px-4 sm:px-6 flex items-center gap-4 sm:gap-6 h-[3.75rem]">
+        <div className="container mx-auto px-4 sm:px-6 flex items-center gap-2 sm:gap-4 h-[3.75rem]">
           <motion.button
             onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); window.location.href = "/"; }}
             className="shrink-0 relative h-8 flex items-center overflow-hidden"
@@ -311,12 +311,12 @@ export default function Layout({ children, overridePhone }: { children: React.Re
             />
           </motion.button>
 
-          <nav className="hidden lg:flex items-center gap-0.5 ml-2">
+          <nav className="hidden lg:flex items-center gap-0 ml-1 whitespace-nowrap">
             {/* Автомобили dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setCarsDropdownOpen(o => !o)}
-                className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all flex items-center gap-1 ${
+                className={`shrink-0 px-1 py-2 text-[11px] font-semibold whitespace-nowrap rounded-lg transition-all flex items-center gap-1 ${
                   location === "/new-cars" || location === "/cars"
                     ? "text-white bg-white/10"
                     : "text-white/60 hover:text-white hover:bg-white/8"
@@ -357,7 +357,7 @@ export default function Layout({ children, overridePhone }: { children: React.Re
             <div className="relative" ref={servicesDropdownRef}>
               <button
                 onClick={() => setServicesDropdownOpen(o => !o)}
-                className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all flex items-center gap-1 ${
+                className={`shrink-0 px-1 py-2 text-[11px] font-semibold whitespace-nowrap rounded-lg transition-all flex items-center gap-1 ${
                   location === "/service" || location === "/service/bonus"
                     ? "text-white bg-white/10"
                     : "text-white/60 hover:text-white hover:bg-white/8"
@@ -395,21 +395,21 @@ export default function Layout({ children, overridePhone }: { children: React.Re
               </AnimatePresence>
             </div>
             <Link href="/service/bonus"
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg transition-all ${
+              className={`flex shrink-0 items-center gap-1 px-1 py-2 text-[11px] font-semibold whitespace-nowrap rounded-lg transition-all ${
                 location === "/service/bonus" ? "text-white bg-white/10" : "text-white/60 hover:text-white hover:bg-white/8"
               }`}>
-              <Gift className="w-4 h-4" />
+              <Gift className="w-3.5 h-3.5" />
               <span>Бонусы</span>
             </Link>
             {NAV_LINKS.map(([label, id, href]) => (
               href.startsWith("/#") ? (
                 <button key={id} onClick={() => handleNav(href)}
-                  className="px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
+                  className="shrink-0 px-1 py-2 text-[11px] font-semibold whitespace-nowrap text-white/60 hover:text-white hover:bg-white/8 rounded-lg transition-all">
                   {label}
                 </button>
               ) : (
                 <Link key={id} href={href}
-                  className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all ${
+                  className={`shrink-0 px-1 py-2 text-[11px] font-semibold whitespace-nowrap rounded-lg transition-all ${
                     location === href
                       ? "text-white bg-white/10"
                       : "text-white/60 hover:text-white hover:bg-white/8"
@@ -419,13 +419,13 @@ export default function Layout({ children, overridePhone }: { children: React.Re
               )
             ))}
             <Link href="/vacancies"
-              className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all ${
+              className={`shrink-0 px-1 py-2 text-[11px] font-semibold whitespace-nowrap rounded-lg transition-all ${
                 location === "/vacancies" ? "text-white bg-white/10" : "text-white/60 hover:text-white hover:bg-white/8"
               }`}>
               Вакансии
             </Link>
             <Link href="/news"
-              className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all ${
+              className={`shrink-0 px-1 py-2 text-[11px] font-semibold whitespace-nowrap rounded-lg transition-all ${
                 location === "/news" ? "text-white bg-white/10" : "text-white/60 hover:text-white hover:bg-white/8"
               }`}>
               Новости
@@ -434,22 +434,22 @@ export default function Layout({ children, overridePhone }: { children: React.Re
 
           <div className="flex-1" />
 
-          <div className="hidden lg:flex items-center gap-2 mr-3">
+          <div className="hidden lg:flex items-center gap-1 mr-1">
             <Link href="/favorites"
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg transition-all ${
+              className={`flex shrink-0 items-center gap-1 px-1 py-2 text-[11px] font-semibold whitespace-nowrap rounded-lg transition-all ${
                 location === "/favorites" ? "text-white bg-white/10" : "text-white/60 hover:text-white hover:bg-white/8"
               }`}>
-              <Heart className="w-4 h-4" />
+              <Heart className="w-3.5 h-3.5" />
               <span>Избранное</span>
               {favCount > 0 && (
                 <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{favCount}</span>
               )}
             </Link>
             <Link href="/compare"
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg transition-all ${
+              className={`flex shrink-0 items-center gap-1 px-1 py-2 text-[11px] font-semibold whitespace-nowrap rounded-lg transition-all ${
                 location === "/compare" ? "text-white bg-white/10" : "text-white/60 hover:text-white hover:bg-white/8"
               }`}>
-              <Scale className="w-4 h-4" />
+              <Scale className="w-3.5 h-3.5" />
               <span>Сравнить</span>
               {compCount > 0 && (
                 <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{compCount}</span>
