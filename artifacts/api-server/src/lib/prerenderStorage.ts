@@ -1,73 +1,137 @@
-import { Storage } from "@google-cloud/storage";
+import { existsSync } from "fs";
+import { writeFile, readFile, readdir, mkdir, unlink, rename, stat } from "fs/promises";
+import path from "path";
 import { logger } from "./logger";
 
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
-
-const gcs = new Storage({
-  credentials: {
-    audience: "replit",
-    subject_token_type: "access_token" as const,
-    token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
-    type: "external_account" as const,
-    credential_source: {
-      url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
-      format: {
-        type: "json" as const,
-        subject_token_field_name: "access_token",
-      },
-    },
-    universe_domain: "googleapis.com",
-  },
-  projectId: "",
-});
-
-function getBucketId(): string {
-  const id = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
-  if (!id) throw new Error("DEFAULT_OBJECT_STORAGE_BUCKET_ID not set");
-  return id;
+export interface PrerenderManifest {
+  route: string;
+  generatedAt: string;
+  generator: string;
+  title?: string;
+  canonical?: string;
+  robots?: string;
+  validationVersion?: number;
 }
 
-function routeToObjectName(route: string): string {
+function getCacheDir(): string {
+  return process.env.LOCAL_PRERENDER_CACHE_DIR || path.resolve(__dirname, "../prerender-cache");
+}
+
+function routeToFilePath(route: string): string {
+  const cacheDir = getCacheDir();
   const clean = route === "/" ? "" : route.replace(/^\//, "").replace(/\/$/, "");
-  return clean ? `prerendered/${clean}/index.html` : "prerendered/index.html";
+  const rel = clean ? `${clean}/index.html` : "index.html";
+  return path.join(cacheDir, rel);
 }
 
-function objectNameToRoute(name: string): string {
-  const withoutPrefix = name.replace(/^prerendered\//, "");
-  const withoutSuffix = withoutPrefix.replace(/\/index\.html$/, "").replace(/^index\.html$/, "");
+function routeToManifestPath(route: string): string {
+  return routeToFilePath(route).replace(/index\.html$/, "prerender-manifest.json");
+}
+
+function filePathToRoute(filePath: string): string {
+  const cacheDir = getCacheDir();
+  const rel = filePath.startsWith(cacheDir) ? filePath.slice(cacheDir.length + 1) : filePath;
+  const withoutSuffix = rel.replace(/\/index\.html$/, "").replace(/^index\.html$/, "");
   return withoutSuffix === "" ? "/" : `/${withoutSuffix}`;
 }
 
-export async function savePrerendered(route: string, html: string): Promise<void> {
-  const file = gcs.bucket(getBucketId()).file(routeToObjectName(route));
-  await file.save(Buffer.from(html, "utf-8"), {
-    contentType: "text/html; charset=utf-8",
-    resumable: false,
-  });
+async function atomicWrite(filePath: string, content: string): Promise<void> {
+  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(tempPath, content, "utf-8");
+  await rename(tempPath, filePath);
+}
+
+/**
+ * Publish an HTML snapshot only after it has passed the caller's validation.
+ * Renaming a complete temporary file avoids exposing a half-written page to bots.
+ */
+export async function savePrerendered(
+  route: string,
+  html: string,
+  manifest?: Omit<PrerenderManifest, "route" | "generatedAt">,
+): Promise<void> {
+  const filePath = routeToFilePath(route);
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await atomicWrite(filePath, html);
+  if (manifest) {
+    await atomicWrite(
+      routeToManifestPath(route),
+      `${JSON.stringify({ route, generatedAt: new Date().toISOString(), ...manifest }, null, 2)}\n`,
+    );
+  }
 }
 
 export async function loadPrerendered(route: string): Promise<string | null> {
-  const file = gcs.bucket(getBucketId()).file(routeToObjectName(route));
-  const [exists] = await file.exists();
-  if (!exists) return null;
-  const [contents] = await file.download();
-  return contents.toString("utf-8");
+  const filePath = routeToFilePath(route);
+  if (!existsSync(filePath)) return null;
+  try {
+    return await readFile(filePath, "utf-8");
+  } catch {
+    return null;
+  }
 }
 
 export async function deletePrerendered(route: string): Promise<void> {
-  const file = gcs.bucket(getBucketId()).file(routeToObjectName(route));
-  await file.delete({ ignoreNotFound: true });
+  const filePath = routeToFilePath(route);
+  try {
+    await unlink(filePath);
+  } catch {
+  }
+  try {
+    await unlink(routeToManifestPath(route));
+  } catch {
+  }
+}
+
+export async function getPrerenderedMetadata(route: string): Promise<{
+  manifest: PrerenderManifest | null;
+  updatedAt: string | null;
+}> {
+  const filePath = routeToFilePath(route);
+  let manifest: PrerenderManifest | null = null;
+  try {
+    manifest = JSON.parse(await readFile(routeToManifestPath(route), "utf-8")) as PrerenderManifest;
+  } catch {
+  }
+  try {
+    const fileStat = await stat(filePath);
+    return { manifest, updatedAt: manifest?.generatedAt ?? fileStat.mtime.toISOString() };
+  } catch {
+    return { manifest, updatedAt: null };
+  }
 }
 
 export async function listPrerenderedRoutes(): Promise<string[]> {
-  const [files] = await gcs.bucket(getBucketId()).getFiles({ prefix: "prerendered/" });
-  return files.map(f => objectNameToRoute(f.name));
+  const cacheDir = getCacheDir();
+  if (!existsSync(cacheDir)) return [];
+
+  const routes: string[] = [];
+
+  async function walk(dir: string): Promise<void> {
+    let entries: import("fs").Dirent[];
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(full);
+      } else if (entry.name === "index.html") {
+        routes.push(filePathToRoute(full));
+      }
+    }
+  }
+
+  await walk(cacheDir);
+  return routes;
 }
 
 export async function countPrerendered(): Promise<number> {
   try {
-    const [files] = await gcs.bucket(getBucketId()).getFiles({ prefix: "prerendered/" });
-    return files.length;
+    const routes = await listPrerenderedRoutes();
+    return routes.length;
   } catch {
     logger.warn("prerenderStorage: countPrerendered failed");
     return -1;
