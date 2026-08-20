@@ -8,17 +8,18 @@ import {
 } from "./prerenderStorage";
 
 const SITE = "https://debryansk-auto.ru";
-const ERROR_MARKERS = [
+export const PRERENDER_ERROR_MARKERS = [
   "Бренд не найден",
   "Страница не найдена",
   "Page not found",
+  "404 Not Found",
 ];
 
-export type BrandRouteHealthStatus = "healthy" | "missing" | "broken" | "orphan";
+export type RouteHealthStatus = "healthy" | "missing" | "broken" | "orphan";
 
-export interface BrandRouteHealth {
+export interface RouteHealth {
   route: string;
-  status: BrandRouteHealthStatus;
+  status: RouteHealthStatus;
   lifecycle: "active" | "gone";
   brandName: string | null;
   issues: string[];
@@ -37,10 +38,10 @@ function matchCanonical(html: string): string | null {
   return tag?.match(/href=["']([^"']*)["']/i)?.[1] ?? null;
 }
 
-export function inspectBrandSnapshot(route: string, html: string, known: boolean): string[] {
+export function inspectSnapshot(route: string, html: string, known: boolean): string[] {
   const issues: string[] = [];
-  if (!known) issues.push("URL отсутствует в текущем реестре брендов");
-  if (ERROR_MARKERS.some((marker) => html.includes(marker))) {
+  if (!known) issues.push("URL отсутствует в текущем реестре страниц");
+  if (PRERENDER_ERROR_MARKERS.some((marker) => html.includes(marker))) {
     issues.push("В кэше сохранена страница ошибки");
   }
   const title = html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1]?.trim();
@@ -70,32 +71,51 @@ async function probeCrawler(route: string): Promise<number | null> {
   }
 }
 
-/**
- * Reconciles the live brand registry against every cached /brands/* route.
- * The disk cache is the source of truth for orphan snapshots; the DB is the
- * source of truth for whether a route is allowed to be indexed.
- */
-export async function scanBrandRouteHealth(): Promise<BrandRouteHealth[]> {
-  const [brandRows, cachedRoutes] = await Promise.all([
+async function getExpectedPrerenderRoutes(): Promise<Map<string, string | null>> {
+  const [brandRows, carRows] = await Promise.all([
     db.execute(sql`SELECT name, slug FROM brands WHERE slug IS NOT NULL AND slug <> 's-probegom'`),
-    listPrerenderedRoutes(),
+    db.execute(sql`
+      SELECT type, id FROM cars
+      WHERE (type = 'new' AND id IS NOT NULL) OR (type = 'used' AND id IS NOT NULL)
+    `),
   ]);
-  const active = new Map(
+  const expected = new Map<string, string | null>(
     (brandRows.rows as { name: string; slug: string }[]).map((brand) => [`/brands/${brand.slug}`, brand.name]),
   );
-  const routes = [...new Set([
-    ...active.keys(),
-    ...cachedRoutes.filter((route) => /^\/brands\/[^/]+$/.test(route)),
-  ])].sort();
+  for (const car of carRows.rows as { type: "new" | "used"; id: string }[]) {
+    expected.set(`/${car.type === "new" ? "new-cars" : "cars"}/${encodeURIComponent(car.id)}`, null);
+  }
+  // These are Puppeteer routes in prerender.mjs. SSG-only routes are
+  // intentionally excluded because their canonical HTML lives in frontend dist.
+  for (const route of ["/", "/service", "/service/bonus", "/contacts", "/vacancies", "/about", "/buyout", "/cars", "/corporate", "/new-cars"]) {
+    expected.set(route, null);
+  }
+  return expected;
+}
 
-  const results: BrandRouteHealth[] = [];
+/**
+ * Reconciles the active route registry against every cached route, not only
+ * brand pages. Cached files are the source of truth for orphan discovery;
+ * the DB-derived registry is the source of truth for active dynamic routes.
+ */
+export async function scanRouteHealth(): Promise<RouteHealth[]> {
+  const [expected, cachedRoutes] = await Promise.all([
+    getExpectedPrerenderRoutes(),
+    listPrerenderedRoutes(),
+  ]);
+  const routes = [...new Set([...expected.keys(), ...cachedRoutes])].sort();
+
+  const results: RouteHealth[] = [];
   for (const route of routes) {
-    const brandName = active.get(route) ?? null;
-    const lifecycle = brandName ? "active" : "gone";
+    const brandName = expected.get(route) ?? null;
+    const lifecycle = expected.has(route) ? "active" : "gone";
     const [html, metadata, crawlerStatus] = await Promise.all([
       loadPrerendered(route),
       getPrerenderedMetadata(route),
-      probeCrawler(route),
+      // A crawler probe is especially important for the incident class that
+      // motivated this work. Avoid N HTTP requests for large car inventories;
+      // their cache/HTML validation still runs for every route.
+      route.startsWith("/brands/") ? probeCrawler(route) : Promise.resolve(null),
     ]);
     if (!html) {
       results.push({
@@ -105,7 +125,7 @@ export async function scanBrandRouteHealth(): Promise<BrandRouteHealth[]> {
       });
       continue;
     }
-    const issues = inspectBrandSnapshot(route, html, lifecycle === "active");
+    const issues = inspectSnapshot(route, html, lifecycle === "active");
     if (!metadata.manifest) issues.push("Нет manifest-файла кэша");
     if (lifecycle === "active" && crawlerStatus !== null && crawlerStatus !== 200) {
       issues.push(`Crawler получает HTTP ${crawlerStatus}, ожидается 200`);
@@ -120,4 +140,10 @@ export async function scanBrandRouteHealth(): Promise<BrandRouteHealth[]> {
     });
   }
   return results;
+}
+
+/** Kept for callers that specifically need the brand-only view. */
+export async function scanBrandRouteHealth(): Promise<RouteHealth[]> {
+  const all = await scanRouteHealth();
+  return all.filter((item) => item.route.startsWith("/brands/"));
 }
