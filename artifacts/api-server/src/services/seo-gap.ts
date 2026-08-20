@@ -11,7 +11,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { loadPrerendered } from "../lib/prerenderStorage";
-import { inspectBrandSnapshot } from "../lib/routeHealth";
+import { inspectSnapshot } from "../lib/routeHealth";
 import { aiClusterToFaqs, AI_HALLUCINATION_SIGNAL } from "../lib/seo-ai";
 import { webmasterGet } from "./yandex-oauth";
 import { getSitemapLocs } from "../routes/sitemap";
@@ -336,7 +336,7 @@ async function checkTechGap(url: string): Promise<{
     }
     const size = Buffer.byteLength(html, "utf-8");
     if (url.startsWith("/brands/")) {
-      const issues = inspectBrandSnapshot(url, html, true);
+      const issues = inspectSnapshot(url, html, true);
       if (issues.length > 0) {
         return { size, isTechGap: true, isCacheAvailable: true, threshold, reason: issues.join("; ") };
       }
