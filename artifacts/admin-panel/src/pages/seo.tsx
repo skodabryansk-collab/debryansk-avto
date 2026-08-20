@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getSeoAudit, runSeoAudit, clearPrerenderCache, requestYandexRecrawl, generateBrandDescriptions, rebuildCache, prerenderRoute, prerenderBulk, getPrerenderStatus, getRebuildStatus, runPrerender,
-  getRouteHealth, repairRoute, startManifestRepair, getManifestRepairStatus,
+  getRouteHealth, repairRoute, startManifestRepair, getManifestRepairStatus, startCacheRepair, getCacheRepairStatus,
   type SeoPageItem, type GeneratedBrandDescription, type OpStatus, type RouteHealthItem,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -250,6 +250,11 @@ export default function SeoPage() {
     queryFn: getManifestRepairStatus,
     refetchInterval: (query) => query.state.data?.status === "running" ? 2000 : false,
   });
+  const { data: cacheRepairStatus } = useQuery({
+    queryKey: ["cache-repair-status"],
+    queryFn: getCacheRepairStatus,
+    refetchInterval: (query) => query.state.data?.status === "running" ? 3000 : false,
+  });
 
   const repairMutation = useMutation({
     mutationFn: (route: string) => repairRoute(route),
@@ -272,6 +277,14 @@ export default function SeoPage() {
       toast({ title: "Ошибка массового обновления", description: err.message, variant: "destructive" });
     },
   });
+  const cacheRepairMutation = useMutation({
+    mutationFn: startCacheRepair,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["cache-repair-status"] });
+      toast({ title: "Массовый прирендер запущен", description: `${data.total} маршрутов будут восстановлены последовательно.` });
+    },
+    onError: (err: Error) => toast({ title: "Ошибка массового прирендера", description: err.message, variant: "destructive" }),
+  });
 
   const previousManifestRepairStatus = useRef<string | undefined>(undefined);
   useEffect(() => {
@@ -286,12 +299,25 @@ export default function SeoPage() {
     previousManifestRepairStatus.current = current;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manifestRepairStatus?.status]);
+  const previousCacheRepairStatus = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const current = cacheRepairStatus?.status;
+    if (previousCacheRepairStatus.current === "running" && (current === "completed" || current === "failed")) {
+      queryClient.invalidateQueries({ queryKey: ["route-health"] });
+      auditMutation.mutate();
+      if (current === "failed") toast({ title: "Массовый прирендер завершился с ошибкой", description: "Проверьте результаты в блоке технического здоровья.", variant: "destructive" });
+    }
+    previousCacheRepairStatus.current = current;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheRepairStatus?.status]);
 
   const technicalIssues: RouteHealthItem[] = (routeHealth?.items ?? []).filter(
     (i) => i.status !== "ok" || i.issueSummary.length > 0
   );
   const needsManifestCount = (routeHealth?.items ?? []).filter((i) => i.status === "needs_manifest").length;
   const manifestRunning = manifestRepairStatus?.status === "running";
+  const missingCacheCount = (routeHealth?.items ?? []).filter((i) => i.status === "error" && i.issueSummary === "Нет опубликованного prerender-кэша").length;
+  const cacheRepairRunning = cacheRepairStatus?.status === "running";
 
   const items = audit?.items ?? [];
   const cacheProblemItems = items.filter((i) =>
@@ -497,6 +523,48 @@ export default function SeoPage() {
             )}
           </div>
         )}
+        {missingCacheCount > 0 && (
+          <div className="mx-4 my-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-red-900">Нет опубликованного prerender-кэша: {missingCacheCount}</div>
+                <div className="mt-1 text-xs text-red-800">
+                  Будут восстановлены только активные страницы без HTML-кэша. Маршруты с ошибочным HTML и orphan-адреса в очередь не попадут.
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={cacheRepairRunning || cacheRepairMutation.isPending || manifestRunning}
+                onClick={() => {
+                  if (window.confirm(`Запустить безопасный прирендер для ${missingCacheCount} страниц без опубликованного кэша? Очередь идёт последовательно, чтобы не перегрузить сервер.`)) {
+                    cacheRepairMutation.mutate();
+                  }
+                }}
+                className="border-red-300 text-red-800 hover:bg-red-100"
+              >
+                {cacheRepairRunning ? "Пририндер..." : cacheRepairMutation.isPending ? "Запуск..." : `Восстановить массово (${missingCacheCount})`}
+              </Button>
+            </div>
+            {cacheRepairRunning && cacheRepairStatus && (
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-red-800">
+                  <span>Проверено {cacheRepairStatus.processed} из {cacheRepairStatus.total}</span>
+                  <span>Восстановлено: {cacheRepairStatus.fixed}</span>
+                </div>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-red-200">
+                  <div
+                    className="h-full bg-red-600 transition-all"
+                    style={{ width: `${cacheRepairStatus.total ? (cacheRepairStatus.processed / cacheRepairStatus.total) * 100 : 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {!cacheRepairRunning && cacheRepairStatus?.status === "completed" && cacheRepairStatus.fixed > 0 && (
+              <div className="mt-2 text-xs text-emerald-700">Завершено: восстановлено — {cacheRepairStatus.fixed}, ошибок — {cacheRepairStatus.failed}.</div>
+            )}
+          </div>
+        )}
         {routeHealthLoading ? (
           <div className="px-4 py-3 text-sm text-slate-500">Загрузка...</div>
         ) : technicalIssues.length === 0 ? (
@@ -569,11 +637,11 @@ export default function SeoPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => repairMutation.mutate(item.route)}
-                        disabled={repairMutation.isPending || item.status === "needs_manifest"}
+                        disabled={repairMutation.isPending || item.status === "needs_manifest" || item.issueSummary === "Нет опубликованного prerender-кэша"}
                         className="border-amber-200 text-amber-700 hover:bg-amber-50"
                       >
                         <Hammer className="w-3.5 h-3.5 mr-1.5" />
-                        {item.status === "needs_manifest" ? "Массово выше" : "Починить"}
+                        {item.status === "needs_manifest" || item.issueSummary === "Нет опубликованного prerender-кэша" ? "Массово выше" : "Починить"}
                       </Button>
                     </td>
                   </tr>
