@@ -944,11 +944,11 @@ export default function Home() {
               {carsDropdown && (
                 <div className="absolute top-full left-0 mt-1 w-44 bg-[#1a1d23] border border-white/10 rounded-xl shadow-xl py-1 z-50">
                   <Link href="/new-cars" onClick={() => setCarsDropdown(false)}
-                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white/70 hover:text-white hover:bg-white/8 transition-colors">
+                     className="flex items-center gap-2 px-4 py-2.5 text-[11px] font-semibold text-white/70 hover:text-white hover:bg-white/8 transition-colors">
                     <Car className="w-4 h-4 text-[#0070b8]" /> Новые автомобили
                   </Link>
                   <Link href="/cars" onClick={() => setCarsDropdown(false)}
-                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white/70 hover:text-white hover:bg-white/8 transition-colors">
+                     className="flex items-center gap-2 px-4 py-2.5 text-[11px] font-semibold text-white/70 hover:text-white hover:bg-white/8 transition-colors">
                     <RotateCcw className="w-4 h-4 text-[#0070b8]" /> С пробегом
                   </Link>
                 </div>
