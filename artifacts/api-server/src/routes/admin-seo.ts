@@ -5,7 +5,7 @@ import { requireAdmin } from "../middlewares/requireAdmin";
 import { resolveMeta, STATIC_META } from "../middleware/seoMeta";
 import { getPrerenderCache } from "../middleware/prerender";
 import { loadPrerendered } from "../lib/prerenderStorage";
-import { scanRouteHealth } from "../lib/routeHealth";
+import { repairLegacyManifest, scanRouteHealth } from "../lib/routeHealth";
 import { deletePrerendered } from "../lib/prerenderStorage";
 import { deletePrerenderCache } from "../middleware/prerender";
 import { spawnPrerenderRoute } from "../lib/spawnBrandPrerender";
@@ -271,6 +271,9 @@ async function runSeoAudit(): Promise<SeoAuditItem[]> {
   const healthItems = await scanRouteHealth();
   for (const health of healthItems) {
     if (health.status === "healthy") continue;
+    // A legacy HTML snapshot without its newer sidecar manifest is a migration
+    // action, not an SEO defect. It stays visible in Route Health only.
+    if (health.status === "needs_manifest") continue;
     const item = items.find((candidate) => candidate.route === health.route);
     const technicalIssues = health.issues.map((issue) => `Техническая проверка: ${issue}`);
     if (item) {
@@ -437,7 +440,11 @@ router.get("/route-health", async (_req, res) => {
       checkedAt,
       items: items.map((item) => ({
         route: item.route,
-        status: item.status === "healthy" ? "ok" : "error",
+        status: item.status === "healthy"
+          ? "ok"
+          : item.status === "needs_manifest"
+          ? "needs_manifest"
+          : "error",
         issueSummary: item.issues.join("; "),
         cacheAge: formatAge(item.cacheUpdatedAt),
         crawlerStatus: item.issues.some((issue) => issue.includes("robots"))
@@ -449,6 +456,85 @@ router.get("/route-health", async (_req, res) => {
     });
   } catch (err) {
     logger.error({ err }, "[admin-seo] route health scan failed");
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+interface ManifestRepairJob {
+  status: "idle" | "running" | "completed" | "failed";
+  total: number;
+  processed: number;
+  fixed: number;
+  failed: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  errors: Array<{ route: string; error: string }>;
+}
+
+let manifestRepairJob: ManifestRepairJob = {
+  status: "idle", total: 0, processed: 0, fixed: 0, failed: 0,
+  startedAt: null, completedAt: null, errors: [],
+};
+
+router.get("/route-health/manifest-repair/preview", async (_req, res) => {
+  try {
+    const items = await scanRouteHealth();
+    const eligible = items.filter((item) => item.status === "needs_manifest").map((item) => item.route);
+    return res.json({
+      ok: true,
+      total: eligible.length,
+      routes: eligible,
+      skipped: items.filter((item) => item.status === "broken" || item.status === "orphan").length,
+    });
+  } catch (err) {
+    logger.error({ err }, "[admin-seo] manifest repair preview failed");
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+router.get("/route-health/manifest-repair/status", (_req, res) => {
+  return res.json({ ok: true, ...manifestRepairJob });
+});
+
+router.post("/route-health/manifest-repair/start", async (_req, res) => {
+  if (manifestRepairJob.status === "running") {
+    return res.status(409).json({ ok: false, error: "Массовое обновление уже выполняется" });
+  }
+  try {
+    const items = await scanRouteHealth();
+    const routes = items.filter((item) => item.status === "needs_manifest").map((item) => item.route);
+    manifestRepairJob = {
+      status: "running", total: routes.length, processed: 0, fixed: 0, failed: 0,
+      startedAt: new Date().toISOString(), completedAt: null, errors: [],
+    };
+    void (async () => {
+      const pending = [...routes];
+      const workers = Array.from({ length: Math.min(2, Math.max(1, pending.length)) }, async () => {
+        while (pending.length) {
+          const route = pending.shift();
+          if (!route) break;
+          try {
+            await repairLegacyManifest(route);
+            manifestRepairJob.fixed += 1;
+          } catch (err) {
+            manifestRepairJob.failed += 1;
+            manifestRepairJob.errors.push({ route, error: String(err) });
+          } finally {
+            manifestRepairJob.processed += 1;
+          }
+        }
+      });
+      await Promise.all(workers);
+      manifestRepairJob.status = manifestRepairJob.failed > 0 && manifestRepairJob.fixed === 0 ? "failed" : "completed";
+      manifestRepairJob.completedAt = new Date().toISOString();
+    })().catch((err) => {
+      manifestRepairJob.status = "failed";
+      manifestRepairJob.completedAt = new Date().toISOString();
+      manifestRepairJob.errors.push({ route: "*", error: String(err) });
+    });
+    return res.status(202).json({ ok: true, total: routes.length, message: routes.length ? "Массовое обновление запущено" : "Маршрутов для обновления нет" });
+  } catch (err) {
+    logger.error({ err }, "[admin-seo] manifest repair start failed");
     return res.status(500).json({ ok: false, error: String(err) });
   }
 });
