@@ -1,4 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 const SITE = "https://debryansk-auto.ru";
@@ -64,6 +66,34 @@ const cache: PrerenderCacheState = {
   pages: new Map(),
   gone: new Set(),
 };
+
+const brandSlugCache = new Map<string, { exists: boolean; checkedAt: number }>();
+const BRAND_SLUG_CACHE_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Cached Puppeteer snapshots can outlive a brand that was removed or renamed.
+ * Check the DB before serving a cached brand page so an old "Бренд не найден"
+ * snapshot cannot be exposed to crawlers as HTTP 200.
+ */
+async function brandExists(slug: string): Promise<boolean | null> {
+  const cached = brandSlugCache.get(slug);
+  if (cached && Date.now() - cached.checkedAt < BRAND_SLUG_CACHE_TTL_MS) {
+    return cached.exists;
+  }
+
+  try {
+    const result = await db.execute(
+      sql`SELECT 1 FROM brands WHERE slug = ${slug} AND slug IS NOT NULL LIMIT 1`,
+    );
+    const exists = result.rows.length > 0;
+    brandSlugCache.set(slug, { exists, checkedAt: Date.now() });
+    return exists;
+  } catch (err) {
+    // A transient DB outage must not turn a valid brand into a false 404.
+    logger.warn({ err, slug }, "prerender: unable to validate brand slug");
+    return null;
+  }
+}
 
 // Current build's asset tags, read once from dist/public/index.html at server
 // startup (see index.ts). Cached snapshots (GCS/Puppeteer captures) bake in
@@ -171,11 +201,11 @@ export function invalidatePrerenderCache(route: string): void {
   // to seoMeta middleware and get fresh meta tags from the DB.
 }
 
-export function prerenderMiddleware(
+export async function prerenderMiddleware(
   req: Request,
   res: Response,
   next: NextFunction,
-): void {
+): Promise<void> {
   if (process.env.PRERENDER_ENABLED !== "true") {
     next();
     return;
@@ -203,6 +233,18 @@ export function prerenderMiddleware(
   console.log(
     `[DEBUG] path=${route}, ua=${ua.substring(0, 50)}, cached=${cache.pages.has(route)}, isGone=${cache.gone.has(route)}`,
   );
+
+  const brandMatch = route.match(/^\/brands\/([^/]+)$/);
+  if (isBot && brandMatch && cache.pages.has(route)) {
+    const exists = await brandExists(brandMatch[1]);
+    if (exists === false) {
+      cache.pages.delete(route);
+      cache.gone.delete(route);
+      res.status(404).end();
+      logger.info({ route }, "prerender: served 404 for cached unknown brand");
+      return;
+    }
+  }
 
   // 410 Gone — only for bots/crawlers; regular browsers get the SPA shell
   // so React can render a "not found" state instead of a blank page
