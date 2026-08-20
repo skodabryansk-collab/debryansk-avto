@@ -175,6 +175,14 @@ function activityValue(value: number, mode: VisitorActivityMode): string {
   return value.toLocaleString("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 }
 
+function activityCellValue(value: number, mode: VisitorActivityMode): string {
+  if (!value) return "·";
+  if (mode === "average") return value.toLocaleString("ru-RU", { maximumFractionDigits: 1 });
+  if (value >= 1000000) return `${(value / 1000000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })}м`;
+  if (value >= 1000) return `${(value / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })}к`;
+  return String(Math.round(value));
+}
+
 function activityColor(value: number, maxValue: number): string {
   if (!value || !maxValue) return "#f1f5f9";
   const intensity = Math.sqrt(value / maxValue);
@@ -326,11 +334,19 @@ function ActivityHeatmap({
                           key={hour}
                           title={title}
                           aria-hidden="true"
-                          className={`aspect-square min-h-6 rounded-[3px] border border-white/80 transition-transform hover:scale-110 hover:z-10 cursor-default ${
-                            intensity > 0.58 ? "text-white" : "text-slate-600"
+                          className={`group relative flex aspect-square min-h-6 items-center justify-center overflow-hidden rounded-[4px] border border-white/80 px-0.5 transition-all hover:z-10 hover:scale-110 hover:shadow-md cursor-default ${
+                            intensity > 0.58
+                              ? "text-white font-semibold"
+                              : intensity > 0
+                                ? "text-slate-700 font-medium"
+                                : "text-slate-300"
                           }`}
                           style={{ backgroundColor: activityColor(value, maxValue) }}
-                        />
+                        >
+                          <span className="truncate text-[9px] leading-none tabular-nums sm:text-[10px]">
+                            {activityCellValue(value, mode)}
+                          </span>
+                        </div>
                       );
                     })}
                   </React.Fragment>
