@@ -7,7 +7,9 @@ import pg from "pg";
 const { Pool } = pg;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const distDir = join(__dirname, "..", "dist", "public");
+const distDir = process.env["FRONTEND_DIST_PATH"]
+  ? join(process.env["FRONTEND_DIST_PATH"])
+  : join(__dirname, "..", "dist", "public");
 
 const SITE = "https://debryansk-auto.ru";
 const DEFAULT_OG_IMAGE = `${SITE}/opengraph.jpg`;
@@ -15,8 +17,7 @@ const DEFAULT_OG_IMAGE = `${SITE}/opengraph.jpg`;
 const STATIC_ROUTES = {
   "/service/bonus": {
     title: "Бонусная программа — Дебрянск Авто | Копите и тратьте бонусы",
-    description:
-      "Бонусная программа автодилера «Дебрянск Авто» в Брянске. Начисление 10% от суммы заказ-наряда. Списание от 5% до 10% по накопительным уровням.",
+    description: "Бонусная программа автодилера «Дебрянск Авто» в Брянске. Начисление 10% от суммы заказ-наряда. Списание от 5% до 10% по накопительным уровням.",
     h1: "Бонусная программа Дебрянск Авто",
   },
   "/": {
@@ -26,15 +27,15 @@ const STATIC_ROUTES = {
     h1: "Дебрянск Авто — официальный дилер автомобилей в Брянске",
   },
   "/new-cars": {
-    title: "Новые автомобили в Брянске — каталог и цены | Дебрянск Авто",
+    title: "Новые автомобили в Брянске — Дебрянск Авто",
     description:
-      "Купите новый автомобиль у официального дилера в Брянске. Большой выбор авто в наличии, кредит, trade-in, гарантийное обслуживание.",
+      "Новые автомобили 14 брендов у официальных дилеров Брянска. Выгодное кредитование, специальные программы, гарантия производителя. Дебрянск Авто.",
     h1: "Новые автомобили в Брянске",
   },
   "/cars": {
-    title: "Автомобили с пробегом в Брянске — каталог | Дебрянск Авто",
+    title: "Автомобили с пробегом в Брянске — Дебрянск Авто",
     description:
-      "Проверенные автомобили с пробегом в наличии у официального дилера Брянска. Отбор по качеству, кредит, трейд-ин.",
+      "Купить авто с пробегом в Брянске. Выгодные цены, проверенные автомобили, кредит, трейд-ин. Дебрянск Авто — 14 брендов.",
     h1: "Автомобили с пробегом в Брянске",
   },
   "/service": {
@@ -79,6 +80,12 @@ const STATIC_ROUTES = {
       "Политика конфиденциальности ООО «9 БР» (Дебрянск Авто) — порядок сбора, хранения и обработки персональных данных пользователей сайта.",
     h1: "Политика конфиденциальности",
   },
+  "/promotions": {
+    title: "Акции и спецпредложения — Дебрянск Авто | Брянск",
+    description:
+      "Актуальные акции на покупку автомобилей от официального дилера Дебрянск Авто в Брянске. Скидки, выгодный кредит, трейд-ин бонусы.",
+    h1: "Акции и спецпредложения Дебрянск Авто",
+  },
 };
 
 function esc(s) {
@@ -113,6 +120,20 @@ function injectMeta(html, title, description, canonical, ogImage, h1, jsonLd) {
     /<meta name="twitter:description" content="[^"]*"\s*\/?>/,
     `<meta name="twitter:description" content="${d}" />`
   );
+
+  // Inject or replace robots meta
+  const DEFAULT_ROBOTS = "index, follow, max-snippet:-1, max-image-preview:large";
+  if (/<meta\s+name="robots"\s+content="[^"]*"\s*\/?/i.test(result)) {
+    result = result.replace(
+      /<meta\s+name="robots"\s+content="[^"]*"\s*\/?>/gi,
+      `<meta name="robots" content="${DEFAULT_ROBOTS}" />`
+    );
+  } else {
+    result = result.replace(
+      "</head>",
+      `    <meta name="robots" content="${DEFAULT_ROBOTS}" />\n  </head>`
+    );
+  }
 
   // Inject or replace og:url
   if (/<meta property="og:url" content="[^"]*"\s*\/?/.test(result)) {
@@ -231,8 +252,8 @@ function injectMeta(html, title, description, canonical, ogImage, h1, jsonLd) {
 
 function buildNewsGridHtml(articles) {
   if (!articles || articles.length === 0) return "";
-  const cards = articles.map((a, i) => {
-    const cat = esc(a.category || "Новости");
+  const cards = articles.map(a => {
+    const cat = esc(a.category || "\u041d\u043e\u0432\u043e\u0441\u0442\u0438");
     const title = esc(a.title);
     const excerpt = esc((a.excerpt || "").substring(0, 140));
     const slug = esc(a.slug);
@@ -241,58 +262,76 @@ function buildNewsGridHtml(articles) {
       ? new Date(a.published_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })
       : "";
     const readTime = a.read_time ?? 3;
-
-    if (i === 0) {
-      // Featured card — full-bleed overlay (matches React ArticleCard isFeatured)
-      return `
-      <article class="group relative rounded-2xl overflow-hidden sm:col-span-2 sm:row-span-2 min-h-[400px]">
-        <a href="/news/${slug}" class="block absolute inset-0">
-          <picture class="absolute inset-0 w-full h-full">
-            <img src="${img}" alt="${title}" class="w-full h-full object-cover" />
-          </picture>
-          <div class="absolute inset-0" style="background:linear-gradient(to top,rgba(0,0,0,.85) 0%,rgba(0,0,0,.25) 50%,rgba(0,0,0,.1) 100%)"></div>
-          <div class="absolute top-4 left-4">
-            <span style="background:rgba(255,255,255,.2);backdrop-filter:blur(4px)" class="inline-flex items-center text-white text-[10px] font-bold px-2.5 py-1 rounded-full border border-white/25">${cat}</span>
-          </div>
-          <div class="absolute bottom-0 left-0 right-0 p-5">
-            <div class="flex items-center gap-2 text-[11px] mb-2.5" style="color:rgba(255,255,255,.65)">
-              <span>${dateStr}</span>
-              <span class="w-0.5 h-0.5 rounded-full" style="background:rgba(255,255,255,.4)"></span>
-              <span>${readTime} мин</span>
-            </div>
-            <h3 class="font-bold text-xl leading-snug text-white mb-2">${title}</h3>
-            <p class="text-sm leading-relaxed line-clamp-2" style="color:rgba(255,255,255,.7)">${excerpt}</p>
-            <span class="inline-flex items-center gap-1.5 text-xs font-bold mt-3.5" style="color:rgba(255,255,255,.9)">Читать дальше →</span>
-          </div>
-        </a>
-      </article>`;
-    }
-
-    // Regular card
     return `
-      <article class="group bg-white rounded-2xl border border-slate-100 overflow-hidden">
+      <article class="bg-white rounded-2xl border border-slate-100 overflow-hidden">
         <a href="/news/${slug}">
-          <div class="relative overflow-hidden h-40">
+          <div class="h-40 overflow-hidden">
             <img src="${img}" alt="${title}" class="w-full h-full object-cover" loading="lazy" decoding="async" />
           </div>
         </a>
         <div class="p-4">
-          <div class="flex items-center gap-2 text-[11px] text-slate-400 mb-2">
+          <span class="inline-flex items-center bg-[#0070b8]/90 text-white text-[10px] font-bold px-2.5 py-1 rounded-full">${cat}</span>
+          <div class="flex items-center gap-2 text-[11px] text-slate-400 mt-2 mb-2">
             <span>${dateStr}</span>
             <span class="w-0.5 h-0.5 rounded-full bg-slate-300"></span>
-            <span>${readTime} мин</span>
+            <span>${readTime} \u043c\u0438\u043d</span>
           </div>
-          <span class="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full mb-1.5" style="background:var(--color-primary,#0070b8);color:#fff">${cat}</span>
           <a href="/news/${slug}">
-            <h3 class="font-semibold text-slate-900 text-sm leading-snug mb-1">${title}</h3>
+            <h3 class="font-bold text-slate-900 text-sm leading-snug hover:text-[#0070b8] transition-colors mb-1">${title}</h3>
           </a>
           <p class="text-slate-500 text-xs leading-relaxed">${excerpt}</p>
-          <a href="/news/${slug}" class="inline-flex items-center gap-1 text-xs font-bold mt-2" style="color:var(--color-primary,#0070b8)">Читать дальше →</a>
+          <a href="/news/${slug}" class="inline-flex items-center gap-1 text-[#0070b8] text-xs font-bold mt-2 hover:underline">
+            \u0427\u0438\u0442\u0430\u0442\u044c \u0434\u0430\u043b\u044c\u0448\u0435 <span aria-hidden="true">\u2192</span>
+          </a>
         </div>
       </article>`;
   }).join("");
 
-  return `<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 container mx-auto px-4 sm:px-6 py-6 sm:py-8">${cards}</div>`;
+  // Wrapped in display:none so the grid is invisible to regular users but
+  // crawlable by Googlebot/Yandex (they index hidden content and follow hidden links).
+  // The React app renders its own visible news grid after hydration.
+  return `<div style="display:none" aria-hidden="true"><div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 container mx-auto px-4 sm:px-6 py-6 sm:py-8">${cards}</div></div>`;
+}
+
+function buildBrandContentHtml(description, faq) {
+  const parts = [];
+
+  if (description && description.trim().length > 50) {
+    const paragraphs = description
+      .split(/\n+/)
+      .map(p => p.trim())
+      .filter(Boolean)
+      .map(p => `<p class="text-slate-600 text-sm leading-relaxed mb-3">${esc(p)}</p>`)
+      .join("");
+    parts.push(`<div class="prose-sm text-slate-700 mb-6">${paragraphs}</div>`);
+  }
+
+  let faqArr = [];
+  if (faq) {
+    try {
+      faqArr = typeof faq === "string" ? JSON.parse(faq) : faq;
+    } catch { faqArr = []; }
+  }
+  const publishedFaq = Array.isArray(faqArr)
+    ? faqArr.filter(f => f.is_published !== false)
+    : [];
+
+  if (publishedFaq.length > 0) {
+    const items = publishedFaq
+      .map(f => `
+        <div class="border-b border-slate-100 py-3">
+          <p class="font-semibold text-sm text-slate-800 mb-1">${esc(f.question || "")}</p>
+          <p class="text-sm text-slate-600 leading-relaxed">${esc(f.answer || "")}</p>
+        </div>`)
+      .join("");
+    parts.push(`<div class="mt-4">${items}</div>`);
+  }
+
+  if (parts.length === 0) return "";
+  // The React brand page renders this content in its intended place. This
+  // static copy is only for crawler discovery and lives after #root, so it
+  // must never become a visible section below the application footer.
+  return `<section data-seo-brand-content="true" style="display:none" aria-hidden="true">${parts.join("")}</section>`;
 }
 
 let _template = null;
@@ -320,13 +359,19 @@ function writeRoute(routePath, title, description, h1, ogImage, jsonLd) {
   let filePath;
   if (routePath === "/") {
     filePath = join(distDir, "index.html");
+    // Root index.html doubles as the SPA shell template that Puppeteer loads
+    // when crawling brand/car pages. If it keeps the sr-only H1, Puppeteer
+    // captures it alongside the React-rendered H1 → duplicate H1s for bots.
+    // seoMeta handles the root-route H1 via injectMeta at request time anyway.
+    const cleanHtml = html.replace(/\n?\s*<h1 class="sr-only">[^<]*<\/h1>/g, "");
+    writeFileSync(filePath, cleanHtml);
   } else {
     const parts = routePath.slice(1).split("/");
     const dir = join(distDir, ...parts);
     mkdirSync(dir, { recursive: true });
     filePath = join(dir, "index.html");
+    writeFileSync(filePath, html);
   }
-  writeFileSync(filePath, html);
   console.log(`SSG: ${routePath}`);
 }
 
@@ -448,6 +493,7 @@ function segmentName(seg) {
     cars: "Авто с пробегом",
     legal: "Юридическая информация",
     privacy: "Политика конфиденциальности",
+    promotions: "Акции",
   };
   return map[seg] || seg;
 }
@@ -484,6 +530,20 @@ async function main() {
       "/vacancies": "vacancies",
     };
 
+    // Load page_seo_overrides so SSG static files reflect admin-applied meta changes
+    let seoOverrides = {};
+    try {
+      const ovResult = await pool.query(
+        "SELECT route, meta_title, meta_description FROM page_seo_overrides WHERE route = ANY($1)",
+        [Object.keys(STATIC_ROUTES)]
+      );
+      for (const row of ovResult.rows) {
+        seoOverrides[row.route] = { meta_title: row.meta_title, meta_description: row.meta_description };
+      }
+    } catch {
+      // page_seo_overrides may not exist yet — use hardcoded defaults
+    }
+
     for (const [route, meta] of Object.entries(STATIC_ROUTES)) {
       const faqSlug = staticRouteSlugMap[route];
       const faqLd = faqSlug ? buildFaqLd(faqsByPage[faqSlug]) : null;
@@ -492,11 +552,14 @@ async function main() {
       if (faqLd) extras.push(faqLd);
       if (route === "/vacancies") extras.push(buildVacanciesLd());
       extras.push(breadcrumbLd);
-      writeRoute(route, meta.title, meta.description, meta.h1, DEFAULT_OG_IMAGE, extras);
+      const ov = seoOverrides[route];
+      const title = (ov?.meta_title) || meta.title;
+      const description = (ov?.meta_description) || meta.description;
+      writeRoute(route, title, description, meta.h1, DEFAULT_OG_IMAGE, extras);
     }
 
     const brandsResult = await pool.query(
-      "SELECT b.id, b.name, b.slug, b.is_service_only, bpc.meta_description, bpc.meta_title FROM brands b LEFT JOIN brand_page_content bpc ON bpc.brand_id = b.id WHERE b.slug IS NOT NULL AND b.slug != ''"
+      "SELECT b.id, b.name, b.slug, b.is_service_only, bpc.meta_description, bpc.meta_title, bpc.description as brand_description, bpc.faq FROM brands b LEFT JOIN brand_page_content bpc ON bpc.brand_id = b.id WHERE b.slug IS NOT NULL AND b.slug != ''"
     );
     for (const row of brandsResult.rows) {
       const faqSlug = `brands/${row.slug}`;
@@ -506,7 +569,7 @@ async function main() {
       const metaTitle = row.meta_title;
       const brandName = row.name;
       const title = metaTitle
-        ? `${metaTitle} | Дебрянск Авто`
+        ? (metaTitle.includes("Дебрянск") ? metaTitle.trim() : `${metaTitle.trim()} | Дебрянск Авто`)
         : `${brandName} в Брянске — ${isService ? "официальный сервис" : "официальный дилер"} | Дебрянск Авто`;
       const description = metaDesc
         ? metaDesc
@@ -527,6 +590,17 @@ async function main() {
         DEFAULT_OG_IMAGE,
         jsonLd
       );
+
+      // ——— Inject brand description + FAQ into body (like /news grid) ———
+      const brandContentHtml = buildBrandContentHtml(row.brand_description, row.faq);
+      if (brandContentHtml) {
+        const brandFile = join(distDir, "brands", row.slug, "index.html");
+        if (existsSync(brandFile)) {
+          let brandHtml = readFileSync(brandFile, "utf-8");
+          brandHtml = brandHtml.replace(/<\/body>/, `${brandContentHtml}\n  </body>`);
+          writeFileSync(brandFile, brandHtml);
+        }
+      }
     }
 
     const newsResult = await pool.query(
