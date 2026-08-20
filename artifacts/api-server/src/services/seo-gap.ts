@@ -11,7 +11,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { loadPrerendered } from "../lib/prerenderStorage";
-import { inspectSnapshot } from "../lib/routeHealth";
+import { inspectSnapshot, requiresPrerenderSnapshot } from "../lib/routeHealth";
 import { aiClusterToFaqs, AI_HALLUCINATION_SIGNAL } from "../lib/seo-ai";
 import { webmasterGet } from "./yandex-oauth";
 import { getSitemapLocs } from "../routes/sitemap";
@@ -300,6 +300,11 @@ async function checkTechGap(url: string): Promise<{
   threshold: number;
   reason?: string;
 }> {
+  // seoMeta/SSG routes deliberately have no Puppeteer cache. Treating that as a
+  // gap creates permanent false positives for news, promotions and static pages.
+  if (!requiresPrerenderSnapshot(url)) {
+    return { size: 0, isTechGap: false, isCacheAvailable: false, threshold: 0 };
+  }
   const pageType = detectPageType(url);
   const threshold = TECH_THRESHOLDS[pageType] ?? TECH_THRESHOLDS.default;
 
