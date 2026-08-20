@@ -7,7 +7,7 @@ import { getPrerenderCache } from "../middleware/prerender";
 import { loadPrerendered } from "../lib/prerenderStorage";
 import { scanRouteHealth } from "../lib/routeHealth";
 import { deletePrerendered } from "../lib/prerenderStorage";
-import { deletePrerenderCache, invalidatePrerenderCache } from "../middleware/prerender";
+import { deletePrerenderCache } from "../middleware/prerender";
 import { spawnPrerenderRoute } from "../lib/spawnBrandPrerender";
 import { logger } from "../lib/logger";
 
@@ -270,6 +270,7 @@ async function runSeoAudit(): Promise<SeoAuditItem[]> {
   // be served to crawlers after a slug rename or deletion.
   const healthItems = await scanRouteHealth();
   for (const health of healthItems) {
+    if (health.status === "healthy") continue;
     const item = items.find((candidate) => candidate.route === health.route);
     const technicalIssues = health.issues.map((issue) => `Техническая проверка: ${issue}`);
     if (item) {
@@ -462,14 +463,19 @@ router.post("/route-health/repair", async (req, res) => {
     if (!healthItem) {
       return res.status(404).json({ ok: false, error: "URL не найден в реестре или кэше" });
     }
-    await deletePrerendered(route);
+    if (healthItem.status === "healthy") {
+      return res.status(400).json({ ok: false, error: "Этот URL не требует восстановления кэша" });
+    }
     if (healthItem.lifecycle === "gone") {
+      await deletePrerendered(route);
       deletePrerenderCache(route);
       return res.json({ ok: true, route, action: "removed", message: "Orphan-кэш удалён; crawler получит 404" });
     }
-    invalidatePrerenderCache(route);
+    // Preserve the last known-good snapshot while Puppeteer validates the next
+    // one. prerender.mjs atomically swaps the file and updates memory only on
+    // successful publication, so a failed repair cannot create an SPA gap.
     spawnPrerenderRoute(route);
-    return res.json({ ok: true, route, action: "prerendering", message: "Кэш очищен, безопасный прирендер запущен" });
+    return res.json({ ok: true, route, action: "prerendering", message: "Запущен безопасный прирендер; текущий кэш сохранён до успешной замены" });
   } catch (err) {
     logger.error({ err, route }, "[admin-seo] route health repair failed");
     return res.status(500).json({ ok: false, error: String(err) });
