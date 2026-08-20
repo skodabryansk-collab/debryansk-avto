@@ -336,7 +336,7 @@ export default function Layout({ children, overridePhone }: { children: React.Re
                   >
                     <Link href="/new-cars"
                       onClick={() => setCarsDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
+                       className="flex items-center gap-2.5 px-4 py-3 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
                     >
                       <Car className="w-4 h-4 text-[#0070b8]" />
                       Новые автомобили
@@ -344,7 +344,7 @@ export default function Layout({ children, overridePhone }: { children: React.Re
                     <div className="mx-4 border-t border-slate-100" />
                     <Link href="/cars"
                       onClick={() => setCarsDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
+                       className="flex items-center gap-2.5 px-4 py-3 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
                     >
                       <Car className="w-4 h-4 text-slate-400" />
                       Автомобили с пробегом
@@ -377,7 +377,7 @@ export default function Layout({ children, overridePhone }: { children: React.Re
                   >
                     <Link href="/service"
                       onClick={() => setServicesDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
+                       className="flex items-center gap-2.5 px-4 py-3 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
                     >
                       <Wrench className="w-4 h-4 text-slate-400" />
                       Сервис и ТО
@@ -385,7 +385,7 @@ export default function Layout({ children, overridePhone }: { children: React.Re
                     <div className="mx-4 border-t border-slate-100" />
                     <Link href="/service/bonus"
                       onClick={() => setServicesDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
+                       className="flex items-center gap-2.5 px-4 py-3 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0070b8] transition-colors"
                     >
                       <Gift className="w-4 h-4 text-[#0070b8]" />
                       Бонусная программа
