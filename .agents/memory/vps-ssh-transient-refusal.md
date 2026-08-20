@@ -7,4 +7,4 @@ When the Timeweb VPS accepts one SSH command but refuses the next, avoid a multi
 
 **Why:** A standard deploy can transfer the API but fail before scripts, admin assets, and the PM2 restart when port 22 begins refusing fresh connections.
 
-**How to apply:** Wait for SSH to recover, establish one SSH ControlMaster session, stream a staged tar bundle through it, install atomically, restart PM2, then verify both localhost and the public domain. For `scp` over that master, use `-o ControlPath=<socket>` (not `-S "ssh -S <socket>"`, which treats the whole string as an executable path).
+**How to apply:** Wait for SSH to recover, establish one SSH ControlMaster session, stream a staged tar bundle through it, install atomically, restart PM2, then verify both localhost and the public domain. If the master drops, stream the staged tar bundle directly into one authenticated SSH command that unpacks, installs, and restarts PM2—never resume with many short connections. For `scp` over that master, use `-o ControlPath=<socket>` (not `-S "ssh -S <socket>"`, which treats the whole string as an executable path).
