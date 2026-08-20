@@ -974,16 +974,16 @@ export default function Home() {
 
           <div className="hidden lg:flex items-center gap-2 mr-3">
             <Link href="/favorites"
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-xl transition-all">
-              <Heart className="w-4 h-4" />
+              className="flex shrink-0 items-center gap-1.5 px-2 py-2 text-xs font-semibold whitespace-nowrap text-white/60 hover:text-white hover:bg-white/8 rounded-xl transition-all">
+              <Heart className="w-3.5 h-3.5" />
               <span>Избранное</span>
               {favCount > 0 && (
                 <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{favCount}</span>
               )}
             </Link>
             <Link href="/compare"
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white/60 hover:text-white hover:bg-white/8 rounded-xl transition-all">
-              <Scale className="w-4 h-4" />
+              className="flex shrink-0 items-center gap-1.5 px-2 py-2 text-xs font-semibold whitespace-nowrap text-white/60 hover:text-white hover:bg-white/8 rounded-xl transition-all">
+              <Scale className="w-3.5 h-3.5" />
               <span>Сравнить</span>
               {compCount > 0 && (
                 <span className="bg-[#0070b8] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{compCount}</span>
