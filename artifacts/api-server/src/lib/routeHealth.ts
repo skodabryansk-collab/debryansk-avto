@@ -6,6 +6,7 @@ import {
   loadPrerendered,
   type PrerenderManifest,
 } from "./prerenderStorage";
+import { STATIC_PAGES } from "../routes/sitemap";
 
 const SITE = "https://debryansk-auto.ru";
 export const PRERENDER_ERROR_MARKERS = [
@@ -72,22 +73,42 @@ async function probeCrawler(route: string): Promise<number | null> {
 }
 
 async function getExpectedPrerenderRoutes(): Promise<Map<string, string | null>> {
-  const [brandRows, carRows] = await Promise.all([
+  const [brandRows, carRows, newsRows, promotionRows, landingRows, extraRows] = await Promise.all([
     db.execute(sql`SELECT name, slug FROM brands WHERE slug IS NOT NULL AND slug <> 's-probegom'`),
     db.execute(sql`
-      SELECT type, id FROM cars
-      WHERE (type = 'new' AND id IS NOT NULL) OR (type = 'used' AND id IS NOT NULL)
+      SELECT type, external_id FROM cars
+      WHERE type IN ('new', 'used') AND external_id IS NOT NULL
     `),
+    db.execute(sql`SELECT slug FROM news WHERE slug IS NOT NULL`),
+    db.execute(sql`
+      SELECT slug FROM promotions
+      WHERE slug IS NOT NULL AND is_active = TRUE
+        AND (expires_at IS NULL OR expires_at > NOW())
+    `),
+    db.execute(sql`SELECT slug FROM seo_landing_pages WHERE is_published = TRUE AND slug IS NOT NULL`).catch(() => ({ rows: [] })),
+    db.execute(sql`SELECT loc FROM sitemap_extra_pages WHERE loc IS NOT NULL`).catch(() => ({ rows: [] })),
   ]);
   const expected = new Map<string, string | null>(
     (brandRows.rows as { name: string; slug: string }[]).map((brand) => [`/brands/${brand.slug}`, brand.name]),
   );
-  for (const car of carRows.rows as { type: "new" | "used"; id: string }[]) {
-    expected.set(`/${car.type === "new" ? "new-cars" : "cars"}/${encodeURIComponent(car.id)}`, null);
+  for (const car of carRows.rows as { type: "new" | "used"; external_id: string }[]) {
+    expected.set(`/${car.type === "new" ? "new-cars" : "cars"}/${encodeURIComponent(car.external_id)}`, null);
   }
-  // These are Puppeteer routes in prerender.mjs. SSG-only routes are
-  // intentionally excluded because their canonical HTML lives in frontend dist.
-  for (const route of ["/", "/service", "/service/bonus", "/contacts", "/vacancies", "/about", "/buyout", "/cars", "/corporate", "/new-cars"]) {
+  for (const row of newsRows.rows as { slug: string }[]) {
+    expected.set(`/news/${encodeURIComponent(row.slug)}`, null);
+  }
+  for (const row of promotionRows.rows as { slug: string }[]) {
+    expected.set(`/promotions/${encodeURIComponent(row.slug)}`, null);
+  }
+  for (const row of landingRows.rows as { slug: string }[]) {
+    expected.set(`/p/${encodeURIComponent(row.slug)}`, null);
+  }
+  for (const row of extraRows.rows as { loc: string }[]) {
+    if (row.loc.startsWith("/")) expected.set(row.loc, null);
+  }
+  // Static sitemap routes are also legitimate cache routes, even when their
+  // production HTML is currently supplied by SSG rather than Puppeteer.
+  for (const { loc: route } of STATIC_PAGES) {
     expected.set(route, null);
   }
   return expected;
