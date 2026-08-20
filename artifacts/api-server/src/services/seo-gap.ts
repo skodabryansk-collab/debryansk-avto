@@ -11,6 +11,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { loadPrerendered } from "../lib/prerenderStorage";
+import { inspectBrandSnapshot } from "../lib/routeHealth";
 import { aiClusterToFaqs, AI_HALLUCINATION_SIGNAL } from "../lib/seo-ai";
 import { webmasterGet } from "./yandex-oauth";
 import { getSitemapLocs } from "../routes/sitemap";
@@ -297,6 +298,7 @@ async function checkTechGap(url: string): Promise<{
   isTechGap: boolean;
   isCacheAvailable: boolean;
   threshold: number;
+  reason?: string;
 }> {
   const pageType = detectPageType(url);
   const threshold = TECH_THRESHOLDS[pageType] ?? TECH_THRESHOLDS.default;
@@ -317,7 +319,7 @@ async function checkTechGap(url: string): Promise<{
     cacheRootExists = existsSync(cacheDir);
   } catch {
     // Can't even check — treat as unavailable
-    return { size: 0, isTechGap: false, isCacheAvailable: false, threshold };
+      return { size: 0, isTechGap: false, isCacheAvailable: false, threshold };
   }
 
   if (!cacheRootExists) {
@@ -330,10 +332,16 @@ async function checkTechGap(url: string): Promise<{
     const html = await loadPrerendered(url);
     if (!html) {
       // Root exists but this page has no cached file → real gap.
-      return { size: 0, isTechGap: true, isCacheAvailable: true, threshold };
+      return { size: 0, isTechGap: true, isCacheAvailable: true, threshold, reason: "файл отсутствует в кэше" };
     }
     const size = Buffer.byteLength(html, "utf-8");
-    return { size, isTechGap: size < threshold, isCacheAvailable: true, threshold };
+    if (url.startsWith("/brands/")) {
+      const issues = inspectBrandSnapshot(url, html, true);
+      if (issues.length > 0) {
+        return { size, isTechGap: true, isCacheAvailable: true, threshold, reason: issues.join("; ") };
+      }
+    }
+    return { size, isTechGap: size < threshold, isCacheAvailable: true, threshold, reason: size < threshold ? "кэш слишком мал" : undefined };
   } catch {
     // Unexpected read error — don't guess, treat as no gap.
     return { size: 0, isTechGap: false, isCacheAvailable: true, threshold };
@@ -1692,7 +1700,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
       const techKey = `tech:${pageUrl}`;
       if (seen.has(techKey)) continue;
 
-      const { size, isTechGap, isCacheAvailable, threshold } = await checkTechGap(pageUrl);
+      const { size, isTechGap, isCacheAvailable, threshold, reason } = await checkTechGap(pageUrl);
       // If cache infrastructure is not mounted (Replit/dev), skip TECH suggestions
       // entirely for this run — don't generate false positives.
       if (!isCacheAvailable) {
@@ -1707,7 +1715,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
 
       const sizeLabel = size === 0 ? "файл отсутствует в кэше" : `${size} байт`;
       const reasoning =
-        `Страница ${pageUrl}: пририндер-кэш на диске — ${sizeLabel} (порог: ${threshold} байт). ` +
+        `Страница ${pageUrl}: пририндер-кэш на диске — ${reason ?? sizeLabel} (размер: ${sizeLabel}, порог: ${threshold} байт). ` +
         `Вероятно, страница не пририндерена — бот получает SPA-оболочку без контента.`;
 
       const techRes = await db.execute(sql`
@@ -1716,7 +1724,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
            priority_score, demand, position_factor, ease, status)
         VALUES
           ('tech', ${pageUrl},
-           ${`Размер кэша: ${sizeLabel} (порог: ${threshold})`},
+           ${`Техническая проверка: ${reason ?? sizeLabel} (порог: ${threshold})`},
            'Запустить пририндер страницы',
            ${reasoning},
            ${priorityScore}, ${demand}, ${positionFactor}, ${EASE.tech}, 'pending')
