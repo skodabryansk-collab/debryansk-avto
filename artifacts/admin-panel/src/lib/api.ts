@@ -401,6 +401,32 @@ export function generateBrandDescriptions(apply = false) {
   return api<{ ok: true; data: { generated: GeneratedBrandDescription[]; applied?: { updated: number; skipped: number } } }>("POST", "/admin/seo/generate-brand-descriptions", { apply }).then(r => r.data);
 }
 
+/* ── Route Health ─────────────────────────────────────────────────────── */
+export interface RouteHealthItem {
+  route: string;
+  status: "ok" | "error" | "redirect" | "timeout" | "unknown";
+  issueSummary: string;
+  cacheAge: string | null;
+  crawlerStatus: "indexed" | "blocked" | "noindex" | "unknown";
+}
+export interface RouteHealthResult {
+  ok: boolean;
+  items: RouteHealthItem[];
+  checkedAt: string;
+}
+export interface RouteRepairResult {
+  ok: boolean;
+  route: string;
+  message: string;
+}
+
+export function getRouteHealth(): Promise<RouteHealthResult> {
+  return api<RouteHealthResult>("GET", "/admin/seo/route-health");
+}
+export function repairRoute(route: string): Promise<RouteRepairResult> {
+  return api<RouteRepairResult>("POST", "/admin/seo/route-health/repair", { route });
+}
+
 /* Promotions */
 export interface Promotion {
   id: number;
