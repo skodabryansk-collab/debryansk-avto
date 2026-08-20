@@ -5,10 +5,10 @@ import { requireAdmin } from "../middlewares/requireAdmin";
 import { resolveMeta, STATIC_META } from "../middleware/seoMeta";
 import { getPrerenderCache } from "../middleware/prerender";
 import { loadPrerendered } from "../lib/prerenderStorage";
-import { scanBrandRouteHealth } from "../lib/routeHealth";
+import { scanRouteHealth } from "../lib/routeHealth";
 import { deletePrerendered } from "../lib/prerenderStorage";
 import { deletePrerenderCache, invalidatePrerenderCache } from "../middleware/prerender";
-import { spawnBrandPrerenderBySlug } from "../lib/spawnBrandPrerender";
+import { spawnPrerenderRoute } from "../lib/spawnBrandPrerender";
 import { logger } from "../lib/logger";
 
 const WEBMASTER_USER_ID = "140495458";
@@ -268,7 +268,7 @@ async function runSeoAudit(): Promise<SeoAuditItem[]> {
   // Cache inventory is deliberately scanned separately from buildSeoPages():
   // old /brands/* snapshots are not present in the DB page list but can still
   // be served to crawlers after a slug rename or deletion.
-  const healthItems = await scanBrandRouteHealth();
+  const healthItems = await scanRouteHealth();
   for (const health of healthItems) {
     const item = items.find((candidate) => candidate.route === health.route);
     const technicalIssues = health.issues.map((issue) => `Техническая проверка: ${issue}`);
@@ -424,7 +424,7 @@ router.post("/audit", async (_req, res) => {
 
 router.get("/route-health", async (_req, res) => {
   try {
-    const items = await scanBrandRouteHealth();
+    const items = await scanRouteHealth();
     const checkedAt = new Date().toISOString();
     const formatAge = (date: string | null): string | null => {
       if (!date) return null;
@@ -436,7 +436,7 @@ router.get("/route-health", async (_req, res) => {
       checkedAt,
       items: items.map((item) => ({
         route: item.route,
-        status: item.status === "healthy" ? "ok" : item.crawlerStatus === null ? "timeout" : "error",
+        status: item.status === "healthy" ? "ok" : "error",
         issueSummary: item.issues.join("; "),
         cacheAge: formatAge(item.cacheUpdatedAt),
         crawlerStatus: item.issues.some((issue) => issue.includes("robots"))
@@ -454,19 +454,21 @@ router.get("/route-health", async (_req, res) => {
 
 router.post("/route-health/repair", async (req, res) => {
   const { route } = req.body as { route?: string };
-  if (!route || !/^\/brands\/[^/]+$/.test(route)) {
-    return res.status(400).json({ ok: false, error: "Поддерживаются только URL брендов" });
+  if (!route || !route.startsWith("/") || route.includes("..") || route.includes("//")) {
+    return res.status(400).json({ ok: false, error: "Укажите безопасный URL, начинающийся с /" });
   }
   try {
-    const slug = route.split("/")[2];
-    const result = await db.execute(sql`SELECT 1 FROM brands WHERE slug = ${slug} LIMIT 1`);
+    const healthItem = (await scanRouteHealth()).find((item) => item.route === route);
+    if (!healthItem) {
+      return res.status(404).json({ ok: false, error: "URL не найден в реестре или кэше" });
+    }
     await deletePrerendered(route);
-    if (result.rows.length === 0) {
+    if (healthItem.lifecycle === "gone") {
       deletePrerenderCache(route);
       return res.json({ ok: true, route, action: "removed", message: "Orphan-кэш удалён; crawler получит 404" });
     }
     invalidatePrerenderCache(route);
-    spawnBrandPrerenderBySlug(slug);
+    spawnPrerenderRoute(route);
     return res.json({ ok: true, route, action: "prerendering", message: "Кэш очищен, безопасный прирендер запущен" });
   } catch (err) {
     logger.error({ err, route }, "[admin-seo] route health repair failed");
