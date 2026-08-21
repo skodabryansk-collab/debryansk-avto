@@ -39,7 +39,7 @@ export async function initCatalog(): Promise<void> {
   try {
     const { data, updatedAt } = await loadFromDb();
     if (data.length > 0) {
-      _cache = data;
+      _cache = normalize(data);
       _updatedAt = updatedAt;
       logger.info({ count: _cache.length }, "to-catalog: loaded from DB");
       return;
@@ -63,13 +63,36 @@ export async function initCatalog(): Promise<void> {
       VALUES (1, ${JSON.stringify(seedData)}::jsonb, NOW())
       ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
     `);
-    _cache = seedData;
+    _cache = normalize(seedData);
     _updatedAt = new Date();
     logger.info({ count: _cache.length }, "to-catalog: seeded into DB from JSON file");
   } catch (err) {
     logger.error({ err }, "to-catalog: initCatalog failed");
     _cache = _cache ?? [];
   }
+}
+
+/** Normalize entries so Maintenance is always non-empty.
+ *  Some feeds (e.g. Haval City) leave Maintenance="" and put the
+ *  service type in the TO field ("ТО-1", "ТО-2", …). */
+function entryKey(e: ToCatalogEntry): string {
+  return [
+    e.Brand, e.Model, e.Maintenance, e.Engine, e.WheelFormula,
+    e.Power, e.Generation, e.TO, e.Mileage, e._Month,
+    e.SumServices, e.SumSpareParts, e.TotalSum,
+  ].map(value => String(value ?? "").trim().toLowerCase()).join("\u001f");
+}
+
+function normalize(entries: ToCatalogEntry[]): ToCatalogEntry[] {
+  const seen = new Set<string>();
+  return entries
+    .map(e => e.Maintenance ? e : { ...e, Maintenance: e.TO || "" })
+    .filter(e => {
+      const key = entryKey(e);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 
 function load(): ToCatalogEntry[] {
@@ -84,7 +107,7 @@ export function invalidateCache(): void {
 export async function reloadFromDb(): Promise<void> {
   try {
     const { data, updatedAt } = await loadFromDb();
-    _cache = data;
+    _cache = normalize(data);
     _updatedAt = updatedAt;
   } catch (err) {
     logger.warn({ err }, "to-catalog: reloadFromDb failed");
@@ -201,6 +224,53 @@ export function findByVehicle(
   });
 }
 
+/** Return all TO entries for a brand+model matching a given CM Expert modification.
+ *  Filters by power ±5 hp and drive direction when the catalog has that data;
+ *  falls back to all entries for that model when none can be matched (e.g. Power=0). */
+export function getEntriesForMod(
+  brand: string,
+  model: string,
+  power: number,
+  drive: string,
+): ToCatalogEntry[] {
+  const allMods = getModifications(brand, model);
+  if (!allMods.length) return [];
+
+  const allEntries = allMods.flatMap(mod => getEntries(brand, model, mod));
+
+  const driveNorm = drive.toLowerCase();
+  const isFullReq  = driveNorm.includes("полн") || driveNorm.includes("4wd") || driveNorm.includes("awd");
+  const isFrontReq = driveNorm.includes("передн") || driveNorm.includes("2wd") || driveNorm.includes("fwd");
+
+  const filtered = power > 0
+    ? allEntries.filter(e => {
+        const ep = Number(e.Power ?? 0);
+        if (ep === 0) return false; // no power data in catalog — cannot match
+        if (Math.abs(ep - power) > 5) return false;
+        if (driveNorm) {
+          const ed = String(e.WheelFormula ?? "").toLowerCase();
+          if (ed) {
+            const isFullEntry  = ed.includes("полн") || ed.includes("4wd");
+            const isFrontEntry = ed.includes("передн") || ed.includes("2wd") || ed.includes("fwd");
+            if (isFullReq  && !isFullEntry)  return false;
+            if (isFrontReq && !isFrontEntry) return false;
+          }
+        }
+        return true;
+      })
+    : [];
+
+  // Fallback: if nothing matched by power/drive, return everything for this model
+  const result = filtered.length > 0 ? filtered : allEntries;
+
+  // Deduplicate by TO field, sort by numeric TO number (ТО-1, ТО-2 … ТО-12)
+  const toNum = (to: string) => Number(to.replace(/[^\d]/g, "") || "0");
+  const seen = new Set<string>();
+  return result
+    .filter(e => { if (seen.has(e.TO)) return false; seen.add(e.TO); return true; })
+    .sort((a, b) => toNum(a.TO) - toNum(b.TO));
+}
+
 export function findCatalogNames(autoruBrand: string, autoruModel: string): { brand: string | null; model: string | null } {
   const brands = getBrands();
   const brand = brands.find(b => brandMatch(autoruBrand, b)) ?? null;
@@ -211,11 +281,12 @@ export function findCatalogNames(autoruBrand: string, autoruModel: string): { br
 }
 
 export async function saveCatalog(data: ToCatalogEntry[]): Promise<void> {
+  const normalized = normalize(data);
   await db.execute(sql`
     INSERT INTO to_catalog_store (id, data, updated_at)
-    VALUES (1, ${JSON.stringify(data)}::jsonb, NOW())
+    VALUES (1, ${JSON.stringify(normalized)}::jsonb, NOW())
     ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
   `);
-  _cache = data;
+  _cache = normalized;
   _updatedAt = new Date();
 }
