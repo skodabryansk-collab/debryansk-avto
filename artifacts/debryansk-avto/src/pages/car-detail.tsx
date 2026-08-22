@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { ymGoal } from "@/lib/ym";
 import { CTPhoneDesktop, CTPhoneMobile } from "@/components/CTPhone";
 import { sendWithRetry } from "@/lib/sendWithRetry";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Car, ChevronLeft, ChevronRight, Phone, User,
   CheckCircle, X, Calendar, Gauge, Palette, MapPin, Shield,
@@ -142,7 +143,6 @@ async function fetchReviewsAggregate(): Promise<{ avg: number; total: number; ov
 }
 
 function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
-  const prefersReduced = useReducedMotion();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -159,14 +159,14 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
     fd.append("carModel", car.model);
     fd.append("carYear", String(car.year));
     fd.append("dealer", "Супонево");
-    sendWithRetry(fd);
+    sendWithRetry(fd).then(ok => { if (ok) ymGoal("lead_submit"); }).catch(() => {});
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <motion.div
-        initial={prefersReduced ? false : { opacity: 0, y: 40 }}
+        initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 40 }}
         className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md overflow-hidden"
@@ -188,25 +188,25 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
           <div className="p-6">
             <h3 className="text-lg font-extrabold mb-1">{car.mark} {car.model}</h3>
             {car.maxDiscount > 0 ? (
-              <p className="text-primary font-bold text-xl mb-5">
+              <p className="text-[#0070b8] font-bold text-xl mb-5">
                 от {formatPrice(car.price - car.maxDiscount)}
                 <DisclaimerBadge type="price-from-used" />
               </p>
             ) : (
-              <p className="text-primary font-bold text-xl mb-5">{formatPrice(car.price)}</p>
+              <p className="text-[#0070b8] font-bold text-xl mb-5">{formatPrice(car.price)}</p>
             )}
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input value={name} onChange={e => setName(e.target.value)}
                   placeholder="Ваше имя" required
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary" />
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8]" />
               </div>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input value={phone} onChange={e => setPhone(formatPhone(e.target.value))}
                   placeholder="+7 (___) ___-__-__" required type="tel" inputMode="tel" maxLength={18}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary" />
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8]" />
               </div>
               <button type="submit"
                 className="w-full brand-gradient text-white font-bold rounded-xl py-3.5 text-sm">
@@ -280,7 +280,7 @@ function Gallery({
               key={i}
               onClick={() => { setImgIdx(i); setLightboxOpen(true); }}
               className={`shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition-all ${
-                i === imgIdx ? "border-primary" : "border-transparent opacity-55 hover:opacity-90"
+                i === imgIdx ? "border-[#0070b8]" : "border-transparent opacity-55 hover:opacity-90"
               }`}
             >
               <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
@@ -300,7 +300,6 @@ function Gallery({
 }
 
 export default function UsedCarDetail() {
-  const prefersReduced = useReducedMotion();
   const [, params] = useRoute("/cars/:id");
   const id = params?.id ?? "";
 
@@ -329,6 +328,13 @@ export default function UsedCarDetail() {
   });
 
   const car = cars.find(c => c.id === id);
+
+  // Expose car identity for exit-intent contextual headline
+  useEffect(() => {
+    if (!car) return;
+    (window as any).__EXIT_INTENT_CAR__ = { mark: car.mark, model: car.model };
+    return () => { (window as any).__EXIT_INTENT_CAR__ = undefined; };
+  }, [car?.mark, car?.model]);
 
   const similarUsed = useMemo(() => {
     if (!car) return [];
@@ -388,7 +394,7 @@ export default function UsedCarDetail() {
       <Layout>
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center text-slate-400">
-            <Car className={`w-12 h-12 mx-auto mb-4 opacity-30${prefersReduced ? "" : " animate-pulse"}`} />
+            <Car className="w-12 h-12 mx-auto mb-4 opacity-30 animate-pulse" />
             <p className="font-semibold">Загрузка...</p>
           </div>
         </div>
@@ -403,7 +409,7 @@ export default function UsedCarDetail() {
           <div className="text-center text-slate-400">
             <Car className="w-12 h-12 mx-auto mb-4 opacity-30" />
             <p className="font-semibold">Автомобиль не найден</p>
-            <Link href="/cars" className="mt-3 inline-block text-sm font-bold text-primary hover:underline">
+            <Link href="/cars" className="mt-3 inline-block text-sm font-bold text-[#0070b8] hover:underline">
               Вернуться в каталог
             </Link>
           </div>
@@ -418,19 +424,19 @@ export default function UsedCarDetail() {
   const ownersLabel = formatOwners(car.ownersNumber);
 
   const specs = [
-    { label: "Год выпуска", value: String(car.year), icon: <Calendar className="w-4 h-4 text-primary" /> },
-    { label: "Пробег", value: formatRun(car.run), icon: <Gauge className="w-4 h-4 text-primary" /> },
-    { label: "Кузов", value: car.bodyType, icon: <Car className="w-4 h-4 text-primary" /> },
-    { label: "Цвет", value: car.color, icon: <Palette className="w-4 h-4 text-primary" /> },
-    ...(transmission ? [{ label: "Коробка", value: transmission, icon: <span className="text-[10px] font-black text-primary">КП</span> }] : []),
-    ...(driveLabel ? [{ label: "Привод", value: driveLabel, icon: <span className="text-[10px] font-black text-primary">4×</span> }] : []),
-    ...(engine ? [{ label: "Двигатель", value: engine, icon: <span className="text-[10px] font-black text-primary">ДВС</span> }] : []),
-    ...(ownersLabel ? [{ label: "Владельцы", value: ownersLabel, icon: <User className="w-4 h-4 text-primary" /> }] : []),
+    { label: "Год выпуска", value: String(car.year), icon: <Calendar className="w-4 h-4 text-[#0070b8]" /> },
+    { label: "Пробег", value: formatRun(car.run), icon: <Gauge className="w-4 h-4 text-[#0070b8]" /> },
+    { label: "Кузов", value: car.bodyType, icon: <Car className="w-4 h-4 text-[#0070b8]" /> },
+    { label: "Цвет", value: car.color, icon: <Palette className="w-4 h-4 text-[#0070b8]" /> },
+    ...(transmission ? [{ label: "Коробка", value: transmission, icon: <span className="text-[10px] font-black text-[#0070b8]">КП</span> }] : []),
+    ...(driveLabel ? [{ label: "Привод", value: driveLabel, icon: <span className="text-[10px] font-black text-[#0070b8]">4×</span> }] : []),
+    ...(engine ? [{ label: "Двигатель", value: engine, icon: <span className="text-[10px] font-black text-[#0070b8]">ДВС</span> }] : []),
+    ...(ownersLabel ? [{ label: "Владельцы", value: ownersLabel, icon: <User className="w-4 h-4 text-[#0070b8]" /> }] : []),
   ].filter(s => s.value);
 
   const PriceCard = () => (
     <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-6">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1.5">С пробегом</p>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-[#0070b8] mb-1.5">С пробегом</p>
       <h1 className="text-lg sm:text-2xl font-extrabold text-slate-900 leading-tight mb-1">
         {car.mark} {car.model}
       </h1>
@@ -441,7 +447,7 @@ export default function UsedCarDetail() {
         <div className="mb-1">
           <div className="flex items-baseline gap-2 mb-0.5">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Цена от</span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-primary">{formatPrice(car.price - car.maxDiscount)}</span>
+            <span className="text-2xl sm:text-3xl font-extrabold text-[#0070b8]">{formatPrice(car.price - car.maxDiscount)}</span>
             <DisclaimerBadge type="price-from-used" />
           </div>
           <p className="text-sm text-slate-400 line-through mb-1">{formatPrice(car.price)}</p>
@@ -488,8 +494,8 @@ export default function UsedCarDetail() {
           })}
           className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all ${
             isInCompare(car.id)
-              ? "bg-primary/10 text-primary border border-primary/20"
-              : "bg-slate-50 text-slate-600 border border-slate-200 hover:border-primary/30 hover:text-primary"
+              ? "bg-[#0070b8]/10 text-[#0070b8] border border-[#0070b8]/20"
+              : "bg-slate-50 text-slate-600 border border-slate-200 hover:border-[#0070b8]/30 hover:text-[#0070b8]"
           }`}
         >
           <Scale className="w-4 h-4" />
@@ -517,7 +523,7 @@ export default function UsedCarDetail() {
             <ArrowLeftRight className="w-4 h-4" /> Trade-In
           </button>
         </div>
-        <CTPhoneDesktop className="hidden lg:flex w-full items-center justify-center gap-2 border-2 border-slate-200 hover:border-primary hover:text-primary text-slate-700 font-bold rounded-xl py-3 text-sm transition-colors"
+        <CTPhoneDesktop className="hidden lg:flex w-full items-center justify-center gap-2 border-2 border-slate-200 hover:border-[#0070b8] hover:text-[#0070b8] text-slate-700 font-bold rounded-xl py-3 text-sm transition-colors"
           phone={locationPhone} />
       </div>
       <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
@@ -589,7 +595,7 @@ export default function UsedCarDetail() {
 
   return (
     <PageCarProvider car={{ carId: car.id, brand: car.mark, model: car.model, year: car.year, price: car.price, isNew: false, bodyType: car.bodyType, run: car.run }}>
-    <Layout>
+    <Layout showMobileStickyBar={false} navigatorMobileBottomOffset="bottom-[92px]">
       {car && (
         <SEO
           title={`${car.mark} ${car.model} ${car.year} год за ${formatPrice(car.price)}`}
@@ -644,9 +650,9 @@ export default function UsedCarDetail() {
           {/* Guarantees */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { icon: <Shield className="w-4 h-4 text-primary" />, title: "Юр. чистота" },
-              { icon: <Gauge className="w-4 h-4 text-primary" />, title: "Диагностика" },
-              { icon: <MapPin className="w-4 h-4 text-primary" />, title: "Тест-драйв" },
+              { icon: <Shield className="w-4 h-4 text-[#0070b8]" />, title: "Юр. чистота" },
+              { icon: <Gauge className="w-4 h-4 text-[#0070b8]" />, title: "Диагностика" },
+              { icon: <MapPin className="w-4 h-4 text-[#0070b8]" />, title: "Тест-драйв" },
             ].map((g, i) => (
               <div key={i} className="bg-white rounded-2xl border border-slate-100 p-3 flex flex-col gap-1.5">
                 {g.icon}
@@ -672,7 +678,7 @@ export default function UsedCarDetail() {
                       <div className="p-2.5">
                         <p className="text-xs font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
                         <p className="text-[10px] text-slate-400">{c.year} · {formatRun(c.run)}</p>
-                        <p className="text-sm font-extrabold text-primary mt-0.5">{formatPrice(c.price)}</p>
+                        <p className="text-sm font-extrabold text-[#0070b8] mt-0.5">{formatPrice(c.price)}</p>
                       </div>
                     </div>
                   </Link>
@@ -683,7 +689,7 @@ export default function UsedCarDetail() {
 
           {/* Same new */}
           {sameNew.length > 0 && (
-            <div className="pb-20">
+            <div className="pb-28">
               <h2 className="text-sm font-extrabold mb-3 text-slate-900">Такой же новый</h2>
               <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory" style={{ scrollbarWidth: "none" }}>
                 {sameNew.map(c => (
@@ -694,14 +700,14 @@ export default function UsedCarDetail() {
                           ? <img src={c.images[0]} className="w-full h-full object-cover" loading="lazy" decoding="async" alt={`${c.mark} ${c.model}`} />
                           : <div className="w-full h-full flex items-center justify-center text-slate-200"><Car className="w-8 h-8" /></div>
                         }
-                        <span className="absolute top-2 left-2 bg-primary text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                        <span className="absolute top-2 left-2 bg-[#0070b8] text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
                           <Sparkles className="w-2.5 h-2.5" /> Новый
                         </span>
                       </div>
                       <div className="p-2.5">
                         <p className="text-xs font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
                         <p className="text-[10px] text-slate-400">{c.year}</p>
-                        <p className="text-sm font-extrabold text-primary mt-0.5">{formatPrice(c.price - (c.maxDiscount || 0))}</p>
+                        <p className="text-sm font-extrabold text-[#0070b8] mt-0.5">{formatPrice(c.price - (c.maxDiscount || 0))}</p>
                       </div>
                     </div>
                   </Link>
@@ -711,7 +717,7 @@ export default function UsedCarDetail() {
           )}
 
           {/* Spacer for sticky bottom bar when no "same new" block */}
-          {sameNew.length === 0 && <div className="pb-20" />}
+          {sameNew.length === 0 && <div className="pb-28" />}
         </div>
       </div>
 
@@ -753,9 +759,9 @@ export default function UsedCarDetail() {
             {/* Guarantees */}
             <div className="mt-4 grid grid-cols-3 gap-3">
               {[
-                { icon: <Shield className="w-5 h-5 text-primary" />, title: "Юридическая чистота", desc: "Проверка по базам ГИБДД и ФССП" },
-                { icon: <Gauge className="w-5 h-5 text-primary" />, title: "Техническая проверка", desc: "Диагностика на 150+ пунктов" },
-                { icon: <MapPin className="w-5 h-5 text-primary" />, title: "Тест-драйв", desc: "Запишитесь на бесплатный тест" },
+                { icon: <Shield className="w-5 h-5 text-[#0070b8]" />, title: "Юридическая чистота", desc: "Проверка по базам ГИБДД и ФССП" },
+                { icon: <Gauge className="w-5 h-5 text-[#0070b8]" />, title: "Техническая проверка", desc: "Диагностика на 150+ пунктов" },
+                { icon: <MapPin className="w-5 h-5 text-[#0070b8]" />, title: "Тест-драйв", desc: "Запишитесь на бесплатный тест" },
               ].map((g, i) => (
                 <div key={i} className="bg-white rounded-2xl border border-slate-100 p-4 flex flex-col gap-2">
                   {g.icon}
@@ -782,7 +788,7 @@ export default function UsedCarDetail() {
                         <div className="p-3">
                           <p className="text-sm font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
                           <p className="text-xs text-slate-400 mt-0.5">{c.year} · {formatRun(c.run)}</p>
-                          <p className="text-base font-extrabold text-primary mt-1">{formatPrice(c.price)}</p>
+                          <p className="text-base font-extrabold text-[#0070b8] mt-1">{formatPrice(c.price)}</p>
                         </div>
                       </div>
                     </Link>
@@ -804,14 +810,14 @@ export default function UsedCarDetail() {
                             ? <img src={c.images[0]} className="w-full h-full object-cover" loading="lazy" decoding="async" alt={`${c.mark} ${c.model}`} />
                             : <div className="w-full h-full flex items-center justify-center text-slate-200"><Car className="w-10 h-10" /></div>
                           }
-                          <span className="absolute top-2 left-2 bg-primary text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                          <span className="absolute top-2 left-2 bg-[#0070b8] text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
                             <Sparkles className="w-2.5 h-2.5" /> Новый
                           </span>
                         </div>
                         <div className="p-3">
                           <p className="text-sm font-extrabold text-slate-900 truncate">{c.mark} {c.model}</p>
                           <p className="text-xs text-slate-400 mt-0.5">{c.year}</p>
-                          <p className="text-base font-extrabold text-primary mt-1">{formatPrice(c.price - (c.maxDiscount || 0))}</p>
+                          <p className="text-base font-extrabold text-[#0070b8] mt-1">{formatPrice(c.price - (c.maxDiscount || 0))}</p>
                         </div>
                       </div>
                     </Link>
@@ -829,24 +835,25 @@ export default function UsedCarDetail() {
       </div>
 
       {/* Mobile sticky bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-white border-t border-slate-200 px-4 py-3 flex items-center gap-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]">
+      <div
+        className="fixed bottom-0 left-0 right-0 z-40 flex items-center gap-2 border-t border-slate-200/80 bg-white/95 px-3 pt-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.10)] backdrop-blur-xl lg:hidden"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0.75rem))" }}
+      >
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide truncate">{car.mark} {car.model}</p>
+          <p className="truncate text-[10px] font-bold uppercase tracking-[0.06em] text-slate-400">{car.mark} {car.model}</p>
           {car.maxDiscount > 0 ? (
-            <div className="flex items-baseline gap-1.5">
-              <p className="text-base font-extrabold text-primary leading-tight">от {formatPrice(car.price - car.maxDiscount)}</p>
-              <p className="text-[11px] text-slate-400 line-through">{formatPrice(car.price)}</p>
-              <DisclaimerBadge type="price-from-used" />
+            <div className="flex min-w-0 items-baseline gap-1.5">
+              <p className="whitespace-nowrap text-[17px] font-extrabold leading-tight tracking-[-0.025em] text-[#0070b8]">от {formatPrice(car.price - car.maxDiscount)}</p>
             </div>
           ) : (
-            <p className="text-base font-extrabold text-slate-900 leading-tight">{formatPrice(car.price)}</p>
+            <p className="whitespace-nowrap text-[17px] font-extrabold leading-tight tracking-[-0.025em] text-slate-900">{formatPrice(car.price)}</p>
           )}
         </div>
-        <CTPhoneMobile className="flex items-center justify-center w-11 h-11 rounded-xl border-2 border-slate-200 text-slate-600 shrink-0"
+        <CTPhoneMobile className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:border-[#0070b8]/40 hover:text-[#0070b8]"
           phone={locationPhone} />
         <button
           onClick={() => setShowLead(true)}
-          className="brand-gradient text-white font-bold rounded-xl px-5 py-3 text-sm shrink-0 hover:opacity-90 transition-opacity"
+          className="brand-gradient h-11 shrink-0 whitespace-nowrap rounded-xl px-3.5 text-[13px] font-extrabold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8]/40"
         >
           Заявка
         </button>
