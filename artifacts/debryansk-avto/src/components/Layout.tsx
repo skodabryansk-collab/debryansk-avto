@@ -123,7 +123,17 @@ function CallbackModal({ onClose }: { onClose: () => void }) {
 }
 
 /* ── Layout ──────────────────────────────────────────────────── */
-export default function Layout({ children, overridePhone }: { children: React.ReactNode; overridePhone?: string | null }) {
+export default function Layout({
+  children,
+  overridePhone,
+  showMobileStickyBar = true,
+  navigatorMobileBottomOffset,
+}: {
+  children: React.ReactNode;
+  overridePhone?: string | null;
+  showMobileStickyBar?: boolean;
+  navigatorMobileBottomOffset?: string;
+}) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [callbackOpen, setCallbackOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -232,12 +242,12 @@ export default function Layout({ children, overridePhone }: { children: React.Re
   useEffect(() => {
     const onScroll = () => {
       setScrolled(window.scrollY > 80);
-      setMobileStickyVisible(window.scrollY >= MOBILE_STICKY_SCROLL_Y);
+      setMobileStickyVisible(showMobileStickyBar && window.scrollY >= MOBILE_STICKY_SCROLL_Y);
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [showMobileStickyBar]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -622,13 +632,19 @@ export default function Layout({ children, overridePhone }: { children: React.Re
       </AnimatePresence>
 
       {/* Navigator AI chat widget */}
-      <ChatWidget mobileStickyBar onOpenCallback={() => setCallbackOpen(true)} />
+      <ChatWidget
+        mobileStickyBar={showMobileStickyBar}
+        mobileBottomOffset={navigatorMobileBottomOffset}
+        onOpenCallback={() => setCallbackOpen(true)}
+      />
 
       {/* Sticky mobile CTA bar */}
-      <StickyMobileBar
-        phone={headerPhone}
-        onCallbackOpen={() => setCallbackOpen(true)}
-      />
+      {showMobileStickyBar && (
+        <StickyMobileBar
+          phone={headerPhone}
+          onCallbackOpen={() => setCallbackOpen(true)}
+        />
+      )}
 
     </div>
   );
