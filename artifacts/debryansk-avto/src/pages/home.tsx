@@ -126,6 +126,24 @@ async function fetchBrands(): Promise<ApiBrand[]> {
   return json.ok ? json.data : [];
 }
 
+interface ApiSales {
+  sales_new: number;
+  sales_used: number;
+  total: number;
+  updatedAt: string;
+}
+
+const formatSalesNumber = (value: number) =>
+  value.toLocaleString("ru-RU").replace(/\u00a0/g, " ");
+
+async function fetchSales(): Promise<ApiSales> {
+  const r = await fetch("/api/sales");
+  if (!r.ok) throw new Error("API error");
+  const json = await r.json();
+  if (!json.ok || !json.data) throw new Error("Invalid sales response");
+  return json.data as ApiSales;
+}
+
 /* ── Reviews — moved to shared component ReviewsSection ───── */
 
 /* ── Form schema ─────────────────────────────────────────── */
@@ -668,6 +686,13 @@ export default function Home() {
     queryKey: ["public-brands"],
     queryFn: fetchBrands,
     staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: sales } = useQuery({
+    queryKey: ["public-sales"],
+    queryFn: fetchSales,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
   });
 
   // Same query keys as UsedCarsSection / SpecialOffersSection / ReviewsSection —
@@ -1328,60 +1353,73 @@ export default function Home() {
               viewport={{ once: true, margin: "-50px" }}
               transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
             >
-              <div className="flex flex-col gap-3 sm:gap-4">
+                <div className="flex flex-col gap-3 sm:gap-4">
                 {/* Широкая карточка — 15 лет */}
-                <div className="relative group overflow-hidden rounded-3xl border border-white/[0.12]
+                 <div className="relative group h-full overflow-hidden rounded-2xl border border-white/[0.12]
                   bg-gradient-to-br from-white/[0.08] via-white/[0.03] to-transparent
                   backdrop-blur-xl hover:border-white/[0.18] transition-all duration-500">
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
                     style={{ background: `radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,112,184,0.12) 0%, transparent 60%)` }} />
-                  <div className="relative p-6 sm:p-8">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-xl bg-[#0070b8]/20 flex items-center justify-center">
+                   <div className="relative flex h-full flex-col p-6 sm:p-7">
+                     <div className="flex items-center gap-3">
+                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#0070b8]/20">
                         <Building2 className="w-5 h-5 text-[#0070b8]" />
                       </div>
-                      <div className="text-sm text-slate-400">С 2011 года в Брянске</div>
+                       <div className="text-xs font-medium leading-5 text-slate-400">С 2011 года в Брянске</div>
                     </div>
-                    <div className="text-4xl sm:text-5xl font-extrabold text-white mb-2">
+                     <div className="mt-8 text-4xl font-extrabold leading-none tracking-[-0.03em] text-white sm:text-5xl">
                       15<span className="text-[#0070b8]">+</span>
                     </div>
-                    <div className="text-base font-bold text-white">лет на рынке</div>
+                     <div className="mt-3 text-base font-bold leading-snug text-white">лет на рынке</div>
                   </div>
                 </div>
 
                 {/* Две узкие карточки */}
                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                  <div className="relative group overflow-hidden rounded-3xl border border-white/[0.12]
+                   <div className="relative group h-full overflow-hidden rounded-2xl border border-white/[0.12]
                     bg-gradient-to-br from-white/[0.08] via-white/[0.03] to-transparent
                     backdrop-blur-xl hover:border-white/[0.18] transition-all duration-500">
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
                       style={{ background: `radial-gradient(ellipse 80% 60% at 50% 0%, rgba(135,182,60,0.12) 0%, transparent 60%)` }} />
-                    <div className="relative p-5 sm:p-6">
-                      <div className="w-10 h-10 rounded-xl bg-[#87b63c]/20 flex items-center justify-center mb-3">
+                     <div className="relative flex h-full flex-col p-5 sm:p-6">
+                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#87b63c]/20">
                         <Car className="w-5 h-5 text-[#87b63c]" />
                       </div>
-                      <div className="text-3xl sm:text-4xl font-extrabold text-white mb-1">
-                        25 000<span className="text-[#87b63c]">+</span>
+                       <div className="mt-7 text-[clamp(1.75rem,3.5vw,2.25rem)] font-extrabold leading-none tracking-[-0.035em] tabular-nums text-white">
+                         {sales ? formatSalesNumber(sales.total) : "—"}
                       </div>
-                      <div className="text-sm font-bold text-white">автомобилей</div>
-                      <div className="text-xs text-slate-400">продано за 15 лет</div>
+                       <div className="mt-3 text-sm font-bold leading-snug text-white">автомобилей продано</div>
+                       <div className="mt-5 grid grid-cols-2 gap-3 border-t border-white/[0.1] pt-4 text-[11px] leading-tight text-slate-400">
+                         <span className="min-w-0">
+                           <strong className="mb-1 block text-sm font-bold leading-none tabular-nums text-white/90">
+                             {sales ? formatSalesNumber(sales.sales_new) : "—"}
+                           </strong>
+                           новых
+                         </span>
+                         <span className="min-w-0">
+                           <strong className="mb-1 block text-sm font-bold leading-none tabular-nums text-white/90">
+                             {sales ? formatSalesNumber(sales.sales_used) : "—"}
+                           </strong>
+                           с пробегом
+                         </span>
+                       </div>
                     </div>
                   </div>
 
-                  <div className="relative group overflow-hidden rounded-3xl border border-white/[0.12]
+                   <div className="relative group h-full overflow-hidden rounded-2xl border border-white/[0.12]
                     bg-gradient-to-br from-white/[0.08] via-white/[0.03] to-transparent
                     backdrop-blur-xl hover:border-white/[0.18] transition-all duration-500">
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
                       style={{ background: `radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,112,184,0.12) 0%, transparent 60%)` }} />
-                    <div className="relative p-5 sm:p-6">
-                      <div className="w-10 h-10 rounded-xl bg-[#0070b8]/20 flex items-center justify-center mb-3">
+                     <div className="relative flex h-full flex-col p-5 sm:p-6">
+                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#0070b8]/20">
                         <Sparkles className="w-5 h-5 text-[#0070b8]" />
                       </div>
-                      <div className="text-3xl sm:text-4xl font-extrabold text-white mb-1">
+                       <div className="mt-7 text-3xl font-extrabold leading-none tracking-[-0.03em] tabular-nums text-white sm:text-4xl">
                         {apiBrands.length || 9}
                       </div>
-                      <div className="text-sm font-bold text-white">брендов</div>
-                      <div className="text-xs text-slate-400">официально</div>
+                       <div className="mt-3 text-sm font-bold leading-snug text-white">брендов</div>
+                       <div className="mt-1 text-[11px] leading-4 text-slate-400">официально</div>
                     </div>
                   </div>
                 </div>
