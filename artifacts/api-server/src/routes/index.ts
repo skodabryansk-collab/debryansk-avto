@@ -56,13 +56,18 @@ import ogImageRouter from "./og-image";
 import adminSeoAutopilotRouter from "./admin-seo-autopilot";
 import adminSeoAnchorRouter from "./admin-seo-anchor";
 import adminSeoContentRouter from "./admin-seo-content";
+import adminAiImagesRouter from "./admin-ai-images";
 import onlineRouter from "./online";
+import landingPagesRouter from "./landing-pages";
+import publicSalesRouter from "./public-sales";
 
 const router: IRouter = Router();
 
 router.use(onlineRouter);
 router.use(ogImageRouter);
 router.use(healthRouter);
+router.use(landingPagesRouter);
+router.use(publicSalesRouter);
 router.use(chatRouter);
 router.use(carsRouter);
 router.use(feedYmlRouter);
@@ -132,6 +137,9 @@ router.use("/manager/login", managerAuthRouter);
 router.use("/manager/register", managerRegisterRouter);
 router.use("/manager", managerProfileRouter);
 router.use("/manager", managerQuotesRouter);
+
+// AI Image Studio
+router.use("/admin/ai-images", adminAiImagesRouter);
 
 // Admin: managers & quotes overview
 router.use("/admin/managers", adminManagersRouter);
