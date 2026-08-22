@@ -1231,9 +1231,11 @@ function RatingButtons({
 export default function ChatWidget({
   onOpenCallback,
   mobileStickyBar = false,
+  mobileBottomOffset,
 }: {
   onOpenCallback?: () => void;
   mobileStickyBar?: boolean;
+  mobileBottomOffset?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -1255,6 +1257,12 @@ export default function ChatWidget({
   const pageCarContext = usePageCar();
   const proactiveSentRef = useRef(false);
   const [location] = useLocation();
+  const chatPanelBottom = mobileStickyVisible
+    ? "bottom-[104px]"
+    : (mobileBottomOffset ?? "bottom-[5.5rem]");
+  const chatButtonBottom = mobileStickyVisible
+    ? "bottom-[104px]"
+    : (mobileBottomOffset ?? "bottom-4");
 
   useEffect(() => {
     if (!mobileStickyBar) {
@@ -1673,7 +1681,7 @@ export default function ChatWidget({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 16 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className={`fixed ${mobileStickyVisible ? "bottom-[104px]" : "bottom-[5.5rem]"} lg:bottom-4 right-4 z-[55] w-[calc(100vw-2rem)] sm:w-[420px] max-h-[640px] bg-white rounded-3xl shadow-[0_32px_80px_-8px_rgba(0,0,0,0.16)] flex flex-col overflow-hidden`}
+            className={`fixed ${chatPanelBottom} lg:bottom-4 right-4 z-[55] w-[calc(100vw-2rem)] sm:w-[420px] max-h-[640px] bg-white rounded-3xl shadow-[0_32px_80px_-8px_rgba(0,0,0,0.16)] flex flex-col overflow-hidden`}
           >
             {/* Header — Variant B: white with accent top bar */}
             <div className="shrink-0">
@@ -1887,7 +1895,7 @@ export default function ChatWidget({
       </AnimatePresence>
 
       {/* Floating button with pulse rings */}
-      <div className={`fixed ${mobileStickyVisible ? "bottom-[104px]" : "bottom-4"} lg:bottom-4 right-4 z-[55] flex flex-col items-end gap-2`}>
+      <div className={`fixed ${chatButtonBottom} lg:bottom-4 right-4 z-[55] flex flex-col items-end gap-2`}>
         {/* Proactive context bubble */}
         <AnimatePresence>
           {promoVisible && !open && (() => {
