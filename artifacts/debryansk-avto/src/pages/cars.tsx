@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { ymGoal } from "@/lib/ym";
 import FaqBlock from "@/components/FaqBlock";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useQuery } from "@tanstack/react-query";
@@ -107,7 +108,9 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
     fd.append("carModel", car.model);
     fd.append("carYear", String(car.year));
     fd.append("dealer", "Супонево");
-    fetch("/api/send-email", { method: "POST", body: fd }).catch(() => {});
+    fetch("/api/send-email", { method: "POST", body: fd })
+      .then(res => { if (res.ok) ymGoal("lead_submit"); })
+      .catch(() => {});
   }
 
   return (
@@ -587,6 +590,9 @@ export default function UsedCars() {
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-1">Сток</p>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Автомобили с пробегом</h1>
+            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed max-w-sm">
+              Проверенные авто у официального дилера в Брянске — выбор по марке и цене, кредит, трейд-ин.
+            </p>
             {!isLoading && (
               <p className="text-sm font-semibold text-slate-400 mt-1">{filtered.length} авто</p>
             )}
