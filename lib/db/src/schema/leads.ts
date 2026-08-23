@@ -8,6 +8,11 @@ export const leadsTable = pgTable("leads", {
   email: text("email"),
   message: text("message"),
   car: text("car"),
+  utmSource: text("utm_source"),
+  utmMedium: text("utm_medium"),
+  utmCampaign: text("utm_campaign"),
+  utmTerm: text("utm_term"),
+  utmContent: text("utm_content"),
   extraJson: jsonb("extra_json"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
