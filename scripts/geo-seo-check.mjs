@@ -32,6 +32,13 @@ const routes = [
     description: /новый автомобиль|новые автомобили/i,
     h1: /Новые автомобили в Брянске/i,
     schemas: ["AutoDealer", "BreadcrumbList"],
+    requiredText: [
+      "Новые автомобили у официального дилера в Брянске",
+      "Jetour",
+      "трейд-ин",
+      "гарантия производителя",
+    ],
+    userAgent: "Googlebot/2.1 (+http://www.google.com/bot.html)",
   },
   {
     path: "/cars",
@@ -39,6 +46,11 @@ const routes = [
     description: /авто с пробегом.*Брянске/i,
     h1: /Автомобили с пробегом в Брянске/i,
     schemas: ["AutoDealer", "BreadcrumbList"],
+    requiredText: [
+      "Автомобили с пробегом у официального дилера в Брянске",
+      "трейд-ин",
+    ],
+    userAgent: "Googlebot/2.1 (+http://www.google.com/bot.html)",
   },
   {
     path: "/brands",
@@ -58,6 +70,13 @@ const routes = [
     description: /сервис.*Брянске/i,
     h1: /Сервисное обслуживание автомобилей в Брянске/i,
     schemas: ["AutoDealer", "BreadcrumbList"],
+    requiredText: [
+      "Официальный сервис автомобилей в Брянске",
+      "шиномонтаж",
+      "кузовной ремонт",
+      "диагностика",
+    ],
+    userAgent: "Googlebot/2.1 (+http://www.google.com/bot.html)",
   },
   {
     path: "/buyout",
@@ -65,6 +84,12 @@ const routes = [
     description: /выкуп[\s\S]{0,240}автомобил/i,
     h1: /Выкуп.*автомобил.*Брянске/i,
     schemas: ["AutoDealer", "BreadcrumbList"],
+    requiredText: [
+      "Выкуп и комиссионная продажа автомобилей в Брянске",
+      "оценка бесплатна",
+      "день сделки",
+    ],
+    userAgent: "Googlebot/2.1 (+http://www.google.com/bot.html)",
   },
   {
     path: "/contacts",
