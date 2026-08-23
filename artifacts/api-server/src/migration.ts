@@ -4,6 +4,20 @@ import { logger } from "./lib/logger";
 
 export async function runMigration() {
   try {
+    // UTM attribution is optional so existing leads remain valid. The table
+    // may be created below during the legacy schema repair, so guard the ALTERs.
+    await db.execute(sql`
+      DO $$ BEGIN
+        IF to_regclass('public.leads') IS NOT NULL THEN
+          ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_source TEXT;
+          ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_medium TEXT;
+          ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_campaign TEXT;
+          ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_term TEXT;
+          ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_content TEXT;
+        END IF;
+      END $$;
+    `);
+
     // Check if migration is needed by checking published_at type
     const checkResult = await db.execute(sql`
       SELECT data_type FROM information_schema.columns
@@ -89,6 +103,11 @@ export async function runMigration() {
           email TEXT,
           message TEXT,
           car TEXT,
+          utm_source TEXT,
+          utm_medium TEXT,
+          utm_campaign TEXT,
+          utm_term TEXT,
+          utm_content TEXT,
           extra_json JSONB,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         )
@@ -206,6 +225,8 @@ export async function runMigration() {
 
     // Add brand_ids array column to news (multi-brand support)
     await db.execute(sql`ALTER TABLE news ADD COLUMN IF NOT EXISTS brand_ids integer[] NOT NULL DEFAULT '{}'`);
+    // Add section_vacancies flag — marks news to show on /vacancies page
+    await db.execute(sql`ALTER TABLE news ADD COLUMN IF NOT EXISTS section_vacancies boolean NOT NULL DEFAULT false`);
     // Migrate existing brand_id → brand_ids (one-time, idempotent)
     await db.execute(sql`
       UPDATE news SET brand_ids = ARRAY[brand_id]
@@ -445,6 +466,9 @@ export async function runMigration() {
 
     // ── car_mark column on brands ─────────────────────────────
     await db.execute(sql`ALTER TABLE brands ADD COLUMN IF NOT EXISTS car_mark TEXT`);
+
+    // ── cm_to_brand_id column on brands ───────────────────────
+    await db.execute(sql`ALTER TABLE brands ADD COLUMN IF NOT EXISTS cm_to_brand_id TEXT`);
 
     // Seed known auto.ru mark → dealer brand mappings
     const carMarkSeed: Array<{ id: number; mark: string }> = [
@@ -929,6 +953,42 @@ export async function runMigration() {
     if (staleCount > 0) {
       logger.info({ count: staleCount }, "seo_suggestions: rejected stale new_page records for existing pages");
     }
+
+    // TO catalog external feeds — urls with brand labels for auto-sync
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS to_catalog_feeds (
+        id          SERIAL PRIMARY KEY,
+        url         TEXT NOT NULL,
+        brand_name  TEXT NOT NULL DEFAULT '',
+        last_synced_at TIMESTAMPTZ,
+        last_count  INTEGER,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    // Migrate brand_name → brand_names (TEXT[]) if not yet done
+    await db.execute(sql`
+      ALTER TABLE to_catalog_feeds ADD COLUMN IF NOT EXISTS brand_names TEXT[] NOT NULL DEFAULT '{}'
+    `);
+    // Back-fill brand_names from brand_name for rows that still have it empty
+    await db.execute(sql`
+      UPDATE to_catalog_feeds
+      SET brand_names = ARRAY[brand_name]
+      WHERE brand_name <> '' AND brand_names = '{}'
+    `);
+    logger.info("to_catalog_feeds schema ready (idempotent)");
+
+    // Track which static pages have been pinged via IndexNow (to auto-ping new ones on startup)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS indexnow_static_pings (
+        loc        TEXT PRIMARY KEY,
+        pinged_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    logger.info("indexnow_static_pings schema ready (idempotent)");
+
+    // ── News image gallery — images text[] column ─────────────────────────────
+    await db.execute(sql`ALTER TABLE news ADD COLUMN IF NOT EXISTS images text[] NOT NULL DEFAULT '{}'`);
+    logger.info("news.images column ready (idempotent)");
 
   } catch (err) {
     logger.error({ err }, "Migration error");
