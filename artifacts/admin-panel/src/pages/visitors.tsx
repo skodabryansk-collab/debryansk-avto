@@ -7,9 +7,13 @@ import {
 import {
   getMetrikaSummary, getMetrikaChart, getMetrikaSources,
   getMetrikaPages, getMetrikaOnline, getLiveOnline, getVisitorActivity,
+  getConversion,
 } from "@/lib/api";
-import type { VisitorActivityCell, VisitorActivityMetric, VisitorActivityMode, VisitorActivityResult } from "@/lib/api";
-import { Clock3, ExternalLink, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import type {
+  VisitorActivityCell, VisitorActivityMetric, VisitorActivityMode, VisitorActivityResult,
+  ConversionResult,
+} from "@/lib/api";
+import { Clock3, ExternalLink, TrendingUp, TrendingDown, AlertCircle, Phone, FileText, PhoneMissed, Users } from "lucide-react";
 
 type Period = "today" | "7d" | "30d";
 
@@ -129,6 +133,294 @@ function KpiCard({ label, value, curr, prev, loading, inverted, suffix }: KpiCar
         </>
       )}
     </div>
+  );
+}
+
+/* ── Conversion Funnel ──────────────────────────────────────── */
+function FunnelStep({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  highlight,
+  color,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  sub?: string;
+  highlight?: boolean;
+  color?: string;
+}) {
+  return (
+    <div className={`flex-1 flex flex-col items-center text-center px-3 py-4 rounded-xl border transition-shadow ${
+      highlight
+        ? "bg-[#0070b8] border-[#0070b8] text-white shadow-md"
+        : "bg-white border-slate-100 text-slate-800 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+    }`}>
+      <Icon className={`w-5 h-5 mb-2 ${highlight ? "text-blue-100" : (color ?? "text-slate-400")}`} />
+      <div className={`text-xs font-medium mb-1 ${highlight ? "text-blue-100" : "text-slate-500"}`}>{label}</div>
+      <div className={`text-2xl font-bold leading-tight tabular-nums ${highlight ? "text-white" : "text-slate-900"}`}>
+        {typeof value === "number" ? formatNum(value) : value}
+      </div>
+      {sub && <div className={`text-xs mt-0.5 ${highlight ? "text-blue-200" : "text-slate-400"}`}>{sub}</div>}
+    </div>
+  );
+}
+
+function FunnelArrow({ rate }: { rate: number }) {
+  return (
+    <div className="flex flex-col items-center justify-center px-1 shrink-0">
+      <div className="text-[10px] font-semibold text-[#0070b8] tabular-nums">{rate > 0 ? `${rate}%` : ""}</div>
+      <svg className="w-4 h-4 text-slate-300 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+      </svg>
+    </div>
+  );
+}
+
+function ConversionFunnel({ period }: { period: Period }) {
+  const q = useQuery<ConversionResult>({
+    queryKey: ["conversion", period],
+    queryFn: () => getConversion(period),
+    refetchInterval: 5 * 60_000,
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  const d = q.data;
+  const curr = d?.current;
+  const prev = d?.previous;
+  const avail = d?.availability;
+
+  const unavailable: string[] = avail
+    ? [
+        !avail.metrika ? "Яндекс.Метрика" : null,
+        !avail.leads ? "база заявок" : null,
+        !avail.calltouch ? "Calltouch" : null,
+      ].filter(Boolean) as string[]
+    : [];
+
+  return (
+    <section className="bg-white rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-700">Воронка конверсии</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Визиты → Обращения (заявки + отвеченные звонки)</p>
+        </div>
+        {!q.isLoading && unavailable.length > 0 && (
+          <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>{unavailable.join(", ")} недоступн{unavailable.length > 1 ? "ы" : "а"}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Funnel steps */}
+      {q.isLoading ? (
+        <div className="flex gap-2">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="flex-1 flex flex-col items-center gap-1.5 py-4">
+              <Skeleton className="w-5 h-5 rounded-full" />
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-7 w-12" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-1 overflow-x-auto pb-1">
+            <FunnelStep
+              icon={Users}
+              label="Визиты"
+              value={curr?.visits ?? 0}
+              sub={prev?.visits ? `прошлый: ${formatNum(prev.visits)}` : undefined}
+              color="text-slate-400"
+            />
+            <FunnelArrow rate={curr?.conversionRate ?? 0} />
+            <FunnelStep
+              icon={Users}
+              label="Всего обращений"
+              value={curr?.grossConversions ?? 0}
+              sub={`конверсия ${curr?.conversionRate ?? 0}%`}
+              highlight
+            />
+            <div className="flex-[0.05] shrink-0" />
+            <FunnelStep
+              icon={FileText}
+              label="Заявки"
+              value={curr?.leads ?? 0}
+              sub={prev?.leads !== undefined ? `прошлый: ${formatNum(prev.leads)}` : undefined}
+              color="text-emerald-500"
+            />
+            <FunnelStep
+              icon={Phone}
+              label="Отвеченные"
+              value={curr?.answeredCalls ?? 0}
+              sub={prev?.answeredCalls !== undefined ? `прошлый: ${formatNum(prev.answeredCalls)}` : undefined}
+              color="text-[#0070b8]"
+            />
+            <FunnelStep
+              icon={PhoneMissed}
+              label="Пропущенные"
+              value={curr?.missedCalls ?? 0}
+              sub={prev?.missedCalls !== undefined ? `прошлый: ${formatNum(prev.missedCalls)}` : undefined}
+              color="text-red-400"
+            />
+          </div>
+
+          {/* Delta row */}
+          {prev && curr && (
+            <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
+              <span className="flex items-center gap-1">
+                Обращения vs прошлый период:
+                <DeltaBadge curr={curr.grossConversions} prev={prev.grossConversions} />
+              </span>
+              <span className="text-slate-300">·</span>
+              <span className="flex items-center gap-1">
+                Визиты:
+                <DeltaBadge curr={curr.visits} prev={prev.visits} />
+              </span>
+              <span className="text-slate-300">·</span>
+              <span className="flex items-center gap-1">
+                Заявки:
+                <DeltaBadge curr={curr.leads} prev={prev.leads} />
+              </span>
+              <span className="text-slate-300">·</span>
+              <span className="flex items-center gap-1">
+                Отвеченные звонки:
+                <DeltaBadge curr={curr.answeredCalls} prev={prev.answeredCalls} />
+              </span>
+            </div>
+          )}
+
+          {/* Daily chart */}
+          {(d?.daily?.length ?? 0) > 1 && (
+            <div className="mt-5">
+              <div className="text-xs font-medium text-slate-500 mb-2">Динамика обращений по дням</div>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart
+                  data={d!.daily}
+                  margin={{ top: 0, right: 4, left: -20, bottom: 0 }}
+                  barCategoryGap="20%"
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={formatDate}
+                    tick={{ fontSize: 10, fill: "#94a3b8" }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 10, fill: "#94a3b8" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    formatter={(v: number, name: string) => [formatNum(v), name]}
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
+                    labelFormatter={(label: string) => {
+                      const parts = label.split("-");
+                      return parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0]}` : label;
+                    }}
+                  />
+                  <Bar dataKey="leads" name="Заявки" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="answeredCalls" name="Отвеченные" stackId="a" fill="#0070b8" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Bottom: calls, leads and UTM attribution */}
+          {((d?.bySource?.length ?? 0) > 0 || (d?.byLeadType?.length ?? 0) > 0 || (d?.byUtmSource?.length ?? 0) > 0) && (
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* By source */}
+              {(d?.bySource?.length ?? 0) > 0 && (
+                <div>
+                  <div className="text-xs font-medium text-slate-500 mb-2">Звонки по источникам</div>
+                  <div className="space-y-1.5">
+                    {d!.bySource.map((row, i) => {
+                      const maxCalls = Math.max(...d!.bySource.map(r => r.calls));
+                      const pct = maxCalls ? Math.round((row.calls / maxCalls) * 100) : 0;
+                      const answerRate = row.calls ? Math.round((row.answeredCalls / row.calls) * 100) : 0;
+                      return (
+                        <div key={i} className="flex items-center gap-2">
+                          <div className="w-24 text-xs text-slate-600 truncate shrink-0" title={row.source}>{row.source}</div>
+                          <div className="flex-1 h-5 bg-slate-100 rounded overflow-hidden">
+                            <div
+                              className="h-full rounded bg-[#0070b8] transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-slate-700 font-medium tabular-nums w-6 shrink-0">{row.calls}</div>
+                          <div className="text-xs text-slate-400 tabular-nums w-10 shrink-0">{answerRate}% ✓</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* By lead type */}
+              {(d?.byLeadType?.length ?? 0) > 0 && (
+                <div>
+                  <div className="text-xs font-medium text-slate-500 mb-2">Заявки по типу</div>
+                  <div className="space-y-1.5">
+                    {d!.byLeadType.map((row, i) => {
+                      const maxCount = Math.max(...d!.byLeadType.map(r => r.count));
+                      const pct = maxCount ? Math.round((row.count / maxCount) * 100) : 0;
+                      return (
+                        <div key={i} className="flex items-center gap-2">
+                          <div className="w-32 text-xs text-slate-600 truncate shrink-0" title={row.label}>{row.label}</div>
+                          <div className="flex-1 h-5 bg-slate-100 rounded overflow-hidden">
+                            <div
+                              className="h-full rounded bg-emerald-500 transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-slate-700 font-medium tabular-nums w-6 shrink-0">{row.count}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* By UTM source */}
+              {(d?.byUtmSource?.length ?? 0) > 0 && (
+                <div>
+                  <div className="text-xs font-medium text-slate-500 mb-2">Заявки по UTM-источнику</div>
+                  <div className="space-y-1.5">
+                    {d!.byUtmSource.map((row, i) => {
+                      const maxCount = Math.max(...d!.byUtmSource.map(r => r.count));
+                      const pct = maxCount ? Math.round((row.count / maxCount) * 100) : 0;
+                      return (
+                        <div key={i} className="flex items-center gap-2">
+                          <div className="w-24 text-xs text-slate-600 truncate shrink-0" title={row.source}>{row.source}</div>
+                          <div className="flex-1 h-5 bg-slate-100 rounded overflow-hidden">
+                            <div className="h-full rounded bg-amber-500 transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="text-xs text-slate-700 font-medium tabular-nums w-6 shrink-0">{row.count}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <p className="mt-4 text-[11px] text-slate-400">
+            Обращения = заявки с сайта + отвеченные звонки из Calltouch. Пропущенные звонки в сумму не входят.
+            {d?.dateFrom && d?.dateTo && ` Период: ${formatDate(d.dateFrom)} – ${formatDate(d.dateTo)}.`}
+          </p>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -564,6 +856,8 @@ export default function VisitorsPage() {
           )}
         </div>
       </div>
+
+      <ConversionFunnel period={period} />
 
       <ActivityHeatmap
         data={activityQ.data}
