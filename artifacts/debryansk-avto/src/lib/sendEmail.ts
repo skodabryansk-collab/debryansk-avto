@@ -1,5 +1,14 @@
 const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
 
+export function getUtmParams(): Record<string, string> {
+  const params = new URLSearchParams(window.location.search);
+  return Object.fromEntries(
+    ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"]
+      .map(key => [key, params.get(key) ?? ""])
+      .filter(([, value]) => value)
+  );
+}
+
 export async function sendEmail(
   type: string,
   fields: Record<string, string>,
@@ -10,6 +19,7 @@ export async function sendEmail(
   for (const [k, v] of Object.entries(fields)) {
     if (v) fd.append(k, v);
   }
+  for (const [k, v] of Object.entries(getUtmParams())) fd.append(k, v);
   if (files) {
     for (const f of files) fd.append("attachments", f);
   }
