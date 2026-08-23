@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { ymGoal } from "@/lib/ym";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { sendWithRetry } from "@/lib/sendWithRetry";
 import { useQuery } from "@tanstack/react-query";
@@ -108,7 +109,7 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
     fd.append("carModel", car.model);
     fd.append("carYear", String(car.year));
     fd.append("dealer", car.dealer);
-    sendWithRetry(fd);
+    sendWithRetry(fd).then(ok => { if (ok) ymGoal("lead_submit"); }).catch(() => {});
   }
 
   return (
@@ -633,6 +634,9 @@ export default function NewCars() {
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-[#0070b8] mb-1">В наличии</p>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Новые автомобили</h1>
+            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed max-w-sm">
+              Официальный дилер Haval, Jetour, OMODA, JAECOO, Soueast, VW, SKODA, Exeed, Tenet в Брянске — кредит, трейд-ин, гарантия производителя.
+            </p>
             {!isLoading && (
               <p className="text-sm font-semibold text-slate-400 mt-1">{filtered.length} авто</p>
             )}
