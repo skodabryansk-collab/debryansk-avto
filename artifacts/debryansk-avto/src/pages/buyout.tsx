@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { ymGoal } from "@/lib/ym";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { motion } from "framer-motion";
 import {
@@ -347,7 +348,8 @@ function BuyoutForm() {
         fd.append("estimateMin", String(priceResult.buyoutMin));
         fd.append("estimateMax", String(priceResult.buyoutMax));
       }
-      await fetch("/api/send-email", { method: "POST", body: fd });
+      const res = await fetch("/api/send-email", { method: "POST", body: fd });
+      if (res.ok) ymGoal("lead_submit");
     } catch (_) {}
     setSubmitted(true);
     toast({ title: "Заявка принята!", description: "Перезвоним в течение 15 минут" });
@@ -1018,6 +1020,19 @@ export default function BuyoutPage() {
               </FadeIn>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="buyout-sources" className="py-8 sm:py-10 bg-white border-t border-slate-100">
+        <div className="container mx-auto px-4 sm:px-6 max-w-3xl">
+          <h2 id="buyout-sources" className="text-lg sm:text-xl font-extrabold mb-3">Официальные источники</h2>
+          <p className="text-sm text-slate-500 leading-relaxed mb-3">
+            Перед сделкой самостоятельно проверьте актуальные требования к регистрации и переоформлению автомобиля на государственных ресурсах.
+          </p>
+          <ul className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+            <li><a href="https://гибдд.рф/" target="_blank" rel="noopener noreferrer" className="text-[#0070b8] font-semibold hover:underline">Госавтоинспекция</a></li>
+            <li><a href="https://www.gosuslugi.ru/" target="_blank" rel="noopener noreferrer" className="text-[#0070b8] font-semibold hover:underline">Госуслуги</a></li>
+          </ul>
         </div>
       </section>
 
