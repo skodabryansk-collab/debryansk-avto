@@ -33,6 +33,10 @@ const BRAND_SLUG_REDIRECTS: Record<string, string> = {
   "haval": "haval-city",
 };
 app.use((req, res, next) => {
+  if (req.path === "/brands/") {
+    const query = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    return res.redirect(301, `/brands${query}`);
+  }
   const m = req.path.match(/^\/brands\/([^/]+)\/?$/);
   if (m) {
     const target = BRAND_SLUG_REDIRECTS[m[1]];
