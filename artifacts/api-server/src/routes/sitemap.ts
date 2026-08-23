@@ -8,13 +8,16 @@ const CACHE_TTL = 60 * 60 * 1000;
 
 let cache: { xml: string; ts: number } | null = null;
 
-const STATIC_PAGES = [
+export const STATIC_PAGES = [
   { loc: "/",          changefreq: "daily",   priority: "1.0" },
+  { loc: "/brands",    changefreq: "weekly",  priority: "0.8" },
   { loc: "/new-cars",  changefreq: "daily",   priority: "0.9" },
   { loc: "/cars",      changefreq: "daily",   priority: "0.9" },
   { loc: "/buyout",    changefreq: "weekly",  priority: "0.8" },
-  { loc: "/service",   changefreq: "weekly",  priority: "0.8" },
-  { loc: "/news",      changefreq: "daily",   priority: "0.8" },
+  { loc: "/service",       changefreq: "weekly",  priority: "0.8" },
+  { loc: "/service/bonus", changefreq: "weekly",  priority: "0.7" },
+  { loc: "/corporate",     changefreq: "weekly",  priority: "0.7" },
+  { loc: "/news",          changefreq: "daily",   priority: "0.8" },
   { loc: "/about",     changefreq: "monthly", priority: "0.7" },
   { loc: "/contacts",  changefreq: "monthly", priority: "0.7" },
   { loc: "/vacancies", changefreq: "weekly",  priority: "0.6" },
@@ -41,7 +44,7 @@ async function buildSitemap(): Promise<string> {
   const [carsResult, newsResult, brandsResult, landingResult, extraResult] = await Promise.all([
     db.execute(sql`SELECT external_id, type, synced_at FROM cars ORDER BY synced_at DESC`),
     db.execute(sql`SELECT slug, updated_at FROM news ORDER BY updated_at DESC`),
-    db.execute(sql`SELECT slug FROM brands WHERE slug IS NOT NULL AND slug != 's-probegom' ORDER BY name`),
+    db.execute(sql`SELECT slug FROM brands WHERE slug IS NOT NULL AND slug NOT IN ('s-probegom', 'mb-bryansk') ORDER BY name`),
     db.execute(sql`SELECT slug, updated_at FROM seo_landing_pages WHERE is_published = true ORDER BY updated_at DESC`).catch(() => ({ rows: [] })),
     db.execute(sql`SELECT loc, changefreq, priority FROM sitemap_extra_pages ORDER BY added_at ASC`).catch(() => ({ rows: [] })),
   ]);
@@ -53,9 +56,10 @@ async function buildSitemap(): Promise<string> {
   const emittedLocs = new Set<string>();
 
   function emitUrl(loc: string, opts: Parameters<typeof url>[1] = {}): void {
-    if (emittedLocs.has(loc)) return;
-    emittedLocs.add(loc);
-    urls.push(url(loc, opts));
+    const normalized = loc === "/" ? "/" : `/${loc.replace(/^\/+|\/+$/g, "")}`;
+    if (emittedLocs.has(normalized)) return;
+    emittedLocs.add(normalized);
+    urls.push(url(normalized, opts));
   }
 
   // Static hardcoded pages
@@ -129,11 +133,41 @@ const FAKE_SITEMAPS = [
  * Always resets the XML cache so the next request rebuilds from scratch.
  * Returns true if the row was newly inserted, false if it already existed.
  */
+/**
+ * Return a Set of all path strings currently included in sitemap.xml:
+ *   • STATIC_PAGES (hardcoded)
+ *   • sitemap_extra_pages table (added via SEO Autopilot)
+ *   • /brands/:slug for every brand in DB (auto-included by buildSitemap)
+ *
+ * Used by the GAP engine to avoid generating duplicate sitemap suggestions.
+ */
+export async function getSitemapLocs(): Promise<Set<string>> {
+  const locs = new Set<string>(STATIC_PAGES.map(p => p.loc));
+
+  await Promise.allSettled([
+    db
+      .execute(sql`SELECT loc FROM sitemap_extra_pages`)
+      .then(r => {
+        for (const row of r.rows as { loc: string }[]) {
+          locs.add(row.loc === "/" ? "/" : `/${row.loc.replace(/^\/+|\/+$/g, "")}`);
+        }
+      }),
+    db
+       .execute(sql`SELECT slug FROM brands WHERE slug IS NOT NULL AND slug NOT IN ('s-probegom', 'mb-bryansk')`)
+      .then(r => {
+        for (const row of r.rows as { slug: string }[]) locs.add(`/brands/${row.slug}`);
+      }),
+  ]);
+
+  return locs;
+}
+
 export async function addSitemapPage(
   loc: string,
   opts: { changefreq?: string; priority?: string } = {},
 ): Promise<boolean> {
-  const normalized = loc.startsWith("/") ? loc : `/${loc}`;
+  const normalizedPath = loc === "/" ? "/" : `/${loc.replace(/^\/+|\/+$/g, "")}`;
+  const normalized = normalizedPath || "/";
   const changefreq = opts.changefreq ?? "weekly";
   const priority   = opts.priority   ?? "0.7";
 
