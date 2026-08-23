@@ -159,7 +159,7 @@ const LOCAL_BUSINESS_SCHEMA = JSON.stringify({
   "@type": ["AutoDealer", "LocalBusiness"],
   "name": "Дебрянск Авто",
   "url": "https://debryansk-auto.ru",
-  "logo": "https://debryansk-auto.ru/logo.svg",
+  "logo": { "@type": "ImageObject", "url": "https://debryansk-auto.ru/favicon.svg" },
   "image": "https://debryansk-auto.ru/og-image.jpg",
   "telephone": "+7-4832-77-77-70",
   "email": "info@debryansk-auto.ru",
@@ -662,12 +662,12 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
   if (newsMatch) {
     const slug = newsMatch[1];
     const result = await db.execute(
-      sql`SELECT title, slug, excerpt, image, images, published_at, content FROM news WHERE slug = ${slug} LIMIT 1`
+      sql`SELECT title, slug, excerpt, image, images, published_at, updated_at, content FROM news WHERE slug = ${slug} LIMIT 1`
     );
     const row = result.rows[0] as {
       title: string; slug: string; excerpt: string | null;
       image: string | null; images: string[] | null;
-      published_at: string | null; content: string | null;
+      published_at: string | null; updated_at: string | null; content: string | null;
     } | undefined;
     if (row) {
       const newsDesc = row.excerpt
@@ -679,6 +679,9 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
       const datePublished = row.published_at
         ? new Date(row.published_at).toISOString().split("T")[0]
         : new Date().toISOString().split("T")[0];
+      const dateModified = row.updated_at
+        ? new Date(row.updated_at).toISOString().split("T")[0]
+        : datePublished;
       const newsArticleSchema = JSON.stringify({
         "@context": "https://schema.org",
         "@type": "NewsArticle",
@@ -687,11 +690,11 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
         "url": `${SITE}/news/${slug}`,
         "image": articleImageFull,
         "datePublished": datePublished,
-        "dateModified": datePublished,
+        "dateModified": dateModified,
         "publisher": {
           "@type": "Organization",
           "name": "Дебрянск Авто",
-          "logo": { "@type": "ImageObject", "url": "https://debryansk-auto.ru/logo.svg" }
+          "logo": { "@type": "ImageObject", "url": "https://debryansk-auto.ru/favicon.svg" }
         },
         "author": {
           "@type": "Organization",
