@@ -280,6 +280,8 @@ function buildNewsGridHtml(articles) {
           <div class="flex items-center gap-2 text-[11px] text-slate-400 mt-2 mb-2">
             <span>${dateStr}</span>
             <span class="w-0.5 h-0.5 rounded-full bg-slate-300"></span>
+            <span>Редакция Дебрянск Авто</span>
+            <span class="w-0.5 h-0.5 rounded-full bg-slate-300"></span>
             <span>${readTime} \u043c\u0438\u043d</span>
           </div>
           <a href="/news/${slug}">
