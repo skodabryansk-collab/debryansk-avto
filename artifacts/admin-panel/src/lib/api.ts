@@ -404,7 +404,7 @@ export function generateBrandDescriptions(apply = false) {
 /* ── Route Health ─────────────────────────────────────────────────────── */
 export interface RouteHealthItem {
   route: string;
-  status: "ok" | "error" | "redirect" | "timeout" | "unknown";
+  status: "ok" | "needs_manifest" | "error" | "redirect" | "timeout" | "unknown";
   issueSummary: string;
   cacheAge: string | null;
   crawlerStatus: "indexed" | "blocked" | "noindex" | "unknown";
@@ -425,6 +425,42 @@ export function getRouteHealth(): Promise<RouteHealthResult> {
 }
 export function repairRoute(route: string): Promise<RouteRepairResult> {
   return api<RouteRepairResult>("POST", "/admin/seo/route-health/repair", { route });
+}
+export interface ManifestRepairPreview {
+  ok: boolean;
+  total: number;
+  routes: string[];
+  skipped: number;
+}
+export interface ManifestRepairStatus {
+  ok: boolean;
+  status: "idle" | "running" | "completed" | "failed";
+  total: number;
+  processed: number;
+  fixed: number;
+  failed: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  errors: Array<{ route: string; error: string }>;
+}
+export function getManifestRepairPreview() {
+  return api<ManifestRepairPreview>("GET", "/admin/seo/route-health/manifest-repair/preview");
+}
+export function startManifestRepair() {
+  return api<{ ok: boolean; total: number; message: string }>("POST", "/admin/seo/route-health/manifest-repair/start");
+}
+export function getManifestRepairStatus() {
+  return api<ManifestRepairStatus>("GET", "/admin/seo/route-health/manifest-repair/status");
+}
+export interface CacheRepairStatus extends ManifestRepairStatus {}
+export function getCacheRepairPreview() {
+  return api<ManifestRepairPreview>("GET", "/admin/seo/route-health/cache-repair/preview");
+}
+export function startCacheRepair() {
+  return api<{ ok: boolean; total: number; message: string }>("POST", "/admin/seo/route-health/cache-repair/start");
+}
+export function getCacheRepairStatus() {
+  return api<CacheRepairStatus>("GET", "/admin/seo/route-health/cache-repair/status");
 }
 
 /* Promotions */
@@ -1406,6 +1442,62 @@ export function syncAllToCatalogFeeds() {
   return api<{ ok: true; results: Array<{ feedId: number; brands: string[]; count?: number; error?: string }> }>(
     "POST", "/admin/to-catalog/feeds/sync-all"
   );
+}
+
+/* ── Conversion funnel ──────────────────────────────────────── */
+export interface ConversionPeriodStats {
+  visits: number;
+  leads: number;
+  answeredCalls: number;
+  missedCalls: number;
+  totalCalls: number;
+  grossConversions: number;
+  conversionRate: number;
+  leadConversionRate: number;
+  callConversionRate: number;
+}
+
+export interface ConversionDailyRow {
+  date: string;
+  leads: number;
+  answeredCalls: number;
+  missedCalls: number;
+  grossConversions: number;
+}
+
+export interface ConversionSourceRow {
+  source: string;
+  calls: number;
+  answeredCalls: number;
+}
+
+export interface ConversionLeadTypeRow {
+  type: string;
+  label: string;
+  count: number;
+}
+
+export interface ConversionUtmSourceRow {
+  source: string;
+  count: number;
+}
+
+export interface ConversionResult {
+  ok: true;
+  period: "today" | "7d" | "30d";
+  dateFrom: string;
+  dateTo: string;
+  current: ConversionPeriodStats;
+  previous: ConversionPeriodStats;
+  daily: ConversionDailyRow[];
+  bySource: ConversionSourceRow[];
+  byLeadType: ConversionLeadTypeRow[];
+  byUtmSource: ConversionUtmSourceRow[];
+  availability: { metrika: boolean; leads: boolean; calltouch: boolean };
+}
+
+export function getConversion(period: "today" | "7d" | "30d") {
+  return api<ConversionResult>("GET", `/admin/metrika/conversion?period=${period}`);
 }
 
 /* ── Brand font with brand association ─────────────────────── */
