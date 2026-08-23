@@ -433,6 +433,22 @@ function buildBuyoutHtml(d: Record<string, string>) {
   );
 }
 
+function buildExitIntentHtml(d: Record<string, string>) {
+  const accent = "#87b63c";
+  return wrapEmail(
+    banner("🎁", "Клиент собирался уйти — оставил номер", accent) +
+    heading("Exit-intent: горячий лид", "Клиент нажал выйти, но оставил номер через форму удержания") +
+    dataTable([
+      ["Телефон",  d.phone],
+      ["Страница", d.page || "—"],
+      ["Дата / время", new Date().toLocaleString("ru-RU")],
+    ]) +
+    hr() +
+    actionBlock(d.phone, undefined, "Перезвонить клиенту — горячий лид", accent),
+    accent
+  );
+}
+
 function buildPromoHtml(d: Record<string, string>) {
   const accent = "#87b63c";
   return wrapEmail(
@@ -562,6 +578,7 @@ const SUBJECTS: Record<string, string> = {
   promo:          "🎁 Заявка по акции",
   corporate:      "🏢 Корпоративная заявка",
   lead:           "🚗 Заявка на автомобиль",
+  exit_intent:    "🎁 Exit-intent — клиент собирался уйти",
 };
 
 /* ── Main send endpoint ── */
@@ -599,6 +616,7 @@ router.post(
         case "to_calculator": html = buildToCalculatorHtml(body); break;
         case "promo":         html = buildPromoHtml(body); break;
         case "corporate":     html = buildCorporateHtml(body); break;
+        case "exit_intent":   html = buildExitIntentHtml(body); break;
       }
 
       const clientName = body.name || "Клиент";
@@ -635,7 +653,7 @@ router.post(
       // Save lead to database (retry once on failure so transient DB hiccups don't lose leads)
       const carParts = [body.carMark, body.carModel, body.carYear].filter(Boolean).join(" ");
       const extraData: Record<string, string> = {};
-      const knownKeys = ["type","name","phone","email","message","carMark","carModel","carYear","carPrice","car","budget","downPayment","term","carMileage","position","surname","brand","model","vehicle"];
+      const knownKeys = ["type","name","phone","email","message","carMark","carModel","carYear","carPrice","car","budget","downPayment","term","carMileage","position","surname","brand","model","vehicle","utm_source","utm_medium","utm_campaign","utm_term","utm_content"];
       for (const [k, v] of Object.entries(body)) {
         if (!knownKeys.includes(k) && v) extraData[k] = v;
       }
@@ -646,6 +664,11 @@ router.post(
         email: body.email || null,
         message: body.message || body.comment || null,
         car: carParts || body.car || body.brand || body.model || body.vehicle || null,
+        utmSource: body.utm_source || null,
+        utmMedium: body.utm_medium || null,
+        utmCampaign: body.utm_campaign || null,
+        utmTerm: body.utm_term || null,
+        utmContent: body.utm_content || null,
         extraJson: Object.keys(extraData).length ? extraData : null,
       };
       let leadSaved = false;
