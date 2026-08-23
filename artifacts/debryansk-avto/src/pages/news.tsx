@@ -72,6 +72,8 @@ function ArticleCard({ article, index }: { article: NewsArticle; index: number }
               <Calendar className="w-3 h-3" />
               <span>{article.publishedAt ? formatDate(article.publishedAt) : ""}</span>
               <span className="w-0.5 h-0.5 rounded-full bg-white/40" />
+              <span>Редакция Дебрянск Авто</span>
+              <span className="w-0.5 h-0.5 rounded-full bg-white/40" />
               <Clock className="w-3 h-3" />
               <span>{article.readTime ?? 3} мин</span>
             </div>
@@ -98,7 +100,7 @@ function ArticleCard({ article, index }: { article: NewsArticle; index: number }
       className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow"
     >
       <Link href={`/news/${article.slug}`}>
-        <div className="relative overflow-hidden h-40">
+        <div className="relative overflow-hidden h-[208px] sm:h-40">
           <picture>
             {article.imageMobile && (
               <source media="(max-width: 639px)" srcSet={article.imageMobile} />
@@ -120,6 +122,8 @@ function ArticleCard({ article, index }: { article: NewsArticle; index: number }
           <Calendar className="w-3 h-3" />
           <span>{article.publishedAt ? formatDate(article.publishedAt) : ""}</span>
           <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
+            <span>Редакция Дебрянск Авто</span>
+            <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
           <Clock className="w-3 h-3" />
           <span>{article.readTime ?? 3} мин</span>
         </div>
