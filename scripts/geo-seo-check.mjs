@@ -41,6 +41,18 @@ const routes = [
     schemas: ["AutoDealer", "BreadcrumbList"],
   },
   {
+    path: "/brands",
+    title: /Бренды автомобилей.*сервис.*Брянске/i,
+    description: /дилер.*автомобил.*сервисн.*бренд/i,
+    h1: /Бренды автомобилей.*сервис.*Брянске/i,
+    h1Count: 1,
+    schemas: ["AutoDealer", "BreadcrumbList", "CollectionPage"],
+    requiredText: ["Новые автомобили", "Автомобили с пробегом", "Сервисные бренды"],
+    requiredLinks: ["/brands/haval-city", "/brands/jetour", "/brands/mercedes-benz", "/cars"],
+    forbiddenLinks: ["/brands/mb-bryansk"],
+    userAgent: "Googlebot/2.1 (+http://www.google.com/bot.html)",
+  },
+  {
     path: "/service",
     title: /Сервис.*Дебрянск Авто|Сервисное обслуживание.*Брянске/i,
     description: /сервис.*Брянске/i,
@@ -126,14 +138,14 @@ function getSchemaTypes(html) {
   return [...new Set(types)];
 }
 
-async function fetchText(path) {
+async function fetchText(path, userAgent = "GEO-SEO-Regression-Check/1.0") {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const response = await fetch(`${BASE_URL}${path}`, {
       redirect: "manual",
       signal: controller.signal,
-      headers: { "User-Agent": "GEO-SEO-Regression-Check/1.0" },
+      headers: { "User-Agent": userAgent },
     });
     return {
       status: response.status,
@@ -149,7 +161,7 @@ async function fetchText(path) {
 async function checkRoute(route) {
   let response;
   try {
-    response = await fetchText(route.path);
+    response = await fetchText(route.path, route.userAgent);
   } catch (error) {
     fail(route.path, "HTTP request", error instanceof Error ? error.message : String(error));
     return;
@@ -177,6 +189,18 @@ async function checkRoute(route) {
     fail(route.path, "robots", robots || "missing");
   }
   if (h1s.length === 0) fail(route.path, "H1", "missing");
+  if (route.h1Count != null && h1s.length !== route.h1Count) {
+    fail(route.path, "H1 count", `expected ${route.h1Count}, got ${h1s.length}`);
+  }
+  for (const text of route.requiredText || []) {
+    if (!body.includes(text)) fail(route.path, "page content", `missing ${text}`);
+  }
+  for (const href of route.requiredLinks || []) {
+    if (!body.includes(`href="${href}"`)) fail(route.path, "brand link", `missing ${href}`);
+  }
+  for (const href of route.forbiddenLinks || []) {
+    if (body.includes(`href="${href}"`)) fail(route.path, "non-canonical link", `found ${href}`);
+  }
   for (const expectedSchema of route.schemas) {
     if (!schemaTypes.includes(expectedSchema)) {
       fail(route.path, "JSON-LD", `missing ${expectedSchema}; found ${schemaTypes.join(", ") || "none"}`);
