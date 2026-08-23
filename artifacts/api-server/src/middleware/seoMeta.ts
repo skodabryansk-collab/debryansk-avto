@@ -705,6 +705,7 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
       const bodyHtml = row.content
         ? `<article aria-label="${row.title}" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">` +
           `<h1>${row.title}</h1>` +
+           `<p>Автор: Редакция Дебрянск Авто${row.published_at ? ` · Опубликовано: ${datePublished}` : ""}</p>` +
           row.content.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "").slice(0, 8000) +
           `</article>`
         : undefined;
