@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { ymGoal } from "@/lib/ym";
 import { CTPhoneDesktop, CTPhoneMobile } from "@/components/CTPhone";
 import { sendWithRetry } from "@/lib/sendWithRetry";
+import { getUtmParams } from "@/lib/sendEmail";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -159,6 +160,7 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
     fd.append("carModel", car.model);
     fd.append("carYear", String(car.year));
     fd.append("dealer", "Супонево");
+    for (const [key, value] of Object.entries(getUtmParams())) fd.append(key, value);
     sendWithRetry(fd).then(ok => { if (ok) ymGoal("lead_submit"); }).catch(() => {});
   }
 
