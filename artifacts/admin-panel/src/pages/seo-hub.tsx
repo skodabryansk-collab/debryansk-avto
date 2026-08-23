@@ -11,8 +11,8 @@ import React, { useState } from "react";
 import {
   Zap, TrendingUp, Search, Link2, RotateCcw,
   Plus, Trash2, Edit3, CheckCircle2, X,
-  ArrowUp, ArrowDown, Sparkles, FileText, ExternalLink, Eye,
-  Newspaper, Loader2, Wand2, CheckCheck, RefreshCw,
+  ArrowUp, ArrowDown, Sparkles, FileText, ExternalLink, Eye, Clock3, ListChecks,
+  Newspaper, Loader2, Wand2, CheckCheck, RefreshCw, ImagePlus,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -33,9 +33,10 @@ import SeoPage from "./seo";
 import {
   getAnchorQueries, createAnchorQuery, deleteAnchorQuery,
   suggestAnchorQueries, getSeoAutopilotSuggestions,
-  getContentTopics, generateArticle, createNews,
+  getContentTopics, generateArticle, generateArticleImage, createNews,
+  getBrands,
   type AnchorQuery, type AnchorSuggestion, type SeoSuggestion,
-  type ContentTopic, type ArticleDraft,
+  type ContentTopic, type ArticleDraft, type Brand,
 } from "@/lib/api";
 
 /* ── Tab definition ─────────────────────────────────────────────────── */
@@ -51,7 +52,7 @@ type TabId = typeof TABS[number]["id"];
 
 function TabBar({ active, onSelect }: { active: TabId; onSelect: (t: TabId) => void }) {
   return (
-    <div className="flex gap-0.5 border-b border-slate-200 overflow-x-auto">
+    <div className="flex gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto shrink-0">
       {TABS.map(t => {
         const Icon = t.icon;
         const isActive = active === t.id;
@@ -59,13 +60,13 @@ function TabBar({ active, onSelect }: { active: TabId; onSelect: (t: TabId) => v
           <button
             key={t.id}
             onClick={() => onSelect(t.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px
-              ${isActive
-                ? "border-[#0070b8] text-[#0070b8]"
-                : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
-              }`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97] ${
+              isActive
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
           >
-            <Icon className="w-4 h-4" />
+            <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-[#0070b8]" : ""}`} />
             {t.label}
           </button>
         );
@@ -92,6 +93,11 @@ function AnchorQueriesTab() {
     enabled: showSuggest,
   });
 
+  const { data: brandsData } = useQuery<Brand[]>({
+    queryKey: ["brands"],
+    queryFn: getBrands,
+  });
+
   const createMut = useMutation({
     mutationFn: createAnchorQuery,
     onSuccess: () => {
@@ -112,8 +118,29 @@ function AnchorQueriesTab() {
     onError: (e: Error) => toast({ title: "Ошибка", description: e.message, variant: "destructive" }),
   });
 
+  // Dynamically match a query text to a brand page URL using live brand data from the DB
+  const USED_CAR_KEYWORDS = ["с пробегом", "авто с пробегом", "подержанные", "б/у авто", "бу авто"];
+  const matchBrandSlug = (queryText: string): string => {
+    const q = queryText.toLowerCase();
+    if (USED_CAR_KEYWORDS.some(k => q.includes(k))) return "/cars";
+    const brands = brandsData ?? [];
+    for (const brand of brands) {
+      if (brand.isServiceOnly || !brand.slug) continue;
+      const keywords = [
+        brand.name.toLowerCase(),
+        brand.slug.toLowerCase(),
+        ...(brand.carMark ? [brand.carMark.toLowerCase()] : []),
+      ].filter(Boolean);
+      if (keywords.some(k => q.includes(k))) {
+        return `/brands/${brand.slug}`;
+      }
+    }
+    return "";
+  };
+
   const addFromSuggest = (s: AnchorSuggestion) => {
-    setForm({ query_text: s.query_text, page_url: "", target_position: String(Math.max(1, Math.round(s.avg_position) - 5)), notes: "" });
+    const autoUrl = matchBrandSlug(s.query_text);
+    setForm({ query_text: s.query_text, page_url: autoUrl, target_position: String(Math.max(1, Math.round(s.avg_position) - 5)), notes: "" });
     setShowSuggest(false);
     setShowAdd(true);
   };
@@ -142,19 +169,17 @@ function AnchorQueriesTab() {
 
       {/* Stats */}
       {anchors.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <div className="text-xs text-slate-500">Всего запросов</div>
-            <div className="text-2xl font-bold text-slate-800">{anchors.length}</div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <div className="text-xs text-slate-500">Достигли цели</div>
-            <div className="text-2xl font-bold text-green-600">{atTarget}</div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <div className="text-xs text-slate-500">Требуют работы</div>
-            <div className="text-2xl font-bold text-amber-600">{anchors.length - atTarget}</div>
-          </div>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "Запросов",       value: anchors.length,           color: "text-slate-800" },
+            { label: "Цель достигнута", value: atTarget,                 color: "text-emerald-600" },
+            { label: "Нужна работа",   value: anchors.length - atTarget, color: "text-amber-600"  },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="bg-white rounded-xl p-3 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]">
+              <div className="text-[10px] font-medium text-slate-400 mb-0.5 leading-tight">{label}</div>
+              <div className={`text-xl font-bold tabular-nums ${color}`}>{value}</div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -332,8 +357,15 @@ function KarpathyLoopTab() {
     queryKey: ["seo-loop-evaluated"],
     queryFn: () => getSeoAutopilotSuggestions({ status: "applied", evaluated: true, limit: 100 }),
   });
+  const { data: pendingData, isLoading: pendingLoading } = useQuery({
+    queryKey: ["seo-loop-pending"],
+    queryFn: () => getSeoAutopilotSuggestions({ status: "applied", evaluated: false, limit: 100 }),
+  });
 
   const evaluated = (data?.data ?? []) as SeoSuggestion[];
+  const pending = ((pendingData?.data ?? []) as SeoSuggestion[])
+    .filter(s => s.evaluate_at && !s.evaluated_at)
+    .sort((a, b) => new Date(a.evaluate_at!).getTime() - new Date(b.evaluate_at!).getTime());
   const byVerdict = {
     improved:  evaluated.filter(s => s.evaluation_result === "improved").length,
     stable:    evaluated.filter(s => s.evaluation_result === "stable").length,
@@ -361,19 +393,97 @@ function KarpathyLoopTab() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {(Object.entries(byVerdict) as [keyof typeof VERDICT_CONFIG, number][]).map(([v, count]) => {
             const cfg = VERDICT_CONFIG[v];
+            const numColor = v === "improved" ? "text-emerald-600" : v === "fell" || v === "falsified" ? "text-red-600" : "text-slate-700";
+            const isSelected = filter === v;
             return (
               <button key={v} onClick={() => setFilter(filter === v ? "all" : v)}
-                className={`text-left bg-white border rounded-xl p-4 transition-all hover:shadow-sm ${filter === v ? "border-[#0070b8] shadow-sm" : "border-slate-200"}`}>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <div className={`w-2 h-2 rounded-full ${cfg.dot}`} />
-                  <div className="text-xs text-slate-500">{cfg.label}</div>
+                className={`text-left bg-white rounded-xl p-4 transition-all duration-150 active:scale-[0.98] ${
+                  isSelected
+                    ? "shadow-[0_0_0_2px_#0070b8] shadow-sm"
+                    : "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                }`}>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
+                  <div className="text-[11px] font-medium text-slate-400">{cfg.label}</div>
                 </div>
-                <div className={`text-2xl font-bold ${v === "improved" ? "text-green-600" : v === "fell" || v === "falsified" ? "text-red-600" : "text-slate-700"}`}>{count}</div>
+                <div className={`text-2xl font-bold ${numColor}`}>{count}</div>
               </button>
             );
           })}
         </div>
       )}
+
+      {/* Applied changes waiting for the first Karpathy evaluation */}
+      <div className="rounded-xl border border-[#0070b8]/15 bg-gradient-to-br from-[#f0f8fc] to-white overflow-hidden">
+        <div className="flex items-start justify-between gap-4 px-4 py-4 border-b border-[#0070b8]/10">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#0070b8]/10 flex items-center justify-center shrink-0">
+              <ListChecks className="w-4 h-4 text-[#0070b8]" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">В очереди на оценку</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Применённые доработки, которые ещё не прошли первый 28-дневный замер.
+              </p>
+            </div>
+          </div>
+          <span className="shrink-0 rounded-full bg-[#0070b8] px-2.5 py-1 text-sm font-bold text-white">
+            {pendingLoading ? "…" : pending.length}
+          </span>
+        </div>
+
+        {pendingLoading ? (
+          <div className="grid gap-2 p-3 sm:grid-cols-2">
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-lg" />)}
+          </div>
+        ) : pending.length === 0 ? (
+          <div className="flex items-center gap-2 px-4 py-5 text-xs text-slate-500">
+            <Clock3 className="h-4 w-4 text-slate-400" />
+            Сейчас нет применённых доработок, ожидающих оценки.
+          </div>
+        ) : (
+          <div className="grid gap-2 p-3 sm:grid-cols-2">
+            {pending.map(s => {
+              const due = new Date(s.evaluate_at!);
+              const remaining = due.getTime() - Date.now();
+              const isReady = remaining <= 0;
+              const days = Math.ceil(remaining / (24 * 60 * 60 * 1000));
+              const timing = isReady ? "Готово к оценке" : `через ${days} ${days === 1 ? "день" : days < 5 ? "дня" : "дней"}`;
+              const typeLabel: Record<string, string> = {
+                meta: "Мета-теги", content: "Контент", text_block: "Текстовый блок",
+                cluster: "Кластер", new_page: "Новая страница", tech: "Техника",
+              };
+              return (
+                <div key={s.id} className="rounded-lg border border-white bg-white/80 p-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <a
+                      href={`https://debryansk-auto.ru${s.page_url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-w-0 truncate font-mono text-xs font-semibold text-[#0070b8] hover:underline"
+                      title={s.page_url}
+                    >
+                      {s.page_url}
+                    </a>
+                    <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                      {typeLabel[s.type] ?? s.type}
+                    </span>
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-600" title={s.proposed_value ?? ""}>
+                    {s.proposed_value || s.reasoning || "Изменение подготовлено"}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-400">
+                    <span>Применено: {s.applied_at ? new Date(s.applied_at).toLocaleDateString("ru-RU") : "—"}</span>
+                    <span className={isReady ? "font-bold text-amber-600" : "font-semibold text-[#0070b8]"}>
+                      {timing} · {due.toLocaleDateString("ru-RU")}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Filter buttons */}
       <div className="flex gap-2 flex-wrap">
@@ -427,7 +537,7 @@ function KarpathyLoopTab() {
                   <th className="px-4 py-3 text-left">Страница</th>
                   <th className="px-4 py-3 text-left">Тип</th>
                   <th className="px-4 py-3 text-left">Вердикт</th>
-                  <th className="px-4 py-3 text-right">Δ поз.</th>
+                  <th className="px-4 py-3 text-right whitespace-nowrap">Было → Стало</th>
                   <th className="px-4 py-3 text-left">Заметка</th>
                   <th className="px-4 py-3 text-left">Дата оценки</th>
                   <th className="px-4 py-3" />
@@ -439,6 +549,15 @@ function KarpathyLoopTab() {
                   const vcfg = verdict ? VERDICT_CONFIG[verdict] : null;
                   const delta = s.result_delta;
                   const Icon = vcfg?.icon ?? null;
+
+                  // Before/after: delta>0 = improved (rank went up = position number went down)
+                  const posBefore = s.snapshot_before?.position ?? null;
+                  const posAfter = (posBefore !== null && delta !== null)
+                    ? Math.round((posBefore - delta) * 10) / 10
+                    : null;
+                  const improved = delta !== null && delta > 0.5;
+                  const fell = delta !== null && delta < -0.5;
+
                   return (
                     <tr key={s.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3">
@@ -457,8 +576,19 @@ function KarpathyLoopTab() {
                         ) : <span className="text-slate-400 text-xs">—</span>}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {delta !== null ? (
-                          <span className={`font-bold text-sm ${delta > 0 ? "text-green-600" : delta < 0 ? "text-red-500" : "text-slate-500"}`}>
+                        {posBefore !== null && posAfter !== null ? (
+                          <div className="inline-flex flex-col items-end gap-0.5">
+                            <span className="text-xs text-slate-500">
+                              #{posBefore} → <span className={`font-bold ${improved ? "text-green-600" : fell ? "text-red-500" : "text-slate-600"}`}>#{posAfter}</span>
+                            </span>
+                            {delta !== null && (
+                              <span className={`text-[10px] font-semibold ${improved ? "text-green-500" : fell ? "text-red-400" : "text-slate-400"}`}>
+                                {delta > 0 ? "▲" : delta < 0 ? "▼" : "→"}{Math.abs(delta).toFixed(1)}
+                              </span>
+                            )}
+                          </div>
+                        ) : delta !== null ? (
+                          <span className={`font-bold text-sm ${improved ? "text-green-600" : fell ? "text-red-500" : "text-slate-500"}`}>
                             {delta > 0 ? "+" : ""}{delta.toFixed(1)}
                           </span>
                         ) : <span className="text-slate-400">—</span>}
@@ -504,6 +634,8 @@ function ContentPlanTab() {
   const [published, setPublished] = useState<string | null>(null);
   const [showOnlyNiche, setShowOnlyNiche] = useState(true);
   const [currentTopic, setCurrentTopic] = useState<ContentTopic | null>(null);
+  const [imgLoading, setImgLoading] = useState(false);
+  const [draftImgUrl, setDraftImgUrl] = useState<string | null>(null);
 
   const { data: topicsRaw = [], isLoading, refetch } = useQuery({
     queryKey: ["seo-content-topics"],
@@ -521,6 +653,7 @@ function ContentPlanTab() {
     setPublished(null);
     setDraft(null);
     setDraftForm(null);
+    setDraftImgUrl(null);
     try {
       const result = await generateArticle(topic.query);
       setDraft(result);
@@ -529,6 +662,23 @@ function ContentPlanTab() {
       toast({ title: "Ошибка генерации", description: (e as Error).message, variant: "destructive" });
     } finally {
       setGeneratingFor(null);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!draftForm) return;
+    setImgLoading(true);
+    try {
+      const url = await generateArticleImage(
+        draftForm.title,
+        draftForm.excerpt,
+        currentTopic?.query ?? draftForm.title,
+      );
+      setDraftImgUrl(url);
+    } catch (e: unknown) {
+      toast({ title: "Ошибка генерации изображения", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setImgLoading(false);
     }
   };
 
@@ -541,8 +691,8 @@ function ContentPlanTab() {
         excerpt: draftForm.excerpt,
         content: draftForm.content,
         category: draftForm.category,
-        image: "",
-        imageMobile: "",
+        image: draftImgUrl ?? "",
+        imageMobile: draftImgUrl ?? "",
         slug: draftForm.slug,
         publishedAt: new Date().toISOString().slice(0, 10),
         readTime: draftForm.readTime,
@@ -553,7 +703,13 @@ function ContentPlanTab() {
       setPublished(draftForm.title);
       setDraft(null);
       setDraftForm(null);
-      toast({ title: "Статья опубликована!", description: "Откройте «Новости» для редактирования изображения." });
+      setDraftImgUrl(null);
+      toast({
+        title: "Статья опубликована!",
+        description: draftImgUrl
+          ? "Статья с обложкой опубликована."
+          : "Откройте «Новости» для добавления обложки.",
+      });
     } catch (e: unknown) {
       toast({ title: "Ошибка публикации", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -682,7 +838,7 @@ function ContentPlanTab() {
       )}
 
       {/* Draft dialog */}
-      <Dialog open={!!draft} onOpenChange={open => { if (!open) { setDraft(null); setDraftForm(null); } }}>
+      <Dialog open={!!draft} onOpenChange={open => { if (!open) { setDraft(null); setDraftForm(null); setDraftImgUrl(null); } }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -723,18 +879,61 @@ function ContentPlanTab() {
                   onChange={e => setDraftForm(f => f ? { ...f, content: e.target.value } : f)}
                   className="text-sm font-mono resize-y" />
               </div>
-              <p className="text-xs text-slate-400">
-                После публикации добавьте изображение в разделе <strong>Новости</strong>.
-              </p>
+
+              {/* ── Обложка ─────────────────────────────────────────── */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Обложка</Label>
+                  {draftImgUrl && (
+                    <button
+                      onClick={() => setDraftImgUrl(null)}
+                      className="flex items-center gap-1 text-xs text-rose-500 hover:text-rose-700 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />Удалить
+                    </button>
+                  )}
+                </div>
+
+                {draftImgUrl ? (
+                  <div className="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                    <img
+                      src={draftImgUrl}
+                      alt="Обложка статьи"
+                      className="w-full aspect-video object-cover"
+                    />
+                    <button
+                      onClick={handleGenerateImage}
+                      disabled={imgLoading}
+                      className="absolute bottom-2 right-2 flex items-center gap-1.5 text-xs bg-white/90 hover:bg-white border border-slate-200 rounded-md px-2.5 py-1.5 shadow-sm transition-colors disabled:opacity-50"
+                    >
+                      {imgLoading
+                        ? <><Loader2 className="w-3 h-3 animate-spin" />Генерация…</>
+                        : <><RefreshCw className="w-3 h-3" />Перегенерировать</>
+                      }
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleGenerateImage}
+                    disabled={imgLoading}
+                    className="w-full flex items-center justify-center gap-2 h-24 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-[#0070b8]/40 transition-colors text-sm text-slate-500 disabled:opacity-60"
+                  >
+                    {imgLoading
+                      ? <><Loader2 className="w-4 h-4 animate-spin" />Генерируется обложка…</>
+                      : <><ImagePlus className="w-4 h-4" />Сгенерировать обложку по контексту статьи</>
+                    }
+                  </button>
+                )}
+              </div>
             </div>
           )}
           <DialogFooter className="gap-2 flex-wrap">
-            <Button variant="outline" onClick={() => { setDraft(null); setDraftForm(null); }}>Отмена</Button>
+            <Button variant="outline" onClick={() => { setDraft(null); setDraftForm(null); setDraftImgUrl(null); }}>Отмена</Button>
             {currentTopic && (
               <Button
                 variant="outline"
                 className="gap-1.5 text-slate-600"
-                disabled={!!generatingFor || publishing}
+                disabled={!!generatingFor || publishing || imgLoading}
                 onClick={() => currentTopic && handleGenerate(currentTopic)}
               >
                 {generatingFor
@@ -746,7 +945,7 @@ function ContentPlanTab() {
             <Button
               className="bg-[#0070b8] hover:bg-[#005a94] gap-1.5"
               onClick={handlePublish}
-              disabled={publishing || !!generatingFor}
+              disabled={publishing || !!generatingFor || imgLoading}
             >
               {publishing
                 ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Публикуется…</>
@@ -761,27 +960,51 @@ function ContentPlanTab() {
 }
 
 /* ── SeoHubPage ──────────────────────────────────────────────────────── */
+const VALID_TAB_IDS = TABS.map(t => t.id);
+
 export default function SeoHubPage() {
-  const [tab, setTab] = useState<TabId>("autopilot");
+  // ── URL-state: read ?tab= on mount, write on change ─────────────────
+  const initialTab = (() => {
+    const param = new URLSearchParams(window.location.search).get("tab") as TabId | null;
+    return param && VALID_TAB_IDS.includes(param) ? param : "autopilot";
+  })();
+
+  const [tab, setTab] = useState<TabId>(initialTab);
+
+  const handleTabSelect = (t: TabId) => {
+    setTab(t);
+    window.history.replaceState({}, "", `${window.location.pathname}?tab=${t}`);
+  };
 
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-[#0070b8]/10 flex items-center justify-center">
-          <Zap className="w-4 h-4 text-[#0070b8]" />
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-[#0070b8]/10 flex items-center justify-center shrink-0">
+            <Zap className="w-4 h-4 text-[#0070b8]" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-slate-900 leading-tight">SEO Центр</h1>
+            <p className="text-xs text-slate-400 leading-tight">debryansk-auto.ru</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">SEO Центр</h1>
-          <p className="text-xs text-slate-500">Управление поисковым продвижением сайта debryansk-auto.ru</p>
-        </div>
+        <a
+          href="https://debryansk-auto.ru"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-[#0070b8] transition-colors duration-100"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          Открыть сайт
+        </a>
       </div>
 
       {/* Tab bar */}
-      <TabBar active={tab} onSelect={setTab} />
+      <TabBar active={tab} onSelect={handleTabSelect} />
 
-      {/* Tab content */}
-      <div>
+      {/* Tab content — key causes remount → CSS animation triggers */}
+      <div key={tab} className="tab-content-enter">
         {tab === "autopilot" && <SeoAutopilotPage />}
         {tab === "positions" && <SeoPositionsPage />}
         {tab === "cache"     && <SeoPage />}
