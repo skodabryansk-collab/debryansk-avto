@@ -23,6 +23,12 @@ const DEFAULT_META = {
 
 export const STATIC_META: Record<string, { title: string; description: string; h1: string; robots?: string }> = {
   "/": DEFAULT_META,
+  "/brands": {
+    title: "Бренды автомобилей и официальный сервис в Брянске — Дебрянск Авто",
+    description: "Официальные дилеры новых автомобилей и сервисные бренды в Брянске. Каталог автомобилей с пробегом, адреса дилерских центров и актуальные предложения Дебрянск Авто.",
+    h1: "Бренды автомобилей и сервис Дебрянск Авто в Брянске",
+    robots: DEFAULT_ROBOTS,
+  },
   "/new-cars": {
     title: "Новые автомобили в Брянске — Дебрянск Авто",
     description: "Новые автомобили 14 брендов у официальных дилеров Брянска. Выгодное кредитование, специальные программы, гарантия производителя. Дебрянск Авто.",
@@ -289,11 +295,10 @@ function injectMeta(
   if (preservedLd.length > 0) {
     result = result.replace("</head>", `  ${preservedLd.join("\n  ")}\n  </head>`);
   }
-  // Replace static root H1 with dynamic brand H1
-  result = result.replace(
-    /<h1 class="sr-only">[^<]*<\/h1>/,
-    `<h1 class="sr-only">${h1}</h1>`,
-  );
+  // SSG templates can contain their own sr-only H1. Remove it here because
+  // the semantic main block below is the single authoritative H1 for every
+  // server-enriched response.
+  result = result.replace(/<h1 class="sr-only">[^<]*<\/h1>\s*/g, "");
 
   // Insert clean, deduplicated meta block right after <meta name="viewport"...>
   const metaBlock = [
@@ -373,7 +378,7 @@ function injectMeta(
   return result;
 }
 
-type MetaResult = { title: string; description: string; canonical: string; ogImage: string; h1: string; jsonLd?: string; robots?: string; breadcrumbLd?: string; bodyHtml?: string; ogType?: string };
+type MetaResult = { title: string; description: string; canonical: string; ogImage: string; h1: string; jsonLd?: string; robots?: string; breadcrumbLd?: string; bodyHtml?: string; botBodyHtml?: string; ogType?: string };
 
 /** Escape HTML special characters for safe injection into attributes and text. */
 function esc(s: string | number | null): string {
@@ -394,6 +399,64 @@ function fmtRub(price: number): string {
 
 type NewCarRow = { external_id: string; brand: string; model: string; year: number; price: number; max_discount: number | null; image_url: string | null; color: string | null };
 type UsedCarRow = { external_id: string; brand: string; model: string; year: number; price: number; image_url: string | null; mileage: number | null };
+type BrandIndexRow = { name: string; slug: string; is_service_only: boolean };
+type BrandIndexItem = { name: string; href: string };
+type BrandIndexGroup = { title: string; description: string; items: BrandIndexItem[] };
+
+function buildBrandIndexGroups(rows: BrandIndexRow[]): BrandIndexGroup[] {
+  const groups: BrandIndexGroup[] = [
+    { title: "Новые автомобили", description: "Официальные дилерские страницы новых автомобилей: модели, актуальные предложения и запись на тест-драйв.", items: [] },
+    { title: "Автомобили с пробегом", description: "Проверенные автомобили с пробегом представлены в отдельном каталоге с актуальным наличием и ценами.", items: [] },
+    { title: "Сервисные бренды", description: "Официальное сервисное обслуживание, ТО, ремонт и оригинальные запчасти для указанных марок.", items: [] },
+  ];
+
+  for (const row of rows) {
+    // mb-bryansk is a legacy alias that 301-redirects to Mercedes-Benz.
+    if (!row.name || !row.slug || row.slug === "mb-bryansk") continue;
+    const isUsedCars = row.slug === "s-probegom" || /пробег/i.test(row.name);
+    const groupIndex = row.is_service_only ? 2 : isUsedCars ? 1 : 0;
+    groups[groupIndex].items.push({
+      name: isUsedCars ? "Автомобили с пробегом" : row.name,
+      href: isUsedCars ? "/cars" : `/brands/${row.slug}`,
+    });
+  }
+
+  return groups.filter((group) => group.items.length > 0);
+}
+
+function buildBrandIndexBodyHtml(groups: BrandIndexGroup[]): string {
+  const sectionId = (title: string) => title === "Новые автомобили" ? "new" : title === "Автомобили с пробегом" ? "used" : "service";
+  return `<section data-seo-brands-index="true" aria-label="Бренды Дебрянск Авто">
+    <p>Дебрянск Авто объединяет дилерские центры новых автомобилей, направление автомобилей с пробегом и официальный сервис в Брянске и Супонево.</p>
+    ${groups.map((group) => `<section aria-labelledby="brands-${sectionId(group.title)}">
+      <h2 id="brands-${sectionId(group.title)}">${esc(group.title)}</h2>
+      <p>${esc(group.description)}</p>
+      <ul>${group.items.map((item) => `<li><a href="${esc(item.href)}">${esc(item.name)}</a></li>`).join("")}</ul>
+    </section>`).join("\n")}
+  </section>`;
+}
+
+function buildBrandIndexJsonLd(groups: BrandIndexGroup[]): string {
+  const items = groups.flatMap((group) => group.items);
+  return JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "Бренды автомобилей и сервис Дебрянск Авто",
+    "description": "Официальные дилеры новых автомобилей, сервисные бренды и автомобили с пробегом в Брянске.",
+    "url": `${SITE}/brands`,
+    "isPartOf": { "@type": "WebSite", "name": "Дебрянск Авто", "url": SITE },
+    "mainEntity": {
+      "@type": "ItemList",
+      "numberOfItems": items.length,
+      "itemListElement": items.map((item, index) => ({
+        "@type": "ListItem",
+        "position": index + 1,
+        "name": item.name,
+        "url": `${SITE}${item.href}`,
+      })),
+    },
+  });
+}
 
 function buildNewCarsGridHtml(cars: NewCarRow[]): string {
   if (!cars.length) return "";
@@ -478,6 +541,22 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
         }
       } catch {
         // DB error — serve page without grid
+      }
+    } else if (pathStr === "/brands") {
+      try {
+        const result = await db.execute(sql`
+          SELECT name, slug, is_service_only
+          FROM brands
+          WHERE slug IS NOT NULL AND slug != ''
+          ORDER BY is_service_only, name
+        `);
+        const groups = buildBrandIndexGroups(result.rows as BrandIndexRow[]);
+        if (groups.length > 0) {
+          base.botBodyHtml = buildBrandIndexBodyHtml(groups);
+          base.jsonLd = buildBrandIndexJsonLd(groups);
+        }
+      } catch (err) {
+        logger.warn({ err }, "seoMeta: unable to build brands index content");
       }
     }
 
@@ -798,6 +877,9 @@ export function seoMetaMiddleware(
           "</body>",
           `<div data-seo-catalog-grid="true" style="display:none" aria-hidden="true">${meta.bodyHtml}</div>\n</body>`,
         );
+      }
+      if (meta.botBodyHtml && isBot) {
+        enriched = enriched.replace("</body>", `${meta.botBodyHtml}\n</body>`);
       }
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader("X-SeoMeta", "1");
