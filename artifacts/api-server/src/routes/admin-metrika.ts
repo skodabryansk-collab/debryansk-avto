@@ -549,6 +549,256 @@ router.get("/activity", async (req, res) => {
 });
 
 /* ─────────────────────────────────────────────────────────────
+   GET /api/admin/metrika/conversion — воронка конверсии
+   ───────────────────────────────────────────────────────────── */
+router.get("/conversion", async (req, res) => {
+  const period = (req.query["period"] as string) || "7d";
+  const safePeriod = (period === "today" || period === "30d" ? period : "7d") as "today" | "7d" | "30d";
+
+  let date1: string, date2: string, prevDate1: string, prevDate2: string;
+  if (safePeriod === "today") {
+    date1 = moscowDateStr(0); date2 = moscowDateStr(0);
+    prevDate1 = moscowDateStr(1); prevDate2 = moscowDateStr(1);
+  } else if (safePeriod === "30d") {
+    date1 = moscowDateStr(30); date2 = moscowDateStr(1);
+    prevDate1 = moscowDateStr(60); prevDate2 = moscowDateStr(31);
+  } else {
+    date1 = moscowDateStr(7); date2 = moscowDateStr(1);
+    prevDate1 = moscowDateStr(14); prevDate2 = moscowDateStr(8);
+  }
+
+  const cacheKey = `conversion:${safePeriod}:${date1}`;
+  const cached = cacheGet<unknown>(cacheKey);
+  if (cached) { res.json(cached); return; }
+
+  const [
+    metrikaCurrR, metrikaPrevR,
+    leadsCurrR, leadsPrevR,
+    callsCurrR, callsPrevR,
+    callsDailyR, leadsDailyR,
+    callsBySourceR, leadsByTypeR, leadsByUtmSourceR,
+  ] = await Promise.allSettled([
+    fetchMetrika({ ids: COUNTER_MAIN, date1, date2, metrics: "ym:s:visits" }, { attempts: 2, requestTimeoutMs: 8_000 }),
+    fetchMetrika({ ids: COUNTER_MAIN, date1: prevDate1, date2: prevDate2, metrics: "ym:s:visits" }, { attempts: 2, requestTimeoutMs: 8_000 }),
+    db.execute(sql`
+      SELECT COUNT(*)::int AS total
+      FROM leads
+      WHERE (created_at AT TIME ZONE 'Europe/Moscow')::date
+            BETWEEN ${date1}::date AND ${date2}::date
+    `),
+    db.execute(sql`
+      SELECT COUNT(*)::int AS total
+      FROM leads
+      WHERE (created_at AT TIME ZONE 'Europe/Moscow')::date
+            BETWEEN ${prevDate1}::date AND ${prevDate2}::date
+    `),
+    db.execute(sql`
+      SELECT
+        COUNT(*)::int                                         AS total,
+        COUNT(*) FILTER (WHERE status = 'completed')::int    AS answered,
+        COUNT(*) FILTER (WHERE status = 'missed')::int       AS missed
+      FROM calltouch_calls
+      WHERE (started_at AT TIME ZONE 'Europe/Moscow')::date
+            BETWEEN ${date1}::date AND ${date2}::date
+    `),
+    db.execute(sql`
+      SELECT
+        COUNT(*)::int                                         AS total,
+        COUNT(*) FILTER (WHERE status = 'completed')::int    AS answered,
+        COUNT(*) FILTER (WHERE status = 'missed')::int       AS missed
+      FROM calltouch_calls
+      WHERE (started_at AT TIME ZONE 'Europe/Moscow')::date
+            BETWEEN ${prevDate1}::date AND ${prevDate2}::date
+    `),
+    db.execute(sql`
+      SELECT
+        (started_at AT TIME ZONE 'Europe/Moscow')::date::text  AS date,
+        COUNT(*)::int                                           AS total,
+        COUNT(*) FILTER (WHERE status = 'completed')::int      AS answered,
+        COUNT(*) FILTER (WHERE status = 'missed')::int         AS missed
+      FROM calltouch_calls
+      WHERE (started_at AT TIME ZONE 'Europe/Moscow')::date
+            BETWEEN ${date1}::date AND ${date2}::date
+      GROUP BY 1 ORDER BY 1
+    `),
+    db.execute(sql`
+      SELECT
+        (created_at AT TIME ZONE 'Europe/Moscow')::date::text  AS date,
+        COUNT(*)::int                                           AS total
+      FROM leads
+      WHERE (created_at AT TIME ZONE 'Europe/Moscow')::date
+            BETWEEN ${date1}::date AND ${date2}::date
+      GROUP BY 1 ORDER BY 1
+    `),
+    db.execute(sql`
+      SELECT
+        COALESCE(NULLIF(TRIM(source), ''), 'Неизвестно')      AS source,
+        COUNT(*)::int                                           AS total,
+        COUNT(*) FILTER (WHERE status = 'completed')::int      AS answered
+      FROM calltouch_calls
+      WHERE (started_at AT TIME ZONE 'Europe/Moscow')::date
+            BETWEEN ${date1}::date AND ${date2}::date
+      GROUP BY 1 ORDER BY total DESC LIMIT 10
+    `),
+    db.execute(sql`
+      SELECT
+        COALESCE(NULLIF(TRIM(type), ''), 'other')  AS type,
+        COUNT(*)::int                               AS count
+      FROM leads
+      WHERE (created_at AT TIME ZONE 'Europe/Moscow')::date
+            BETWEEN ${date1}::date AND ${date2}::date
+      GROUP BY 1 ORDER BY count DESC
+    `),
+    db.execute(sql`
+      SELECT
+        COALESCE(NULLIF(TRIM(utm_source), ''), 'Неизвестно') AS source,
+        COUNT(*)::int AS count
+      FROM leads
+      WHERE (created_at AT TIME ZONE 'Europe/Moscow')::date
+            BETWEEN ${date1}::date AND ${date2}::date
+      GROUP BY 1 ORDER BY count DESC
+    `),
+  ]);
+
+  const metrikaOk   = metrikaCurrR.status === "fulfilled";
+  const leadsOk     = leadsCurrR.status === "fulfilled";
+  const calltouchOk = callsCurrR.status === "fulfilled";
+
+  const currVisits = metrikaOk  ? Math.round(metrikaCurrR.value.totals[0] ?? 0) : 0;
+  const prevVisits = metrikaPrevR.status === "fulfilled" ? Math.round(metrikaPrevR.value.totals[0] ?? 0) : 0;
+
+  type AggRow = { total: number; answered: number; missed: number };
+  const currLeads   = leadsOk ? Number((leadsCurrR.value.rows[0] as { total: number } | undefined)?.total ?? 0) : 0;
+  const prevLeads   = leadsPrevR.status === "fulfilled" ? Number((leadsPrevR.value.rows[0] as { total: number } | undefined)?.total ?? 0) : 0;
+
+  const currCalls   = calltouchOk ? (callsCurrR.value.rows[0] as AggRow | undefined) : undefined;
+  const prevCalls   = callsPrevR.status === "fulfilled" ? (callsPrevR.value.rows[0] as AggRow | undefined) : undefined;
+  const currAnswered = Number(currCalls?.answered ?? 0);
+  const currMissed   = Number(currCalls?.missed   ?? 0);
+  const currTotalCalls = Number(currCalls?.total  ?? 0);
+  const prevAnswered = Number(prevCalls?.answered ?? 0);
+  const prevMissed   = Number(prevCalls?.missed   ?? 0);
+  const prevTotalCalls = Number(prevCalls?.total  ?? 0);
+
+  const currGross = currLeads + currAnswered;
+  const prevGross = prevLeads + prevAnswered;
+
+  function rate(num: number, denom: number): number {
+    if (!denom) return 0;
+    return Math.round((num / denom) * 1000) / 10;
+  }
+
+  // Daily dynamics
+  type DailyCallRow = { date: string; total: number; answered: number; missed: number };
+  type DailyLeadRow = { date: string; total: number };
+  const callsDaily = callsDailyR.status === "fulfilled"
+    ? (callsDailyR.value.rows as unknown as DailyCallRow[]) : [];
+  const leadsDaily = leadsDailyR.status === "fulfilled"
+    ? (leadsDailyR.value.rows as unknown as DailyLeadRow[]) : [];
+
+  const dailyMap = new Map<string, { leads: number; answeredCalls: number; missedCalls: number; grossConversions: number }>();
+  for (const row of leadsDaily) {
+    const e = dailyMap.get(row.date) ?? { leads: 0, answeredCalls: 0, missedCalls: 0, grossConversions: 0 };
+    e.leads = Number(row.total);
+    e.grossConversions = e.leads + e.answeredCalls;
+    dailyMap.set(row.date, e);
+  }
+  for (const row of callsDaily) {
+    const e = dailyMap.get(row.date) ?? { leads: 0, answeredCalls: 0, missedCalls: 0, grossConversions: 0 };
+    e.answeredCalls = Number(row.answered);
+    e.missedCalls   = Number(row.missed);
+    e.grossConversions = e.leads + e.answeredCalls;
+    dailyMap.set(row.date, e);
+  }
+  // Fill full date range (no gaps)
+  const daily: Array<{ date: string; leads: number; answeredCalls: number; missedCalls: number; grossConversions: number }> = [];
+  const cursor = new Date(`${date1}T00:00:00Z`);
+  const endDay = new Date(`${date2}T00:00:00Z`);
+  while (cursor <= endDay) {
+    const d = cursor.toISOString().slice(0, 10);
+    daily.push({ date: d, ...(dailyMap.get(d) ?? { leads: 0, answeredCalls: 0, missedCalls: 0, grossConversions: 0 }) });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  // By source (calltouch)
+  type SourceRow = { source: string; total: number; answered: number };
+  const bySource = callsBySourceR.status === "fulfilled"
+    ? (callsBySourceR.value.rows as unknown as SourceRow[]).map(r => ({
+        source: String(r.source),
+        calls: Number(r.total),
+        answeredCalls: Number(r.answered),
+      }))
+    : [];
+
+  // By lead type
+  type LeadTypeRow = { type: string; count: number };
+  const LEAD_TYPE_LABELS: Record<string, string> = {
+    callback: "Обратный звонок",
+    testdrive: "Тест-драйв",
+    credit: "Кредит",
+    tradein: "Трейд-ин",
+    lead: "Заявка с авто",
+    other: "Прочее",
+  };
+  const byLeadType = leadsByTypeR.status === "fulfilled"
+    ? (leadsByTypeR.value.rows as unknown as LeadTypeRow[]).map(r => ({
+        type: String(r.type),
+        label: LEAD_TYPE_LABELS[String(r.type)] ?? String(r.type),
+        count: Number(r.count),
+      }))
+    : [];
+  type LeadUtmSourceRow = { source: string; count: number };
+  const byUtmSource = leadsByUtmSourceR.status === "fulfilled"
+    ? (leadsByUtmSourceR.value.rows as unknown as LeadUtmSourceRow[]).map(r => ({
+        source: String(r.source),
+        count: Number(r.count),
+      }))
+    : [];
+
+  const result = {
+    ok: true,
+    period: safePeriod,
+    dateFrom: date1,
+    dateTo: date2,
+    current: {
+      visits: currVisits,
+      leads: currLeads,
+      answeredCalls: currAnswered,
+      missedCalls: currMissed,
+      totalCalls: currTotalCalls,
+      grossConversions: currGross,
+      conversionRate: rate(currGross, currVisits),
+      leadConversionRate: rate(currLeads, currVisits),
+      callConversionRate: rate(currAnswered, currVisits),
+    },
+    previous: {
+      visits: prevVisits,
+      leads: prevLeads,
+      answeredCalls: prevAnswered,
+      missedCalls: prevMissed,
+      totalCalls: prevTotalCalls,
+      grossConversions: prevGross,
+      conversionRate: rate(prevGross, prevVisits),
+      leadConversionRate: rate(prevLeads, prevVisits),
+      callConversionRate: rate(prevAnswered, prevVisits),
+    },
+    daily,
+    bySource,
+    byLeadType,
+    byUtmSource,
+    availability: {
+      metrika: metrikaOk,
+      leads: leadsOk,
+      calltouch: calltouchOk,
+    },
+  };
+
+  const hasFailure = !metrikaOk || !leadsOk || !calltouchOk;
+  cacheSet(cacheKey, result, hasFailure ? 30_000 : 5 * 60_000);
+  res.json(result);
+});
+
+/* ─────────────────────────────────────────────────────────────
    GET /api/admin/metrika/online — сейчас на сайте (кеш 30 сек)
    ───────────────────────────────────────────────────────────── */
 router.get("/online", async (_req, res) => {
