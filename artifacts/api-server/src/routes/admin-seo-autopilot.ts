@@ -152,9 +152,10 @@ router.get("/suggestions", async (req, res) => {
     if (blocked_by_tech === "true") whereClause = sql`${whereClause} AND blocked_by_tech = true`;
     if (blocked_by_tech === "false") whereClause = sql`${whereClause} AND blocked_by_tech = false`;
 
-    // evaluated=true → only suggestions that have been evaluated (applied + evaluated_at IS NOT NULL)
-    const evaluatedOnly = req.query["evaluated"] === "true";
-    if (evaluatedOnly) whereClause = sql`${whereClause} AND evaluated_at IS NOT NULL`;
+    // evaluated=true/false → filter the Karpathy Loop queue by evaluation state.
+    const evaluatedFilter = req.query["evaluated"];
+    if (evaluatedFilter === "true") whereClause = sql`${whereClause} AND evaluated_at IS NOT NULL`;
+    if (evaluatedFilter === "false") whereClause = sql`${whereClause} AND evaluated_at IS NULL`;
 
     const rows = await db.execute(sql`
       SELECT id, type, page_url, current_value, proposed_value, reasoning,
