@@ -211,9 +211,70 @@ async function checkTextResource(path, contentTypePattern) {
   }
 }
 
+async function checkLlms() {
+  const response = await checkTextResource("/llms.txt", /^text\/plain\b/i);
+  if (!response) return;
+
+  const requiredStatements = [
+    /^# Дебрянск Авто/m,
+    /Брянск/,
+    /2011 год/,
+    /Литейная/,
+    /Советская/,
+    /Супонево/,
+    /Московский/,
+    /Новые автомобили/,
+    /Автомобили с пробегом/,
+    /Сервисное обслуживание/,
+  ];
+  for (const statement of requiredStatements) {
+    if (!statement.test(response.body)) {
+      fail("/llms.txt", "entity profile", `missing required statement: ${statement}`);
+    }
+  }
+  if (/<(?:!doctype|html|head|body|script)\b/i.test(response.body)) {
+    fail("/llms.txt", "text-only response", "HTML markup found");
+  }
+
+  const links = [...response.body.matchAll(/\[[^\]]+\]\((https:\/\/debryansk-auto\.ru(?:\/[^)\s]*)?)\)/g)]
+    .map((match) => match[1]);
+  if (links.length < 6) {
+    fail("/llms.txt", "official sources", `expected at least 6 links, got ${links.length}`);
+    return;
+  }
+
+  for (const url of links) {
+    const path = new URL(url).pathname;
+    try {
+      const target = await fetchTextFrom(CANONICAL_BASE_URL, path);
+      if (target.status !== 200) {
+        fail("/llms.txt", "official source", `${url} returned ${target.status}`);
+      }
+    } catch (error) {
+      fail("/llms.txt", "official source", `${url}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
+
+async function fetchTextFrom(baseUrl, path) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await fetch(`${baseUrl}${path}`, {
+      redirect: "manual",
+      signal: controller.signal,
+      headers: { "User-Agent": "GEO-SEO-Regression-Check/1.0" },
+    });
+    return { status: response.status, contentType: response.headers.get("content-type") || "", body: await response.text() };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 await Promise.all(routes.map(checkRoute));
 const robots = await checkTextResource("/robots.txt", /^text\/plain\b/i);
 const sitemap = await checkTextResource("/sitemap.xml", /^(application\/xml|text\/xml)\b/i);
+await checkLlms();
 
 if (robots && !/Sitemap:\s*https:\/\/debryansk-auto\.ru\/sitemap\.xml/i.test(robots.body)) {
   fail("/robots.txt", "sitemap declaration", "canonical sitemap URL is missing");
