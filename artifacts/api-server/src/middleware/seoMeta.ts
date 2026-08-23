@@ -458,6 +458,58 @@ function buildBrandIndexJsonLd(groups: BrandIndexGroup[]): string {
   });
 }
 
+// ── GEO intent blocks — visible to crawlers via botBodyHtml ────────────────
+
+function buildNewCarsGeoBotHtml(): string {
+  return `<section data-seo-geo="new-cars" aria-label="Новые автомобили в Брянске">
+    <h2>Новые автомобили у официального дилера в Брянске</h2>
+    <p>«Дебрянск Авто» — официальный дилер новых автомобилей Haval, Jetour, OMODA, JAECOO, Soueast, Volkswagen, SKODA, Exeed, Tenet в Брянске. Весь каталог в наличии на площадках дилерских центров.</p>
+    <p>Способы приобретения: автокредит, программа трейд-ин, лизинг для юридических лиц. На все новые автомобили распространяется гарантия производителя.</p>
+    <ul>
+      <li><a href="/brands/haval-city">Haval City — официальный дилер в Брянске</a></li>
+      <li><a href="/brands/haval-pro">Haval Pro — официальный дилер в Брянске</a></li>
+      <li><a href="/brands/jetour">Jetour — официальный дилер в Брянске</a></li>
+      <li><a href="/brands/omoda">OMODA — официальный дилер в Брянске</a></li>
+      <li><a href="/brands/jaecoo">JAECOO — официальный дилер в Брянске</a></li>
+      <li><a href="/brands/soueast">Soueast — официальный дилер в Брянске</a></li>
+      <li><a href="/brands/volkswagen">Volkswagen — официальный дилер в Брянске</a></li>
+      <li><a href="/brands/skoda">SKODA — официальный дилер в Брянске</a></li>
+      <li><a href="/brands/exeed">EXEED — официальный дилер в Брянске</a></li>
+      <li><a href="/brands/tenet">Tenet — официальный дилер в Брянске</a></li>
+    </ul>
+    <p>Запись на тест-драйв и консультация по телефону <a href="tel:+74832777770">+7 (4832) 77-77-70</a>. Режим работы: ежедневно 9:00–21:00.</p>
+  </section>`;
+}
+
+function buildUsedCarsGeoBotHtml(): string {
+  return `<section data-seo-geo="used-cars" aria-label="Автомобили с пробегом в Брянске">
+    <h2>Автомобили с пробегом у официального дилера в Брянске</h2>
+    <p>Каталог автомобилей с пробегом «Дебрянск Авто» регулярно обновляется. Выбор по марке, модели, году выпуска, ценовому диапазону и пробегу. Онлайн-заявка и просмотр на площадке в Брянске.</p>
+    <p>Доступны: автокредит, программа трейд-ин. Автомобили проверены специалистами официального дилера.</p>
+    <p>Телефон: <a href="tel:+74832777770">+7 (4832) 77-77-70</a>. Ежедневно 9:00–21:00.</p>
+  </section>`;
+}
+
+function buildServiceGeoBotHtml(): string {
+  return `<section data-seo-geo="service" aria-label="Сервисное обслуживание в Брянске">
+    <h2>Официальный сервис автомобилей в Брянске</h2>
+    <p>Сервисные услуги: техническое обслуживание и ремонт, кузовной ремонт, детейлинг, компьютерная диагностика, шиномонтаж и хранение шин, оригинальные запасные части.</p>
+    <p>Обслуживаемые марки: Haval, Jetour, OMODA, JAECOO, Soueast, Volkswagen, SKODA, Exeed, Tenet, Mercedes-Benz и другие. Запись на сервис онлайн или по телефону <a href="tel:+74832777770">+7 (4832) 77-77-70</a>.</p>
+    <p>Адреса сервисных центров: ул. Советская, д. 77; ул. Литейная, 3/2; пр. Московский, 2Г; с. Супонево, ул. Шоссейная, 12Г. Режим работы: ежедневно 9:00–21:00.</p>
+  </section>`;
+}
+
+function buildBuyoutGeoBotHtml(): string {
+  return `<section data-seo-geo="buyout" aria-label="Выкуп автомобилей в Брянске">
+    <h2>Выкуп и комиссионная продажа автомобилей в Брянске</h2>
+    <p>Срочный выкуп: оценка бесплатна, принимаем любую марку и год выпуска. Деньги переводятся в день сделки. Документы на снятие с учёта оформляем самостоятельно.</p>
+    <p>Комиссионная продажа: автомобиль размещается одновременно на Авито, Авто.ру, Дром и в каталоге дилера. Хранение на охраняемой стоянке бесплатно.</p>
+    <p>Официальный дилер «Дебрянск Авто» в Брянске. Телефон: <a href="tel:+74832777770">+7 (4832) 77-77-70</a>. Ежедневно 9:00–21:00.</p>
+  </section>`;
+}
+
+// ── Car grids for /new-cars and /cars catalog pages ────────────────────────
+
 function buildNewCarsGridHtml(cars: NewCarRow[]): string {
   if (!cars.length) return "";
   const cards = cars.map(c => {
@@ -528,6 +580,7 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
       } catch {
         // DB error — serve page without grid rather than failing
       }
+      base.botBodyHtml = buildNewCarsGeoBotHtml();
     } else if (pathStr === "/cars") {
       try {
         const r = await db.execute(sql`
@@ -542,6 +595,11 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
       } catch {
         // DB error — serve page without grid
       }
+      base.botBodyHtml = buildUsedCarsGeoBotHtml();
+    } else if (pathStr === "/service") {
+      base.botBodyHtml = buildServiceGeoBotHtml();
+    } else if (pathStr === "/buyout") {
+      base.botBodyHtml = buildBuyoutGeoBotHtml();
     } else if (pathStr === "/brands") {
       try {
         const result = await db.execute(sql`
