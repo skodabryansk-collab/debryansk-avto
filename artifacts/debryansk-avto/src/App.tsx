@@ -1,11 +1,13 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { useEffect, useRef, Suspense, lazy } from "react";
+import { useEffect, useRef, useState, useCallback, Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import CookieBanner from "@/components/CookieBanner";
 import { CTPhoneGuard } from "@/components/CTPhoneGuard";
 import NotFound from "@/pages/not-found";
+import { ExitIntentSlider } from "@/components/ExitIntentSlider";
+import { useExitIntent } from "@/hooks/useExitIntent";
 
 // Lazy-loaded page components — each route loads its chunk on demand.
 // Chunks are split by Vite manualChunks into logical groups (catalog,
@@ -16,6 +18,7 @@ const NewCars            = lazy(() => import("@/pages/new-cars"));
 const UsedCarDetail      = lazy(() => import("@/pages/car-detail"));
 const NewCarDetail       = lazy(() => import("@/pages/new-car-detail"));
 const BrandPage          = lazy(() => import("@/pages/brand-page"));
+const BrandsPage         = lazy(() => import("@/pages/brands"));
 const NewsPage           = lazy(() => import("@/pages/news"));
 const NewsDetailPage     = lazy(() => import("@/pages/news-detail"));
 const Vacancies          = lazy(() => import("@/pages/vacancies"));
@@ -149,6 +152,7 @@ function Router() {
           <Route path="/buyout" component={BuyoutPage} />
           <Route path="/contacts" component={ContactsPage} />
           <Route path="/about" component={AboutPage} />
+          <Route path="/brands" component={BrandsPage} />
           <Route path="/brands/:slug" component={BrandPage} />
           <Route path="/promotions/:slug" component={PromotionDetailPage} />
           <Route path="/corporate" component={CorporatePage} />
@@ -162,6 +166,14 @@ function Router() {
   );
 }
 
+/** Global exit-intent — lives inside WouterRouter so useLocation() works on ALL pages including home.tsx */
+function ExitIntentController() {
+  const [open, setOpen] = useState(false);
+  const onClose = useCallback(() => setOpen(false), []);
+  useExitIntent(useCallback(() => setOpen(true), []));
+  return <ExitIntentSlider open={open} onClose={onClose} />;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -172,6 +184,7 @@ function App() {
           {!((window as any).__PRERENDER__ || navigator.userAgent.includes("HeadlessChrome")) && <CTPhoneGuard />}
           <Router />
           <CookieBanner />
+          {!((window as any).__PRERENDER__ || navigator.userAgent.includes("HeadlessChrome")) && <ExitIntentController />}
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
