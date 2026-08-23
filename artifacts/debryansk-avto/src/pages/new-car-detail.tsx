@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { ymGoal } from "@/lib/ym";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { sendWithRetry } from "@/lib/sendWithRetry";
+import { getUtmParams } from "@/lib/sendEmail";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -160,6 +161,7 @@ function LeadModal({ car, onClose }: { car: NewCarRecord; onClose: () => void })
     fd.append("carModel", car.model);
     fd.append("carYear", String(car.year));
     fd.append("dealer", car.dealer);
+    for (const [key, value] of Object.entries(getUtmParams())) fd.append(key, value);
     sendWithRetry(fd).then(ok => { if (ok) ymGoal("lead_submit"); }).catch(() => {});
   }
 
