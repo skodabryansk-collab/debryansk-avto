@@ -142,7 +142,7 @@ const SSG_ROUTES = new Set([
   // These static pages have SSG-generated HTML with correct meta — always pass through
   // to seoMetaMiddleware even when a Puppeteer snapshot exists in the cache.
   "/about", "/contacts", "/promotions",
-  "/service", "/service/bonus", "/buyout", "/vacancies", "/corporate", "/new-cars", "/cars",
+  "/service", "/service/bonus", "/buyout", "/vacancies", "/corporate", "/new-cars", "/cars", "/brands",
 ]);
 export function isSsgRoute(route: string): boolean {
   if (SSG_ROUTES.has(route)) return true;
