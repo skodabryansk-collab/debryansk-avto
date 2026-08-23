@@ -530,6 +530,8 @@ async function main() {
     // Map static route paths to faqs page_slug keys
     const staticRouteSlugMap = {
       "/": "main",
+      "/new-cars": "new-cars",
+      "/cars": "cars",
       "/service": "service",
       "/service/bonus": "bonus-program",
       "/buyout": "buyout",
