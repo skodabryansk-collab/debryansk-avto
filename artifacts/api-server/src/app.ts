@@ -9,6 +9,7 @@ import { logger } from "./lib/logger";
 import { registerSitemapRoute } from "./routes/sitemap";
 import { prerenderMiddleware } from "./middleware/prerender";
 import { seoMetaMiddleware } from "./middleware/seoMeta";
+import { LLMS_TEXT } from "./lib/llms";
 
 const app: Express = express();
 
@@ -90,6 +91,15 @@ app.get("/sitemaps.xml", (_req, res) => {
 });
 
 registerSitemapRoute(app);
+
+// AI search systems need a small, crawlable entity profile. Register it before
+// the frontend middleware so it can never fall through to the React SPA shell.
+app.get("/llms.txt", (_req, res) => {
+  res
+    .setHeader("Content-Type", "text/plain; charset=utf-8")
+    .setHeader("Cache-Control", "public, max-age=3600")
+    .send(LLMS_TEXT);
+});
 
 app.use("/api", router);
 // Uploaded files — serve from local disk with correct MIME types.
