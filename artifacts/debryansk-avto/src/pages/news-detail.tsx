@@ -1,7 +1,8 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { Link, useRoute } from "wouter";
 import { motion, useReducedMotion } from "framer-motion";
-import { ChevronRight, Calendar, Clock, ArrowRight, Car } from "lucide-react";
+import { ChevronRight, ChevronLeft, Calendar, Clock, Car, X, ZoomIn } from "lucide-react";
 import SEO from "@/components/SEO";
 import Layout from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
@@ -14,7 +15,9 @@ interface NewsArticle {
   category: string | null;
   image: string | null;
   imageMobile: string | null;
+  images?: string[];
   publishedAt: string | null;
+  updatedAt: string | null;
   readTime: number | null;
   slug: string;
 }
@@ -31,10 +34,350 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
 }
 
+/** Returns the effective images array for an article — prefers images[], falls back to image */
+function getImages(article: NewsArticle): string[] {
+  if (article.images && article.images.length > 0) return article.images;
+  if (article.image) return [article.image];
+  return [];
+}
+
+/**
+ * Mobile carousel slide order:
+ * - slide 0: imageMobile (dedicated mobile cover) OR images[0]
+ * - slides 1…N: images[1…N] (additional photos from gallery)
+ * Index maps 1-to-1 with lightbox heroImages (images[]).
+ */
+function getMobileSlides(article: NewsArticle): string[] {
+  const imgs = getImages(article);
+  if (!article.imageMobile) return imgs; // no dedicated mobile — use images as-is
+  // imageMobile replaces images[0] visually on mobile
+  return [article.imageMobile, ...imgs.slice(1)];
+}
+
+// ─── Mobile swipe carousel ───────────────────────────────────────────────────
+
+interface MobileCarouselProps {
+  slides: string[];
+  title: string;
+  onOpen: (idx: number) => void;
+}
+
+function MobileCarousel({ slides, title, onOpen }: MobileCarouselProps) {
+  const [idx, setIdx] = React.useState(0);
+  const touchStartX = React.useRef(0);
+  const touchDeltaX = React.useRef(0);
+  const dragged = React.useRef(false);
+
+  if (!slides.length) return null;
+
+  const clamp = (i: number) => Math.max(0, Math.min(slides.length - 1, i));
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchDeltaX.current = 0;
+    dragged.current = false;
+  };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchDeltaX.current = e.touches[0].clientX - touchStartX.current;
+    if (Math.abs(touchDeltaX.current) > 8) dragged.current = true;
+  };
+  const handleTouchEnd = () => {
+    if (touchDeltaX.current < -50) setIdx(i => clamp(i + 1));
+    else if (touchDeltaX.current > 50) setIdx(i => clamp(i - 1));
+    touchDeltaX.current = 0;
+  };
+  const handleClick = (e: React.MouseEvent, i: number) => {
+    if (dragged.current) { e.preventDefault(); return; }
+    onOpen(i);
+  };
+
+  return (
+    <figure
+      className="relative rounded-2xl overflow-hidden mb-6 select-none"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Slides — natural image height, no clipping */}
+      {slides.map((src, i) => (
+        <div
+          key={i}
+          className="w-full"
+          style={{ display: i === idx ? "block" : "none" }}
+          onClick={e => handleClick(e, i)}
+        >
+          <img
+            src={src}
+            alt={slides.length > 1 ? `${title} — фото ${i + 1}` : title}
+            className="w-full block"
+            fetchPriority={i === 0 ? "high" : undefined}
+            decoding="async"
+            loading={i === 0 ? undefined : "lazy"}
+            draggable={false}
+          />
+        </div>
+      ))}
+
+      {/* Gradient overlay for controls readability */}
+      {slides.length > 1 && (
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
+      )}
+
+      {/* Pill dots */}
+      {slides.length > 1 && (
+        <div className="absolute bottom-3 left-0 right-0 flex justify-center items-center gap-1.5 pointer-events-none">
+          {slides.map((_, i) => (
+            <div
+              key={i}
+              className={`rounded-full transition-all duration-200 ${
+                i === idx ? "w-4 h-[5px] bg-white" : "w-[5px] h-[5px] bg-white/50"
+              }`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Counter badge */}
+      {slides.length > 1 && (
+        <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-sm text-white text-[11px] font-semibold px-2 py-0.5 rounded-full pointer-events-none tracking-wide">
+          {idx + 1}&thinsp;/&thinsp;{slides.length}
+        </div>
+      )}
+    </figure>
+  );
+}
+
+// ─── Lightbox ────────────────────────────────────────────────────────────────
+
+interface LightboxProps {
+  images: string[];
+  startIdx: number;
+  onClose: () => void;
+}
+
+function Lightbox({ images, startIdx, onClose }: LightboxProps) {
+  const [idx, setIdx] = React.useState(startIdx);
+  const prefersReduced = useReducedMotion();
+  const touchStartX = React.useRef(0);
+  const touchDeltaX = React.useRef(0);
+
+  React.useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") setIdx(i => Math.min(i + 1, images.length - 1));
+      if (e.key === "ArrowLeft") setIdx(i => Math.max(i - 1, 0));
+    };
+    document.addEventListener("keydown", handler);
+    return () => {
+      document.removeEventListener("keydown", handler);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose, images.length]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchDeltaX.current = 0;
+  };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchDeltaX.current = e.touches[0].clientX - touchStartX.current;
+  };
+  const handleTouchEnd = () => {
+    if (touchDeltaX.current < -50) setIdx(i => Math.min(i + 1, images.length - 1));
+    else if (touchDeltaX.current > 50) setIdx(i => Math.max(i - 1, 0));
+    touchDeltaX.current = 0;
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{ animation: prefersReduced ? "none" : "lb-fadein 0.18s ease" }}
+      onClick={onClose}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <style>{`@keyframes lb-fadein{from{opacity:0}to{opacity:1}}`}</style>
+
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
+
+      {/* Close */}
+      <button
+        aria-label="Закрыть"
+        className="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors"
+        onClick={onClose}
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      {/* Prev */}
+      {images.length > 1 && idx > 0 && (
+        <button
+          aria-label="Предыдущее фото"
+          className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+          onClick={e => { e.stopPropagation(); setIdx(i => i - 1); }}
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Next */}
+      {images.length > 1 && idx < images.length - 1 && (
+        <button
+          aria-label="Следующее фото"
+          className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+          onClick={e => { e.stopPropagation(); setIdx(i => i + 1); }}
+        >
+          <ChevronRight className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Image */}
+      <div
+        className="relative z-10 max-w-[90vw] max-h-[85vh] flex items-center justify-center"
+        onClick={e => e.stopPropagation()}
+      >
+        <img
+          key={idx}
+          src={images[idx]}
+          alt={`Фото ${idx + 1}`}
+          className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
+          style={{ animation: prefersReduced ? "none" : "lb-fadein 0.15s ease" }}
+        />
+      </div>
+
+      {/* Dots */}
+      {images.length > 1 && (
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10 flex gap-2">
+          {images.map((_, i) => (
+            <button
+              key={i}
+              aria-label={`Фото ${i + 1}`}
+              className={`w-2 h-2 rounded-full transition-all ${i === idx ? "bg-white scale-125" : "bg-white/40"}`}
+              onClick={e => { e.stopPropagation(); setIdx(i); }}
+            />
+          ))}
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+}
+
+// ─── Gallery layout ───────────────────────────────────────────────────────────
+
+/**
+ * Grid class for the right-side gallery depending on how many extra photos there are.
+ * 1 extra  → single cell
+ * 2 extra  → 2 rows stacked
+ * 3 extra  → 2-col 2-row grid, first photo spans full width
+ * 4 extra  → 2×2 grid
+ */
+function galleryGridClass(count: number): string {
+  if (count === 1) return "grid-cols-1 grid-rows-1";
+  if (count === 2) return "grid-cols-1 grid-rows-2";
+  if (count === 3) return "grid-cols-2 grid-rows-2";
+  return "grid-cols-2 grid-rows-2"; // 4
+}
+
+/** For 3 extras: first item spans both columns (top row full-width) */
+function galleryItemClass(idx: number, total: number): string {
+  if (total === 3 && idx === 0) return "col-span-2";
+  return "";
+}
+
+interface HeroGalleryProps {
+  images: string[];
+  title: string;
+  onOpen: (idx: number) => void;
+}
+
+function HeroGallery({ images, title, onOpen }: HeroGalleryProps) {
+  const [main, ...rest] = images;
+
+  if (!rest.length) {
+    // Single image
+    return (
+      <figure className="relative rounded-2xl overflow-hidden mb-6 cursor-pointer group" onClick={() => onOpen(0)}>
+        <img
+          src={main}
+          alt={title}
+          fetchPriority="high"
+          decoding="async"
+          className="w-full h-52 sm:h-80 object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+        />
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          <ZoomIn className="w-8 h-8 text-white drop-shadow-lg" />
+        </div>
+      </figure>
+    );
+  }
+
+  // Multi-image grid — works on both mobile and desktop
+  const RADIUS = "10px";
+  const GAP = 3;
+
+  return (
+    <figure className="mb-6 rounded-2xl overflow-hidden">
+      <div className="flex flex-row" style={{ gap: GAP }}>
+        {/* Main photo */}
+        <div
+          className="w-[58%] flex-shrink-0 relative group cursor-pointer overflow-hidden"
+          style={{ borderRadius: RADIUS }}
+          onClick={() => onOpen(0)}
+        >
+          <img
+            src={main}
+            alt={title}
+            fetchPriority="high"
+            decoding="async"
+            className="w-full h-52 sm:h-80 object-cover object-center transition-transform duration-500 group-hover:scale-[1.02]"
+            style={{ display: "block" }}
+          />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors flex items-center justify-center">
+            <ZoomIn className="w-6 h-6 sm:w-8 sm:h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+          </div>
+        </div>
+
+        {/* Thumbnails — height matches main photo via Tailwind */}
+        <div
+          className={`flex-1 grid overflow-hidden h-52 sm:h-80 ${galleryGridClass(rest.length)}`}
+          style={{ gap: GAP }}
+        >
+          {rest.map((src, i) => (
+            <div
+              key={i}
+              className={`relative group cursor-pointer overflow-hidden ${galleryItemClass(i, rest.length)}`}
+              style={{ borderRadius: RADIUS }}
+              onClick={() => onOpen(i + 1)}
+            >
+              <img
+                src={src}
+                alt={`${title} — фото ${i + 2}`}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-[1.03]"
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors flex items-center justify-center">
+                <ZoomIn className="w-4 h-4 sm:w-5 sm:h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </figure>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function NewsDetailPage() {
   const [, params] = useRoute("/news/:slug");
   const slug = params?.slug ?? "";
   const prefersReduced = useReducedMotion();
+  const [lightboxIdx, setLightboxIdx] = React.useState<number | null>(null);
 
   const { data: allNews = [], isLoading } = useQuery({
     queryKey: ["public-news"],
@@ -79,12 +422,16 @@ export default function NewsDetailPage() {
     );
   }
 
+  const heroImages = getImages(article);
+  const mobileSlides = getMobileSlides(article);
+
   const articleJsonLd = {
     "@type": "NewsArticle",
     "headline": article.title,
     "description": article.excerpt,
     "image": article.image,
     "datePublished": article.publishedAt,
+    "dateModified": article.updatedAt || article.publishedAt,
     "author": { "@type": "Organization", "name": "Дебрянск Авто" },
     "publisher": {
       "@type": "Organization",
@@ -167,28 +514,24 @@ export default function NewsDetailPage() {
             )}
           </div>
 
-          {/* Cover image */}
-          {article.image && (
-            <figure className="rounded-2xl overflow-hidden mb-6">
-              <picture>
-                {article.imageMobile && (
-                  <source media="(max-width: 639px)" srcSet={article.imageMobile} />
-                )}
-                <img
-                  src={article.image}
-                  alt={article.title}
-                  fetchPriority="high"
-                  decoding="async"
-                  className="w-full h-48 sm:h-80 object-cover"
-                />
-              </picture>
-            </figure>
+          {/* Hero gallery grid — mobile and desktop */}
+          {heroImages.length > 0 && (
+            <HeroGallery images={heroImages} title={article.title} onOpen={setLightboxIdx} />
+          )}
+
+          {/* Lightbox (shared, both mobile and desktop) */}
+          {lightboxIdx !== null && heroImages.length > 0 && (
+            <Lightbox
+              images={heroImages}
+              startIdx={lightboxIdx}
+              onClose={() => setLightboxIdx(null)}
+            />
           )}
 
           {/* Content */}
           <div className="prose prose-slate max-w-none">
             {(article.content ?? article.excerpt ?? "").split("\n\n").map((paragraph, i) => (
-              <p key={i} className={`text-slate-700 leading-relaxed mb-4 ${i === 0 ? "text-base sm:text-lg" : "text-sm sm:text-base"}`}>
+              <p key={i} className="text-slate-700 leading-relaxed mb-4 text-sm sm:text-base">
                 {paragraph}
               </p>
             ))}
