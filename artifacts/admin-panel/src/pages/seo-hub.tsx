@@ -1,11 +1,12 @@
 /**
- * SEO Центр — единый хаб, объединяющий 6 вкладок:
+ * SEO Центр — единый хаб, объединяющий 7 вкладок:
  * 1. Автопилот      — рекомендации GAP-анализа
  * 2. Позиции        — Яндекс.Вебмастер снапшоты
  * 3. Аудит кэша     — метатеги и prerender-кэш
  * 4. Анкорные запросы — целевые позиции
  * 5. Петля Карпаты  — оценка применённых рекомендаций
  * 6. Контент-план   — AI-черновики статей из Wordstat-запросов
+ * 7. GEO-цитирование — мониторинг AI-упоминаний и ссылок на сайт
  */
 import React, { useState } from "react";
 import {
@@ -13,6 +14,7 @@ import {
   Plus, Trash2, Edit3, CheckCircle2, X,
   ArrowUp, ArrowDown, Sparkles, FileText, ExternalLink, Eye, Clock3, ListChecks,
   Newspaper, Loader2, Wand2, CheckCheck, RefreshCw, ImagePlus,
+  Globe2,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +31,7 @@ import {
 import SeoAutopilotPage from "./seo-autopilot";
 import SeoPositionsPage from "./seo-positions";
 import SeoPage from "./seo";
+import SeoGeoCitationsTab from "./seo-geo-citations";
 
 import {
   getAnchorQueries, createAnchorQuery, deleteAnchorQuery,
@@ -47,6 +50,7 @@ const TABS = [
   { id: "anchors",   label: "Анкорные запросы",    icon: Link2,      badge: null },
   { id: "loop",      label: "Петля Карпаты",       icon: RotateCcw,  badge: null },
   { id: "content",   label: "Контент-план",        icon: Newspaper,  badge: null },
+  { id: "geo",       label: "GEO-цитирование",     icon: Globe2,     badge: null },
 ] as const;
 type TabId = typeof TABS[number]["id"];
 
@@ -1011,6 +1015,7 @@ export default function SeoHubPage() {
         {tab === "anchors"   && <AnchorQueriesTab />}
         {tab === "loop"      && <KarpathyLoopTab />}
         {tab === "content"   && <ContentPlanTab />}
+        {tab === "geo"       && <SeoGeoCitationsTab />}
       </div>
     </div>
   );
