@@ -5,11 +5,12 @@ import { requireAdmin } from "../middlewares/requireAdmin";
 import { resolveMeta, STATIC_META } from "../middleware/seoMeta";
 import { getPrerenderCache } from "../middleware/prerender";
 import { loadPrerendered } from "../lib/prerenderStorage";
-import { repairLegacyManifest, scanRouteHealth } from "../lib/routeHealth";
-import { deletePrerendered } from "../lib/prerenderStorage";
+import { inspectSnapshot, repairLegacyManifest, scanRouteHealth } from "../lib/routeHealth";
+import { deletePrerendered, getPrerenderedMetadata } from "../lib/prerenderStorage";
 import { deletePrerenderCache } from "../middleware/prerender";
-import { spawnPrerenderRoute } from "../lib/spawnBrandPrerender";
+import { prerenderRouteAndWait, spawnPrerenderRoute } from "../lib/spawnBrandPrerender";
 import { logger } from "../lib/logger";
+import { readGeoCitationReport } from "../lib/geoCitationReport";
 
 const WEBMASTER_USER_ID = "140495458";
 const HOST_ID = "https%3Adebryansk-auto.ru%3A443";
@@ -392,6 +393,14 @@ router.get("/pages", async (_req, res) => {
   }
 });
 
+router.get("/geo-citations", async (_req, res): Promise<void> => {
+  const report = await readGeoCitationReport();
+  if (report.status === "invalid") {
+    logger.warn({ status: report.status }, "[admin-seo] GEO citation report is unavailable");
+  }
+  res.json({ ok: true, ...report });
+});
+
 router.post("/recrawl", async (req, res) => {
   try {
     const { url } = req.body as { url?: string };
@@ -535,6 +544,94 @@ router.post("/route-health/manifest-repair/start", async (_req, res) => {
     return res.status(202).json({ ok: true, total: routes.length, message: routes.length ? "Массовое обновление запущено" : "Маршрутов для обновления нет" });
   } catch (err) {
     logger.error({ err }, "[admin-seo] manifest repair start failed");
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+interface CacheRepairJob {
+  status: "idle" | "running" | "completed" | "failed";
+  total: number;
+  processed: number;
+  fixed: number;
+  failed: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  errors: Array<{ route: string; error: string }>;
+}
+
+let cacheRepairJob: CacheRepairJob = {
+  status: "idle", total: 0, processed: 0, fixed: 0, failed: 0,
+  startedAt: null, completedAt: null, errors: [],
+};
+
+function isMissingPublishedCache(item: Awaited<ReturnType<typeof scanRouteHealth>>[number]): boolean {
+  return item.status === "missing" &&
+    item.lifecycle === "active" &&
+    item.issues.length === 1 &&
+    item.issues[0] === "Нет опубликованного prerender-кэша";
+}
+
+router.get("/route-health/cache-repair/preview", async (_req, res) => {
+  try {
+    const items = await scanRouteHealth();
+    const eligible = items.filter(isMissingPublishedCache).map((item) => item.route);
+    return res.json({
+      ok: true,
+      total: eligible.length,
+      routes: eligible,
+      skipped: items.filter((item) => item.status === "orphan" || item.status === "broken").length,
+    });
+  } catch (err) {
+    logger.error({ err }, "[admin-seo] cache repair preview failed");
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+router.get("/route-health/cache-repair/status", (_req, res) => {
+  return res.json({ ok: true, ...cacheRepairJob });
+});
+
+router.post("/route-health/cache-repair/start", async (_req, res) => {
+  if (cacheRepairJob.status === "running") {
+    return res.status(409).json({ ok: false, error: "Массовый прирендер уже выполняется" });
+  }
+  try {
+    const items = await scanRouteHealth();
+    const routes = items.filter(isMissingPublishedCache).map((item) => item.route);
+    cacheRepairJob = {
+      status: "running", total: routes.length, processed: 0, fixed: 0, failed: 0,
+      startedAt: new Date().toISOString(), completedAt: null, errors: [],
+    };
+    void (async () => {
+      // Deliberately one worker: each route starts Chrome and the publication
+      // lock protects the last known-good cache from concurrent replacement.
+      for (const route of routes) {
+        try {
+          await prerenderRouteAndWait(route);
+          const html = await loadPrerendered(route);
+          const metadata = await getPrerenderedMetadata(route);
+          const issues = html ? inspectSnapshot(route, html, true) : ["HTML snapshot не опубликован"];
+          if (!html || issues.length > 0 || !metadata.manifest) {
+            throw new Error(!html ? "HTML snapshot не опубликован" : issues.length ? issues.join("; ") : "Manifest не опубликован");
+          }
+          cacheRepairJob.fixed += 1;
+        } catch (err) {
+          cacheRepairJob.failed += 1;
+          cacheRepairJob.errors.push({ route, error: String(err) });
+        } finally {
+          cacheRepairJob.processed += 1;
+        }
+      }
+      cacheRepairJob.status = cacheRepairJob.failed > 0 && cacheRepairJob.fixed === 0 ? "failed" : "completed";
+      cacheRepairJob.completedAt = new Date().toISOString();
+    })().catch((err) => {
+      cacheRepairJob.status = "failed";
+      cacheRepairJob.completedAt = new Date().toISOString();
+      cacheRepairJob.errors.push({ route: "*", error: String(err) });
+    });
+    return res.status(202).json({ ok: true, total: routes.length, message: routes.length ? "Массовый прирендер запущен" : "Маршрутов для восстановления нет" });
+  } catch (err) {
+    logger.error({ err }, "[admin-seo] cache repair start failed");
     return res.status(500).json({ ok: false, error: String(err) });
   }
 });
