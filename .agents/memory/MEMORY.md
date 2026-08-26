@@ -63,3 +63,8 @@
 - [Workflow restart port ownership](workflow-restart-port-ownership.md) — a stale API process can survive restart and keep serving old code on port 8080; verify listener ownership before testing.
 - [VPS SSH transient refusal](vps-ssh-transient-refusal.md) — if Timeweb accepts one connection then refuses the next, use one ControlMaster session and a staged tar deploy.
 - [Route health and safe prerender publication](route-health-integrity.md) — reconcile DB registry with every cache route; validate and atomically publish only crawl-safe snapshots.
+- [Quote PDF priority](quote-pdf-priority.md) — интерактивная генерация КП должна прерывать длительный SEO-пререндер и не оставлять КП без файла.
+- [Karpathy evaluator schedule](karpathy-evaluator-schedule.md) — оценка должна иметь ежедневный catch-up, а не зависеть только от воскресного снапшота позиций.
+- [GAP pending stability](gap-pending-stability.md) — pending-гипотезы принадлежат менеджеру: GAP не создаёт и не перезаписывает их до решения.
+- [Visitor conversion calls](visitor-conversion-calls.md) — целевой звонок для конверсии: completed и длительность строго больше 30 секунд.
+- [Non-interactive post-merge schema sync](post-merge-drizzle.md) — post-merge запускается без TTY; Drizzle push должен использовать non-interactive entry point.
