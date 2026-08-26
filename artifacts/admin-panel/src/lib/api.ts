@@ -401,6 +401,78 @@ export function generateBrandDescriptions(apply = false) {
   return api<{ ok: true; data: { generated: GeneratedBrandDescription[]; applied?: { updated: number; skipped: number } } }>("POST", "/admin/seo/generate-brand-descriptions", { apply }).then(r => r.data);
 }
 
+/* GEO citation monitor */
+export type GeoCitationProviderStatus = "ok" | "partial" | "manual-export" | "unavailable" | "error" | "not-run";
+export interface GeoCitationProvider {
+  provider: string;
+  label: string;
+  status: GeoCitationProviderStatus;
+  reason: string | null;
+  failedQueries: Array<{ queryId: string; reason: string }>;
+  expectedQueries: number;
+  responses: number;
+  queriesChecked: number;
+  queryCoveragePct: number | null;
+  mentions: number;
+  mentionRatePct: number | null;
+  siteLinks: number;
+  citationRatePct: number | null;
+}
+export interface GeoCitationQuery {
+  queryId: string;
+  query: string;
+  targetPaths: string[];
+  responses: number;
+  mentions: number;
+  mentionRatePct: number | null;
+  siteLinks: number;
+  citationRatePct: number | null;
+  citedPages: string[];
+  notRun: boolean;
+  blockedByUnavailable: boolean;
+  unavailableProviders: string[];
+}
+export interface GeoCitationPage {
+  path: string;
+  responses: number;
+  mentions: number;
+  siteLinks: number;
+  citationRatePct: number | null;
+  needsReview: boolean;
+}
+export interface GeoCitationWeek {
+  week: string;
+  runs: number;
+  expectedResponses: number;
+  responses: number;
+  responseCoveragePct: number | null;
+  queriesChecked: number;
+  queryCoveragePct: number | null;
+  mentions: number;
+  mentionRatePct: number | null;
+  siteLinks: number;
+  citationRatePct: number | null;
+  byProvider: GeoCitationProvider[];
+  byQuery: GeoCitationQuery[];
+  pages: GeoCitationPage[];
+  topCitedPages: Array<{ path: string; count: number }>;
+}
+export interface GeoCitationReport {
+  site: { name: string; domain: string };
+  updatedAt: string | null;
+  latest: GeoCitationWeek | null;
+  history: GeoCitationWeek[];
+}
+export interface GeoCitationReportResponse {
+  ok: true;
+  status: "ready" | "empty" | "invalid";
+  message?: string;
+  data: GeoCitationReport;
+}
+export function getGeoCitationReport() {
+  return api<GeoCitationReportResponse>("GET", "/admin/seo/geo-citations");
+}
+
 /* ── Route Health ─────────────────────────────────────────────────────── */
 export interface RouteHealthItem {
   route: string;
@@ -827,6 +899,10 @@ export function getAdminQuotes(params?: { managerId?: number; from?: string; to?
   if (params?.to) qs.set("to", params.to);
   const q = qs.toString();
   return api<{ ok: true; data: AdminQuoteItem[] }>("GET", `/admin/quotes${q ? "?" + q : ""}`);
+}
+
+export function regenerateAdminQuotePdf(quoteId: number) {
+  return api<{ ok: true; quoteId: number; pdfUrl: string }>("POST", `/manager/quotes/${quoteId}/pdf`);
 }
 
 /* ── Metrika / Visitors ── */
