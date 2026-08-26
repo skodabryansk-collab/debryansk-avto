@@ -7,7 +7,9 @@
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-    "geo:check": "node scripts/geo-seo-check.mjs"
+    "geo:check": "node scripts/geo-seo-check.mjs",
+    "geo:citations": "node scripts/geo-citation-check.mjs",
+    "geo:citations:weekly": "node scripts/geo-citation-check.mjs --weekly"
   },
   "private": true,
   "devDependencies": {
