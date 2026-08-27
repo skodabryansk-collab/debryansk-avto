@@ -770,6 +770,19 @@ export async function runMigration() {
       )
     `);
 
+    // Keep applied suggestions as immutable history, while allowing GAP to
+    // create a fresh active attempt for the same page/type after a negative
+    // Karpathy evaluation. Pending/rejected rows remain deduplicated.
+    await db.execute(sql`
+      ALTER TABLE seo_suggestions
+      DROP CONSTRAINT IF EXISTS seo_suggestions_type_page_url_key
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS seo_suggestions_active_type_page_url_idx
+      ON seo_suggestions (type, page_url)
+      WHERE status <> 'applied'
+    `);
+
     // Петля Карпаты evaluation columns (idempotent — ADD COLUMN IF NOT EXISTS)
     await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS snapshot_before  JSONB`);
     await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS evaluate_at      TIMESTAMPTZ`);
@@ -777,6 +790,16 @@ export async function runMigration() {
     await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS evaluation_result TEXT`);
     await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS evaluation_note  TEXT`);
     await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS content_draft    TEXT`);
+    // GEO evidence and evaluation are separate from the Yandex/SEO Karpathy
+    // fields above. JSONB keeps old SEO rows and their snapshot contract intact.
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS geo_evidence           JSONB`);
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS geo_snapshot_before   JSONB`);
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS geo_evaluate_at       TIMESTAMPTZ`);
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS geo_evaluated_at      TIMESTAMPTZ`);
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS geo_evaluation_result  TEXT`);
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS geo_evaluation_note    TEXT`);
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS geo_result_delta       JSONB`);
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS geo_action             TEXT`);
 
     // Anchor-query priority boost flag (idempotent)
     await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS is_anchor_boosted BOOLEAN NOT NULL DEFAULT false`);
