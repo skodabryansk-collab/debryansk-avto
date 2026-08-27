@@ -1132,7 +1132,7 @@ async function applyBrandMeta(
   await recordApplySnapshot(suggestionId, pageUrl);
   let verificationLog = "";
   let status: "applied" | "applied_with_errors" = "applied";
-  let descGeneratedBy: "ai" | "template" = "template";
+  let descGeneratedBy: "ai" | "template" | "ai_hallucinated" = "template";
 
   try {
     // Step 1: Fetch brand data + generate AI description
@@ -1623,7 +1623,7 @@ async function applyTextBlock(
   await recordApplySnapshot(suggestionId, pageUrl);
   let verificationLog = "";
   let status: "applied" | "applied_with_errors" = "applied";
-  let textGeneratedBy: "ai" | "template" = "template";
+  let textGeneratedBy: "ai" | "template" | "ai_hallucinated" = "template";
 
   try {
     // Get brand id
@@ -1881,7 +1881,7 @@ router.get("/suggestions/:id/preview", async (req, res) => {
     }
   }
 
-  res.json({ ok: true, faqs });
+  return res.json({ ok: true, faqs });
 });
 
 /* ──────────────────────────────────────────────────────────────────────
