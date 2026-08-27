@@ -2172,19 +2172,62 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
         logger.info({ url: gap.url }, "[seo-gap] Sitemap gap suggestion created");
       }
 
-      // 9.2 Webmaster crawl errors — pages Yandex crawled and got 4xx/5xx
+      // 9.2 Webmaster indexing errors — pages Yandex downloaded and got 4xx/5xx.
+      // Webmaster API v4 has no /crawling/samples resource. The supported
+      // /indexing/samples endpoint exposes the HTTP status and access date.
       try {
-        const today = new Date().toISOString().slice(0, 10);
-        const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
-        type CrawlSample = { url?: string; http_response_code?: number; httpCode?: number };
-        type CrawlResp = { samples?: CrawlSample[]; url_items?: CrawlSample[] };
-        const crawlData = await webmasterGet<CrawlResp>(
-          `/hosts/${WEBMASTER_HOST}/crawling/samples?date_from=${weekAgo}&date_to=${today}&limit=100`,
+        const weekAgoMs = Date.now() - 7 * 86_400_000;
+        const pageSize = 100;
+        const maxPages = 50;
+        type CrawlSample = {
+          url?: string;
+          status?: string;
+          http_code?: number;
+          access_date?: string;
+        };
+        type CrawlResp = { count?: number; samples?: CrawlSample[] };
+
+        // The API returns the samples in chronological order, but its first
+        // page can contain years-old records. Start at the last page and
+        // walk backwards until the oldest fetched sample is outside the
+        // analysis window. This keeps the GAP run bounded while preserving
+        // all recent samples in the usual case.
+        const firstPage = await webmasterGet<CrawlResp>(
+          `/hosts/${WEBMASTER_HOST}/indexing/samples?limit=${pageSize}&offset=0`,
         );
-        const rawSamples = crawlData.samples ?? crawlData.url_items ?? [];
+        const totalSamples = Math.max(firstPage.count ?? firstPage.samples?.length ?? 0, 0);
+        const rawSamples: CrawlSample[] = [];
+        let offset = totalSamples > 0
+          ? Math.floor((totalSamples - 1) / pageSize) * pageSize
+          : 0;
+
+        for (let pageNumber = 0; pageNumber < maxPages && offset >= 0; pageNumber++) {
+          const page = offset === 0
+            ? firstPage
+            : await webmasterGet<CrawlResp>(
+              `/hosts/${WEBMASTER_HOST}/indexing/samples?limit=${pageSize}&offset=${offset}`,
+            );
+          const samples = page.samples ?? [];
+          rawSamples.push(...samples);
+
+          const accessTimes = samples
+            .map(s => s.access_date ? new Date(s.access_date).getTime() : NaN)
+            .filter(Number.isFinite);
+          const oldestAccess = accessTimes.length > 0 ? Math.min(...accessTimes) : NaN;
+          if (Number.isFinite(oldestAccess) && oldestAccess < weekAgoMs) break;
+          if (offset === 0) break;
+          offset = Math.max(0, offset - pageSize);
+        }
+
         const errors4xx = rawSamples.filter(s => {
-          const code = s.http_response_code ?? s.httpCode ?? 0;
-          return code >= 400 && code < 600;
+          const code = s.http_code ?? 0;
+          const status = s.status ?? "";
+          const accessedAt = s.access_date ? new Date(s.access_date).getTime() : NaN;
+          const isHttpError =
+            (code >= 400 && code < 600) ||
+            status === "HTTP_4XX" ||
+            status === "HTTP_5XX";
+          return isHttpError && Number.isFinite(accessedAt) && accessedAt >= weekAgoMs;
         });
 
         for (const sample of errors4xx.slice(0, 20)) {
@@ -2198,9 +2241,10 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
           const crawlKey = `tech-crawl:${path}`;
           if (seen.has(crawlKey)) continue;
 
-          const code = sample.http_response_code ?? sample.httpCode ?? 0;
+          const code = sample.http_code ?? 0;
+          const statusLabel = code || sample.status || "HTTP_ERROR";
           const reasoning =
-            `Яндекс пытается обойти ${rawUrl} и получает ${code}. ` +
+            `Яндекс пытается обойти ${rawUrl} и получает ${statusLabel}. ` +
             `Если страница удалена — добавьте 301-редирект на ближайшую актуальную страницу ` +
             `или верните её в эфир. Битые URL снижают краулинговый бюджет.`;
 
@@ -2210,7 +2254,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
                priority_score, demand, position_factor, ease, status)
             VALUES
               ('tech', ${path},
-               ${'HTTP ' + code + ' при обходе Яндексом'},
+               ${String(statusLabel) + ' при обходе Яндексом'},
                'Добавить 301-редирект или восстановить страницу',
                ${reasoning}, 60, 20, 0.7, ${EASE.tech}, 'pending')
             ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
@@ -2224,7 +2268,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
           `);
           seen.add(crawlKey);
           generated += crawlRes.rows.length;
-          logger.info({ path, code }, "[seo-gap] Webmaster crawl error → tech suggestion");
+          logger.info({ path, status: statusLabel }, "[seo-gap] Webmaster indexing error → tech suggestion");
         }
         if (errors4xx.length > 0) {
           logger.info({ count: errors4xx.length }, "[seo-gap] Webmaster crawl errors processed");
