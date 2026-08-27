@@ -15,6 +15,10 @@ import { inspectSnapshot, requiresPrerenderSnapshot } from "../lib/routeHealth";
 import { aiClusterToFaqs, AI_HALLUCINATION_SIGNAL } from "../lib/seo-ai";
 import { webmasterGet } from "./yandex-oauth";
 import { getSitemapLocs } from "../routes/sitemap";
+import {
+  getGeoPageSignals,
+  readGeoCitationReport,
+} from "../lib/geoCitationReport";
 
 /**
  * Pre-generate 2–3 DIVERSE FAQ pairs for a cluster suggestion using a single
@@ -53,6 +57,7 @@ const EASE: Record<string, number> = {
   content: 0.6,
   text_block: 0.5,
   new_page: 0.3,
+  geo: 0.65,
 };
 
 /* ── Page size thresholds for tech gap detection (bytes) ─────────────── */
@@ -531,6 +536,160 @@ function applyFeedbackDiscount(
   return score;
 }
 
+/**
+ * GEO is intentionally a separate signal. It has no Wordstat demand and no
+ * Yandex position, so legacy demand/position columns stay zero for backwards
+ * compatibility while priority_score uses only observed AI responses.
+ */
+async function runGeoGapStep(): Promise<number> {
+  let report;
+  try {
+    report = await readGeoCitationReport();
+  } catch (err) {
+    logger.warn({ err }, "[seo-gap] GEO report read failed — skipping GEO step");
+    return 0;
+  }
+
+  let indexablePaths: Set<string>;
+  try {
+    indexablePaths = await getSitemapLocs();
+  } catch (err) {
+    logger.warn({ err }, "[seo-gap] Could not load sitemap paths — skipping GEO step");
+    return 0;
+  }
+
+  const result = getGeoPageSignals(report, indexablePaths);
+  if (result.status !== "ready") {
+    logger.info(
+      { reportStatus: report.status, geoStatus: result.status, reason: result.reason },
+      "[seo-gap] GEO step skipped",
+    );
+    return 0;
+  }
+
+  const activeRows = await db.execute(sql`
+    SELECT page_url, type, status
+    FROM seo_suggestions
+    WHERE status = 'pending'
+       OR status = 'manual'
+       OR (status = 'applied' AND evaluated_at IS NULL)
+  `);
+  const activeByPage = new Map<string, { type: string; status: string }[]>();
+  for (const row of activeRows.rows as { page_url: string; type: string; status: string }[]) {
+    const list = activeByPage.get(row.page_url) ?? [];
+    list.push(row);
+    activeByPage.set(row.page_url, list);
+  }
+
+  const geoFeedbackRows = await db.execute(sql`
+    SELECT page_url
+    FROM seo_suggestions
+    WHERE type = 'geo'
+      AND geo_evaluation_result IN ('fell', 'falsified')
+      AND geo_evaluated_at >= NOW() - INTERVAL '90 days'
+  `).catch(err => {
+    logger.warn({ err }, "[seo-gap] Could not load GEO evaluation feedback");
+    return { rows: [] };
+  });
+  const negativeFeedback = new Set(
+    (geoFeedbackRows.rows as { page_url: string }[]).map(row => row.page_url),
+  );
+
+  let generated = 0;
+  for (const signal of result.signals) {
+    const active = activeByPage.get(signal.pageUrl) ?? [];
+    const hasActiveGeo = active.some(row => row.type === "geo");
+    if (hasActiveGeo) continue;
+
+    const competing = active.filter(row => row.type !== "geo");
+    if (competing.length > 0) {
+      logger.info(
+        { pageUrl: signal.pageUrl, competingTypes: competing.map(row => row.type) },
+        "[seo-gap] GEO opportunity deferred because another active hypothesis owns the page",
+      );
+      continue;
+    }
+
+    if (signal.citationRatePct > 25 || signal.noCitationRatePct < 50) continue;
+
+    const noCitationRate = signal.noCitationRatePct / 100;
+    const mentionRate = signal.mentionRatePct / 100;
+    const coverageFactor = Math.min(signal.responses / 12, 1);
+    const providerFactor = Math.min(signal.providerCount / 2, 1);
+    const feedbackFactor = negativeFeedback.has(signal.pageUrl) ? 0.5 : 1;
+    const priorityScore = Math.round(
+      100 * noCitationRate * (0.5 + mentionRate * 0.5) *
+      coverageFactor * providerFactor * EASE.geo * feedbackFactor * 10,
+    ) / 10;
+
+    const evidence = {
+      pageUrl: signal.pageUrl,
+      reportWeek: signal.reportWeek,
+      reportUpdatedAt: signal.reportUpdatedAt,
+      responses: signal.responses,
+      mentions: signal.mentions,
+      citations: signal.citations,
+      mentionRatePct: signal.mentionRatePct,
+      citationRatePct: signal.citationRatePct,
+      noCitationRatePct: signal.noCitationRatePct,
+      coveragePct: signal.coveragePct,
+      providers: signal.providers,
+      queryIds: signal.queryIds,
+      queries: signal.queries,
+      observedCitedPages: signal.citedPages,
+      targetPageMissingFromObservedCitations: true,
+    };
+    const proposedValue = [
+      "Ручное ТЗ по GEO:",
+      `1. Добавить на страницу ${signal.pageUrl} прямой ответ на интент: ${signal.queries.slice(0, 3).join("; ")}.`,
+      "2. Связать ответ с релевантными разделами сайта внутренними ссылками.",
+      "3. Проверить FAQ и структурированные данные, не добавляя неподтверждённые факты.",
+      "Измерение повторить после публикации отдельным GEO-замером.",
+    ].join("\n");
+    const reasoning =
+      `GEO-наблюдение за ${signal.reportWeek}: ${signal.responses} фактических ответов ` +
+      `от ${signal.providerCount} провайд. Упоминание страницы/бренда — ${signal.mentionRatePct}%, ` +
+      `цитирование целевого URL — ${signal.citationRatePct}%. ` +
+      `В ${signal.citations === 0 ? "ответах не наблюдалась" : `${signal.responses - signal.citations} из ${signal.responses} ответов не наблюдалась`} ` +
+      `ссылка на ${signal.pageUrl}. Это отсутствие наблюдаемой ссылки, а не список несуществующих URL.`;
+
+    const insert = await db.execute(sql`
+      INSERT INTO seo_suggestions
+        (type, page_url, current_value, proposed_value, reasoning,
+         priority_score, demand, position_factor, ease, status,
+         geo_evidence, geo_action)
+      VALUES
+        ('geo', ${signal.pageUrl},
+         ${JSON.stringify(evidence)},
+         ${proposedValue},
+         ${reasoning},
+         ${priorityScore}, 0, 0, ${EASE.geo}, 'pending',
+         ${JSON.stringify(evidence)}::jsonb, 'manual_brief')
+      ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
+        current_value = EXCLUDED.current_value,
+        proposed_value = EXCLUDED.proposed_value,
+        reasoning = EXCLUDED.reasoning,
+        priority_score = EXCLUDED.priority_score,
+        demand = 0,
+        position_factor = 0,
+        ease = EXCLUDED.ease,
+        geo_evidence = EXCLUDED.geo_evidence,
+        geo_action = EXCLUDED.geo_action,
+        status = CASE WHEN seo_suggestions.status IN ('pending', 'manual') THEN seo_suggestions.status ELSE 'pending' END,
+        updated_at = NOW()
+      RETURNING id
+    `);
+    generated += insert.rows.length;
+    activeByPage.set(signal.pageUrl, [{ type: "geo", status: "pending" }]);
+    logger.info(
+      { pageUrl: signal.pageUrl, responses: signal.responses, citationRatePct: signal.citationRatePct },
+      "[seo-gap] GEO suggestion created",
+    );
+  }
+
+  return generated;
+}
+
 /* ── Main GAP analysis function ───────────────────────────────────────── */
 export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"): Promise<{ generated: number; skipped: boolean }> {
   if (isGapRunning) {
@@ -572,6 +731,33 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
       logger.info(
         { count: staleCleanup.rows.length },
         "[seo-gap] Cleaned up stale new_page suggestions for existing pages",
+      );
+    }
+
+    // A pending card for a page/type becomes stale as soon as an equivalent
+    // change has been applied and is waiting for Karpathy evaluation. Old GAP
+    // runs could leave these rows behind after the applied row stopped taking
+    // part in the active unique index, which made the same finding reappear.
+    const supersededCleanup = await db.execute(sql`
+      UPDATE seo_suggestions pending
+      SET status = 'rejected',
+          reject_reason = 'Аналогичная находка уже применена и ожидает оценку Петли Карпаты',
+          updated_at = NOW()
+      WHERE pending.status = 'pending'
+        AND EXISTS (
+          SELECT 1
+          FROM seo_suggestions applied
+          WHERE applied.type = pending.type
+            AND applied.page_url = pending.page_url
+            AND applied.status = 'applied'
+            AND applied.evaluated_at IS NULL
+        )
+      RETURNING pending.id
+    `);
+    if (supersededCleanup.rows.length > 0) {
+      logger.info(
+        { count: supersededCleanup.rows.length },
+        "[seo-gap] Rejected pending suggestions superseded by unevaluated applied changes",
       );
     }
 
@@ -669,14 +855,15 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
     if (wordstatAge > STALE_DAYS && webmasterAge > STALE_DAYS) {
       const msg = `Данные устарели: Wordstat=${freshness.wordstat_date ?? "нет"} (${Math.round(wordstatAge)}д), Webmaster=${freshness.webmaster_date ?? "нет"} (${Math.round(webmasterAge)}д). Порог: ${STALE_DAYS} дней.`;
       logger.warn({ wordstatAge, webmasterAge, staleDays: STALE_DAYS }, `[seo-gap] ${msg}`);
+      const geoGenerated = await runGeoGapStep();
       await db.execute(sql`
         UPDATE gap_runs SET status='completed', completed_at=NOW(),
-          duration_ms=${Date.now() - startedAt}, suggestions_created=0,
+          duration_ms=${Date.now() - startedAt}, suggestions_created=${geoGenerated},
           wordstat_rows=0, webmaster_rows=0,
           error_message=${msg}
         WHERE id=${runId}
       `);
-      return { generated: 0, skipped: false };
+      return { generated: geoGenerated, skipped: false };
     }
 
     // 2. Load latest Wordstat snapshot (seeds + related, no cap)
@@ -741,8 +928,19 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
       (brandsResult.rows as { name: string; slug: string }[]).map(r => [r.name.toLowerCase(), r.slug])
     );
 
-    // 4. Track which (pageUrl, type) pairs we've already proposed in this run
+    // 4. Track which (pageUrl, type) pairs are already occupied by an
+    // unreviewed hypothesis or an applied change awaiting Karpathy evaluation.
+    // GAP must not rediscover an applied change before its result is known.
     const seen = new Set<string>();
+    const pendingPairs = await db.execute(sql`
+      SELECT type, page_url
+      FROM seo_suggestions
+      WHERE status = 'pending'
+         OR (status = 'applied' AND evaluated_at IS NULL)
+    `);
+    for (const row of pendingPairs.rows as { type: string; page_url: string }[]) {
+      seen.add(`${row.type}:${row.page_url}`);
+    }
     // Track priority scores for meta pages so TECH step can sort by importance
     const pagePriority = new Map<string, number>();
 
@@ -811,7 +1009,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
            ${reasoning},
            ${priorityScore}, ${ws.shows_count}, ${positionFactor}, ${EASE.meta}, 'pending',
            ${isAnchorBoostedMeta})
-        ON CONFLICT (type, page_url) DO UPDATE SET
+        ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
           current_value = EXCLUDED.current_value,
           proposed_value = EXCLUDED.proposed_value,
           reasoning = EXCLUDED.reasoning,
@@ -890,7 +1088,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
              ${reasoning},
              ${priorityScore}, ${demand}, ${positionFactor}, ${EASE.meta}, 'pending',
              ${isAnchorBoostedGenMeta})
-          ON CONFLICT (type, page_url) DO UPDATE SET
+          ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
             current_value = EXCLUDED.current_value,
             proposed_value = EXCLUDED.proposed_value,
             reasoning = EXCLUDED.reasoning,
@@ -1121,7 +1319,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
             (${suggType}, ${page.url}, ${currentValue}, ${page.proposed}, ${reasoning},
              ${priorityScore}, ${demand}, ${positionFactor}, ${ease}, 'pending',
              ${isAnchorBoosted})
-          ON CONFLICT (type, page_url) DO UPDATE SET
+          ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
             current_value    = EXCLUDED.current_value,
             proposed_value   = EXCLUDED.proposed_value,
             reasoning        = EXCLUDED.reasoning,
@@ -1205,6 +1403,8 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
         }
 
         const pageUrl = `/brands/${brandSlug}`;
+        const contentKey = `content:${pageUrl}`;
+        if (seen.has(contentKey)) continue;
         const sorted = [...byModel.entries()].sort((a, b) => b[1].shows - a[1].shows);
 
         const proposedValue = sorted
@@ -1236,7 +1436,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
             ('content', ${pageUrl}, '', ${proposedValue}, ${reasoning},
              ${priorityScore}, ${totalShows}, ${positionFactor}, ${EASE.content}, 'pending',
              ${isAnchorBoostedContent})
-          ON CONFLICT (type, page_url) DO UPDATE SET
+          ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
             proposed_value = EXCLUDED.proposed_value,
             reasoning = EXCLUDED.reasoning,
             priority_score = EXCLUDED.priority_score,
@@ -1247,8 +1447,96 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
             updated_at = NOW()
           RETURNING id
         `);
+        seen.add(contentKey);
         generated += contentRes.rows.length;
         logger.info({ brand: brand.brandName, models: modelList, totalShows }, "[seo-gap] Model content suggestion created");
+      }
+    }
+
+    // 5.6 Negative feedback must produce a fresh hypothesis even when the
+    // normal Wordstat/model source did not emit a candidate this run.
+    // Applied rows are history; the partial unique index allows a new pending
+    // row for the same page/type to coexist with them.
+    {
+      const failedRows = await db.execute(sql`
+        SELECT failed.id, failed.type, failed.page_url, failed.proposed_value,
+               failed.reasoning, failed.priority_score, failed.evaluation_result
+        FROM seo_suggestions failed
+        WHERE failed.status = 'applied'
+          AND failed.evaluation_result IN ('fell', 'falsified')
+          AND failed.evaluated_at IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM seo_suggestions active
+            WHERE active.type = failed.type
+              AND active.page_url = failed.page_url
+              AND active.status = 'pending'
+          )
+        ORDER BY failed.evaluated_at ASC
+        LIMIT 50
+      `);
+
+      for (const failed of failedRows.rows as {
+        id: number;
+        type: string;
+        page_url: string;
+        proposed_value: string;
+        reasoning: string | null;
+        priority_score: number;
+        evaluation_result: "fell" | "falsified";
+      }[]) {
+        let proposedValue = failed.proposed_value;
+        let retryReason = `Предыдущая гипотеза (КП №${failed.id}) получила результат «${failed.evaluation_result}». ` +
+          `Сформировать новую гипотезу и проверить её отдельно.`;
+
+        // Content suggestions are applied as FAQ JSON or model-query lines.
+        // Ask the same validated AI path for a genuinely different FAQ set.
+        if (failed.type === "content" && failed.page_url.startsWith("/brands/")) {
+          const slug = failed.page_url.replace("/brands/", "");
+          const queries = [...failed.proposed_value.matchAll(/«([^»]+)»/g)].map(m => m[1]!);
+          const models = failed.proposed_value
+            .split("\n")
+            .map(line => line.split(":")[0]?.trim())
+            .filter(Boolean);
+          const brandRow = await db.execute(sql`
+            SELECT name FROM brands WHERE slug = ${slug} LIMIT 1
+          `);
+          const brandName = (brandRow.rows[0] as { name?: string } | undefined)?.name ?? slug;
+          if (queries.length > 0) {
+            const freshFaqs = await preGenClusterFaqs(queries, brandName, slug, models);
+            if (freshFaqs !== AI_HALLUCINATION_SIGNAL && freshFaqs !== "[]") {
+              proposedValue = freshFaqs;
+              retryReason += " AI подготовил новый набор FAQ с учётом неудачи предыдущей гипотезы.";
+            } else {
+              const modelText = models.length > 0 ? models.join(", ") : brandName;
+              proposedValue = JSON.stringify([{
+                question: `Как выбрать автомобиль ${brandName} для поездок по Брянску?`,
+                answer: `На странице ${brandName} представлены модели ${modelText}. Сравните их комплектации и запишитесь на консультацию у официального дилера в Брянске.`,
+              }]);
+              retryReason += " Создан резервный FAQ-вариант с новым пользовательским интентом.";
+            }
+          }
+        }
+
+        const retryRes = await db.execute(sql`
+          INSERT INTO seo_suggestions
+            (type, page_url, current_value, proposed_value, reasoning,
+             priority_score, demand, position_factor, ease, status)
+          VALUES
+            (${failed.type}, ${failed.page_url}, ${failed.proposed_value},
+             ${proposedValue}, ${retryReason},
+             ${Math.max(1, Number(failed.priority_score) || 1) * KARPATHY_NEGATIVE_DISCOUNT},
+             0, 0, ${EASE[failed.type] ?? 0.5}, 'pending')
+          ON CONFLICT DO NOTHING
+          RETURNING id
+        `);
+        const retryId = (retryRes.rows[0] as { id?: number } | undefined)?.id ?? null;
+        if (retryId) {
+          generated += 1;
+          logger.info(
+            { previousId: failed.id, retryId, type: failed.type, pageUrl: failed.page_url },
+            "[seo-gap] Fresh retry suggestion created after negative Karpathy evaluation",
+          );
+        }
       }
     }
 
@@ -1333,6 +1621,8 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
 
       // If brand already has ≥2 FAQ entries, suggest a text_block instead of another FAQ cluster
       if (existingFaqCount >= 2) {
+        const textBlockKey = `text_block:${pageUrl}`;
+        if (seen.has(textBlockKey)) continue;
         const models = brand.modelKeywords?.slice(0, 4).join(", ") ?? brand.brandName;
         const textBlockContent =
           `${brand.brandName} — официальный дилер в Брянске. ` +
@@ -1360,7 +1650,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
             ('text_block', ${pageUrl}, '', ${textBlockContent}, ${reasoning},
              ${priorityScore}, ${totalDemand}, ${positionFactor}, ${EASE.text_block}, 'pending',
              ${isAnchorBoostedTb})
-          ON CONFLICT (type, page_url) DO UPDATE SET
+          ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
             proposed_value = EXCLUDED.proposed_value,
             reasoning = EXCLUDED.reasoning,
             priority_score = EXCLUDED.priority_score,
@@ -1371,6 +1661,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
             updated_at = NOW()
           RETURNING id
         `);
+        seen.add(textBlockKey);
         generated += tbRes.rows.length;
         logger.info({ brand: brand.brandName, existingFaqCount }, "[seo-gap] text_block suggestion created (FAQ already present)");
       } else {
@@ -1405,7 +1696,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
             ('cluster', ${pageUrl}, '', ${clusterProposedValue}, ${reasoning},
              ${priorityScore}, ${totalDemand}, ${positionFactor}, ${EASE.cluster}, ${clusterStatus},
              ${clusterRejectReason}, ${isAnchorBoostedCluster})
-          ON CONFLICT (type, page_url) DO UPDATE SET
+          ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
             proposed_value = EXCLUDED.proposed_value,
             reasoning = EXCLUDED.reasoning,
             priority_score = EXCLUDED.priority_score,
@@ -1455,7 +1746,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
           ('cluster', '/cars', '', ${proposed}, ${reasoning},
            ${priorityScore}, ${genericDemand}, ${positionFactor}, ${EASE.cluster}, 'pending',
            ${isAnchorBoostedCars})
-        ON CONFLICT (type, page_url) DO UPDATE SET
+        ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
           proposed_value = EXCLUDED.proposed_value,
           reasoning = EXCLUDED.reasoning,
           priority_score = EXCLUDED.priority_score,
@@ -1504,7 +1795,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
           ('cluster', '/new-cars', '', ${proposedNew}, ${reasoningNew},
            ${priorityScoreNew}, ${newCarDemand}, ${positionFactorNew}, ${EASE.cluster}, 'pending',
            ${isAnchorBoostedNewCars})
-        ON CONFLICT (type, page_url) DO UPDATE SET
+        ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
           proposed_value = EXCLUDED.proposed_value,
           reasoning = EXCLUDED.reasoning,
           priority_score = EXCLUDED.priority_score,
@@ -1560,6 +1851,8 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
       const faqCount2 = (faqCountRow2.rows[0] as { cnt: number }).cnt ?? 0;
       const suggType2 = faqCount2 >= 2 ? "text_block" : "cluster";
       const suggEase2 = faqCount2 >= 2 ? EASE.text_block : EASE.cluster;
+      const suggestionKey2 = `${suggType2}:${pageUrl}`;
+      if (seen.has(suggestionKey2)) continue;
 
       const priorityScore2 = applyFeedbackDiscount(
         totalDemand * positionFactor * suggEase2 * (isAnchorBoosted ? 1.5 : 1),
@@ -1610,7 +1903,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
           (${suggType2}, ${pageUrl}, '', ${seedProposedValue}, ${reasoning2},
            ${priorityScore2}, ${totalDemand}, ${positionFactor}, ${suggEase2}, ${seedStatus},
            ${seedRejectReason}, ${isAnchorBoosted})
-        ON CONFLICT (type, page_url) DO UPDATE SET
+        ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
           proposed_value = EXCLUDED.proposed_value,
           reasoning = EXCLUDED.reasoning,
           priority_score = EXCLUDED.priority_score,
@@ -1621,6 +1914,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
           updated_at = NOW()
         RETURNING id
       `);
+      seen.add(suggestionKey2);
       generated += seedRes.rows.length;
       seen.add(clusterKey);
       logger.info(
@@ -1669,7 +1963,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
            ${`title: ${proposal.proposedTitle}\ndesc: ${proposal.proposedDesc}`},
            ${reasoning},
            ${priorityScore}, ${demand}, ${positionFactor}, ${EASE.meta}, 'pending', true)
-        ON CONFLICT (type, page_url) DO UPDATE SET
+        ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
           current_value   = EXCLUDED.current_value,
           proposed_value  = EXCLUDED.proposed_value,
           reasoning       = EXCLUDED.reasoning,
@@ -1733,7 +2027,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
            'Запустить пририндер страницы',
            ${reasoning},
            ${priorityScore}, ${demand}, ${positionFactor}, ${EASE.tech}, 'pending')
-        ON CONFLICT (type, page_url) DO UPDATE SET
+        ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
           current_value = EXCLUDED.current_value,
           reasoning = EXCLUDED.reasoning,
           priority_score = EXCLUDED.priority_score,
@@ -1863,7 +2157,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
           VALUES
             ('sitemap', ${gap.url}, 'Отсутствует в sitemap.xml', ${proposed},
              ${reasoning}, ${priorityScore}, ${demand}, 0.5, ${EASE.sitemap}, 'pending')
-          ON CONFLICT (type, page_url) DO UPDATE SET
+          ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
             reasoning      = EXCLUDED.reasoning,
             priority_score = EXCLUDED.priority_score,
             status = CASE WHEN seo_suggestions.status = 'applied' THEN 'applied' ELSE 'pending' END,
@@ -1917,7 +2211,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
                ${'HTTP ' + code + ' при обходе Яндексом'},
                'Добавить 301-редирект или восстановить страницу',
                ${reasoning}, 60, 20, 0.7, ${EASE.tech}, 'pending')
-            ON CONFLICT (type, page_url) DO UPDATE SET
+            ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
               current_value  = EXCLUDED.current_value,
               reasoning      = EXCLUDED.reasoning,
               priority_score = EXCLUDED.priority_score,
@@ -1979,7 +2273,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
              'Страница не видна в Яндекс Вебмастере (0 показов за 90 дней)',
              'Проверить индексацию в Вебмастере → убедиться в sitemap → добавить внутренние ссылки с /new-cars и главной',
              ${reasoning}, 40, 15, 0.8, ${EASE.sitemap}, 'pending')
-          ON CONFLICT (type, page_url) DO UPDATE SET
+          ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
             reasoning      = EXCLUDED.reasoning,
             status = CASE WHEN seo_suggestions.status = 'applied' THEN 'applied' ELSE 'pending' END,
             reject_reason = CASE WHEN seo_suggestions.status = 'applied' THEN seo_suggestions.reject_reason ELSE NULL END,
@@ -2014,7 +2308,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
              'Добавить строку: Sitemap: https://debryansk-auto.ru/sitemap.xml',
              'robots.txt не содержит директиву Sitemap:. Без неё Яндекс и Google находят sitemap.xml только через Search Console/Вебмастер, но не автоматически при первом обходе. Добавление Sitemap: ускоряет индексацию новых страниц.',
              55, 20, 0.9, ${EASE.tech}, 'pending')
-          ON CONFLICT (type, page_url) DO UPDATE SET
+          ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
             status = CASE WHEN seo_suggestions.status = 'applied' THEN 'applied' ELSE 'pending' END,
             reject_reason = CASE WHEN seo_suggestions.status = 'applied' THEN seo_suggestions.reject_reason ELSE NULL END,
             updated_at = NOW()
@@ -2055,7 +2349,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
              ${"КРИТИЧНО: robots.txt блокирует краулеров (" + blocked.join(", ") + "). " +
                "Весь сайт закрыт от индексации поисковиков. Немедленно уберите Disallow: / для * / Yandex / Google."},
              200, 100, 1.0, ${EASE.tech}, 'pending')
-          ON CONFLICT (type, page_url) DO UPDATE SET
+          ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
             current_value  = EXCLUDED.current_value,
             reasoning      = EXCLUDED.reasoning,
             priority_score = EXCLUDED.priority_score,
@@ -2113,7 +2407,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
                    "Без schema.org AutoDealer/LocalBusiness поисковики не показывают расширенные сниппеты (рейтинг, адрес, телефон). " +
                    "Обычная причина — устаревший prerender-кэш, в котором ещё нет новых мета-тегов. Пересоберите страницу."},
                  70, 25, 0.85, ${EASE.tech}, 'pending')
-              ON CONFLICT (type, page_url) DO UPDATE SET
+              ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
                 current_value  = EXCLUDED.current_value,
                 reasoning      = EXCLUDED.reasoning,
                 status = CASE WHEN seo_suggestions.status = 'applied' THEN 'applied' ELSE 'pending' END,
@@ -2138,7 +2432,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
                    "Именно этот тип даёт расширенные сниппеты в Яндексе и Google для дилерских страниц. " +
                    "Проверьте seoMeta.ts: ld+json блок должен содержать @type: [\"AutoDealer\",\"LocalBusiness\"]."},
                  55, 20, 0.8, ${EASE.tech}, 'pending')
-              ON CONFLICT (type, page_url) DO UPDATE SET
+              ON CONFLICT (type, page_url) WHERE status <> 'applied' DO UPDATE SET
                 current_value  = EXCLUDED.current_value,
                 reasoning      = EXCLUDED.reasoning,
                 status = CASE WHEN seo_suggestions.status = 'applied' THEN 'applied' ELSE 'pending' END,
@@ -2157,6 +2451,10 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
         logger.debug("[seo-gap] Prerender cache not available — skipping JSON-LD coverage check");
       }
     }
+
+    // 13. GEO citation opportunity. This is deliberately last so a regular
+    // SEO hypothesis generated during this run owns the page first.
+    generated += await runGeoGapStep();
 
     logger.info({ generated }, "[seo-gap] GAP analysis complete");
 
