@@ -365,11 +365,21 @@ function KarpathyLoopTab() {
     queryKey: ["seo-loop-pending"],
     queryFn: () => getSeoAutopilotSuggestions({ status: "applied", evaluated: false, limit: 100 }),
   });
+  const { data: geoData, isLoading: geoLoading } = useQuery({
+    queryKey: ["seo-loop-geo"],
+    queryFn: () => getSeoAutopilotSuggestions({ type: "geo", limit: 100 }),
+  });
 
-  const evaluated = (data?.data ?? []) as SeoSuggestion[];
+  // Keep the original Yandex/SEO loop separate from the GEO branch below.
+  const evaluated = ((data?.data ?? []) as SeoSuggestion[]).filter(s => s.type !== "geo");
   const pending = ((pendingData?.data ?? []) as SeoSuggestion[])
-    .filter(s => s.evaluate_at && !s.evaluated_at)
+    .filter(s => s.type !== "geo" && s.evaluate_at && !s.evaluated_at)
     .sort((a, b) => new Date(a.evaluate_at!).getTime() - new Date(b.evaluate_at!).getTime());
+  const geoEvaluated = ((geoData?.data ?? []) as SeoSuggestion[])
+    .filter(s => s.geo_evaluated_at)
+    .sort((a, b) => new Date(b.geo_evaluated_at!).getTime() - new Date(a.geo_evaluated_at!).getTime());
+  const geoPending = ((geoData?.data ?? []) as SeoSuggestion[])
+    .filter(s => s.status === "applied" && s.geo_evaluate_at && !s.geo_evaluated_at);
   const byVerdict = {
     improved:  evaluated.filter(s => s.evaluation_result === "improved").length,
     stable:    evaluated.filter(s => s.evaluation_result === "stable").length,
@@ -384,7 +394,7 @@ function KarpathyLoopTab() {
       <div>
         <h2 className="text-lg font-bold text-slate-800">Петля Карпаты</h2>
         <p className="text-sm text-slate-500 mt-0.5">
-          Оценка применённых SEO-рекомендаций через 28 дней. Закрывает обратную связь — помогает системе учиться на результатах.
+          Оценка применённых SEO-рекомендаций через 28 дней. GEO-цитирование оценивается отдельной веткой и не смешивается с позициями Яндекса.
         </p>
       </div>
 
@@ -416,6 +426,57 @@ function KarpathyLoopTab() {
           })}
         </div>
       )}
+
+      {/* GEO branch — separate metrics and verdicts */}
+      <section className="rounded-xl border border-violet-200 bg-violet-50/40 overflow-hidden">
+        <div className="flex items-start justify-between gap-4 px-4 py-4 border-b border-violet-100">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
+              <Globe2 className="w-4 h-4 text-violet-700" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">GEO-оценка</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Citation/mention rate по одинаковым provider + queryId. Это не позиция и не спрос.
+              </p>
+            </div>
+          </div>
+          <span className="rounded-full bg-violet-600 px-2.5 py-1 text-sm font-bold text-white">
+            {geoLoading ? "…" : geoEvaluated.length}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-5">
+          {[
+            ["improved", "Улучшилось", "text-emerald-700"],
+            ["stable", "Стабильно", "text-slate-700"],
+            ["fell", "Упало", "text-red-700"],
+            ["falsified", "Не сработало", "text-orange-700"],
+            ["insufficient_data", "Мало данных", "text-amber-700"],
+          ].map(([key, label, color]) => (
+            <div key={key} className="rounded-lg bg-white px-3 py-2">
+              <div className="text-[10px] font-medium text-slate-400">{label}</div>
+              <div className={`mt-0.5 text-xl font-bold ${color}`}>
+                {geoEvaluated.filter(s => s.geo_evaluation_result === key).length}
+              </div>
+            </div>
+          ))}
+        </div>
+        {geoPending.length > 0 && (
+          <p className="px-4 pb-3 text-xs text-violet-700">
+            В GEO-очереди на оценку: {geoPending.length}. Сравнение начнётся только после нового сопоставимого отчёта.
+          </p>
+        )}
+        {geoEvaluated.length > 0 && (
+          <div className="divide-y divide-violet-100 border-t border-violet-100 bg-white/70">
+            {geoEvaluated.slice(0, 5).map(s => (
+              <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                <a href={`https://debryansk-auto.ru${s.page_url}`} target="_blank" rel="noopener noreferrer" className="font-mono text-[#0070b8] hover:underline">{s.page_url}</a>
+                <span className="text-slate-600">{s.geo_evaluation_note || "—"}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* Applied changes waiting for the first Karpathy evaluation */}
       <div className="rounded-xl border border-[#0070b8]/15 bg-gradient-to-br from-[#f0f8fc] to-white overflow-hidden">
