@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   getGeoCitationReport,
+  getSeoAutopilotSuggestions,
   type GeoCitationProviderStatus,
   type GeoCitationQuery,
   type GeoCitationWeek,
+  type SeoSuggestion,
 } from "@/lib/api";
 
 const STATUS_STYLE: Record<GeoCitationProviderStatus, { label: string; className: string }> = {
@@ -42,25 +44,78 @@ function rateTone(value: number | null): string {
 
 function QueryStatus({ query }: { query: GeoCitationQuery }) {
   if (query.blockedByUnavailable) {
-    return <span className="text-xs text-slate-500">Источник недоступен</span>;
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+        <CircleSlash className="h-3.5 w-3.5" aria-hidden="true" />
+        Источник недоступен
+      </span>
+    );
   }
   if (query.notRun) {
-    return <span className="text-xs text-slate-500">Не запущен</span>;
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+        <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+        Не запущен
+      </span>
+    );
   }
-  if (query.responses > 0 && query.siteLinks === 0) {
-    return <span className="text-xs font-medium text-amber-700">Нет ссылок на сайт</span>;
+  if (query.siteLinks > 0) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+        Есть ссылка
+      </span>
+    );
   }
-  return <span className="text-xs text-emerald-700">Есть цитирование</span>;
+  if (query.responses > 0) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+        <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
+        Нет ссылки
+      </span>
+    );
+  }
+  return <span className="text-xs text-slate-500">Нет ответа</span>;
 }
 
-function LatestSummary({ latest, updatedAt }: { latest: GeoCitationWeek; updatedAt: string | null }) {
+function CitedPages({ query }: { query: GeoCitationQuery }) {
+  if (query.citedPages.length === 0) {
+    return <span className="text-xs text-slate-400">—</span>;
+  }
+
+  return (
+    <div className="flex max-w-[300px] flex-wrap gap-1.5">
+      {query.citedPages.map((path) => (
+        <a
+          key={path}
+          href={`https://debryansk-auto.ru${path}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex max-w-full items-center gap-1 truncate rounded-md bg-[#0070b8]/10 px-2 py-1 font-mono text-[11px] font-semibold text-[#0070b8] hover:bg-[#0070b8]/15 hover:underline"
+          title={`Открыть ${path}`}
+        >
+          <span className="truncate">{path}</span>
+          <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function LatestSummary({
+  latest,
+  updatedAt,
+  geoSuggestions,
+}: {
+  latest: GeoCitationWeek;
+  updatedAt: string | null;
+  geoSuggestions: SeoSuggestion[];
+}) {
   const emptyCitationQueries = latest.byQuery.filter((query) => query.responses > 0 && query.siteLinks === 0);
   const notRunQueries = latest.byQuery.filter((query) => query.notRun);
   const blockedQueries = latest.byQuery.filter((query) => query.blockedByUnavailable);
   const pagesNeedingReview = latest.pages.filter((page) => page.needsReview);
-  const reviewQueries = latest.byQuery.filter(
-    (query) => query.notRun || query.blockedByUnavailable || (query.responses > 0 && query.siteLinks === 0),
-  );
+  const queriesWithLinks = latest.byQuery.filter((query) => query.siteLinks > 0).length;
 
   return (
     <div className="space-y-5">
@@ -197,7 +252,24 @@ function LatestSummary({ latest, updatedAt }: { latest: GeoCitationWeek; updated
                   >
                     {page.path}<ExternalLink className="ml-1 inline h-3 w-3" />
                   </a>
-                  <span className="shrink-0 text-xs text-amber-700">{page.responses} ответов</span>
+                  <div className="flex shrink-0 items-center gap-2 text-xs">
+                    <span className="text-amber-700">{page.responses} ответов</span>
+                    {geoSuggestions.filter(s => s.page_url === page.path).map(s => (
+                      <span
+                        key={s.id}
+                        className={`rounded-full px-2 py-0.5 font-semibold ${
+                          s.status === "manual"
+                            ? "bg-violet-100 text-violet-700"
+                            : s.status === "rejected"
+                            ? "bg-slate-100 text-slate-500"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                        title={s.reasoning ?? undefined}
+                      >
+                        GAP #{s.id} · {s.status === "manual" ? "ТЗ" : s.status}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -207,40 +279,50 @@ function LatestSummary({ latest, updatedAt }: { latest: GeoCitationWeek; updated
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 px-4 py-3">
-          <h4 className="text-sm font-bold text-slate-800">Запросы, требующие внимания</h4>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-sm font-bold text-slate-800">Все запросы: где есть ссылка</h4>
+            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">
+              {queriesWithLinks} из {latest.byQuery.length} запросов со ссылкой
+            </span>
+          </div>
           <p className="mt-0.5 text-xs text-slate-500">
-            Без ссылки на сайт: {emptyCitationQueries.length} · Не запущены: {notRunQueries.length} · Заблокированы источником: {blockedQueries.length}
+            «Ответы со ссылкой» — сколько ответов AI содержали ссылку на debryansk-auto.ru. Страница в колонке справа открывается в новой вкладке.
           </p>
         </div>
-        {reviewQueries.length === 0 ? (
-          <div className="flex items-center gap-2 px-4 py-6 text-sm text-slate-500">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            Все полученные ответы в последнем замере содержат ссылку на сайт.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-sm">
-              <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-4 py-2.5 text-left">Запрос</th>
-                  <th className="px-4 py-2.5 text-right">Ответы</th>
-                  <th className="px-4 py-2.5 text-right">Ссылки</th>
-                  <th className="px-4 py-2.5 text-left">Статус</th>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-sm">
+            <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-2.5 text-left">Запрос</th>
+                <th className="px-4 py-2.5 text-right">Ответы</th>
+                <th className="px-4 py-2.5 text-right">Упоминания</th>
+                <th className="px-4 py-2.5 text-right">Ответы со ссылкой</th>
+                <th className="px-4 py-2.5 text-left">Процитированные страницы</th>
+                <th className="px-4 py-2.5 text-left">Статус</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {latest.byQuery.map((query) => (
+                <tr key={query.queryId} className="align-top hover:bg-slate-50">
+                  <td className="max-w-[380px] px-4 py-3 text-slate-700">
+                    <div>{query.query}</div>
+                    <span className="mt-1 block font-mono text-[10px] text-slate-400">{query.queryId}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums text-slate-600">{query.responses}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-slate-600">{query.mentions}</td>
+                  <td className={`px-4 py-3 text-right font-semibold tabular-nums ${query.siteLinks > 0 ? "text-emerald-600" : "text-slate-600"}`}>
+                    {query.siteLinks}
+                  </td>
+                  <td className="px-4 py-3"><CitedPages query={query} /></td>
+                  <td className="px-4 py-3"><QueryStatus query={query} /></td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {reviewQueries.map((query) => (
-                  <tr key={query.queryId} className="hover:bg-slate-50">
-                    <td className="max-w-xl px-4 py-3 text-slate-700">{query.query}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">{query.responses}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">{query.siteLinks}</td>
-                    <td className="px-4 py-3"><QueryStatus query={query} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
+          Без ссылки: {emptyCitationQueries.length} · Не запущены: {notRunQueries.length} · Заблокированы источником: {blockedQueries.length}
+        </div>
       </section>
     </div>
   );
@@ -252,6 +334,12 @@ export default function SeoGeoCitationsTab() {
     queryFn: getGeoCitationReport,
     staleTime: 60_000,
   });
+  const { data: geoSuggestionsData } = useQuery({
+    queryKey: ["seo-geo-suggestions"],
+    queryFn: () => getSeoAutopilotSuggestions({ type: "geo", limit: 100 }),
+    staleTime: 60_000,
+  });
+  const geoSuggestions = (geoSuggestionsData?.data ?? []) as SeoSuggestion[];
 
   const emptyState = report?.status === "empty" || report?.status === "invalid";
   return (
@@ -297,7 +385,11 @@ export default function SeoGeoCitationsTab() {
         </div>
       ) : (
         <>
-          <LatestSummary latest={report.data.latest} updatedAt={report.data.updatedAt} />
+           <LatestSummary
+             latest={report.data.latest}
+             updatedAt={report.data.updatedAt}
+             geoSuggestions={geoSuggestions}
+           />
           {report.data.history.length > 1 && (
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
               <div className="border-b border-slate-100 px-4 py-3">
