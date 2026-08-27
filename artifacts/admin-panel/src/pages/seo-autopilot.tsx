@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, CheckCircle2, XCircle, AlertTriangle, Database, Zap, ShieldAlert, BarChart3, Wrench, FileText, FilePlus, Clock, Activity, Trash2, RotateCcw, Sparkles, Target, HelpCircle, AlertCircle, Check, Pencil, ChevronUp, ChevronDown } from "lucide-react";
+import { RefreshCw, CheckCircle2, XCircle, AlertTriangle, Database, Zap, ShieldAlert, BarChart3, Wrench, FileText, FilePlus, Clock, Activity, Trash2, RotateCcw, Sparkles, Target, HelpCircle, AlertCircle, Check, Pencil, ChevronUp, ChevronDown, Globe2 } from "lucide-react";
 
 /* ── Type labels ─────────────────────────────────────────────────────── */
 const TYPE_LABELS: Record<string, { label: string; color: string }> = {
@@ -22,12 +22,14 @@ const TYPE_LABELS: Record<string, { label: string; color: string }> = {
   content:    { label: "Контент",     color: "bg-amber-100 text-amber-800" },
   text_block: { label: "Текст",       color: "bg-teal-100 text-teal-800" },
   new_page:   { label: "Новая стр.",  color: "bg-green-100 text-green-800" },
+  geo:        { label: "GEO",         color: "bg-violet-100 text-violet-800" },
 };
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending:             { label: "Ожидает",      color: "bg-slate-100 text-slate-700" },
   applied:             { label: "Применено",    color: "bg-green-100 text-green-700" },
   applied_with_errors: { label: "Ошибка",       color: "bg-red-100 text-red-700" },
   rejected:            { label: "Отклонено",    color: "bg-slate-200 text-slate-500" },
+  manual:              { label: "ТЗ сохранено", color: "bg-violet-100 text-violet-700" },
 };
 
 /* ── Animated progress hook ──────────────────────────────────────────── */
@@ -536,6 +538,35 @@ function WillBeDoneBlock({
     );
   }
 
+  /* GEO — manual brief only; never imply that the page was changed */
+  if (type === "geo") {
+    const evidence = s.geo_evidence;
+    return (
+      <div className="border border-violet-100 bg-violet-50/30 rounded-lg p-3 space-y-2">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-violet-700">
+          <Globe2 className="w-3.5 h-3.5" />
+          Что будет сделано — ручное GEO-ТЗ
+        </div>
+        <p className="text-[11px] text-slate-600 leading-relaxed">
+          Сохранится инструкция для редактора. Страница автоматически не изменяется и рекомендация не получает статус «применено».
+        </p>
+        {evidence && (
+          <div className="grid grid-cols-2 gap-2 text-[11px]">
+            <div className="rounded bg-white px-2 py-1.5"><b>{evidence.responses}</b> ответов · {evidence.reportWeek}</div>
+            <div className="rounded bg-white px-2 py-1.5"><b>{evidence.providers.length}</b> провайд. · {evidence.queryIds.length} запросов</div>
+            <div className="rounded bg-white px-2 py-1.5">Упоминание: <b>{evidence.mentionRatePct}%</b></div>
+            <div className="rounded bg-white px-2 py-1.5">Цитирование URL: <b>{evidence.citationRatePct}%</b></div>
+          </div>
+        )}
+        {evidence && evidence.queries.length > 0 && (
+          <p className="text-[10px] leading-relaxed text-slate-500">
+            Запросы: {evidence.queries.join(" · ")}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   /* NEW_PAGE */
   if (type === "new_page") {
     const lines = (proposed_value ?? "").split("\n").map(l => l.trim()).filter(Boolean);
@@ -904,23 +935,33 @@ function SuggestionCard({ s, maxScore, onApply, onReject, isApplying, isRejectin
         </div>
       </div>
 
-      {/* Metrics — compact inline row */}
-      <div className="flex items-center gap-3 text-xs text-slate-500 border-t border-slate-100 pt-2">
-        <span className="flex items-center gap-1">
-          <span className="font-semibold text-slate-700">{s.demand.toLocaleString("ru-RU")}</span>
-          <span>спрос</span>
-        </span>
-        <span className="text-slate-200">·</span>
-        <span className="flex items-center gap-1">
-          <span className="font-semibold text-slate-700">{(s.position_factor * 100).toFixed(0)}%</span>
-          <span>позиция</span>
-        </span>
-        <span className="text-slate-200">·</span>
-        <span className="flex items-center gap-1">
-          <span className="font-semibold text-slate-700">{(s.ease * 100).toFixed(0)}%</span>
-          <span>лёгкость</span>
-        </span>
-      </div>
+      {/* Metrics — GEO never presents citation as demand or position */}
+      {s.type === "geo" && s.geo_evidence ? (
+        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 border-t border-slate-100 pt-2">
+          <span><b className="text-slate-700">{s.geo_evidence.noCitationRatePct}%</b> без цитаты</span>
+          <span className="text-slate-200">·</span>
+          <span><b className="text-slate-700">{s.geo_evidence.responses}</b> наблюдений</span>
+          <span className="text-slate-200">·</span>
+          <span><b className="text-slate-700">{s.geo_evidence.reportWeek}</b> период</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 text-xs text-slate-500 border-t border-slate-100 pt-2">
+          <span className="flex items-center gap-1">
+            <span className="font-semibold text-slate-700">{s.demand.toLocaleString("ru-RU")}</span>
+            <span>спрос</span>
+          </span>
+          <span className="text-slate-200">·</span>
+          <span className="flex items-center gap-1">
+            <span className="font-semibold text-slate-700">{(s.position_factor * 100).toFixed(0)}%</span>
+            <span>позиция</span>
+          </span>
+          <span className="text-slate-200">·</span>
+          <span className="flex items-center gap-1">
+            <span className="font-semibold text-slate-700">{(s.ease * 100).toFixed(0)}%</span>
+            <span>лёгкость</span>
+          </span>
+        </div>
+      )}
 
       {/* Reasoning */}
       <p className="text-xs text-slate-600 leading-relaxed">{s.reasoning}</p>
@@ -964,9 +1005,25 @@ function SuggestionCard({ s, maxScore, onApply, onReject, isApplying, isRejectin
           </div>
         </div>
       )}
+      {s.status === "manual" && s.verification_log && (
+        <div className="bg-violet-50 border border-violet-200 rounded p-2 text-[11px] text-violet-800">
+          <div className="flex items-center gap-1.5 font-semibold">
+            <Globe2 className="w-3.5 h-3.5" />Ручное ТЗ сохранено
+          </div>
+          <p className="mt-1">{s.verification_log}</p>
+        </div>
+      )}
       {s.status !== "applied" && s.verification_log && (
         <div className="bg-slate-50 rounded p-2 text-[11px] font-mono text-slate-600 whitespace-pre-wrap">
           {s.verification_log}
+        </div>
+      )}
+
+      {/* Rejection reason — shown for rejected suggestions */}
+      {s.status === "rejected" && s.reject_reason && (
+        <div className="flex items-start gap-1.5 bg-slate-50 border border-slate-200 rounded p-2 text-[11px] text-slate-600">
+          <XCircle className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+          <span><span className="font-medium text-slate-700">Причина отклонения: </span>{s.reject_reason}</span>
         </div>
       )}
 
@@ -1227,6 +1284,21 @@ export default function SeoAutopilotPage() {
   const wordstatRunning = !!statusData?.wordstatRunning;
   const gapRunning      = !!statusData?.gapRunning;
 
+  // ── Data-freshness helpers ────────────────────────────────────────────
+  const daysSince = (dateStr: string | null | undefined): number | null => {
+    if (!dateStr) return null;
+    const diff = Date.now() - new Date(dateStr).getTime();
+    return Math.floor(diff / 86_400_000);
+  };
+  const fmtDate = (d: string | null | undefined) =>
+    d ? new Date(d).toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) : "нет данных";
+
+  const wordstatDays    = daysSince(statusData?.lastWordstatDate);
+  const webmasterDays   = daysSince(statusData?.lastWebmasterDate);
+  const isWordstatStale = wordstatDays !== null && wordstatDays > 10;
+  const isWebmasterStale = webmasterDays !== null && webmasterDays > 10;
+  const anyStale = isWordstatStale || isWebmasterStale;
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -1239,6 +1311,28 @@ export default function SeoAutopilotPage() {
           <p className="text-sm text-slate-500 mt-0.5">
             Wordstat + Вебмастер + Метрика → GAP-анализ → аппрув изменений
           </p>
+          {/* Data-freshness banner */}
+          {statusData && (
+            <div className={`mt-2 inline-flex items-center gap-3 px-3 py-1.5 rounded-lg text-xs border ${
+              anyStale
+                ? "bg-amber-50 border-amber-200 text-amber-800"
+                : "bg-slate-50 border-slate-200 text-slate-500"
+            }`}>
+              {anyStale && <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+              <span className={isWordstatStale ? "font-semibold text-amber-700" : ""}>
+                Wordstat: <span className="font-medium">{fmtDate(statusData.lastWordstatDate)}</span>
+                {wordstatDays !== null && <span className="ml-1 opacity-60">({wordstatDays}д)</span>}
+              </span>
+              <span className="opacity-30">·</span>
+              <span className={isWebmasterStale ? "font-semibold text-amber-700" : ""}>
+                Вебмастер: <span className="font-medium">{fmtDate(statusData.lastWebmasterDate)}</span>
+                {webmasterDays !== null && <span className="ml-1 opacity-60">({webmasterDays}д)</span>}
+              </span>
+              {anyStale && (
+                <span className="text-amber-600 font-medium">— данные устарели</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Buttons + progress bars */}
@@ -1420,6 +1514,7 @@ export default function SeoAutopilotPage() {
               <option value="content">Контент</option>
               <option value="text_block">Текст</option>
               <option value="new_page">Новая стр.</option>
+              <option value="geo">GEO</option>
             </select>
             <select
               value={statusFilter}
@@ -1431,6 +1526,7 @@ export default function SeoAutopilotPage() {
               <option value="applied">Применено</option>
               <option value="applied_with_errors">С ошибками</option>
               <option value="rejected">Отклонено</option>
+              <option value="manual">ТЗ сохранено</option>
             </select>
             <div className="text-sm text-slate-500 self-center">
               {suggestionsData?.total ?? 0} находок
