@@ -3,11 +3,48 @@ import { resolve } from "node:path";
 
 export type GeoCitationReportStatus = "ready" | "empty" | "invalid";
 
+export type GeoProviderObservation = {
+  provider: string;
+  queryId: string;
+  query: string;
+  mentioned: boolean;
+  targetCited: boolean;
+};
+
+export type GeoCitationCheck = GeoProviderObservation & {
+  checkedAt: string;
+  week: string;
+  citedPages: Array<{ path: string; url?: string | null }>;
+};
+
+export type GeoPageSignalStatus = "ready" | "insufficient_data" | "stale" | "empty" | "invalid";
+
+export interface GeoPageSignal {
+  pageUrl: string;
+  reportWeek: string;
+  reportUpdatedAt: string | null;
+  status: "ready" | "insufficient_data";
+  responses: number;
+  mentions: number;
+  citations: number;
+  mentionRatePct: number;
+  citationRatePct: number;
+  noCitationRatePct: number;
+  coveragePct: number;
+  providerCount: number;
+  providers: string[];
+  queryIds: string[];
+  queries: string[];
+  citedPages: string[];
+  observations: GeoProviderObservation[];
+}
+
 export interface GeoCitationReportData {
   site: { name: string; domain: string };
   updatedAt: string | null;
   latest: Record<string, unknown> | null;
   history: Record<string, unknown>[];
+  latestChecks: GeoCitationCheck[];
 }
 
 export interface GeoCitationReportResult {
@@ -40,6 +77,7 @@ function emptyData(): GeoCitationReportData {
     updatedAt: null,
     latest: null,
     history: [],
+    latestChecks: [],
   };
 }
 
@@ -49,6 +87,36 @@ function reportData(value: Record<string, unknown>): GeoCitationReportData {
     ? value.weekly
     : [];
   const history = weekly.slice(-12);
+  const latestWeek = history.length ? String(history[history.length - 1].week) : null;
+  const checks = Array.isArray(value.checks) ? value.checks : [];
+  const latestChecks: GeoCitationCheck[] = checks
+    .filter((check): check is Record<string, unknown> =>
+      isRecord(check) &&
+      check.week === latestWeek &&
+      typeof check.checkedAt === "string" &&
+      typeof check.provider === "string" &&
+      typeof check.queryId === "string" &&
+      typeof check.query === "string" &&
+      typeof check.mention === "boolean" &&
+      typeof check.citedPages === "object" &&
+      Array.isArray(check.citedPages),
+    )
+    .map((check) => ({
+      checkedAt: String(check.checkedAt),
+      week: String(check.week),
+      provider: String(check.provider),
+      queryId: String(check.queryId),
+      query: String(check.query),
+      mentioned: Boolean(check.mention),
+      targetCited: false,
+      citedPages: (check.citedPages as unknown[])
+        .filter(isRecord)
+        .map(page => ({
+          path: typeof page.path === "string" ? page.path : "",
+          url: typeof page.url === "string" ? page.url : null,
+        }))
+        .filter(page => page.path.length > 0),
+    }));
 
   return {
     site: {
@@ -58,6 +126,7 @@ function reportData(value: Record<string, unknown>): GeoCitationReportData {
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : null,
     latest: history.length ? history[history.length - 1] : null,
     history,
+    latestChecks,
   };
 }
 
@@ -122,4 +191,132 @@ export async function readGeoCitationReport(): Promise<GeoCitationReportResult> 
   }
 
   return { status: "ready", data };
+}
+
+function normalizePath(path: string): string {
+  try {
+    const parsed = new URL(path, "https://debryansk-auto.ru");
+    const pathname = parsed.pathname || "/";
+    return pathname === "/" ? "/" : pathname.replace(/\/+$/, "");
+  } catch {
+    const clean = path.split(/[?#]/, 1)[0] || "/";
+    return clean === "/" ? "/" : `/${clean.replace(/^\/+|\/+$/g, "")}`;
+  }
+}
+
+function reportAgeDays(updatedAt: string | null, now: number): number {
+  if (!updatedAt) return Infinity;
+  const timestamp = new Date(updatedAt).getTime();
+  return Number.isFinite(timestamp) ? Math.max(0, (now - timestamp) / 86_400_000) : Infinity;
+}
+
+/**
+ * Converts the saved weekly report into page-level observations for GAP.
+ * It deliberately works from observed checks only: missing URLs are never
+ * invented, and a page without a response cannot become a negative signal.
+ */
+export function getGeoPageSignals(
+  report: GeoCitationReportResult,
+  indexablePaths: Set<string>,
+  options: { now?: number; staleDays?: number; minResponses?: number; minMentions?: number } = {},
+): { status: GeoPageSignalStatus; reason?: string; signals: GeoPageSignal[] } {
+  if (report.status !== "ready" || !report.data.latest) {
+    return {
+      status: report.status === "invalid" ? "invalid" : "empty",
+      reason: report.message || "Нет готового GEO-отчёта.",
+      signals: [],
+    };
+  }
+
+  const now = options.now ?? Date.now();
+  const staleDays = options.staleDays ?? 14;
+  const ageDays = reportAgeDays(report.data.updatedAt, now);
+  if (ageDays > staleDays) {
+    return {
+      status: "stale",
+      reason: `GEO-отчёт старше ${staleDays} дней (${Math.floor(ageDays)} дн.).`,
+      signals: [],
+    };
+  }
+
+  const latest = report.data.latest;
+  const rows = report.data.latestChecks;
+  const targetPaths = new Set<string>();
+  const byQuery = Array.isArray(latest.byQuery) ? latest.byQuery : [];
+  for (const query of byQuery) {
+    if (!isRecord(query) || !Array.isArray(query.targetPaths)) continue;
+    for (const path of query.targetPaths) {
+      if (typeof path === "string") targetPaths.add(normalizePath(path));
+    }
+  }
+
+  const signals = [...targetPaths]
+    .filter(path => indexablePaths.has(path))
+    .map((pageUrl): GeoPageSignal => {
+      const pageRows = rows.filter(row =>
+        row.citedPages.some(page => normalizePath(page.path) === pageUrl) ||
+        byQuery.some(query =>
+          isRecord(query) &&
+          Array.isArray(query.targetPaths) &&
+          query.targetPaths.some(target => typeof target === "string" && normalizePath(target) === pageUrl) &&
+          query.queryId === row.queryId,
+        ),
+      );
+      const relevantRows = pageRows.filter(row =>
+        byQuery.some(query =>
+          isRecord(query) &&
+          query.queryId === row.queryId &&
+          Array.isArray(query.targetPaths) &&
+          query.targetPaths.some(target => typeof target === "string" && normalizePath(target) === pageUrl),
+        ),
+      );
+      const uniqueRows = new Map<string, GeoCitationCheck>();
+      for (const row of relevantRows) uniqueRows.set(`${row.provider}:${row.queryId}`, row);
+      const observations = [...uniqueRows.values()].map(row => ({
+        provider: row.provider,
+        queryId: row.queryId,
+        query: row.query,
+        mentioned: row.mentioned,
+        targetCited: row.citedPages.some(page => normalizePath(page.path) === pageUrl),
+      }));
+      const responses = observations.length;
+      const mentions = observations.filter(row => row.mentioned).length;
+      const citations = observations.filter(row => row.targetCited).length;
+      const providers = [...new Set(observations.map(row => row.provider))].sort();
+      const queryIds = [...new Set(observations.map(row => row.queryId))].sort();
+      const queries = [...new Set(observations.map(row => row.query))].sort();
+      const citedPages = [...new Set(observations.flatMap(row =>
+        uniqueRows.get(`${row.provider}:${row.queryId}`)?.citedPages.map(page => normalizePath(page.path)) ?? [],
+      ))].sort();
+
+      const minResponses = options.minResponses ?? 4;
+      const minMentions = options.minMentions ?? 2;
+      const enoughData = responses >= minResponses && mentions >= minMentions;
+      return {
+        pageUrl,
+        reportWeek: typeof latest.week === "string" ? latest.week : "unknown",
+        reportUpdatedAt: report.data.updatedAt,
+        status: enoughData ? "ready" : "insufficient_data",
+        responses,
+        mentions,
+        citations,
+        mentionRatePct: responses ? Math.round((mentions / responses) * 1000) / 10 : 0,
+        citationRatePct: responses ? Math.round((citations / responses) * 1000) / 10 : 0,
+        noCitationRatePct: responses ? Math.round(((responses - citations) / responses) * 1000) / 10 : 0,
+        coveragePct: responses ? Math.round((responses / Math.max(1, Number(latest.expectedResponses) || responses)) * 1000) / 10 : 0,
+        providerCount: providers.length,
+        providers,
+        queryIds,
+        queries,
+        citedPages,
+        observations,
+      };
+    })
+    .filter(signal => signal.status === "ready");
+
+  return {
+    status: signals.length ? "ready" : "insufficient_data",
+    reason: signals.length ? undefined : "В отчёте нет страниц с достаточной наблюдаемой выборкой.",
+    signals,
+  };
 }
