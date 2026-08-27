@@ -462,6 +462,16 @@ export interface GeoCitationReport {
   updatedAt: string | null;
   latest: GeoCitationWeek | null;
   history: GeoCitationWeek[];
+  latestChecks?: Array<{
+    checkedAt: string;
+    week: string;
+    provider: string;
+    queryId: string;
+    query: string;
+    mentioned: boolean;
+    targetCited: boolean;
+    citedPages: Array<{ path: string; url?: string | null }>;
+  }>;
 }
 export interface GeoCitationReportResponse {
   ok: true;
@@ -1038,6 +1048,55 @@ export interface SeoSuggestion {
   evaluation_result: "improved" | "stable" | "fell" | "falsified" | null;
   evaluation_note: string | null;
   content_draft: string | null;
+  // GEO signal/evaluation fields (kept separate from Yandex fields above)
+  geo_evidence: {
+    pageUrl: string;
+    reportWeek: string;
+    reportUpdatedAt: string | null;
+    responses: number;
+    mentions: number;
+    citations: number;
+    mentionRatePct: number;
+    citationRatePct: number;
+    noCitationRatePct: number;
+    coveragePct: number;
+    providers: string[];
+    queryIds: string[];
+    queries: string[];
+    observedCitedPages: string[];
+    targetPageMissingFromObservedCitations: boolean;
+  } | null;
+  geo_snapshot_before: {
+    pageUrl: string;
+    reportWeek: string;
+    reportUpdatedAt: string | null;
+    responses: number;
+    mentions: number;
+    citations: number;
+    mentionRatePct: number;
+    citationRatePct: number;
+    providers: string[];
+    queryIds: string[];
+    observations: Array<{
+      provider: string;
+      queryId: string;
+      query: string;
+      mentioned: boolean;
+      targetCited: boolean;
+    }>;
+  } | null;
+  geo_evaluate_at: string | null;
+  geo_evaluated_at: string | null;
+  geo_evaluation_result: "improved" | "stable" | "fell" | "falsified" | "insufficient_data" | null;
+  geo_evaluation_note: string | null;
+  geo_result_delta: {
+    citationRatePp?: number | null;
+    mentionRatePp?: number | null;
+    comparableResponses?: number;
+    beforeReportWeek?: string;
+    currentReportWeek?: string;
+  } | null;
+  geo_action: "manual_brief" | "safe_pipeline" | null;
   created_at: string;
   updated_at: string;
 }
