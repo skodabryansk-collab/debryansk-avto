@@ -572,7 +572,9 @@ async function runGeoGapStep(): Promise<number> {
     FROM seo_suggestions
     WHERE status = 'pending'
        OR status = 'manual'
-       OR (status = 'applied' AND evaluated_at IS NULL)
+       -- Applied rows without an evaluation schedule are legacy history.
+       -- They must not own a page forever and block a new GEO hypothesis.
+       OR (status = 'applied' AND evaluate_at IS NOT NULL AND evaluated_at IS NULL)
   `);
   const activeByPage = new Map<string, { type: string; status: string }[]>();
   for (const row of activeRows.rows as { page_url: string; type: string; status: string }[]) {
