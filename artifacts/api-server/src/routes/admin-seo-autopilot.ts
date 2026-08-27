@@ -113,6 +113,16 @@ function canonModelDisplay(term: string): string {
   return _canonLookup.get(term.toLowerCase().replace(/\s+/g, ""))?.display ?? term.toUpperCase();
 }
 
+function isSafeFaqItem(value: unknown): value is { question: string; answer: string } {
+  if (!value || typeof value !== "object") return false;
+  const item = value as { question?: unknown; answer?: unknown };
+  if (typeof item.question !== "string" || typeof item.answer !== "string") return false;
+  const question = item.question.trim();
+  const answer = item.answer.trim();
+  if (question.length < 12 || answer.length < 20) return false;
+  return !/(?:\[\s*\{|["']?(?:question|answer)["']?\s*:|```|<json>)/i.test(`${question} ${answer}`);
+}
+
 /** Resolve SSG script path — same three-candidate strategy used by admin-news.ts */
 function getSsgPath(): string | null {
   const devPath = join(process.cwd(), "artifacts/debryansk-avto/scripts/ssg.mjs");
@@ -164,6 +174,8 @@ router.get("/suggestions", async (req, res) => {
              applied_at, verified_at, verification_log, result_delta,
              snapshot_before, evaluate_at, evaluated_at,
              evaluation_result, evaluation_note, content_draft,
+              geo_evidence, geo_snapshot_before, geo_evaluate_at, geo_evaluated_at,
+              geo_evaluation_result, geo_evaluation_note, geo_result_delta, geo_action,
              generated_by, reject_reason,
              created_at, updated_at
       FROM seo_suggestions
@@ -218,6 +230,23 @@ router.post("/suggestions/:id/apply", async (req, res) => {
       WHERE id = ${id}
     `);
     suggestion = { ...suggestion, proposed_value: overrideValue };
+  }
+
+  // GEO recommendations are deliberately manual briefs. They may capture a
+  // baseline for a future comparison, but this endpoint must not claim that a
+  // page changed when no content pipeline actually changed it.
+  if (suggestion.type === "geo") {
+    await recordGeoApplySnapshot(id, suggestion.page_url);
+    await db.execute(sql`
+      UPDATE seo_suggestions
+      SET status = 'manual',
+          applied_at = NULL,
+          verification_log = 'Ручное ТЗ сохранено. Страница не изменялась; повторите GEO-замер после публикации.',
+          updated_at = NOW()
+      WHERE id = ${id}
+    `);
+    res.json({ ok: true, message: "GEO-ТЗ сохранено. Страница не изменялась и не помечена как применённая." });
+    return;
   }
 
   // BRAND CLUSTER APPLY PIPELINE
@@ -411,8 +440,11 @@ router.post("/suggestions/:id/apply", async (req, res) => {
 async function recordApplySnapshot(suggestionId: number, pageUrl: string): Promise<void> {
   try {
     const { capturePositionSnapshot } = await import("../services/seo-evaluator");
-    const snap = await capturePositionSnapshot(pageUrl);
-    if (!snap) return;
+    const snap = await capturePositionSnapshot(pageUrl) ?? {
+      position: null,
+      clicks: null,
+      date: new Date().toISOString(),
+    };
     await db.execute(sql`
       UPDATE seo_suggestions
       SET snapshot_before = ${JSON.stringify(snap)}::jsonb,
@@ -423,6 +455,30 @@ async function recordApplySnapshot(suggestionId: number, pageUrl: string): Promi
     logger.info({ suggestionId, pageUrl, snap }, "[seo-autopilot] Snapshot recorded (Karpathy Loop)");
   } catch (err) {
     logger.warn({ err, suggestionId }, "[seo-autopilot] capturePositionSnapshot skipped");
+  }
+}
+
+async function recordGeoApplySnapshot(suggestionId: number, pageUrl: string): Promise<void> {
+  try {
+    const { captureGeoCitationSnapshot } = await import("../services/seo-evaluator");
+    const snapshot = await captureGeoCitationSnapshot(pageUrl);
+    if (!snapshot) {
+      logger.warn({ suggestionId, pageUrl }, "[seo-autopilot] GEO baseline skipped: report has no comparable observations");
+      return;
+    }
+    await db.execute(sql`
+      UPDATE seo_suggestions
+      SET geo_snapshot_before = ${JSON.stringify(snapshot)}::jsonb,
+          geo_evaluate_at = NULL,
+          updated_at = NOW()
+      WHERE id = ${suggestionId}
+    `);
+    logger.info(
+      { suggestionId, pageUrl, week: snapshot.reportWeek, responses: snapshot.responses },
+      "[seo-autopilot] GEO baseline recorded",
+    );
+  } catch (err) {
+    logger.warn({ err, suggestionId }, "[seo-autopilot] GEO baseline capture skipped");
   }
 }
 
@@ -907,7 +963,7 @@ async function applyContentBrand(
         let sortOrder = ((maxSortRow.rows[0] as { max_ord: number }).max_ord ?? 0) + 10;
         let inserted = 0;
         for (const faq of preGenFaqs) {
-          if (!faq.question || !faq.answer) continue;
+          if (!isSafeFaqItem(faq)) continue;
           await db.execute(sql`
             INSERT INTO faqs (page_slug, question, answer, sort_order, is_published, include_in_schema)
             VALUES (${'brands/' + slug}, ${faq.question}, ${faq.answer}, ${sortOrder}, true, true)
@@ -1763,6 +1819,26 @@ router.get("/suggestions/:id/preview", async (req, res) => {
   if (!brand) return res.status(404).json({ ok: false, error: "Brand not found" });
 
   // Parse model entries from proposed_value
+  const trimmedProposal = suggestion.proposed_value.trimStart();
+  if (trimmedProposal.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmedProposal) as unknown;
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(isSafeFaqItem)) {
+        return res.json({
+          ok: true,
+          faqs: parsed.map(item => ({
+            modelTerm: (item as { modelTerm?: string }).modelTerm ?? brand.name,
+            question: item.question,
+            answer: item.answer,
+          })),
+        });
+      }
+    } catch {
+      // Invalid JSON must never fall through to the legacy line parser.
+    }
+    return res.json({ ok: true, faqs: [] });
+  }
+
   const entries: { modelTerm: string }[] = [];
   for (const line of suggestion.proposed_value.split("\n")) {
     const colonIdx = line.indexOf(":");
@@ -2006,6 +2082,22 @@ async function applySuggestionBackground(id: number): Promise<void> {
     UPDATE seo_suggestions SET status = 'applied', applied_at = NOW(), updated_at = NOW()
     WHERE id = ${id}
   `);
+
+  // GEO has no safe automatic content mutation. Keep the background path
+  // consistent with the HTTP path: save the baseline, but never claim that a
+  // manual instruction changed the page.
+  if (suggestion.type === "geo") {
+    await recordGeoApplySnapshot(id, suggestion.page_url);
+    await db.execute(sql`
+      UPDATE seo_suggestions
+      SET status = 'manual',
+          applied_at = NULL,
+          verification_log = 'Ручное ТЗ сохранено. Страница не изменялась; повторите GEO-замер после публикации.',
+          updated_at = NOW()
+      WHERE id = ${id}
+    `);
+    return;
+  }
 
   // BRAND CLUSTER
   if (suggestion.type === "cluster" && suggestion.page_url.startsWith("/brands/")) {
