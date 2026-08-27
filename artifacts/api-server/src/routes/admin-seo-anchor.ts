@@ -95,9 +95,9 @@ router.post("/", async (req, res) => {
         updated_at      = NOW()
       RETURNING id, query_text, page_url, target_position, is_active, notes, created_at
     `);
-    res.json({ ok: true, data: result.rows[0] });
+    return res.json({ ok: true, data: result.rows[0] });
   } catch (err) {
-    res.status(500).json({ ok: false, error: String(err) });
+    return res.status(500).json({ ok: false, error: String(err) });
   }
 });
 
@@ -119,9 +119,9 @@ router.put("/:id", async (req, res) => {
         updated_at      = NOW()
       WHERE id = ${id}
     `);
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ ok: false, error: String(err) });
+    return res.status(500).json({ ok: false, error: String(err) });
   }
 });
 
@@ -131,9 +131,9 @@ router.delete("/:id", async (req, res) => {
   if (isNaN(id)) return res.status(400).json({ ok: false, error: "Invalid id" });
   try {
     await db.execute(sql`DELETE FROM seo_anchor_queries WHERE id = ${id}`);
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ ok: false, error: String(err) });
+    return res.status(500).json({ ok: false, error: String(err) });
   }
 });
 
