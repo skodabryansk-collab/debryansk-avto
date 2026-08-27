@@ -69,3 +69,4 @@
 - [Visitor conversion calls](visitor-conversion-calls.md) — целевой звонок для конверсии: completed и длительность строго больше 30 секунд.
 - [Non-interactive post-merge schema sync](post-merge-drizzle.md) — post-merge запускается без TTY; Drizzle push должен использовать non-interactive entry point.
 - [GEO active hypothesis ownership](geo-active-hypothesis.md) — legacy applied rows without an evaluation schedule must not block new GEO recommendations forever.
+- [Yandex Webmaster indexing samples](webmaster-indexing-samples.md) — v4 uses /indexing/samples, not /crawling/samples; read the tail because offset=0 can be historical.
