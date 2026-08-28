@@ -103,7 +103,7 @@ export function deleteDealer(id: number) { return api<{ ok: true }>("DELETE", `/
 
 /* Brands */
 export interface Brand {
-  id: number; name: string; slug: string | null; websiteUrl: string | null; logoUrl: string | null; isServiceOnly: boolean; carMark: string | null; cmToBrandId: string | null; createdAt: string;
+  id: number; name: string; slug: string | null; websiteUrl: string | null; logoUrl: string | null; subName?: string | null; isServiceOnly: boolean; carMark: string | null; cmToBrandId: string | null; createdAt: string;
 }
 
 export function getCmBrands(): Promise<Array<{ id: string; name: string }>> {
