@@ -66,7 +66,7 @@
 - [Quote PDF priority](quote-pdf-priority.md) — интерактивная генерация КП должна прерывать длительный SEO-пререндер и не оставлять КП без файла.
 - [Karpathy evaluator schedule](karpathy-evaluator-schedule.md) — оценка должна иметь ежедневный catch-up, а не зависеть только от воскресного снапшота позиций.
 - [GAP pending stability](gap-pending-stability.md) — pending-гипотезы принадлежат менеджеру: GAP не создаёт и не перезаписывает их до решения.
-- [Visitor conversion calls](visitor-conversion-calls.md) — целевой звонок для конверсии: completed и длительность строго больше 30 секунд.
+- [Visitor conversion calls](visitor-conversion-calls.md) — completed >30 сек; звонки и заявки уникальны в rolling-окне 24 часа с учётом границы периода.
 - [Non-interactive post-merge schema sync](post-merge-drizzle.md) — post-merge запускается без TTY; Drizzle push должен использовать non-interactive entry point.
 - [GEO active hypothesis ownership](geo-active-hypothesis.md) — legacy applied rows without an evaluation schedule must not block new GEO recommendations forever.
 - [Yandex Webmaster indexing samples](webmaster-indexing-samples.md) — v4 uses /indexing/samples, not /crawling/samples; read the tail because offset=0 can be historical.
