@@ -11,6 +11,8 @@ router.use(requireAdmin);
 const COUNTER_MAIN = 109748190;
 const API_BASE = "https://api-metrika.yandex.net/stat/v1/data";
 const MGMT_BASE = "https://api-metrika.yandex.net/management/v1";
+const TARGET_CALL_MIN_DURATION_SECONDS = 30;
+const UNIQUE_CONVERSION_WINDOW_HOURS = 24;
 
 const SRC_MAP: Record<string, string> = {
   organic: "Поиск",
@@ -26,6 +28,110 @@ const SRC_MAP: Record<string, string> = {
 
 function srcName(id: string | undefined, name: string): string {
   return SRC_MAP[id || ""] || SRC_MAP[name?.toLowerCase() || ""] || name || "Прочее";
+}
+
+function moscowWindowBounds(dateFrom: string, dateTo: string) {
+  const from = sql`(${dateFrom}::date AT TIME ZONE 'Europe/Moscow')`;
+  const to = sql`((${dateTo}::date + INTERVAL '1 day') AT TIME ZONE 'Europe/Moscow')`;
+  return { from, to };
+}
+
+/**
+ * Returns only unique target calls in the requested Moscow date window.
+ * A short/missed call does not consume the 24-hour uniqueness window because
+ * it is not a conversion in the first place.
+ */
+function uniqueTargetCallsSql(dateFrom: string, dateTo: string) {
+  const { from, to } = moscowWindowBounds(dateFrom, dateTo);
+  return sql`
+    SELECT *
+    FROM (
+      SELECT ranked.*,
+             LAG(ranked.started_at) OVER (
+               PARTITION BY ranked.unique_key
+               ORDER BY ranked.started_at, ranked.id
+             ) AS previous_started_at
+      FROM (
+        SELECT c.*,
+               COALESCE(
+                 NULLIF(
+                   CASE
+                     WHEN normalized.phone_digits ~ '^8[0-9]{10}$'
+                       THEN '7' || SUBSTRING(normalized.phone_digits FROM 2)
+                     WHEN normalized.phone_digits ~ '^[0-9]{10}$'
+                       THEN '7' || normalized.phone_digits
+                     ELSE normalized.phone_digits
+                   END,
+                   ''
+                 ),
+                 'call:' || c.call_id
+               ) AS unique_key
+        FROM calltouch_calls c
+        CROSS JOIN LATERAL (
+          SELECT regexp_replace(COALESCE(c.phone_number, ''), '[^0-9]', '', 'g') AS phone_digits
+        ) normalized
+        WHERE c.status = 'completed'
+          AND c.duration_seconds > ${TARGET_CALL_MIN_DURATION_SECONDS}
+          AND c.started_at IS NOT NULL
+          AND c.started_at >= (${from} - INTERVAL '24 hours')
+          AND c.started_at < ${to}
+      ) ranked
+    ) deduplicated
+    WHERE (
+      deduplicated.previous_started_at IS NULL
+      OR deduplicated.started_at - deduplicated.previous_started_at >= INTERVAL '24 hours'
+    )
+      AND deduplicated.started_at >= ${from}
+      AND deduplicated.started_at < ${to}
+  `;
+}
+
+/**
+ * Returns only unique website leads in the requested Moscow date window.
+ * The same phone + form type + car is one conversion for 24 hours.
+ * Without a phone number, each database row remains independently countable.
+ */
+function uniqueLeadsSql(dateFrom: string, dateTo: string) {
+  const { from, to } = moscowWindowBounds(dateFrom, dateTo);
+  return sql`
+    SELECT *
+    FROM (
+      SELECT ranked.*,
+             LAG(ranked.created_at) OVER (
+               PARTITION BY ranked.unique_key
+               ORDER BY ranked.created_at, ranked.id
+             ) AS previous_created_at
+      FROM (
+        SELECT l.*,
+               CASE
+                 WHEN NULLIF(normalized.phone_digits, '') IS NULL
+                   THEN 'lead:' || l.id::text
+                 ELSE CASE
+                   WHEN normalized.phone_digits ~ '^8[0-9]{10}$'
+                     THEN '7' || SUBSTRING(normalized.phone_digits FROM 2)
+                   WHEN normalized.phone_digits ~ '^[0-9]{10}$'
+                     THEN '7' || normalized.phone_digits
+                   ELSE normalized.phone_digits
+                 END
+                   || '|' || LOWER(TRIM(COALESCE(l.type, '')))
+                   || '|' || LOWER(TRIM(COALESCE(l.car, '')))
+               END AS unique_key
+        FROM leads l
+        CROSS JOIN LATERAL (
+          SELECT regexp_replace(COALESCE(l.phone, ''), '[^0-9]', '', 'g') AS phone_digits
+        ) normalized
+        WHERE l.created_at IS NOT NULL
+          AND l.created_at >= (${from} - INTERVAL '24 hours')
+          AND l.created_at < ${to}
+      ) ranked
+    ) deduplicated
+    WHERE (
+      deduplicated.previous_created_at IS NULL
+      OR deduplicated.created_at - deduplicated.previous_created_at >= INTERVAL '24 hours'
+    )
+      AND deduplicated.created_at >= ${from}
+      AND deduplicated.created_at < ${to}
+  `;
 }
 
 /* ── In-memory cache (TTL 5 min) ── */
@@ -582,80 +688,101 @@ router.get("/conversion", async (req, res) => {
     fetchMetrika({ ids: COUNTER_MAIN, date1: prevDate1, date2: prevDate2, metrics: "ym:s:visits" }, { attempts: 2, requestTimeoutMs: 8_000 }),
     db.execute(sql`
       SELECT COUNT(*)::int AS total
-      FROM leads
-      WHERE (created_at AT TIME ZONE 'Europe/Moscow')::date
-            BETWEEN ${date1}::date AND ${date2}::date
+      FROM (${uniqueLeadsSql(date1, date2)}) AS unique_leads
     `),
     db.execute(sql`
       SELECT COUNT(*)::int AS total
-      FROM leads
-      WHERE (created_at AT TIME ZONE 'Europe/Moscow')::date
-            BETWEEN ${prevDate1}::date AND ${prevDate2}::date
+      FROM (${uniqueLeadsSql(prevDate1, prevDate2)}) AS unique_leads
     `),
     db.execute(sql`
       SELECT
-        COUNT(*)::int                                         AS total,
-        COUNT(*) FILTER (WHERE status = 'completed')::int    AS answered,
+        COUNT(*)::int AS total,
+        (SELECT COUNT(*)::int
+         FROM (${uniqueTargetCallsSql(date1, date2)}) AS unique_target_calls) AS answered,
         COUNT(*) FILTER (WHERE status = 'missed')::int       AS missed
       FROM calltouch_calls
-      WHERE (started_at AT TIME ZONE 'Europe/Moscow')::date
-            BETWEEN ${date1}::date AND ${date2}::date
+      WHERE started_at >= (${date1}::date AT TIME ZONE 'Europe/Moscow')
+        AND started_at < ((${date2}::date + INTERVAL '1 day') AT TIME ZONE 'Europe/Moscow')
     `),
     db.execute(sql`
       SELECT
-        COUNT(*)::int                                         AS total,
-        COUNT(*) FILTER (WHERE status = 'completed')::int    AS answered,
+        COUNT(*)::int AS total,
+        (SELECT COUNT(*)::int
+         FROM (${uniqueTargetCallsSql(prevDate1, prevDate2)}) AS unique_target_calls) AS answered,
         COUNT(*) FILTER (WHERE status = 'missed')::int       AS missed
       FROM calltouch_calls
-      WHERE (started_at AT TIME ZONE 'Europe/Moscow')::date
-            BETWEEN ${prevDate1}::date AND ${prevDate2}::date
+      WHERE started_at >= (${prevDate1}::date AT TIME ZONE 'Europe/Moscow')
+        AND started_at < ((${prevDate2}::date + INTERVAL '1 day') AT TIME ZONE 'Europe/Moscow')
+    `),
+    db.execute(sql`
+      WITH raw_calls AS (
+        SELECT
+          (started_at AT TIME ZONE 'Europe/Moscow')::date::text AS date,
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE status = 'missed')::int AS missed
+        FROM calltouch_calls
+        WHERE started_at >= (${date1}::date AT TIME ZONE 'Europe/Moscow')
+          AND started_at < ((${date2}::date + INTERVAL '1 day') AT TIME ZONE 'Europe/Moscow')
+        GROUP BY 1
+      ),
+      unique_target_calls AS (
+        SELECT
+          (started_at AT TIME ZONE 'Europe/Moscow')::date::text AS date,
+          COUNT(*)::int AS answered
+        FROM (${uniqueTargetCallsSql(date1, date2)}) AS unique_calls
+        GROUP BY 1
+      )
+      SELECT
+        COALESCE(raw_calls.date, unique_target_calls.date) AS date,
+        COALESCE(raw_calls.total, 0)::int AS total,
+        COALESCE(unique_target_calls.answered, 0)::int AS answered,
+        COALESCE(raw_calls.missed, 0)::int AS missed
+      FROM raw_calls
+      FULL OUTER JOIN unique_target_calls USING (date)
+      ORDER BY 1
     `),
     db.execute(sql`
       SELECT
-        (started_at AT TIME ZONE 'Europe/Moscow')::date::text  AS date,
-        COUNT(*)::int                                           AS total,
-        COUNT(*) FILTER (WHERE status = 'completed')::int      AS answered,
-        COUNT(*) FILTER (WHERE status = 'missed')::int         AS missed
-      FROM calltouch_calls
-      WHERE (started_at AT TIME ZONE 'Europe/Moscow')::date
-            BETWEEN ${date1}::date AND ${date2}::date
+        (created_at AT TIME ZONE 'Europe/Moscow')::date::text AS date,
+        COUNT(*)::int AS total
+      FROM (${uniqueLeadsSql(date1, date2)}) AS unique_leads
+      WHERE created_at >= (${date1}::date AT TIME ZONE 'Europe/Moscow')
+        AND created_at < ((${date2}::date + INTERVAL '1 day') AT TIME ZONE 'Europe/Moscow')
       GROUP BY 1 ORDER BY 1
     `),
     db.execute(sql`
-      SELECT
-        (created_at AT TIME ZONE 'Europe/Moscow')::date::text  AS date,
-        COUNT(*)::int                                           AS total
-      FROM leads
-      WHERE (created_at AT TIME ZONE 'Europe/Moscow')::date
-            BETWEEN ${date1}::date AND ${date2}::date
-      GROUP BY 1 ORDER BY 1
-    `),
-    db.execute(sql`
-      SELECT
-        COALESCE(NULLIF(TRIM(source), ''), 'Неизвестно')      AS source,
-        COUNT(*)::int                                           AS total,
-        COUNT(*) FILTER (WHERE status = 'completed')::int      AS answered
-      FROM calltouch_calls
-      WHERE (started_at AT TIME ZONE 'Europe/Moscow')::date
-            BETWEEN ${date1}::date AND ${date2}::date
-      GROUP BY 1 ORDER BY total DESC LIMIT 10
+      WITH raw_calls AS (
+        SELECT COALESCE(NULLIF(TRIM(source), ''), 'Неизвестно') AS source,
+               COUNT(*)::int AS total
+        FROM calltouch_calls
+        WHERE started_at >= (${date1}::date AT TIME ZONE 'Europe/Moscow')
+          AND started_at < ((${date2}::date + INTERVAL '1 day') AT TIME ZONE 'Europe/Moscow')
+        GROUP BY 1
+      ),
+      unique_target_calls AS (
+        SELECT COALESCE(NULLIF(TRIM(source), ''), 'Неизвестно') AS source,
+               COUNT(*)::int AS answered
+        FROM (${uniqueTargetCallsSql(date1, date2)}) AS unique_calls
+        GROUP BY 1
+      )
+      SELECT raw_calls.source, raw_calls.total,
+             COALESCE(unique_target_calls.answered, 0)::int AS answered
+      FROM raw_calls
+      LEFT JOIN unique_target_calls USING (source)
+      ORDER BY raw_calls.total DESC LIMIT 10
     `),
     db.execute(sql`
       SELECT
         COALESCE(NULLIF(TRIM(type), ''), 'other')  AS type,
         COUNT(*)::int                               AS count
-      FROM leads
-      WHERE (created_at AT TIME ZONE 'Europe/Moscow')::date
-            BETWEEN ${date1}::date AND ${date2}::date
+      FROM (${uniqueLeadsSql(date1, date2)}) AS unique_leads
       GROUP BY 1 ORDER BY count DESC
     `),
     db.execute(sql`
       SELECT
         COALESCE(NULLIF(TRIM(utm_source), ''), 'Неизвестно') AS source,
         COUNT(*)::int AS count
-      FROM leads
-      WHERE (created_at AT TIME ZONE 'Europe/Moscow')::date
-            BETWEEN ${date1}::date AND ${date2}::date
+      FROM (${uniqueLeadsSql(date1, date2)}) AS unique_leads
       GROUP BY 1 ORDER BY count DESC
     `),
   ]);
