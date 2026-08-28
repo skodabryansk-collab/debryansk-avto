@@ -13,6 +13,9 @@ const API_BASE = "https://api-metrika.yandex.net/stat/v1/data";
 const MGMT_BASE = "https://api-metrika.yandex.net/management/v1";
 const TARGET_CALL_MIN_DURATION_SECONDS = 30;
 const UNIQUE_CONVERSION_WINDOW_HOURS = 24;
+// Test submissions have no dedicated DB flag; the test suite identifies them
+// by a name containing "test" or "тест".
+const REAL_LEAD_NAME_SQL = sql`COALESCE(l.name, '') !~* '(test|тест)'`;
 
 const SRC_MAP: Record<string, string> = {
   organic: "Поиск",
@@ -121,6 +124,7 @@ function uniqueLeadsSql(dateFrom: string, dateTo: string) {
           SELECT regexp_replace(COALESCE(l.phone, ''), '[^0-9]', '', 'g') AS phone_digits
         ) normalized
         WHERE l.created_at IS NOT NULL
+           AND ${REAL_LEAD_NAME_SQL}
           AND l.created_at >= (${from} - INTERVAL '24 hours')
           AND l.created_at < ${to}
       ) ranked
@@ -552,8 +556,9 @@ router.get("/activity", async (req, res) => {
         (((EXTRACT(DOW FROM (created_at AT TIME ZONE 'Europe/Moscow'))::int + 6) % 7))::int AS day_of_week,
         EXTRACT(HOUR FROM (created_at AT TIME ZONE 'Europe/Moscow'))::int AS hour,
         COUNT(*)::int AS value
-      FROM leads
+      FROM leads l
       WHERE created_at IS NOT NULL
+        AND COALESCE(l.name, '') !~* '(test|тест)'
         AND (created_at AT TIME ZONE 'Europe/Moscow')::date BETWEEN ${date1}::date AND ${date2}::date
       GROUP BY date, day_of_week, hour
       ORDER BY date, hour
