@@ -3,8 +3,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getBrands, createBrand, updateBrand, deleteBrand, uploadFile,
   getBrandPageContent, updateBrandPageContent, getBrandCatalogModels,
+  scanBrandPrerender, fixBrokenBrandPrerender, rerenderBrandSlug,
+  getCmBrands,
   type Brand, type BrandPageContent, type BrandAdvantage, type BrandPromotion,
-  type BrandModel, type BrandService, type CatalogModel,
+  type BrandModel, type BrandService, type BrandFaqItem, type CatalogModel,
+  type BrandPrerenderScanItem,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,6 +28,7 @@ export default function BrandsPage() {
   const [isCreate, setIsCreate] = React.useState(false);
   const [deleteId, setDeleteId] = React.useState<number | null>(null);
   const [pageEditBrand, setPageEditBrand] = React.useState<Brand | null>(null);
+  const [showPrerenderPanel, setShowPrerenderPanel] = React.useState(false);
   const { data, isLoading } = useQuery({ queryKey: ["brands"], queryFn: getBrands });
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -40,15 +44,159 @@ export default function BrandsPage() {
     onError: () => toast({ title: "Ошибка", variant: "destructive" }),
   });
 
+  const scanQuery = useQuery({
+    queryKey: ["brands-prerender-scan"],
+    queryFn: scanBrandPrerender,
+    enabled: showPrerenderPanel,
+    staleTime: 0,
+  });
+
+  const fixMutation = useMutation({
+    mutationFn: fixBrokenBrandPrerender,
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["brands-prerender-scan"] });
+      toast({
+        title: result.fixed > 0 ? `Исправлено ${result.fixed} страниц` : "Сломанных страниц нет",
+        description: result.message,
+      });
+    },
+    onError: () => toast({ title: "Ошибка", variant: "destructive" }),
+  });
+
+  const rerenderMutation = useMutation({
+    mutationFn: (slug: string) => rerenderBrandSlug(slug),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["brands-prerender-scan"] });
+      toast({ title: "Пересчёт запущен", description: result.message });
+    },
+    onError: () => toast({ title: "Ошибка", variant: "destructive" }),
+  });
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-slate-900">Справочник брендов</h1>
-        <Button size="sm" className="bg-[#0070b8] hover:bg-[#005a94]" onClick={() => setIsCreate(true)}>
-          <Plus className="w-4 h-4 mr-1" />
-          Добавить
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm" variant="outline"
+            onClick={() => setShowPrerenderPanel(v => !v)}
+          >
+            <RefreshCw className="w-4 h-4 mr-1" />
+            Пресчёт кэша
+          </Button>
+          <Button size="sm" className="bg-[#0070b8] hover:bg-[#005a94]" onClick={() => setIsCreate(true)}>
+            <Plus className="w-4 h-4 mr-1" />
+            Добавить
+          </Button>
+        </div>
       </div>
+
+      {/* Prerender scan panel */}
+      {showPrerenderPanel && (
+        <Card className="border border-amber-200 bg-amber-50 shadow-sm mb-4">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="font-semibold text-slate-800 text-sm">Проверка кэша страниц брендов</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Ищет страницы с устаревшим кэшем «Бренд не найден» и пересчитывает их</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {scanQuery.data && scanQuery.data.broken > 0 && (
+                  <Button
+                    size="sm"
+                    className="bg-red-600 hover:bg-red-700 text-white text-xs"
+                    onClick={() => fixMutation.mutate()}
+                    disabled={fixMutation.isPending}
+                  >
+                    {fixMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                    Исправить все ({scanQuery.data.broken})
+                  </Button>
+                )}
+                <Button
+                  size="sm" variant="outline" className="text-xs"
+                  onClick={() => qc.invalidateQueries({ queryKey: ["brands-prerender-scan"] })}
+                  disabled={scanQuery.isFetching}
+                >
+                  {scanQuery.isFetching ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+                  Обновить
+                </Button>
+              </div>
+            </div>
+
+            {scanQuery.isLoading && (
+              <div className="text-center py-4 text-slate-400 text-sm">
+                <Loader2 className="w-4 h-4 animate-spin inline mr-2" />Сканирование...
+              </div>
+            )}
+
+            {scanQuery.data && (
+              <>
+                <div className="flex items-center gap-4 mb-3 text-xs">
+                  <span className="flex items-center gap-1 text-emerald-700 font-medium">
+                    <CheckCircle className="w-3.5 h-3.5" /> Ок: {scanQuery.data.ok}
+                  </span>
+                  <span className="flex items-center gap-1 text-red-600 font-medium">
+                    ✗ Сломано: {scanQuery.data.broken}
+                  </span>
+                  <span className="flex items-center gap-1 text-slate-500">
+                    ○ Нет кэша: {scanQuery.data.noCache}
+                  </span>
+                  <span className="text-slate-400">Всего: {scanQuery.data.total}</span>
+                </div>
+
+                {scanQuery.data.items.length > 0 && (
+                  <div className="space-y-1.5">
+                    {scanQuery.data.items.map((item: BrandPrerenderScanItem) => (
+                      <div
+                        key={item.slug}
+                        className={`flex items-center justify-between px-3 py-2 rounded text-xs ${
+                          item.status === "broken"
+                            ? "bg-red-50 border border-red-200"
+                            : item.status === "no_cache"
+                              ? "bg-slate-100 border border-slate-200"
+                              : "bg-white border border-emerald-100"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={
+                            item.status === "broken" ? "text-red-600 font-bold" :
+                            item.status === "no_cache" ? "text-slate-400" : "text-emerald-600"
+                          }>
+                            {item.status === "broken" ? "✗" : item.status === "no_cache" ? "○" : "✓"}
+                          </span>
+                          <span className="font-medium text-slate-700">{item.name}</span>
+                          <span className="font-mono text-slate-400">{item.route}</span>
+                          {item.status === "broken" && (
+                            <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-semibold">Бренд не найден в кэше</span>
+                          )}
+                          {item.status === "no_cache" && (
+                            <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">нет кэша</span>
+                          )}
+                        </div>
+                        {(item.status === "broken" || item.status === "no_cache") && (
+                          <Button
+                            size="sm" variant="outline" className="h-6 px-2 text-xs"
+                            onClick={() => rerenderMutation.mutate(item.slug)}
+                            disabled={rerenderMutation.isPending}
+                          >
+                            <RefreshCw className="w-3 h-3 mr-1" />
+                            Пересчитать
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {scanQuery.isError && (
+              <div className="text-red-600 text-sm py-2">Ошибка сканирования</div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="border-0 shadow-sm overflow-hidden">
         <CardContent className="p-0">
           <Table>
@@ -157,6 +305,13 @@ function BrandFormDialog({ item, onClose }: { item: Brand | null; onClose: () =>
     websiteUrl: item?.websiteUrl ?? "",
     logoUrl: item?.logoUrl ?? "",
     isServiceOnly: item?.isServiceOnly ?? false,
+    cmToBrandId: item?.cmToBrandId ?? "",
+  });
+
+  const { data: cmBrands = [] } = useQuery({
+    queryKey: ["cm-brands"],
+    queryFn: getCmBrands,
+    staleTime: 24 * 60 * 60 * 1000,
   });
   const [uploading, setUploading] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
@@ -246,6 +401,20 @@ function BrandFormDialog({ item, onClose }: { item: Brand | null; onClose: () =>
                 </button>
               </div>
             )}
+          </div>
+          <div>
+            <Label>Бренд в Авто.ру (CM Expert) — для калькулятора ТО</Label>
+            <p className="text-xs text-slate-400 mb-1">Используется при выборе модификации в калькуляторе ТО через каталог Авто.ру</p>
+            <select
+              value={form.cmToBrandId}
+              onChange={e => setForm(f => ({ ...f, cmToBrandId: e.target.value }))}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              <option value="">— Не выбран (отключить CM Expert для ТО) —</option>
+              {cmBrands.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
           </div>
           <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5 bg-slate-50">
             <div>
@@ -793,6 +962,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     promoText: string;
     advantages: BrandAdvantage[];
     features: string[];
+    faq: BrandFaqItem[];
     promotions: BrandPromotion[];
     models: BrandModel[];
     services: BrandService[];
@@ -806,6 +976,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
     promoText: "",
     advantages: [],
     features: [],
+    faq: [],
     promotions: [],
     models: [],
     services: [],
@@ -855,6 +1026,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
         promoText: data.content.promoText ?? "",
         advantages: data.content.advantages ?? [],
         features: data.content.features ?? [],
+        faq: data.content.faq ?? [],
         promotions: data.content.promotions ?? [],
         models: data.content.models ?? [],
         services: data.content.services ?? [],
@@ -877,6 +1049,7 @@ function BrandPageDialog({ brand, onClose }: { brand: Brand; onClose: () => void
       advantages: form.advantages,
       features: form.features,
       promotions: form.promotions,
+      faq: form.faq ?? [],
       models: form.models,
       services: form.services,
       heroImageUrl: form.heroImageUrl || null,
