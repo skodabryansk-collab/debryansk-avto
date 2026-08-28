@@ -13,7 +13,7 @@ import type {
   VisitorActivityCell, VisitorActivityMetric, VisitorActivityMode, VisitorActivityResult,
   ConversionResult,
 } from "@/lib/api";
-import { Clock3, ExternalLink, TrendingUp, TrendingDown, AlertCircle, Phone, FileText, PhoneMissed, Users } from "lucide-react";
+import { Clock3, ExternalLink, TrendingUp, TrendingDown, Minus, AlertCircle, Phone, FileText, PhoneMissed, Users } from "lucide-react";
 
 type Period = "today" | "7d" | "30d";
 
@@ -179,7 +179,7 @@ function FunnelArrow({ rate }: { rate: number }) {
   );
 }
 
-function ConversionFunnel({ period }: { period: Period }) {
+function ConversionFunnelLegacy({ period }: { period: Period }) {
   const q = useQuery<ConversionResult>({
     queryKey: ["conversion", period],
     queryFn: () => getConversion(period),
@@ -207,7 +207,7 @@ function ConversionFunnel({ period }: { period: Period }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-sm font-semibold text-slate-700">Воронка конверсии</h2>
-          <p className="text-xs text-slate-400 mt-0.5">Визиты → Обращения (заявки + отвеченные звонки)</p>
+          <p className="text-xs text-slate-400 mt-0.5">Визиты → уникальные обращения за 24 часа</p>
         </div>
         {!q.isLoading && unavailable.length > 0 && (
           <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5">
@@ -249,14 +249,14 @@ function ConversionFunnel({ period }: { period: Period }) {
             <div className="flex-[0.05] shrink-0" />
             <FunnelStep
               icon={FileText}
-              label="Заявки"
+              label="Уникальные заявки"
               value={curr?.leads ?? 0}
               sub={prev?.leads !== undefined ? `прошлый: ${formatNum(prev.leads)}` : undefined}
               color="text-emerald-500"
             />
             <FunnelStep
               icon={Phone}
-              label="Отвеченные"
+               label="Уникальные целевые (>30 сек)"
               value={curr?.answeredCalls ?? 0}
               sub={prev?.answeredCalls !== undefined ? `прошлый: ${formatNum(prev.answeredCalls)}` : undefined}
               color="text-[#0070b8]"
@@ -289,7 +289,7 @@ function ConversionFunnel({ period }: { period: Period }) {
               </span>
               <span className="text-slate-300">·</span>
               <span className="flex items-center gap-1">
-                Отвеченные звонки:
+                 Целевые звонки (&gt;30 сек):
                 <DeltaBadge curr={curr.answeredCalls} prev={prev.answeredCalls} />
               </span>
             </div>
@@ -329,7 +329,7 @@ function ConversionFunnel({ period }: { period: Period }) {
                     }}
                   />
                   <Bar dataKey="leads" name="Заявки" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="answeredCalls" name="Отвеченные" stackId="a" fill="#0070b8" radius={[3, 3, 0, 0]} />
+                   <Bar dataKey="answeredCalls" name="Целевые (>30 сек)" stackId="a" fill="#0070b8" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -415,12 +415,245 @@ function ConversionFunnel({ period }: { period: Period }) {
           )}
 
           <p className="mt-4 text-[11px] text-slate-400">
-            Обращения = заявки с сайта + отвеченные звонки из Calltouch. Пропущенные звонки в сумму не входят.
+            Обращения = уникальные заявки с сайта + уникальные целевые звонки из Calltouch дольше 30 секунд. Повторы в течение 24 часов, пропущенные и короткие звонки в сумму не входят.
             {d?.dateFrom && d?.dateTo && ` Период: ${formatDate(d.dateFrom)} – ${formatDate(d.dateTo)}.`}
           </p>
         </>
       )}
     </section>
+  );
+}
+
+
+function ConversionFunnel({ period }: { period: Period }) {
+  const q = useQuery<ConversionResult>({
+    queryKey: ["conversion", period],
+    queryFn: () => getConversion(period),
+    refetchInterval: 5 * 60_000,
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  const d = q.data;
+  const curr = d?.current;
+  const prev = d?.previous;
+  const unavailable = d?.availability
+    ? [
+        !d.availability.metrika ? "Метрика" : null,
+        !d.availability.leads ? "заявки" : null,
+        !d.availability.calltouch ? "Calltouch" : null,
+      ].filter(Boolean) as string[]
+    : [];
+
+  const conversionDelta = curr && prev
+    ? curr.conversionRate - prev.conversionRate
+    : 0;
+  const conversionDeltaLabel = conversionDelta === 0
+    ? "без изменений"
+    : `${conversionDelta > 0 ? "+" : ""}${conversionDelta.toLocaleString("ru-RU", { maximumFractionDigits: 1 })} п.п.`;
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.04)]">
+      <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-slate-800">Конверсия сайта</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Как визиты превращаются в обращения
+            </p>
+          </div>
+          {unavailable.length > 0 && (
+            <div className="flex items-center gap-1.5 self-start rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700 ring-1 ring-inset ring-amber-200/70">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              <span>Недоступны: {unavailable.join(", ")}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {q.isLoading ? (
+        <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
+          <Skeleton className="h-40 rounded-xl" />
+          <div className="grid grid-cols-2 gap-4">
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-14 rounded-lg" />)}
+          </div>
+        </div>
+      ) : q.isError ? (
+        <div className="flex min-h-40 items-center justify-center px-5 text-sm text-slate-500">
+          Не удалось загрузить данные о конверсии
+        </div>
+      ) : (
+        <div className="p-5 sm:p-6">
+          <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+            {/* ── Главный KPI ── */}
+            <div className="relative overflow-hidden rounded-xl bg-[#0070b8] p-5 text-white">
+              <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10" />
+              <div className="relative">
+                <div className="text-xs font-medium text-blue-100">Общая конверсия</div>
+                <div className="mt-2.5 flex items-end gap-1.5">
+                  <span className="text-5xl font-bold leading-none tracking-[-0.04em] tabular-nums">
+                    {(curr?.conversionRate ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 1 })}
+                  </span>
+                  <span className="mb-0.5 text-xl font-semibold text-blue-100">%</span>
+                </div>
+                <div className="mt-2.5 flex items-center gap-1.5 text-xs text-blue-100">
+                  {conversionDelta !== 0 ? (
+                    conversionDelta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />
+                  ) : <Minus className="h-3.5 w-3.5" />}
+                  <span>{conversionDeltaLabel} к прошлому периоду</span>
+                </div>
+                <div className="mt-4 border-t border-white/20 pt-3">
+                  <div className="text-[11px] text-blue-100">Уникальные обращения</div>
+                  <div className="mt-0.5 text-2xl font-bold tabular-nums">{formatNum(curr?.grossConversions ?? 0)}</div>
+                  <div className="mt-0.5 text-[11px] text-blue-200">без повторов в течение 24 часов</div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── 4 метрики, заполняют всё оставшееся место ── */}
+            <div className="grid grid-cols-2 gap-3">
+              {(
+                [
+                  { icon: Users,       label: "Визиты",             value: curr?.visits ?? 0,       prev: prev?.visits,        tone: "slate" },
+                  { icon: FileText,    label: "Уникальные заявки", value: curr?.leads ?? 0,        prev: prev?.leads,         tone: "green" },
+                   { icon: Phone,       label: "Уникальные звонки (>30 сек)", value: curr?.answeredCalls ?? 0, prev: prev?.answeredCalls, tone: "blue"  },
+                  { icon: PhoneMissed, label: "Пропущенные звонки", value: curr?.missedCalls ?? 0,  prev: prev?.missedCalls,   tone: "red"   },
+                ] as Array<{ icon: React.ElementType; label: string; value: number; prev: number | undefined; tone: "slate" | "blue" | "green" | "red" }>
+              ).map(({ icon: Icon, label, value, prev: prevVal, tone }) => {
+                const iconCls = {
+                  slate: "bg-slate-100 text-slate-500",
+                  blue:  "bg-blue-50 text-[#0070b8]",
+                  green: "bg-emerald-50 text-emerald-600",
+                  red:   "bg-red-50 text-red-500",
+                }[tone];
+                return (
+                   <div key={label} className="flex min-h-[126px] items-start gap-2 rounded-xl bg-slate-50 p-3 sm:gap-3 sm:p-4">
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconCls}`}>
+                      <Icon className="h-4 w-4" strokeWidth={1.8} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                       <div className="whitespace-normal break-words text-[11px] font-medium leading-tight text-slate-500">{label}</div>
+                      <div className="mt-0.5 text-xl font-bold leading-none tabular-nums text-slate-900">{formatNum(value)}</div>
+                      {prevVal !== undefined && (
+                         <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[11px] leading-tight text-slate-400">
+                          <span>прошлый: {formatNum(prevVal)}</span>
+                          <DeltaBadge curr={value} prev={prevVal} inverted={tone === "red"} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-6 border-t border-slate-100 pt-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Динамика обращений</h3>
+              <p className="mt-1 text-xs text-slate-400">Уникальные заявки и целевые звонки дольше 30 сек по дням</p>
+              </div>
+              {d?.dateFrom && d?.dateTo && (
+                <span className="shrink-0 text-[11px] tabular-nums text-slate-400">{formatDate(d.dateFrom)} – {formatDate(d.dateTo)}</span>
+              )}
+            </div>
+            {(d?.daily?.length ?? 0) > 1 ? (
+              <ResponsiveContainer width="100%" height={170}>
+                <AreaChart data={d!.daily} margin={{ top: 6, right: 4, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradConvLeads" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#10b981" stopOpacity={0.18} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gradConvCalls" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#0070b8" stopOpacity={0.18} />
+                      <stop offset="95%" stopColor="#0070b8" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="date" tickFormatter={formatDate} tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    formatter={(v: number, name: string) => [formatNum(v), name]}
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
+                    labelFormatter={(label: string) => {
+                      const parts = label.split("-");
+                      return parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0]}` : label;
+                    }}
+                  />
+                  <Area type="monotone" dataKey="leads" name="Заявки" stroke="#10b981" strokeWidth={2} fill="url(#gradConvLeads)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                  <Area type="monotone" dataKey="answeredCalls" name="Целевые (>30 сек)" stroke="#0070b8" strokeWidth={2} fill="url(#gradConvCalls)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-32 items-center justify-center rounded-lg bg-slate-50 text-xs text-slate-400">За период нет данных</div>
+            )}
+          </div>
+
+          <div className="mt-6 grid gap-6 border-t border-slate-100 pt-5 md:grid-cols-3">
+            <ConversionBreakdown
+              title="Источники звонков"
+              rows={d?.bySource?.map(row => ({ label: row.source, value: row.calls, note: `${row.calls ? Math.round((row.answeredCalls / row.calls) * 100) : 0}% целевых` })) ?? []}
+              color="bg-[#0070b8]"
+            />
+            <ConversionBreakdown
+              title="Типы заявок"
+              rows={d?.byLeadType?.map(row => ({ label: row.label, value: row.count })) ?? []}
+              color="bg-emerald-500"
+            />
+            <ConversionBreakdown
+              title="UTM-источники заявок"
+              rows={d?.byUtmSource?.map(row => ({ label: row.source, value: row.count })) ?? []}
+              color="bg-amber-500"
+              emptyLabel="Нет данных — UTM сохраняется в заявках с момента подключения"
+            />
+          </div>
+
+          <p className="mt-5 text-[11px] leading-relaxed text-slate-400">
+            Обращения = уникальные заявки с сайта + уникальные целевые звонки из Calltouch дольше 30 секунд. Повторы в течение 24 часов, пропущенные и короткие звонки в сумму не входят.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ConversionBreakdown({
+  title,
+  rows,
+  color,
+  emptyLabel = "Нет данных за период",
+}: {
+  title: string;
+  rows: Array<{ label: string; value: number; note?: string }>;
+  color: string;
+  emptyLabel?: string;
+}) {
+  const max = Math.max(...rows.map(row => row.value), 0);
+  return (
+    <div className="min-w-0">
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">{title}</h3>
+      {rows.length === 0 ? (
+        <div className="rounded-lg bg-slate-50 px-3 py-4 text-xs text-slate-400">{emptyLabel}</div>
+      ) : (
+        <div className="space-y-2.5">
+          {rows.slice(0, 6).map((row, index) => (
+            <div key={`${row.label}-${index}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
+              <div className="min-w-0">
+                <div className="truncate text-xs text-slate-600" title={row.label}>{row.label}</div>
+                <div className="mt-1 h-1 overflow-hidden rounded-full bg-slate-100">
+                  <div className={`h-full rounded-full ${color}`} style={{ width: `${max ? Math.max(4, (row.value / max) * 100) : 0}%` }} />
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs font-semibold tabular-nums text-slate-700">{formatNum(row.value)}</div>
+                {row.note && <div className="text-[10px] text-slate-400">{row.note}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
