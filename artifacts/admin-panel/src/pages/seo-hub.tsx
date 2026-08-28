@@ -763,6 +763,7 @@ function ContentPlanTab() {
         readTime: draftForm.readTime,
         brandIds: [],
         brandId: null,
+        sectionVacancies: false,
       });
       qc.invalidateQueries({ queryKey: ["news"] });
       setPublished(draftForm.title);
