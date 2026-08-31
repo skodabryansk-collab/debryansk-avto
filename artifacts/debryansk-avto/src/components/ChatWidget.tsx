@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ymGoal } from "@/lib/ym";
+import { ensureLeadSubmissionMetadata } from "../lib/leadSubmission";
 import { useQuery } from "@tanstack/react-query";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { usePageCar } from "@/context/PageCarContext";
@@ -345,6 +346,7 @@ function ContactFormCard({ base, history }: { base: string; history?: Message[] 
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+  const pageCarContext = usePageCar();
 
   if (submitted) {
     return (
@@ -368,7 +370,7 @@ function ContactFormCard({ base, history }: { base: string; history?: Message[] 
       if (pageCarContext?.brand) fd.append("brand", pageCarContext.brand);
       fd.append("source", "Навигатор (чат)");
       if (history?.length) fd.append("chatHistory", formatHistoryForEmail(history));
-      const res = await fetch(`${base}/api/send-email`, { method: "POST", body: fd });
+      const res = await fetch(`${base}/api/send-email`, { method: "POST", body: ensureLeadSubmissionMetadata(fd) });
       if (!res.ok) throw new Error("server");
       ymGoal("chat_lead");
       setSubmitted(true);
@@ -419,6 +421,7 @@ function TestDriveFormCard({ base, prefillModel, history }: { base: string; pref
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+  const pageCarContext = usePageCar();
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
   const maxDateStr = useMemo(() => new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0], []);
   const timeSlots = ["9:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00"];
@@ -448,7 +451,7 @@ function TestDriveFormCard({ base, prefillModel, history }: { base: string; pref
       if (time) fd.append("preferredTime", time);
       fd.append("source", "Навигатор (чат)");
       if (history?.length) fd.append("chatHistory", formatHistoryForEmail(history));
-      const res = await fetch(`${base}/api/send-email`, { method: "POST", body: fd });
+      const res = await fetch(`${base}/api/send-email`, { method: "POST", body: ensureLeadSubmissionMetadata(fd) });
       if (!res.ok) throw new Error("server");
       ymGoal("chat_lead");
       setSubmitted(true);
@@ -576,7 +579,7 @@ function ServiceFormCard({ base, history }: { base: string; history?: Message[] 
       fd.append("location", selectedLocation?.title || locationId);
       fd.append("source", "Навигатор (чат)");
       if (history?.length) fd.append("chatHistory", formatHistoryForEmail(history));
-      const res = await fetch(`${base}/api/send-email`, { method: "POST", body: fd });
+      const res = await fetch(`${base}/api/send-email`, { method: "POST", body: ensureLeadSubmissionMetadata(fd) });
       if (!res.ok) throw new Error("server");
       ymGoal("chat_lead");
       setSubmitted(true);
@@ -641,6 +644,7 @@ function CreditFormCard({ base, prefillModel, history }: { base: string; prefill
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+  const pageCarContext = usePageCar();
 
   if (submitted) {
     return (
@@ -665,7 +669,7 @@ function CreditFormCard({ base, prefillModel, history }: { base: string; prefill
       if (model.trim()) fd.append("model", model.trim());
       fd.append("source", "Навигатор (чат)");
       if (history?.length) fd.append("chatHistory", formatHistoryForEmail(history));
-      const res = await fetch(`${base}/api/send-email`, { method: "POST", body: fd });
+      const res = await fetch(`${base}/api/send-email`, { method: "POST", body: ensureLeadSubmissionMetadata(fd) });
       if (!res.ok) throw new Error("server");
       ymGoal("chat_lead");
       setSubmitted(true);
@@ -914,7 +918,7 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
       if (estimateMin !== null) fd.append("estimateMin", String(estimateMin));
       if (estimateMax !== null) fd.append("estimateMax", String(estimateMax));
       if (history?.length) fd.append("chatHistory", formatHistoryForEmail(history));
-      const emailRes = await fetch(`${base}/api/send-email`, { method: "POST", body: fd });
+      const emailRes = await fetch(`${base}/api/send-email`, { method: "POST", body: ensureLeadSubmissionMetadata(fd) });
       if (!emailRes.ok) throw new Error("email_send_failed");
       ymGoal("chat_lead");
 
