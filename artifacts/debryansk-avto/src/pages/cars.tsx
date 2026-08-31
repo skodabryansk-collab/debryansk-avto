@@ -17,7 +17,7 @@ import DisclaimerBadge from "@/components/DisclaimerBadge";
 import { CreditModal } from "@/components/modals/CreditModal";
 import { TradeInModal } from "@/components/modals/TradeInModal";
 import Layout from "@/components/Layout";
-import CatalogFilterPanel, { BODY_TYPE_NAMES, TRANSMISSIONS, DRIVES, type FilterSection } from "@/components/CatalogFilterPanel";
+import CatalogFilterPanel, { BODY_TYPE_NAMES, TRANSMISSIONS, DRIVES, FUEL_TYPES, type FilterSection } from "@/components/CatalogFilterPanel";
 import { SortPopover } from "@/components/SortPopover";
 import { ActiveFilters, type ActiveFilterChip } from "@/components/ActiveFilters";
 
@@ -59,6 +59,16 @@ function parseDrive(mod: string): string {
   if (!mod) return "Передний";
   return mod.includes("4WD") ? "Полный" : "Передний";
 }
+
+function parseFuel(mod: string): string {
+  if (!mod) return "";
+  const normalized = mod.toUpperCase();
+  if (normalized.includes("ЭЛЕКТР") || /\bEV\b|\bBEV\b/.test(normalized)) return "Электро";
+  if (normalized.includes("ГИБРИД") || /\bHYBRID\b|\bHEV\b|\bPHEV\b/.test(normalized)) return "Гибрид";
+  if (normalized.includes("ДИЗЕЛ") || /\bDIESEL\b/.test(normalized) || /\d+(?:[.,]\d+)?\s*D\b/.test(normalized)) return "Дизель";
+  return "Бензин";
+}
+
 function formatOwners(raw: string): string {
   if (!raw) return "";
   const s = raw.toLowerCase().trim();
@@ -454,6 +464,7 @@ export default function UsedCars() {
   const [filterBodyType, setFilterBodyType] = useState("Все типы кузова");
   const [filterTransmission, setFilterTransmission] = useState("Любая");
   const [filterDrive, setFilterDrive] = useState("Любой");
+  const [filterFuel, setFilterFuel] = useState("Любое");
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
   const [sortBy, setSortBy] = useState<"popular" | "price_asc" | "price_desc" | "year_desc" | "run_asc">("popular");
@@ -483,6 +494,7 @@ export default function UsedCars() {
     if (filterBodyType !== "Все типы кузова") list = list.filter(c => c.bodyType === filterBodyType);
     if (filterTransmission !== "Любая") list = list.filter(c => parseTransmission(c.modification) === filterTransmission);
     if (filterDrive !== "Любой") list = list.filter(c => parseDrive(c.modification) === filterDrive);
+    if (filterFuel !== "Любое") list = list.filter(c => parseFuel(c.modification) === filterFuel);
     const pMin = priceMin ? parseInt(priceMin.replace(/\D/g, "")) : 0;
     const pMax = priceMax ? parseInt(priceMax.replace(/\D/g, "")) : Infinity;
     if (pMin) list = list.filter(c => (c.price - (c.maxDiscount || 0)) >= pMin);
@@ -493,7 +505,7 @@ export default function UsedCars() {
     if (sortBy === "year_desc") list = [...list].sort((a, b) => b.year - a.year);
     if (sortBy === "run_asc") list = [...list].sort((a, b) => a.run - b.run);
     return list;
-  }, [cars, filterMark, filterBodyType, filterTransmission, filterDrive, priceMin, priceMax, sortBy]);
+  }, [cars, filterMark, filterBodyType, filterTransmission, filterDrive, filterFuel, priceMin, priceMax, sortBy]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -505,6 +517,7 @@ export default function UsedCars() {
     setFilterBodyType("Все типы кузова");
     setFilterTransmission("Любая");
     setFilterDrive("Любой");
+    setFilterFuel("Любое");
     setPriceMin("");
     setPriceMax("");
     setPage(1);
@@ -515,6 +528,7 @@ export default function UsedCars() {
     filterBodyType !== "Все типы кузова",
     filterTransmission !== "Любая",
     filterDrive !== "Любой",
+    filterFuel !== "Любое",
     !!priceMin,
     !!priceMax,
   ].filter(Boolean).length;
@@ -555,6 +569,13 @@ export default function UsedCars() {
       options: DRIVES,
       value: filterDrive,
       onSelect: d => go(() => setFilterDrive(d)),
+    },
+    {
+      kind: "pills",
+      label: "Тип двигателя",
+      options: FUEL_TYPES,
+      value: filterFuel,
+      onSelect: fuel => go(() => setFilterFuel(fuel)),
     },
   ];
 
@@ -709,6 +730,7 @@ export default function UsedCars() {
                 filterBodyType !== "Все типы кузова" ? { key: "body", label: filterBodyType, onRemove: () => go(() => setFilterBodyType("Все типы кузова")) } : null,
                 filterTransmission !== "Любая" ? { key: "trans", label: filterTransmission, onRemove: () => go(() => setFilterTransmission("Любая")) } : null,
                 filterDrive !== "Любой" ? { key: "drive", label: filterDrive, onRemove: () => go(() => setFilterDrive("Любой")) } : null,
+                filterFuel !== "Любое" ? { key: "fuel", label: filterFuel, onRemove: () => go(() => setFilterFuel("Любое")) } : null,
                 priceMin ? { key: "pmin", label: `от ${priceMin} ₽`, onRemove: () => go(() => setPriceMin("")) } : null,
                 priceMax ? { key: "pmax", label: `до ${priceMax} ₽`, onRemove: () => go(() => setPriceMax("")) } : null,
               ].filter((c): c is NonNullable<typeof c> => c !== null)}
