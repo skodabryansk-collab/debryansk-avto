@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import { ymGoal } from "@/lib/ym";
+import { ensureLeadSubmissionMetadata } from "../lib/leadSubmission";
 import { Link, useRoute } from "wouter";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft, ArrowRight, Calendar, CheckCircle, ExternalLink, Phone, Share2, Check,
@@ -27,6 +29,7 @@ interface PromotionDetail {
   buttonText: string | null;
   buttonUrl: string | null;
   promotionType: "sales" | "service";
+  brandIds: number[];
   brands: PromoBrand[];
   isActive: boolean;
   isExpired: boolean;
@@ -41,7 +44,6 @@ async function fetchPromotion(slug: string): Promise<PromotionDetail | null> {
 }
 
 export default function PromotionDetailPage() {
-  const prefersReduced = useReducedMotion();
   const [, params] = useRoute("/promotions/:slug");
   const slug = params?.slug ?? "";
 
@@ -67,10 +69,12 @@ export default function PromotionDetailPage() {
       const fd = new FormData();
       fd.append("type", "promo");
       fd.append("phone", phone);
-      if (promo.brandId) fd.append("brand", promo.brandId);
+      const brandNames = promo.brands.map(brand => brand.name).filter(Boolean);
+      if (brandNames.length > 0) fd.append("brand", brandNames.join(", "));
       fd.append("source", `Акция (прямая ссылка): ${promo.title}`);
-      const r = await fetch("/api/send-email", { method: "POST", body: fd });
+      const r = await fetch("/api/send-email", { method: "POST", body: ensureLeadSubmissionMetadata(fd) });
       if (!r.ok) { setError(true); setSending(false); return; }
+      ymGoal("lead_submit");
       setSubmitted(true);
     } catch {
       setError(true);
@@ -96,7 +100,7 @@ export default function PromotionDetailPage() {
   if (isLoading) {
     return (
       <Layout>
-        <div className={`container mx-auto px-4 sm:px-6 py-8 max-w-2xl ${prefersReduced ? "" : "animate-pulse"} space-y-4`}>
+        <div className="container mx-auto px-4 sm:px-6 py-8 max-w-2xl animate-pulse space-y-4">
           <div className="h-4 bg-slate-100 rounded w-1/3" />
           <div className="h-64 bg-slate-100 rounded-2xl" />
           <div className="h-8 bg-slate-100 rounded w-2/3" />
@@ -117,7 +121,7 @@ export default function PromotionDetailPage() {
         <div className="text-center text-slate-400 py-20 px-4">
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Акция не найдена</h1>
           <p className="text-sm text-slate-400 mb-6">Возможно, ссылка устарела или акция была удалена.</p>
-          <Link href="/" className="text-primary font-bold text-sm hover:underline">
+          <Link href="/" className="text-[#0070b8] font-bold text-sm hover:underline">
             <ArrowLeft className="w-4 h-4 inline mr-1" />
             На главную
           </Link>
@@ -146,13 +150,13 @@ export default function PromotionDetailPage() {
 
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-2xl">
         <div className="flex items-center gap-2 text-xs text-slate-400 mb-4">
-          <Link href="/" className="hover:text-primary transition-colors">Главная</Link>
+          <Link href="/" className="hover:text-[#0070b8] transition-colors">Главная</Link>
           <ArrowRight className="w-3 h-3" />
           <span className="text-slate-600 truncate">{promo.title}</span>
         </div>
 
         <motion.article
-          initial={prefersReduced ? false : { opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
           className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm"
@@ -221,7 +225,7 @@ export default function PromotionDetailPage() {
                 <p className="font-bold text-slate-700">Акция больше недоступна</p>
                 <p className="text-sm text-slate-500 mt-1">
                   Уточните актуальные предложения по телефону{" "}
-                  <a href="tel:+74832777770" className="text-primary font-bold">+7 (4832) 77-77-70</a>
+                  <a href="tel:+74832777770" className="text-[#0070b8] font-bold">+7 (4832) 77-77-70</a>
                 </p>
               </div>
             ) : submitted ? (
@@ -239,7 +243,7 @@ export default function PromotionDetailPage() {
                   </a>
                 )}
                 <button onClick={() => setShowForm(true)}
-                  className="flex-1 bg-gradient-to-r from-primary to-[#005a94] text-white font-bold px-5 py-3 rounded-xl text-sm hover:opacity-90 transition-opacity">
+                  className="flex-1 bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold px-5 py-3 rounded-xl text-sm hover:opacity-90 transition-opacity">
                   {btnText}
                 </button>
               </div>
@@ -254,13 +258,13 @@ export default function PromotionDetailPage() {
                     <input type="tel" inputMode="tel" maxLength={18}
                       value={phone} onChange={e => setPhone(formatPhone(e.target.value))}
                       placeholder="+7 (___) ___-__-__" required
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary transition-colors"
+                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#0070b8] transition-colors"
                     />
                   </div>
                 </div>
                 {error && <p className="text-xs text-red-500 text-center">Не удалось отправить. Попробуйте ещё раз.</p>}
                 <button type="submit" disabled={sending || !isPhoneValid(phone)}
-                  className="w-full bg-gradient-to-r from-primary to-[#005a94] text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity disabled:opacity-60">
+                  className="w-full bg-gradient-to-r from-[#0070b8] to-[#005a94] text-white font-bold rounded-xl py-3 text-sm hover:opacity-90 transition-opacity disabled:opacity-60">
                   {sending ? "Отправляем…" : "Отправить заявку"}
                 </button>
                 <p className="text-[10px] text-slate-400 text-center">
