@@ -44,6 +44,9 @@ interface CarRecord {
   creditDiscount: number;
   tradeinDiscount: number;
   popularity_score?: number;
+  fuelType?: string | null;
+  engineVolume?: number | null;
+  enginePower?: number | null;
 }
 
 function parseTransmission(mod: string): string {
@@ -60,7 +63,8 @@ function parseDrive(mod: string): string {
   return mod.includes("4WD") ? "Полный" : "Передний";
 }
 
-function parseFuel(mod: string): string {
+function parseFuel(mod: string, fuelType?: string | null): string {
+  if (fuelType && FUEL_TYPES.includes(fuelType)) return fuelType;
   if (!mod) return "";
   const normalized = mod.toUpperCase();
   if (normalized.includes("ЭЛЕКТР") || /\bEV\b|\bBEV\b/.test(normalized)) return "Электро";
@@ -494,7 +498,7 @@ export default function UsedCars() {
     if (filterBodyType !== "Все типы кузова") list = list.filter(c => c.bodyType === filterBodyType);
     if (filterTransmission !== "Любая") list = list.filter(c => parseTransmission(c.modification) === filterTransmission);
     if (filterDrive !== "Любой") list = list.filter(c => parseDrive(c.modification) === filterDrive);
-    if (filterFuel !== "Любое") list = list.filter(c => parseFuel(c.modification) === filterFuel);
+    if (filterFuel !== "Любое") list = list.filter(c => parseFuel(c.modification, c.fuelType) === filterFuel);
     const pMin = priceMin ? parseInt(priceMin.replace(/\D/g, "")) : 0;
     const pMax = priceMax ? parseInt(priceMax.replace(/\D/g, "")) : Infinity;
     if (pMin) list = list.filter(c => (c.price - (c.maxDiscount || 0)) >= pMin);
