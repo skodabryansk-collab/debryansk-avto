@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, real, timestamp } from "drizzle-orm/pg-core";
 
 export const carsTable = pgTable("cars", {
   id: serial("id").primaryKey(),
@@ -18,7 +18,13 @@ export const carsTable = pgTable("cars", {
   imageUrl: text("image_url"),
   ownersNumber: integer("owners_number"),
   vin: text("vin"),
+  driveType: text("drive_type"),
   dealer: text("dealer"),
+  fuelType: text("fuel_type"),
+  engineVolume: real("engine_volume"),
+  enginePower: integer("engine_power"),
+  engineSource: text("engine_source"),
+  engineEnrichedAt: timestamp("engine_enriched_at", { withTimezone: true }),
   syncedAt: timestamp("synced_at", { withTimezone: true }).defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   maxDiscount: integer("max_discount").notNull().default(0),
