@@ -17,6 +17,7 @@ export async function getToken(): Promise<string | null> {
         "Authorization": "Basic " + Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64"),
       },
       body: new URLSearchParams({ grant_type: "client_credentials" }),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!r.ok) return tokenCache?.access_token ?? null;
     const data = await r.json() as { access_token: string; expires_in: number };
@@ -33,6 +34,7 @@ export async function cmGet(path: string, params?: Record<string, string>): Prom
   const qs = params ? "?" + new URLSearchParams(params).toString() : "";
   const r = await fetch(`${API_BASE}${path}${qs}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    signal: AbortSignal.timeout(15_000),
   });
   if (!r.ok) {
     const text = await r.text();
