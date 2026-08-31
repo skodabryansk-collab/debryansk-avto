@@ -252,6 +252,12 @@ export async function runMigration() {
 
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS popularity_score integer NOT NULL DEFAULT 0`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS drive_type text`);
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS fuel_type text`);
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS engine_volume real`);
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS engine_power integer`);
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS engine_source text`);
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS engine_enriched_at timestamptz`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS cars_engine_enrichment_idx ON cars (engine_enriched_at)`);
 
     logger.info("Navigator schema ready (conversations, messages, cars — idempotent)");
 
@@ -590,6 +596,31 @@ export async function runMigration() {
       ON calltouch_calls (call_id)
     `);
     logger.info("calltouch_calls schema ready (idempotent)");
+
+    // Calltouch callback submissions — persistent idempotency and diagnostics
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS calltouch_callbacks (
+        id                    SERIAL PRIMARY KEY,
+        submission_id         TEXT NOT NULL UNIQUE,
+        lead_id               INTEGER,
+        status                TEXT NOT NULL DEFAULT 'pending',
+        attempts              INTEGER NOT NULL DEFAULT 1,
+        http_status           INTEGER,
+        calltouch_request_id  TEXT,
+        error_message         TEXT,
+        created_at            TIMESTAMPTZ DEFAULT NOW(),
+        updated_at            TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_calltouch_callbacks_lead_id
+      ON calltouch_callbacks (lead_id)
+    `);
+    await db.execute(sql`
+      ALTER TABLE calltouch_callbacks
+      ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 1
+    `);
+    logger.info("calltouch_callbacks schema ready (idempotent)");
 
     // Promotions: unique shareable slug (Task #260)
     await db.execute(sql`ALTER TABLE promotions ADD COLUMN IF NOT EXISTS slug TEXT`);
