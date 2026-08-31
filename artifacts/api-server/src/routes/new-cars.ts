@@ -14,6 +14,7 @@ const FEEDS = [
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/53fe918374eb87e8f6536b8c3bb21937.xml", dealer: "Haval City" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/913211584f8ad577ee76a703f2f13186.xml", dealer: "Jetour" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/86abbe9a79571a2757b583e323b27564.xml", dealer: "Soueast" },
+  { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/35c5c670c873d1d7bb686184b3f27398.xml", dealer: "Jeland" },
 ];
 
 export interface NewCarRecord {
@@ -80,6 +81,7 @@ const BRAND_CANONICAL: Record<string, string> = {
   "HAVAL": "Haval",
   "JAECOO": "Jaecoo",
   "JETOUR": "Jetour",
+  "JELAND": "Jeland",
   "OMODA": "Omoda",
   "EXEED": "Exeed",
   "TANK": "Tank",
@@ -125,6 +127,7 @@ function parseFeed(text: string, dealer: string): NewCarRecord[] {
       phone: getField(block, "phone"),
       notRegisteredInRussia: getField(block, "not_registered_in_russia") === "true",
       acceptedAutoruExclusive: getField(block, "accepted_autoru_exclusive") === "true",
+      popularity_score: 0,
     });
   }
   return cars;
@@ -246,15 +249,50 @@ router.get("/cars/new", async (req, res) => {
 
     const ids = data.map(c => c.id);
     const rows = ids.length
-      ? await db.execute(sql`SELECT external_id, popularity_score, created_at FROM cars WHERE external_id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`)
+      ? await db.execute(sql`
+          SELECT external_id, popularity_score, created_at, fuel_type,
+                 engine_volume, engine_power, engine_source
+          FROM cars
+          WHERE external_id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})
+        `)
       : { rows: [] };
     const metaMap = new Map(
-      (rows.rows as { external_id: string; popularity_score: number; created_at: string | null }[]).map(r => [r.external_id, { score: r.popularity_score ?? 0, createdAt: r.created_at }])
+      (rows.rows as {
+        external_id: string;
+        popularity_score: number;
+        created_at: string | null;
+        fuel_type: string | null;
+        engine_volume: number | null;
+        engine_power: number | null;
+        engine_source: string | null;
+      }[]).map(r => [r.external_id, {
+        score: r.popularity_score ?? 0,
+        createdAt: r.created_at,
+        fuelType: r.fuel_type,
+        engineVolume: r.engine_volume,
+        enginePower: r.engine_power,
+        engineSource: r.engine_source,
+      }])
     );
 
     let enriched = data.map(c => {
-      const meta = metaMap.get(c.id) ?? { score: 0, createdAt: null };
-      return { ...c, popularity_score: meta.score, created_at: meta.createdAt };
+      const meta = metaMap.get(c.id) ?? {
+        score: 0,
+        createdAt: null,
+        fuelType: null,
+        engineVolume: null,
+        enginePower: null,
+        engineSource: null,
+      };
+      return {
+        ...c,
+        popularity_score: meta.score,
+        created_at: meta.createdAt,
+        fuelType: meta.fuelType,
+        engineVolume: meta.engineVolume,
+        enginePower: meta.enginePower,
+        engineSource: meta.engineSource,
+      };
     });
 
     if (sort === "popularity") {
