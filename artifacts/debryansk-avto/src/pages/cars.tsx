@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { ymGoal } from "@/lib/ym";
+import { ensureLeadSubmissionMetadata } from "../lib/leadSubmission";
 import FaqBlock from "@/components/FaqBlock";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useQuery } from "@tanstack/react-query";
@@ -108,7 +109,7 @@ function LeadModal({ car, onClose }: { car: CarRecord; onClose: () => void }) {
     fd.append("carModel", car.model);
     fd.append("carYear", String(car.year));
     fd.append("dealer", "Супонево");
-    fetch("/api/send-email", { method: "POST", body: fd })
+    fetch("/api/send-email", { method: "POST", body: ensureLeadSubmissionMetadata(fd) })
       .then(res => { if (res.ok) ymGoal("lead_submit"); })
       .catch(() => {});
   }
@@ -461,6 +462,15 @@ export default function UsedCars() {
   const [creditCar, setCreditCar] = useState<CarRecord | null>(null);
   const [showTradeIn, setShowTradeIn] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const pageMountedRef = useRef(false);
+
+  useEffect(() => {
+    if (!pageMountedRef.current) {
+      pageMountedRef.current = true;
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [page]);
 
   const availableMarks = useMemo(() => {
     const found = [...new Set(cars.map(c => c.mark))].sort();
