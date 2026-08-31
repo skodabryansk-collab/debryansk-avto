@@ -161,21 +161,53 @@ router.get("/cars/used", async (req, res) => {
 
     const ids = data.map(c => c.id);
     const rows = ids.length
-      ? await db.execute(sql`SELECT external_id, popularity_score, created_at FROM cars WHERE external_id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)}) AND type = 'used'`)
+      ? await db.execute(sql`
+          SELECT external_id, popularity_score, created_at, fuel_type,
+                 engine_volume, engine_power, engine_source
+          FROM cars
+          WHERE external_id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})
+            AND type = 'used'
+        `)
       : { rows: [] };
     const metaMap = new Map(
-      (rows.rows as { external_id: string; popularity_score: number; created_at: string | null }[]).map(r => [r.external_id, { score: r.popularity_score ?? 0, createdAt: r.created_at }])
+      (rows.rows as {
+        external_id: string;
+        popularity_score: number;
+        created_at: string | null;
+        fuel_type: string | null;
+        engine_volume: number | null;
+        engine_power: number | null;
+        engine_source: string | null;
+      }[]).map(r => [r.external_id, {
+        score: r.popularity_score ?? 0,
+        createdAt: r.created_at,
+        fuelType: r.fuel_type,
+        engineVolume: r.engine_volume,
+        enginePower: r.engine_power,
+        engineSource: r.engine_source,
+      }])
     );
 
     const avitoMap = await getAvitoMeta();
 
     let enriched = data.map(c => {
-      const meta = metaMap.get(c.id) ?? { score: 0, createdAt: null };
+      const meta = metaMap.get(c.id) ?? {
+        score: 0,
+        createdAt: null,
+        fuelType: null,
+        engineVolume: null,
+        enginePower: null,
+        engineSource: null,
+      };
       const avito = avitoMap.get(c.id);
       return {
         ...c,
         popularity_score: meta.score,
         created_at: meta.createdAt,
+        fuelType: meta.fuelType,
+        engineVolume: meta.engineVolume,
+        enginePower: meta.enginePower,
+        engineSource: meta.engineSource,
         driveType: avito?.driveType || "",
         ownersNumber: avito?.owners || c.ownersNumber,
       };
