@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { ymGoal } from "@/lib/ym";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { sendWithRetry } from "@/lib/sendWithRetry";
@@ -463,6 +463,15 @@ export default function NewCars() {
   const [creditCar, setCreditCar] = useState<NewCarRecord | null>(null);
   const [showTradeIn, setShowTradeIn] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const pageMountedRef = useRef(false);
+
+  useEffect(() => {
+    if (!pageMountedRef.current) {
+      pageMountedRef.current = true;
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [page]);
 
   const availableModels = useMemo(() => {
     const src = filterDealer === "Все дилеры" ? cars : cars.filter(c => c.dealer === filterDealer);
