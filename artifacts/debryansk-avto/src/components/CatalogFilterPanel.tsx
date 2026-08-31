@@ -13,6 +13,7 @@ export const BODY_TYPE_NAMES = [
 ];
 export const TRANSMISSIONS = ["Любая", "Робот", "Автомат", "Механика", "Вариатор"];
 export const DRIVES = ["Любой", "Полный", "Передний"];
+export const FUEL_TYPES = ["Любое", "Бензин", "Дизель", "Гибрид", "Электро"];
 
 export type PillSection = {
   kind: "pills";
