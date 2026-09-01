@@ -7,6 +7,7 @@ import { runMigration } from "./migration";
 import path from "path";
 import { spawn } from "child_process";
 import { setPrerendererRunning } from "./lib/chrome-semaphore";
+import { scheduleCmDealerFuelSync } from "./services/cm-expert-dealer";
 
 const rawPort = process.env["PORT"];
 
@@ -251,6 +252,12 @@ async function main() {
   // Then seed data
   await seedDatabase();
 
+  // IndexNow: ping any STATIC_PAGES that haven't been pinged before
+  // (auto-pings /service/bonus, /corporate, and any future additions on first deploy)
+  import("./services/indexnow").then(({ pingNewStaticPages }) => {
+    pingNewStaticPages().catch(err => logger.warn({ err }, "[indexnow] startup ping failed"));
+  }).catch(err => logger.warn({ err }, "[indexnow] module load failed"));
+
   // Load TO catalog from DB (seeds from bundled JSON on first run)
   import("./services/to-catalog.service").then(({ initCatalog }) => {
     initCatalog()
@@ -263,6 +270,7 @@ async function main() {
     syncCars()
       .then(stats => {
         logger.info(stats, "Startup car sync complete");
+        scheduleCmDealerFuelSync("startup");
         handlePrerenderAfterSync(stats);
         handleIndexNowAfterSync(stats);
       })
@@ -273,6 +281,7 @@ async function main() {
       syncCars()
         .then(stats => {
           logger.info(stats, "Scheduled car sync complete");
+          scheduleCmDealerFuelSync("scheduled");
           handlePrerenderAfterSync(stats);
           handleIndexNowAfterSync(stats);
         })
@@ -348,9 +357,11 @@ async function main() {
   }).catch(err => logger.warn({ err }, "[metrika] Scheduler load failed"));
 
   // SEO positions — Webmaster API, weekly Sunday 10:00 MSK (07:00 UTC)
-  // onComplete callback triggers the Петля Карпаты evaluator after each fetch
+  // The evaluator also has its own daily catch-up scheduler. The weekly
+  // callback is kept so fresh position data is evaluated immediately.
   import("./services/seo-positions").then(({ scheduleSeoPositions }) => {
-    import("./services/seo-evaluator").then(({ runEvaluation }) => {
+    import("./services/seo-evaluator").then(({ runEvaluation, scheduleSeoEvaluation }) => {
+      scheduleSeoEvaluation();
       scheduleSeoPositions(() => {
         runEvaluation()
           .then(r => logger.info(r, "[seo-evaluator] Evaluation triggered by positions fetch"))
