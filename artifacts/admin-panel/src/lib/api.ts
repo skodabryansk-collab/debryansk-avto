@@ -326,8 +326,37 @@ export function syncCars() {
     "POST", "/admin/navigator/sync-cars"
   );
 }
+export interface CmFuelSyncResult {
+  ok: true;
+  dealerId: string;
+  dealerName: string | null;
+  carsFetched: number;
+  pagesFetched: number;
+  totalRowsScanned: number;
+  carsWithVin: number;
+  carsWithFuel: number;
+  carsWithEngineDetails: number;
+  matchedCars: number;
+  updatedCars: number;
+  skippedCars: number;
+  paginationTruncated: boolean;
+}
+export function syncCmFuel() {
+  return api<CmFuelSyncResult>("POST", "/admin/navigator/sync-cm-fuel");
+}
 export function getSyncStatus() {
-  return api<{ ok: true; total: number; lastSynced: string | null; byDealer?: { dealer: string; type: string; cnt: number }[] }>("GET", "/admin/navigator/sync-status");
+  return api<{
+    ok: true;
+    total: number;
+    lastSynced: string | null;
+    byDealer?: { dealer: string; type: string; cnt: number }[];
+    cmFuel?: {
+      running: boolean;
+      startedAt: string | null;
+      completedAt: string | null;
+      lastResult: CmFuelSyncResult | null;
+    };
+  }>("GET", "/admin/navigator/sync-status");
 }
 
 /* Cache rebuild */
