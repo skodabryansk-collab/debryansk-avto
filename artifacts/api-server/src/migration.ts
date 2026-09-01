@@ -253,6 +253,7 @@ export async function runMigration() {
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS popularity_score integer NOT NULL DEFAULT 0`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS drive_type text`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS fuel_type text`);
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS cm_dms_car_id text`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS engine_volume real`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS engine_power integer`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS engine_source text`);
