@@ -3,6 +3,11 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { syncCars } from "../services/car-sync";
+import { syncFuelFromAutoruDealer } from "../services/autoru-dealer";
+import {
+  getCmDealerFuelSyncStatus,
+  syncFuelFromCmDealerStock,
+} from "../services/cm-expert-dealer";
 import { clearNewCarsCache } from "../routes/new-cars";
 
 const router: IRouter = Router();
@@ -139,6 +144,32 @@ router.post("/force-sync", async (_req, res) => {
   }
 });
 
+/* ── POST /admin/navigator/sync-cm-fuel ── */
+router.post("/sync-cm-fuel", async (_req, res) => {
+  try {
+    const result = await syncFuelFromCmDealerStock();
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    return res.status(502).json({
+      ok: false,
+      error: err instanceof Error ? err.message : "CM Expert dealer sync failed",
+    });
+  }
+});
+
+/* ── POST /admin/navigator/sync-autoru-fuel — legacy Auto.ru fallback ── */
+router.post("/sync-autoru-fuel", async (_req, res) => {
+  try {
+    const result = await syncFuelFromAutoruDealer();
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    return res.status(502).json({
+      ok: false,
+      error: err instanceof Error ? err.message : "Auto.ru dealer sync failed",
+    });
+  }
+});
+
 /* ── GET /admin/navigator/sync-status ── last sync info ── */
 router.get("/sync-status", async (_req, res) => {
   try {
@@ -161,6 +192,7 @@ router.get("/sync-status", async (_req, res) => {
       total: row.total ?? 0,
       lastSynced: row.last_synced ?? null,
       byDealer: byDealer.rows as { dealer: string; type: string; cnt: number }[],
+      cmFuel: getCmDealerFuelSyncStatus(),
     });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
