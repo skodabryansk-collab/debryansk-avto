@@ -11,11 +11,11 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  getChats, getChatDetail, exportChatsJsonl, syncCars, getSyncStatus,
+  getChats, getChatDetail, exportChatsJsonl, syncCars, syncCmFuel, getSyncStatus,
   type ChatListItem, type ChatDetail,
 } from "@/lib/api";
 import {
-  RefreshCw, Download, MessageSquare, Car, Star, ThumbsUp, ThumbsDown,
+  RefreshCw, Download, MessageSquare, Car, Fuel, Star, ThumbsUp, ThumbsDown,
   Trash2, Info
 } from "lucide-react";
 
@@ -108,6 +108,20 @@ export default function NavigatorPage() {
     },
   });
 
+  const cmFuelMutation = useMutation({
+    mutationFn: syncCmFuel,
+    onSuccess: (data) => {
+      toast({
+        title: "Топливо АСП обновлено",
+        description: `${data.updatedCars} карточек сопоставлено по VIN/DMS ID. В наличии в CM: ${data.carsFetched}.`,
+      });
+      qc.invalidateQueries({ queryKey: ["sync-status"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Ошибка синхронизации CM Expert", description: err.message, variant: "destructive" });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => fetch(`/api/admin/navigator/chats/${id}`, {
       method: "DELETE",
@@ -157,6 +171,14 @@ export default function NavigatorPage() {
             <RefreshCw size={16} className={`mr-2 ${syncMutation.isPending ? "animate-spin" : ""}`} />
             {syncMutation.isPending ? "Синхронизация…" : "Синхронизировать сейчас"}
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => cmFuelMutation.mutate()}
+            disabled={cmFuelMutation.isPending}
+          >
+            <Fuel size={16} className={`mr-2 ${cmFuelMutation.isPending ? "animate-pulse" : ""}`} />
+            {cmFuelMutation.isPending ? "Обновление топлива…" : "Обновить топливо АСП"}
+          </Button>
           {syncStatus && (
             <div className="text-sm text-slate-600 w-full">
               <div className="mb-3">
@@ -165,6 +187,19 @@ export default function NavigatorPage() {
                   <span className="ml-2 text-slate-400">· последний раз: {formatDate(syncStatus.lastSynced)}</span>
                 )}
               </div>
+              {syncStatus.cmFuel?.lastResult && (
+                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                  <span className="font-medium">CM Expert / АСП:</span>{" "}
+                  {syncStatus.cmFuel.lastResult.updatedCars} обновлено из{" "}
+                  {syncStatus.cmFuel.lastResult.carsFetched} машин в наличии
+                  {syncStatus.cmFuel.lastResult.paginationTruncated && (
+                    <span className="ml-1 text-amber-700">· достигнут лимит страниц</span>
+                  )}
+                  {syncStatus.cmFuel.completedAt && (
+                    <span className="ml-2 text-slate-400">· {formatDate(syncStatus.cmFuel.completedAt)}</span>
+                  )}
+                </div>
+              )}
               {syncStatus.byDealer && syncStatus.byDealer.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {(syncStatus.byDealer as { dealer: string; type: string; cnt: number }[])
