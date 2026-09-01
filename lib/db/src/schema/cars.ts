@@ -20,6 +20,7 @@ export const carsTable = pgTable("cars", {
   vin: text("vin"),
   driveType: text("drive_type"),
   dealer: text("dealer"),
+  cmDmsCarId: text("cm_dms_car_id"),
   fuelType: text("fuel_type"),
   engineVolume: real("engine_volume"),
   enginePower: integer("engine_power"),
