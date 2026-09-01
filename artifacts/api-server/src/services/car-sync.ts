@@ -143,7 +143,7 @@ export async function syncCars(): Promise<SyncStats> {
         ${c.run}, ${c.bodyType}, ${c.modification}, ${c.complectation},
         ${c.extras || null}, ${c.description || null}, ${c.images[0] ?? null},
         ${c.vin || null}, null, ${ownersNum}, ${driveType},
-        ${engine?.fuelType ?? null}, ${engine?.engineVolume ?? null},
+         NULL, ${engine?.engineVolume ?? null},
         ${engine?.enginePower ?? null}, ${engine ? "xml_pending" : null}, NULL,
         ${c.maxDiscount}, ${c.creditDiscount}, ${c.tradeinDiscount}, NOW()
       )
@@ -162,12 +162,12 @@ export async function syncCars(): Promise<SyncStats> {
         vin = EXCLUDED.vin,
         owners_number = EXCLUDED.owners_number,
         drive_type = EXCLUDED.drive_type,
-        fuel_type = CASE
-          WHEN cars.vin IS DISTINCT FROM EXCLUDED.vin OR cars.modification IS DISTINCT FROM EXCLUDED.modification
-            THEN EXCLUDED.fuel_type
-          WHEN cars.engine_source = 'cm_vin' THEN cars.fuel_type
-          ELSE COALESCE(EXCLUDED.fuel_type, cars.fuel_type)
-        END,
+         fuel_type = CASE
+           WHEN cars.vin IS DISTINCT FROM EXCLUDED.vin OR cars.modification IS DISTINCT FROM EXCLUDED.modification
+             THEN EXCLUDED.fuel_type
+           WHEN cars.engine_source = 'cm_cabinet' THEN cars.fuel_type
+           ELSE EXCLUDED.fuel_type
+         END,
         engine_volume = CASE
           WHEN cars.vin IS DISTINCT FROM EXCLUDED.vin OR cars.modification IS DISTINCT FROM EXCLUDED.modification
             THEN EXCLUDED.engine_volume
@@ -180,11 +180,12 @@ export async function syncCars(): Promise<SyncStats> {
           WHEN cars.engine_source = 'cm_vin' THEN cars.engine_power
           ELSE COALESCE(EXCLUDED.engine_power, cars.engine_power)
         END,
-        engine_source = CASE
-          WHEN cars.vin IS DISTINCT FROM EXCLUDED.vin OR cars.modification IS DISTINCT FROM EXCLUDED.modification
-            THEN EXCLUDED.engine_source
-          ELSE COALESCE(cars.engine_source, EXCLUDED.engine_source)
-        END,
+         engine_source = CASE
+           WHEN cars.vin IS DISTINCT FROM EXCLUDED.vin OR cars.modification IS DISTINCT FROM EXCLUDED.modification
+             THEN EXCLUDED.engine_source
+           WHEN cars.engine_source = 'cm_cabinet' THEN cars.engine_source
+           ELSE EXCLUDED.engine_source
+         END,
         engine_enriched_at = CASE
           WHEN cars.vin IS DISTINCT FROM EXCLUDED.vin OR cars.modification IS DISTINCT FROM EXCLUDED.modification
             THEN EXCLUDED.engine_enriched_at
@@ -221,7 +222,7 @@ export async function syncCars(): Promise<SyncStats> {
         0, ${c.bodyType}, ${c.modification}, ${c.complectation},
         ${c.extras || null}, ${c.description || null}, ${imageUrl},
         ${c.vin || null}, ${c.dealer}, ${driveType},
-        ${engine?.fuelType ?? null}, ${engine?.engineVolume ?? null},
+         NULL, ${engine?.engineVolume ?? null},
         ${engine?.enginePower ?? null}, ${engine ? "xml_pending" : null}, NULL,
         ${c.maxDiscount}, ${c.creditDiscount}, ${c.tradeinDiscount}, NOW()
       )
@@ -300,8 +301,11 @@ export async function syncCars(): Promise<SyncStats> {
   await deleteByType("used", usedIds);
   await deleteByType("new",  newIds);
 
-  scheduleEngineEnrichment(
-    [...usedCars, ...newCars].map(car => ({
+   // Used-car fuel is authoritative only from CM Expert Business stock.
+   // Keep VIN enrichment for new cars, but never let XML/CM VIN inference
+   // repopulate fuel for ASP cards.
+   scheduleEngineEnrichment(
+     newCars.map(car => ({
       id: car.id,
       vin: car.vin,
       modification: car.modification,
