@@ -990,6 +990,9 @@ export async function runMigration() {
 
     // reject_reason column (added with hallucination detection feature — idempotent)
     await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS reject_reason TEXT`);
+    // generated_by is used by the SEO Autopilot apply pipelines and the admin
+    // suggestions endpoint. Keep older development databases in sync with VPS.
+    await db.execute(sql`ALTER TABLE seo_suggestions ADD COLUMN IF NOT EXISTS generated_by TEXT`);
 
     // Reject accumulated new_page suggestions for pages that already exist on the site.
     // The old SITE_WIDE COVERAGE code incorrectly created new_page suggestions for
