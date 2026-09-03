@@ -162,10 +162,15 @@ router.get("/suggestions", async (req, res) => {
     if (blocked_by_tech === "true") whereClause = sql`${whereClause} AND blocked_by_tech = true`;
     if (blocked_by_tech === "false") whereClause = sql`${whereClause} AND blocked_by_tech = false`;
 
-    // evaluated=true/false → filter the Karpathy Loop queue by evaluation state.
+    // evaluated=true/false → filter the Karpathy Loop by its own lifecycle,
+    // not by the current suggestion status. An apply pipeline may legitimately
+    // finish as applied_with_errors/manual after it has already scheduled a
+    // snapshot; those rows must remain visible in the loop instead of vanishing.
     const evaluatedFilter = req.query["evaluated"];
     if (evaluatedFilter === "true") whereClause = sql`${whereClause} AND evaluated_at IS NOT NULL`;
-    if (evaluatedFilter === "false") whereClause = sql`${whereClause} AND evaluated_at IS NULL`;
+    if (evaluatedFilter === "false") {
+      whereClause = sql`${whereClause} AND evaluate_at IS NOT NULL AND evaluated_at IS NULL`;
+    }
 
     const rows = await db.execute(sql`
       SELECT id, type, page_url, current_value, proposed_value, reasoning,
