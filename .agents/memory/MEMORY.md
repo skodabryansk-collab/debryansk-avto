@@ -72,3 +72,4 @@
 - [Yandex Webmaster indexing samples](webmaster-indexing-samples.md) — v4 uses /indexing/samples, not /crawling/samples; read the tail because offset=0 can be historical.
 - [Fuel type in stock feeds](fuel-type-feed.md) — CM Expert XML encodes diesel as a `d` suffix in modification_id; no dedicated fuel field currently exists.
 - [VIN engine enrichment priority](vin-engine-enrichment-priority.md) — use `xml_pending` before CM lookup; only exact techParamId matches may become `cm_vin`, which feed sync must never overwrite.
+- [SEO suggestion schema drift](seo-suggestion-schema-drift.md) — raw SQL fields need idempotent migrations in both dev and VPS, or the admin list can fail with 500.
