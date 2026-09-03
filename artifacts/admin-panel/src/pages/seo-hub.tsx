@@ -359,15 +359,21 @@ function KarpathyLoopTab() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["seo-loop-evaluated"],
-    queryFn: () => getSeoAutopilotSuggestions({ status: "applied", evaluated: true, limit: 100 }),
+    queryFn: () => getSeoAutopilotSuggestions({ evaluated: true, limit: 100 }),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
   const { data: pendingData, isLoading: pendingLoading } = useQuery({
     queryKey: ["seo-loop-pending"],
-    queryFn: () => getSeoAutopilotSuggestions({ status: "applied", evaluated: false, limit: 100 }),
+    queryFn: () => getSeoAutopilotSuggestions({ evaluated: false, limit: 100 }),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
   const { data: geoData, isLoading: geoLoading } = useQuery({
     queryKey: ["seo-loop-geo"],
     queryFn: () => getSeoAutopilotSuggestions({ type: "geo", limit: 100 }),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 
   // Keep the original Yandex/SEO loop separate from the GEO branch below.
@@ -542,6 +548,11 @@ function KarpathyLoopTab() {
                     <span className={isReady ? "font-bold text-amber-600" : "font-semibold text-[#0070b8]"}>
                       {timing} · {due.toLocaleDateString("ru-RU")}
                     </span>
+                    {s.status !== "applied" && (
+                      <span className="font-semibold text-orange-600">
+                        Статус: {s.status === "applied_with_errors" ? "применено с ошибкой" : s.status}
+                      </span>
+                    )}
                   </div>
                 </div>
               );
