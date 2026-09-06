@@ -3,6 +3,8 @@ import nodemailer from "nodemailer";
 import multer from "multer";
 import { db, leadsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { enqueueCalltouchCallback } from "../services/calltouch-callback";
+import { escapeLeadBodyForHtml, validateLeadBody } from "../services/lead-validation";
 
 const router: IRouter = Router();
 
@@ -594,29 +596,48 @@ router.post(
         return res.status(400).json({ ok: false, error: "Unknown form type: " + type });
       }
 
+      const validationError = validateLeadBody(body);
+      if (validationError) {
+        console.warn("[email] rejected unsafe lead submission", {
+          type,
+          field: validationError.field,
+          reason: validationError.reason,
+          submissionId: body.submissionId || null,
+          hasPhone: Boolean(body.phone),
+          hasEmail: Boolean(body.email),
+        });
+        return res.status(400).json({
+          ok: false,
+          error: "Проверьте данные заявки",
+          code: "invalid_lead_data",
+        });
+      }
+
       // For buyout: use pre-computed estimate from frontend (CM Expert), or leave empty
       let buyoutEstimate: { estimateMin: number; estimateMax: number } | null = null;
       if (type === "buyout" && body.estimateMin && body.estimateMax) {
         buyoutEstimate = { estimateMin: Number(body.estimateMin), estimateMax: Number(body.estimateMax) };
       }
 
+      const emailBody = escapeLeadBodyForHtml(body);
+
       // Build HTML
       let html = "";
       switch (type) {
-        case "callback":   html = buildCallbackHtml(body); break;
-        case "lead":       html = buildLeadHtml(body); break;
-        case "testdrive":  html = buildTestDriveHtml(body); break;
-        case "service":    html = buildServiceHtml(body); break;
-        case "credit":     html = buildCreditHtml(body); break;
-        case "tradein":    html = buildTradeInHtml(body); break;
-        case "buyout":     html = buildBuyoutHtml(body); break;
-        case "vacancy":    html = buildVacancyHtml(body); break;
-        case "openresume":    html = buildOpenResumeHtml(body); break;
-        case "feedback":      html = buildFeedbackHtml(body); break;
-        case "to_calculator": html = buildToCalculatorHtml(body); break;
-        case "promo":         html = buildPromoHtml(body); break;
-        case "corporate":     html = buildCorporateHtml(body); break;
-        case "exit_intent":   html = buildExitIntentHtml(body); break;
+        case "callback":   html = buildCallbackHtml(emailBody); break;
+        case "lead":       html = buildLeadHtml(emailBody); break;
+        case "testdrive":  html = buildTestDriveHtml(emailBody); break;
+        case "service":    html = buildServiceHtml(emailBody); break;
+        case "credit":     html = buildCreditHtml(emailBody); break;
+        case "tradein":    html = buildTradeInHtml(emailBody); break;
+        case "buyout":     html = buildBuyoutHtml(emailBody); break;
+        case "vacancy":    html = buildVacancyHtml(emailBody); break;
+        case "openresume":    html = buildOpenResumeHtml(emailBody); break;
+        case "feedback":      html = buildFeedbackHtml(emailBody); break;
+        case "to_calculator": html = buildToCalculatorHtml(emailBody); break;
+        case "promo":         html = buildPromoHtml(emailBody); break;
+        case "corporate":     html = buildCorporateHtml(emailBody); break;
+        case "exit_intent":   html = buildExitIntentHtml(emailBody); break;
       }
 
       const clientName = body.name || "Клиент";
@@ -672,9 +693,11 @@ router.post(
         extraJson: Object.keys(extraData).length ? extraData : null,
       };
       let leadSaved = false;
+      let leadId: number | undefined;
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          await db.insert(leadsTable).values(leadValues);
+          const saved = await db.insert(leadsTable).values(leadValues).returning({ id: leadsTable.id });
+          leadId = saved[0]?.id;
           leadSaved = true;
           break;
         } catch (dbErr) {
@@ -683,8 +706,42 @@ router.post(
         }
       }
       if (!leadSaved) {
-        // Last resort: log full lead data so it can be recovered from server logs
-        console.error("[email] LEAD LOST — could not save to DB. Data:", JSON.stringify(leadValues));
+        // Do not put customer data in normal logs. The correlation ID and
+        // metadata are enough to locate the failed request operationally.
+        console.error("[email] lead save exhausted", {
+          type,
+          submissionId: body.submissionId || null,
+          hasPhone: Boolean(body.phone),
+          hasEmail: Boolean(body.email),
+        });
+      }
+
+      if (leadSaved && body.phone) {
+        enqueueCalltouchCallback({
+          submissionId: body.submissionId,
+          leadId,
+          type,
+          phone: body.phone,
+          name: body.name,
+          email: body.email,
+          message: body.message || body.comment,
+          car: carParts || body.car || body.brand || body.model || body.vehicle,
+          pageUrl: body.pageUrl || body.page || req.get("referer"),
+          clientIp: (req.headers["x-forwarded-for"] as string || req.ip || "").split(",")[0].trim(),
+          sessionId: body.calltouchSessionId,
+          utmSource: body.utm_source,
+          utmMedium: body.utm_medium,
+          utmCampaign: body.utm_campaign,
+          utmContent: body.utm_content,
+          utmTerm: body.utm_term,
+          extraFields: {
+            dealer: body.dealer,
+            location: body.location,
+            service: body.service,
+            preferredDate: body.preferredDate,
+            preferredTime: body.preferredTime,
+          },
+        });
       }
 
       return res.json({
