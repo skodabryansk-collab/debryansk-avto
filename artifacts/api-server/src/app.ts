@@ -56,7 +56,7 @@ app.use((_req, res, next) => {
   );
   res.setHeader(
     "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
   );
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
   next();
