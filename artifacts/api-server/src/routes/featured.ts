@@ -10,6 +10,7 @@ const FEEDS = [
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/f8056db2c70dba547744e2e4aaa20556.xml", dealer: "Haval Pro" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/53fe918374eb87e8f6536b8c3bb21937.xml", dealer: "Haval City" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/913211584f8ad577ee76a703f2f13186.xml", dealer: "Jetour" },
+  { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/3be8e5ea72deb63eec3e56b8d9d28263.xml", dealer: "Tenet Plus" },
 ];
 
 let cache: { data: NewCarRecord[]; ts: number } | null = null;
@@ -57,6 +58,7 @@ function parseFeed(text: string, dealer: string): NewCarRecord[] {
       phone: getField(block, "phone"),
       notRegisteredInRussia: getField(block, "not_registered_in_russia") === "true",
       acceptedAutoruExclusive: getField(block, "accepted_autoru_exclusive") === "true",
+      popularity_score: 0,
     });
   }
   return cars;
