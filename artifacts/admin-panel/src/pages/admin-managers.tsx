@@ -35,14 +35,31 @@ function avatarColor(name: string) {
   return COLORS[h % COLORS.length];
 }
 
+function managerPhotoSrc(manager: Pick<ManagerItem, "id" | "photoUrl">): string | null {
+  if (!manager.photoUrl) return null;
+  // photoUrl stores a local object key, not a browser URL. The API endpoint
+  // resolves the key from the database and serves the image without auth so
+  // an <img> tag can load it.
+  return `/api/admin/managers/${manager.id}/photo?key=${encodeURIComponent(manager.photoUrl)}`;
+}
+
 function Avatar({ name, src, size = 10, pending = false }: {
   name: string; src?: string | null; size?: number; pending?: boolean;
 }) {
+  const [imageFailed, setImageFailed] = React.useState(false);
+  React.useEffect(() => setImageFailed(false), [src]);
   const cls = `w-${size} h-${size} rounded-full flex-none flex items-center justify-center text-sm font-bold overflow-hidden border-2 ${
     pending ? "border-amber-200" : "border-white shadow-sm"
   }`;
-  return src ? (
-    <div className={cls}><img src={src} alt={name} className="w-full h-full object-cover" /></div>
+  return src && !imageFailed ? (
+    <div className={cls}>
+      <img
+        src={src}
+        alt={name}
+        className="w-full h-full object-cover"
+        onError={() => setImageFailed(true)}
+      />
+    </div>
   ) : (
     <div className={`${cls} ${avatarColor(name)}`}>{initials(name)}</div>
   );
@@ -269,7 +286,7 @@ function PendingRow({
   return (
     <div className="flex items-start justify-between px-5 py-4 gap-4">
       <div className="flex items-start gap-3 min-w-0">
-        <Avatar name={m.name} src={m.photoUrl} size={10} pending />
+        <Avatar name={m.name} src={managerPhotoSrc(m)} size={10} pending />
         <div className="min-w-0">
           <div className="font-semibold text-slate-900 text-sm leading-tight">{m.name}</div>
           <div className="text-xs text-slate-400 mt-0.5 space-y-0.5">
@@ -323,7 +340,7 @@ function ManagerRow({
     <div className="px-5 py-4 flex gap-4 group hover:bg-slate-50/60
                     transition-colors duration-100">
       {/* Avatar */}
-      <Avatar name={m.name} src={m.photoUrl} size={10} />
+      <Avatar name={m.name} src={managerPhotoSrc(m)} size={10} />
 
       {/* Main content */}
       <div className="flex-1 min-w-0">
