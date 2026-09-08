@@ -26,9 +26,17 @@ export const ALLOWED_MODELS = [
   "gemini/gemini-3-pro-image-preview",
   "gemini/gemini-3.1-flash-image-preview",
   "openai/gpt-image-2",
+  "black_forest_labs/flux-2-max",
+  "black_forest_labs/flux-2-pro",
+  "black_forest_labs/flux-2-klein-9b",
 ] as const;
 
 export type ImageModel = (typeof ALLOWED_MODELS)[number];
+export const FLUX_MODELS = [
+  "black_forest_labs/flux-2-max",
+  "black_forest_labs/flux-2-pro",
+  "black_forest_labs/flux-2-klein-9b",
+] as const;
 
 export const IMAGE_SIZES = ["1024x1024", "1024x1792", "1792x1024"] as const;
 export type ImageSize = (typeof IMAGE_SIZES)[number];
@@ -48,7 +56,7 @@ function assertModel(model: string): asserts model is ImageModel {
 }
 
 interface TimewebImageResponse {
-  data: Array<{ b64_json: string }>;
+  data: Array<{ b64_json?: string; url?: string }>;
   usage?: {
     total_tokens?: number;
     input_tokens?: number;
@@ -56,6 +64,11 @@ interface TimewebImageResponse {
     output_tokens?: number;
   };
 }
+
+type TimewebImagePayload = {
+  data?: Array<{ b64_json?: string; url?: string }>;
+  usage?: TimewebImageResponse["usage"];
+};
 
 // Responses API types (used for image-with-reference)
 interface TimewebResponseOutput {
@@ -170,6 +183,12 @@ export async function generateImage(
   quality?: ImageQuality,
 ): Promise<ImageResult> {
   assertModel(model);
+  if ((FLUX_MODELS as readonly string[]).includes(model)) {
+    throw new Error(
+      "Flux через Timeweb сейчас доступен в режиме image-to-image. " +
+      "Прикрепите исходное изображение или выберите Gemini для генерации с нуля.",
+    );
+  }
 
   // quality is only supported by GPT Image 2 via /images/generations
   const supportsQuality = model.includes("gpt-image");
@@ -194,10 +213,7 @@ export async function generateImage(
   }
 
   const json = (await res.json()) as TimewebImageResponse;
-  const b64 = json.data?.[0]?.b64_json;
-  if (!b64) throw new Error("Timeweb API вернул пустой результат");
-
-  return { buffer: Buffer.from(b64, "base64"), usage: extractUsage(json) };
+  return { buffer: await extractImageBuffer(json), usage: extractUsage(json) };
 }
 
 export interface ReferenceFile {
@@ -230,6 +246,10 @@ export async function generateImageWithReference(
       return { buffer, mime };
     }),
   );
+
+  if ((FLUX_MODELS as readonly string[]).includes(model)) {
+    return generateFluxImageWithReference(prepared, prompt, model);
+  }
 
   // Build content array: all images first, then the text prompt
   const imageParts = prepared.map(({ buffer, mime }) => ({
@@ -295,11 +315,72 @@ export async function generateImageWithReference(
   return generateImage(prompt, model, size);
 }
 
+/**
+ * FLUX.2 uses the native /images/edits endpoint through Timeweb.
+ * The endpoint returns a short-lived BFL URL, so fetch it immediately and
+ * keep the rest of the image pipeline provider-agnostic.
+ */
+async function generateFluxImageWithReference(
+  files: ReferenceFile[],
+  prompt: string,
+  model: string,
+): Promise<ImageResult> {
+  const form = new FormData();
+  form.append("model", model);
+  form.append("prompt", prompt);
+
+  files.slice(0, 8).forEach(({ buffer, mime }, index) => {
+    const extension = mime.split("/")[1]?.replace("jpeg", "jpg") || "png";
+    const field = index === 0 ? "image" : `image_${index + 1}`;
+    form.append(
+      field,
+      new Blob([Uint8Array.from(buffer)], { type: mime }),
+      `reference-${index + 1}.${extension}`,
+    );
+  });
+
+  const res = await fetch(`${BASE_URL}/images/edits`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${getKey()}` },
+    body: form,
+    signal: AbortSignal.timeout(240_000),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Timeweb Flux image edit error ${res.status}: ${text.slice(0, 300)}`);
+  }
+
+  const json = (await res.json()) as TimewebImagePayload;
+  return {
+    buffer: await extractImageBuffer(json),
+    usage: extractUsage(json),
+  };
+}
+
+async function extractImageBuffer(json: TimewebImagePayload): Promise<Buffer> {
+  const item = json.data?.[0];
+  if (item?.b64_json) return Buffer.from(item.b64_json, "base64");
+
+  const url = item?.url;
+  if (url?.startsWith("data:image/")) {
+    const match = url.match(/^data:image\/[^;]+;base64,(.+)$/s);
+    if (match?.[1]) return Buffer.from(match[1], "base64");
+  }
+
+  if (url) {
+    const imageRes = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    if (imageRes.ok) return Buffer.from(await imageRes.arrayBuffer());
+  }
+
+  throw new Error("Timeweb API вернул пустой результат изображения");
+}
+
 function zeroUsage(): TokenUsage {
   return { total_tokens: 0, input_tokens: 0, input_text_tokens: 0, input_image_tokens: 0, output_tokens: 0 };
 }
 
-function extractUsage(json: TimewebImageResponse): TokenUsage {
+function extractUsage(json: TimewebImagePayload): TokenUsage {
   const u = json.usage;
   return {
     total_tokens: u?.total_tokens ?? 0,
