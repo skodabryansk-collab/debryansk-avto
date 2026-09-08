@@ -97,6 +97,7 @@ const DEALER_COLORS: Record<string, string> = {
   "Jaecoo":     "#f0f4ff",
   "Omoda":      "#fff5ee",
   "Tenet":      "#edfbf3",
+  "Tenet Plus": "#eefcf2",
   "Haval Pro":  "#eef2ff",
   "Haval City": "#e8f4ff",
   "Jetour":     "#f4f0ff",
@@ -436,7 +437,7 @@ function NewCarCard({ car, onTestDrive }: { car: NewCarRecord; onTestDrive: (car
 const PAGE_SIZE = 12;
 
 const BODY_TYPES = ["Все типы", ...BODY_TYPE_NAMES];
-const DEALERS = ["Все дилеры", "Jaecoo", "Omoda", "Tenet", "Haval City", "Haval Pro", "Jetour", "Soueast", "Jeland"];
+const DEALERS = ["Все дилеры", "Jaecoo", "Omoda", "Tenet", "Tenet Plus", "Haval City", "Haval Pro", "Jetour", "Soueast", "Jeland"];
 
 export default function NewCars() {
   const { favorites, compare } = useCarStorage();
