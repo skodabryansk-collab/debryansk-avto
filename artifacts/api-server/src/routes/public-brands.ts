@@ -144,25 +144,20 @@ router.get("/:slug", async (req, res) => {
 
     // New cars for this brand — from in-memory XML feed cache
     // Use car_mark as the authoritative dealer/mark identifier.
-    // When car_mark is empty (brand not yet launched), return no cars.
-    // This prevents fuzzy-match cross-pollution between sub-brands
-    // (e.g. "Tenet Plus" vs "Tenet": "tenet plus".includes("tenet") = true).
+    // For a separately managed brand page without car_mark, use the exact
+    // brand name. Never use fuzzy matching: Tenet and Tenet Plus are separate
+    // brand pages and must not share inventory.
     const allNewCars = await getNewCars();
     let brandCarsRaw: Awaited<typeof allNewCars> = [];
-    if (brand.carMark) {
-      const carMarkLower = brand.carMark.toLowerCase();
-      const feedNames = new Set([carMarkLower]);
-      // Tenet Plus is a separate feed/dealer, but belongs to the Tenet brand
-      // page instead of being silently omitted by exact-name matching.
-      if (brand.name.toLowerCase() === "tenet") feedNames.add("tenet plus");
-      // Primary: exact dealer match (e.g. car_mark="Haval City" → dealer="Haval City")
-      brandCarsRaw = allNewCars.filter(c => feedNames.has(c.dealer.toLowerCase()));
-      // Fallback: exact mark match (for brands where dealer ≠ car_mark but mark matches)
-      if (brandCarsRaw.length === 0) {
-        brandCarsRaw = allNewCars.filter(c => feedNames.has(c.mark.toLowerCase()));
-      }
+    const feedNames = new Set([
+      (brand.carMark?.trim() || brand.name).toLowerCase(),
+    ]);
+    // Primary: exact dealer match (e.g. car_mark="Haval City" → dealer="Haval City")
+    brandCarsRaw = allNewCars.filter(c => feedNames.has(c.dealer.toLowerCase()));
+    // Fallback: exact mark match (for brands where dealer ≠ car_mark but mark matches)
+    if (brandCarsRaw.length === 0) {
+      brandCarsRaw = allNewCars.filter(c => feedNames.has(c.mark.toLowerCase()));
     }
-    // brand.carMark empty → [] (brand launching soon, no feed yet)
 
     const brandCars = brandCarsRaw.sort((a, b) => a.price - b.price)
       // Normalize camelCase NewCarRecord → snake_case DTO expected by frontend
