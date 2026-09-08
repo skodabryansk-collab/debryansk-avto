@@ -15,6 +15,7 @@ const FEEDS = [
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/913211584f8ad577ee76a703f2f13186.xml", dealer: "Jetour" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/86abbe9a79571a2757b583e323b27564.xml", dealer: "Soueast" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/35c5c670c873d1d7bb686184b3f27398.xml", dealer: "Jeland" },
+  { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/3be8e5ea72deb63eec3e56b8d9d28263.xml", dealer: "Tenet Plus" },
 ];
 
 export interface NewCarRecord {
