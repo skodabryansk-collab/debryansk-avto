@@ -151,11 +151,15 @@ router.get("/:slug", async (req, res) => {
     let brandCarsRaw: Awaited<typeof allNewCars> = [];
     if (brand.carMark) {
       const carMarkLower = brand.carMark.toLowerCase();
+      const feedNames = new Set([carMarkLower]);
+      // Tenet Plus is a separate feed/dealer, but belongs to the Tenet brand
+      // page instead of being silently omitted by exact-name matching.
+      if (brand.name.toLowerCase() === "tenet") feedNames.add("tenet plus");
       // Primary: exact dealer match (e.g. car_mark="Haval City" → dealer="Haval City")
-      brandCarsRaw = allNewCars.filter(c => c.dealer.toLowerCase() === carMarkLower);
+      brandCarsRaw = allNewCars.filter(c => feedNames.has(c.dealer.toLowerCase()));
       // Fallback: exact mark match (for brands where dealer ≠ car_mark but mark matches)
       if (brandCarsRaw.length === 0) {
-        brandCarsRaw = allNewCars.filter(c => c.mark.toLowerCase() === carMarkLower);
+        brandCarsRaw = allNewCars.filter(c => feedNames.has(c.mark.toLowerCase()));
       }
     }
     // brand.carMark empty → [] (brand launching soon, no feed yet)
