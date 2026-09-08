@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ymGoal } from "@/lib/ym";
 import { ensureLeadSubmissionMetadata } from "../lib/leadSubmission";
+import { createBrowserId } from "../lib/browserId";
 import { useQuery } from "@tanstack/react-query";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { usePageCar } from "@/context/PageCarContext";
@@ -1286,7 +1287,7 @@ export default function ChatWidget({
   const sessionId = useMemo(() => {
     let id = localStorage.getItem("nav_session_id");
     if (!id) {
-      id = crypto.randomUUID();
+      id = createBrowserId();
       localStorage.setItem("nav_session_id", id);
     }
     return id;
