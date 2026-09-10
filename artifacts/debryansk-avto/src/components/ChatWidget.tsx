@@ -254,6 +254,10 @@ function formatHistoryForEmail(messages: Message[]): string {
     .join("\n");
 }
 
+function appendNavigatorSession(fd: FormData, sessionId: string): void {
+  if (sessionId) fd.append("navigatorSessionId", sessionId);
+}
+
 /* ── Car card ───────────────────────────────────────────────── */
 function CarCard({ car }: { car: ChatCarItem }) {
   const totalDiscount = car.discount ?? 0;
@@ -341,7 +345,7 @@ function ActionButton({ action, onAction }: { action: string; onAction: (a: stri
 }
 
 /* ── Contact form card ──────────────────────────────────────── */
-function ContactFormCard({ base, history }: { base: string; history?: Message[] }) {
+function ContactFormCard({ base, history, sessionId }: { base: string; history?: Message[]; sessionId: string }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -366,6 +370,7 @@ function ContactFormCard({ base, history }: { base: string; history?: Message[] 
     try {
       const fd = new FormData();
       fd.append("type", "callback");
+      appendNavigatorSession(fd, sessionId);
       fd.append("name", name.trim());
       fd.append("phone", phone.trim());
       if (pageCarContext?.brand) fd.append("brand", pageCarContext.brand);
@@ -413,7 +418,7 @@ function ContactFormCard({ base, history }: { base: string; history?: Message[] 
 }
 
 /* ── Test-drive form card (inline, no redirect) ─────────────── */
-function TestDriveFormCard({ base, prefillModel, history }: { base: string; prefillModel?: string; history?: Message[] }) {
+function TestDriveFormCard({ base, prefillModel, history, sessionId }: { base: string; prefillModel?: string; history?: Message[]; sessionId: string }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [model, setModel] = useState(prefillModel ?? "");
@@ -444,6 +449,7 @@ function TestDriveFormCard({ base, prefillModel, history }: { base: string; pref
     try {
       const fd = new FormData();
       fd.append("type", "testdrive");
+      appendNavigatorSession(fd, sessionId);
       fd.append("name", name.trim());
       fd.append("phone", phone.trim());
       if (pageCarContext?.brand) fd.append("brand", pageCarContext.brand);
@@ -525,7 +531,7 @@ interface ApiLocation {
   phone: string | null;
 }
 
-function ServiceFormCard({ base, history }: { base: string; history?: Message[] }) {
+function ServiceFormCard({ base, history, sessionId }: { base: string; history?: Message[]; sessionId: string }) {
   const { data: locations = [] } = useQuery({
     queryKey: ["chat-locations"],
     queryFn: async (): Promise<ApiLocation[]> => {
@@ -574,6 +580,7 @@ function ServiceFormCard({ base, history }: { base: string; history?: Message[] 
     try {
       const fd = new FormData();
       fd.append("type", "service");
+      appendNavigatorSession(fd, sessionId);
       fd.append("name", name.trim());
       fd.append("phone", phone.trim());
       if (comment.trim()) fd.append("comment", comment.trim());
@@ -638,7 +645,7 @@ function ServiceFormCard({ base, history }: { base: string; history?: Message[] 
 }
 
 /* ── Credit form card ───────────────────────────────────────── */
-function CreditFormCard({ base, prefillModel, history }: { base: string; prefillModel?: string; history?: Message[] }) {
+function CreditFormCard({ base, prefillModel, history, sessionId }: { base: string; prefillModel?: string; history?: Message[]; sessionId: string }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [model, setModel] = useState(prefillModel ?? "");
@@ -664,6 +671,7 @@ function CreditFormCard({ base, prefillModel, history }: { base: string; prefill
     try {
       const fd = new FormData();
       fd.append("type", "credit");
+      appendNavigatorSession(fd, sessionId);
       fd.append("name", name.trim());
       fd.append("phone", phone.trim());
       if (pageCarContext?.brand) fd.append("brand", pageCarContext.brand);
@@ -730,7 +738,7 @@ interface ChatModOptions {
   doorNumbers: CmItem[];
 }
 
-function TradeInFormCard({ base, history }: { base: string; history?: Message[] }) {
+function TradeInFormCard({ base, history, sessionId }: { base: string; history?: Message[]; sessionId: string }) {
   // Catalog data
   const [brands, setBrands] = useState<CmItem[]>([]);
   const [brandsLoading, setBrandsLoading] = useState(true);
@@ -902,6 +910,7 @@ function TradeInFormCard({ base, history }: { base: string; history?: Message[] 
       // 2. Send lead / email
       const fd = new FormData();
       fd.append("type", "buyout");
+      appendNavigatorSession(fd, sessionId);
       fd.append("dealer", "Супонево");
       fd.append("brand", brandName);
       fd.append("model", modelName);
@@ -1775,15 +1784,15 @@ export default function ChatWidget({
 
                           {msg.role === "assistant" && !msg.isStreaming && msg.action && (
                             msg.action === "contact_form" ? (
-                              <ContactFormCard base={base} history={messages} />
+                              <ContactFormCard base={base} history={messages} sessionId={sessionId} />
                             ) : msg.action === "tradein_form" ? (
-                              <TradeInFormCard base={base} history={messages} />
+                              <TradeInFormCard base={base} history={messages} sessionId={sessionId} />
                             ) : msg.action === "testdrive" ? (
-                              <TestDriveFormCard base={base} prefillModel={msg.prefillModel} history={messages} />
+                              <TestDriveFormCard base={base} prefillModel={msg.prefillModel} history={messages} sessionId={sessionId} />
                             ) : msg.action === "credit_form" ? (
-                              <CreditFormCard base={base} prefillModel={msg.prefillModel} history={messages} />
+                              <CreditFormCard base={base} prefillModel={msg.prefillModel} history={messages} sessionId={sessionId} />
                             ) : msg.action === "service_form" ? (
-                              <ServiceFormCard base={base} history={messages} />
+                              <ServiceFormCard base={base} history={messages} sessionId={sessionId} />
                             ) : (
                               <ActionButton action={msg.action} onAction={handleAction} />
                             )
