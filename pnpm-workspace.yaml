@@ -75,6 +75,10 @@ onlyBuiltDependencies:
   - unrs-resolver
 
 overrides:
+  # gaxios 6 still requests uuid 9, which is deprecated and flagged by the
+  # security audit. uuid 11 keeps the v4 API used by the Google clients while
+  # removing the vulnerable/deprecated release from the runtime graph.
+  uuid: "^11.1.1"
   # replit uses linux-x64 only, we can exclude all other platforms
   "esbuild>@esbuild/darwin-arm64": "-"
   "esbuild>@esbuild/darwin-x64": "-"
