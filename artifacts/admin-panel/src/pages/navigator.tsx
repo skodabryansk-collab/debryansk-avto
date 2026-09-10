@@ -49,6 +49,34 @@ function ChatDetailModal({ convId, open, onClose }: { convId: number | null; ope
           <DialogTitle>Диалог</DialogTitle>
           <DialogDescription>История переписки пользователя с Навигатором</DialogDescription>
         </DialogHeader>
+        {data?.conversation && (
+          data.conversation.lead_id ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="font-semibold text-emerald-800">Заявка отправлена из Navigator</span>
+                <span className="text-[11px] text-emerald-700">
+                  {data.conversation.lead_type ?? "обращение"}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-emerald-900">
+                <span>Имя: <strong>{data.conversation.lead_name || "не указано"}</strong></span>
+                <a
+                  href={data.conversation.lead_phone ? `tel:${data.conversation.lead_phone}` : undefined}
+                  className="font-semibold hover:underline"
+                >
+                  Телефон: {data.conversation.lead_phone || "не указан"}
+                </a>
+                <span className="text-xs text-emerald-700 sm:col-span-2">
+                  Отправлена: {data.conversation.lead_created_at ? formatDate(data.conversation.lead_created_at) : "—"}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              В этом диалоге заявка не зафиксирована. Клиент не отправил заполненную форму или отправка не завершилась.
+            </div>
+          )
+        )}
         <div className="overflow-y-auto flex-1 pr-2 space-y-3">
           {isLoading && <p className="text-slate-400 text-sm">Загрузка…</p>}
           {data?.messages?.map((m: any) => (
@@ -250,6 +278,7 @@ export default function NavigatorPage() {
                 <TableRow>
                   <TableHead>Сессия</TableHead>
                   <TableHead>Дата</TableHead>
+                  <TableHead>Заявка</TableHead>
                   <TableHead className="text-center">Сообщений</TableHead>
                   <TableHead className="text-center">Оценка</TableHead>
                   <TableHead className="text-center">Согласие</TableHead>
@@ -263,6 +292,16 @@ export default function NavigatorPage() {
                       {(c.session_id ?? "—").slice(0, 8)}…
                     </TableCell>
                     <TableCell className="text-sm">{formatDate(c.created_at)}</TableCell>
+                    <TableCell className="text-xs">
+                      {c.lead_id ? (
+                        <div>
+                          <Badge className="bg-emerald-100 text-emerald-700">Есть</Badge>
+                          <div className="mt-1 text-slate-500">{c.lead_phone || c.lead_name || "Контакт"}</div>
+                        </div>
+                      ) : (
+                        <Badge variant="outline" className="text-slate-400">Нет</Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-center text-sm">{c.msg_count}</TableCell>
                     <TableCell className="text-center">
                       <RatingBadge val={c.rated_count > 0 ? c.avg_rating : null} />
