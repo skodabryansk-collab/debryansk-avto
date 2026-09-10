@@ -674,7 +674,7 @@ router.post(
       // Save lead to database (retry once on failure so transient DB hiccups don't lose leads)
       const carParts = [body.carMark, body.carModel, body.carYear].filter(Boolean).join(" ");
       const extraData: Record<string, string> = {};
-      const knownKeys = ["type","name","phone","email","message","carMark","carModel","carYear","carPrice","car","budget","downPayment","term","carMileage","position","surname","brand","model","vehicle","utm_source","utm_medium","utm_campaign","utm_term","utm_content"];
+      const knownKeys = ["type","name","phone","email","message","carMark","carModel","carYear","carPrice","car","budget","downPayment","term","carMileage","position","surname","brand","model","vehicle","utm_source","utm_medium","utm_campaign","utm_term","utm_content","navigatorSessionId"];
       for (const [k, v] of Object.entries(body)) {
         if (!knownKeys.includes(k) && v) extraData[k] = v;
       }
@@ -714,6 +714,24 @@ router.post(
           hasPhone: Boolean(body.phone),
           hasEmail: Boolean(body.email),
         });
+      }
+
+      if (leadSaved && leadId && body.navigatorSessionId && body.navigatorSessionId.length <= 128) {
+        try {
+          await db.execute(sql`
+            UPDATE conversations
+            SET lead_id = ${leadId}
+            WHERE session_id = ${body.navigatorSessionId}
+          `);
+        } catch (linkErr) {
+          // The lead is still valid and visible in the general leads list.
+          // Linking it to Navigator is an additional convenience for managers.
+          console.warn("[email] could not link lead to Navigator session", {
+            leadId,
+            navigatorSessionId: body.navigatorSessionId,
+            error: linkErr instanceof Error ? linkErr.message : String(linkErr),
+          });
+        }
       }
 
       if (leadSaved && body.phone) {
