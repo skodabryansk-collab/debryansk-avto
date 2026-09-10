@@ -183,8 +183,13 @@ export async function runMigration() {
         session_id TEXT UNIQUE,
         title TEXT NOT NULL DEFAULT 'Чат',
         consented_at TIMESTAMPTZ,
+        lead_id INTEGER REFERENCES leads(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
       )
+    `);
+    await db.execute(sql`
+      ALTER TABLE conversations
+      ADD COLUMN IF NOT EXISTS lead_id INTEGER REFERENCES leads(id) ON DELETE SET NULL
     `);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS messages (
