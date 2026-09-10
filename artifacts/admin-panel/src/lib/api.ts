@@ -290,12 +290,32 @@ export interface ChatListItem {
   session_id: string | null;
   created_at: string;
   consented_at: string | null;
+  lead_id: number | null;
+  lead_type: string | null;
+  lead_name: string | null;
+  lead_phone: string | null;
+  lead_email: string | null;
+  lead_message: string | null;
+  lead_created_at: string | null;
   msg_count: number;
   rated_count: number;
   avg_rating: number | null;
 }
 export interface ChatDetail {
-  conversation: Record<string, unknown>;
+  conversation: {
+    id: number;
+    session_id: string | null;
+    title: string;
+    consented_at: string | null;
+    created_at: string;
+    lead_id: number | null;
+    lead_type: string | null;
+    lead_name: string | null;
+    lead_phone: string | null;
+    lead_email: string | null;
+    lead_message: string | null;
+    lead_created_at: string | null;
+  };
   messages: {
     id: number; role: string; content: string;
     car_ids: string | null; rating: number | null; created_at: string;
