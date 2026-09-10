@@ -22,12 +22,20 @@ router.get("/chats", async (_req, res) => {
         c.session_id,
         c.created_at,
         c.consented_at,
+        l.id AS lead_id,
+        l.type AS lead_type,
+        l.name AS lead_name,
+        l.phone AS lead_phone,
+        l.email AS lead_email,
+        l.message AS lead_message,
+        l.created_at AS lead_created_at,
         COUNT(m.id)::int AS msg_count,
         COUNT(CASE WHEN m.role = 'assistant' AND m.rating IS NOT NULL THEN 1 END)::int AS rated_count,
         AVG(CASE WHEN m.role = 'assistant' AND m.rating IS NOT NULL THEN m.rating END) AS avg_rating
       FROM conversations c
+      LEFT JOIN leads l ON l.id = c.lead_id
       LEFT JOIN messages m ON m.conversation_id = c.id
-      GROUP BY c.id
+      GROUP BY c.id, l.id
       ORDER BY c.created_at DESC
       LIMIT 200
     `);
@@ -95,7 +103,14 @@ router.get("/chats/:id", async (req, res) => {
     if (!id) return res.status(400).json({ ok: false, error: "invalid id" });
 
     const [convRows, msgRows] = await Promise.all([
-      db.execute(sql`SELECT * FROM conversations WHERE id = ${id}`),
+      db.execute(sql`
+        SELECT c.*, l.id AS lead_id, l.type AS lead_type, l.name AS lead_name,
+               l.phone AS lead_phone, l.email AS lead_email, l.message AS lead_message,
+               l.created_at AS lead_created_at
+        FROM conversations c
+        LEFT JOIN leads l ON l.id = c.lead_id
+        WHERE c.id = ${id}
+      `),
       db.execute(sql`
         SELECT id, role, content, car_ids, rating, created_at
         FROM messages WHERE conversation_id = ${id} ORDER BY created_at ASC
