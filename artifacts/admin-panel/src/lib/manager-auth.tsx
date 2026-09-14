@@ -165,6 +165,14 @@ export function regenerateQuotePdf(quoteId: number): Promise<{ ok: boolean; quot
   return managerApi("POST", `/quotes/${quoteId}/pdf`);
 }
 
+export function createQuoteShareLink(quoteId: number): Promise<{
+  ok: boolean;
+  shareUrl: string;
+  expiresAt: string;
+}> {
+  return managerApi("POST", `/quotes/${quoteId}/share-link`);
+}
+
 export function pdfDownloadUrl(quoteId: number): string {
   const token = getManagerToken() ?? "";
   return `/api/manager/quotes/${quoteId}/pdf?token=${encodeURIComponent(token)}`;
