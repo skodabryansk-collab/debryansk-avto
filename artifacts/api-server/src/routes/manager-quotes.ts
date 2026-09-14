@@ -209,6 +209,49 @@ async function getManagerBrands(managerId: number): Promise<string[]> {
 
 const USED_BRAND = "С пробегом";
 
+type CreditOfferPayload = {
+  term?: unknown;
+  rate?: unknown;
+  monthlyPayment?: unknown;
+  downPayment?: unknown;
+};
+
+type NormalizedCreditOffer = {
+  term: string;
+  rate: string;
+  monthlyPayment: number;
+  downPayment?: number;
+};
+
+function normalizeCreditOffer(input: CreditOfferPayload | null | undefined): NormalizedCreditOffer | null {
+  if (!input) return null;
+
+  const term = String(input.term ?? "").trim();
+  const rawRate = String(input.rate ?? "").trim().replace(",", ".");
+  const parsedRate = rawRate ? Number(rawRate) : NaN;
+  const rate = rawRate && Number.isFinite(parsedRate) && parsedRate >= 0
+    ? String(Math.round(parsedRate * 100) / 100)
+    : "";
+
+  const parsedMonthly = Number(input.monthlyPayment);
+  const monthlyPayment = Number.isFinite(parsedMonthly) && parsedMonthly > 0
+    ? Math.round(parsedMonthly)
+    : 0;
+
+  const parsedDownPayment = Number(input.downPayment);
+  const downPayment = Number.isFinite(parsedDownPayment) && parsedDownPayment > 0
+    ? Math.round(parsedDownPayment / 1000) * 1000
+    : undefined;
+
+  if (!term && !rate && !monthlyPayment && !downPayment) return null;
+  return {
+    term,
+    rate,
+    monthlyPayment,
+    ...(downPayment ? { downPayment } : {}),
+  };
+}
+
 function brandInList(col: typeof carsTable.brand, brands: string[]) {
   const uniqueBrands = Array.from(new Set(
     brands.map(normalizeManagerQuoteBrand).filter(Boolean),
@@ -446,7 +489,7 @@ async function regenerateStoredQuotePdf(quote: typeof quotesTable.$inferSelect):
   const salesHead = salesHeadRows[0] ?? null;
   const salutation = quote.clientGender === "male" ? "Уважаемый" : quote.clientGender === "female" ? "Уважаемая" : "Уважаемый(-ая)";
   const validUntil = new Date(quote.validUntil).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
-  const storedCreditOffer = quote.creditOffer as { term?: string; rate?: string; monthlyPayment?: number } | null;
+  const storedCreditOffer = normalizeCreditOffer(quote.creditOffer as CreditOfferPayload | null);
   const kpData: KpData = {
     kpNumber: String(quote.id).padStart(10, "0"),
     kpDate: new Date().toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }),
@@ -465,11 +508,12 @@ async function regenerateStoredQuotePdf(quote: typeof quotesTable.$inferSelect):
     discounts: (quote.discounts as Array<{ label: string; value: number }>) ?? [],
     options: parseExtrasToOptions(car?.extras ?? null),
     extraEquipment: (quote.extraEquipment as { text: string; price?: number } | null) ?? undefined,
-    creditOffer: (storedCreditOffer?.term || storedCreditOffer?.rate || storedCreditOffer?.monthlyPayment)
+    creditOffer: storedCreditOffer
       ? {
           term: storedCreditOffer.term ? `${storedCreditOffer.term} мес.` : "",
-          rate: storedCreditOffer.rate ? `${storedCreditOffer.rate}%` : "",
-          monthlyPayment: storedCreditOffer.monthlyPayment ?? 0,
+          rate: storedCreditOffer.rate,
+          monthlyPayment: storedCreditOffer.monthlyPayment,
+          ...(storedCreditOffer.downPayment ? { downPayment: storedCreditOffer.downPayment } : {}),
         }
       : undefined,
     tradeIn: (quote.tradeIn as { priceFrom?: number; priceTo?: number } | null) ?? undefined,
@@ -600,7 +644,7 @@ router.post("/quotes", async (req, res) => {
       priceOverride?: number;
       extraEquipment?: { text: string; price?: number };
       extraAddToRrp?: boolean;
-      creditOffer?: { term: string; rate: string; monthlyPayment: number };
+      creditOffer?: CreditOfferPayload;
       tradeIn?: { priceFrom?: number; priceTo?: number };
     };
 
@@ -613,6 +657,7 @@ router.post("/quotes", async (req, res) => {
       return res.status(404).json({ ok: false, error: "Car not found" });
     }
     const car = carRows[0]!;
+    const normalizedCreditOffer = normalizeCreditOffer(creditOffer);
 
     let managerId: number;
     let manager: { id: number; name: string | null; phone?: string | null; email?: string | null; photoUrl?: string | null };
@@ -672,7 +717,7 @@ router.post("/quotes", async (req, res) => {
       validUntil,
       extraEquipment: extraEquipment?.text?.trim() ? extraEquipment : null,
       extraAddToRrp: addExtraToRrp,
-      creditOffer: (creditOffer?.term || creditOffer?.rate || creditOffer?.monthlyPayment) ? creditOffer : null,
+      creditOffer: normalizedCreditOffer,
       tradeIn: (tradeIn?.priceFrom || tradeIn?.priceTo) ? tradeIn : null,
       pdfUrl: null,
     }).returning({ id: quotesTable.id });
@@ -768,11 +813,12 @@ router.post("/quotes", async (req, res) => {
       discounts: discounts ?? [],
       options: parseExtrasToOptions(car.extras),
       extraEquipment: extraEquipment?.text?.trim() ? extraEquipment : undefined,
-      creditOffer: (creditOffer?.term || creditOffer?.rate || creditOffer?.monthlyPayment)
+      creditOffer: normalizedCreditOffer
         ? {
-            term: creditOffer.term ? `${creditOffer.term} мес.` : "",
-            rate: creditOffer.rate ? `${creditOffer.rate}%` : "",
-            monthlyPayment: creditOffer.monthlyPayment,
+            term: normalizedCreditOffer.term ? `${normalizedCreditOffer.term} мес.` : "",
+            rate: normalizedCreditOffer.rate,
+            monthlyPayment: normalizedCreditOffer.monthlyPayment,
+            ...(normalizedCreditOffer.downPayment ? { downPayment: normalizedCreditOffer.downPayment } : {}),
           } : undefined,
       tradeIn: (tradeIn?.priceFrom || tradeIn?.priceTo) ? tradeIn : undefined,
       salesHead: salesHead ? {
@@ -861,7 +907,7 @@ router.put("/quotes/:id", async (req, res) => {
       priceOverride?: number;
       extraEquipment?: { text: string; price?: number };
       extraAddToRrp?: boolean;
-      creditOffer?: { term: string; rate: string; monthlyPayment: number };
+      creditOffer?: CreditOfferPayload;
       tradeIn?: { priceFrom?: number; priceTo?: number };
     };
 
@@ -872,6 +918,7 @@ router.put("/quotes/:id", async (req, res) => {
     const carRows = await db.select().from(carsTable).where(eq(carsTable.externalId, quote.carId)).limit(1);
     const car = carRows[0] ?? null;
     const snap = quote.carSnapshot as Record<string, unknown>;
+    const normalizedCreditOffer = normalizeCreditOffer(creditOffer);
 
     // priceOverride — only for KP document, never writes to cars table
     const rawPrice = (priceOverride != null && priceOverride > 0)
@@ -961,11 +1008,12 @@ router.put("/quotes/:id", async (req, res) => {
       discounts: discounts ?? [],
       options: parseExtrasToOptions(car?.extras ?? null),
       extraEquipment: extraEquipment?.text?.trim() ? extraEquipment : undefined,
-      creditOffer: (creditOffer?.term || creditOffer?.rate || creditOffer?.monthlyPayment)
+      creditOffer: normalizedCreditOffer
         ? {
-            term: creditOffer.term ? `${creditOffer.term} мес.` : "",
-            rate: creditOffer.rate ? `${creditOffer.rate}%` : "",
-            monthlyPayment: creditOffer.monthlyPayment,
+            term: normalizedCreditOffer.term ? `${normalizedCreditOffer.term} мес.` : "",
+            rate: normalizedCreditOffer.rate,
+            monthlyPayment: normalizedCreditOffer.monthlyPayment,
+            ...(normalizedCreditOffer.downPayment ? { downPayment: normalizedCreditOffer.downPayment } : {}),
           } : undefined,
       tradeIn: (tradeIn?.priceFrom || tradeIn?.priceTo) ? tradeIn : undefined,
       salesHead: salesHead ? {
@@ -1013,7 +1061,7 @@ router.put("/quotes/:id", async (req, res) => {
       validUntil,
       extraEquipment: extraEquipment?.text?.trim() ? extraEquipment : null,
       extraAddToRrp: addExtraToRrp,
-      creditOffer: (creditOffer?.term || creditOffer?.rate || creditOffer?.monthlyPayment) ? creditOffer : null,
+      creditOffer: normalizedCreditOffer,
       tradeIn: (tradeIn?.priceFrom || tradeIn?.priceTo) ? tradeIn : null,
       pdfUrl: pdfUrl ? pdfUrl.replace(/^\/api\/manager\/quotes\/\d+\/pdf$/, `quotes/${quote.managerId}/${quoteId}.pdf`) : null,
       updatedAt: now,
