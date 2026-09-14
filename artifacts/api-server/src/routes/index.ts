@@ -47,6 +47,7 @@ import adminCalltouchRouter from "./admin-calltouch";
 import managerAuthRouter from "./manager-auth";
 import managerRegisterRouter from "./manager-register";
 import managerQuotesRouter from "./manager-quotes";
+import quoteShareRouter from "./quote-share";
 import managerProfileRouter from "./manager-profile";
 import adminManagersRouter from "./admin-managers";
 import adminQuotesRouter from "./admin-quotes";
@@ -135,6 +136,7 @@ router.use("/admin/calltouch-calls", adminCalltouchRouter);
 // Manager auth & register (public)
 router.use("/manager/login", managerAuthRouter);
 router.use("/manager/register", managerRegisterRouter);
+router.use("/quote-share", quoteShareRouter);
 router.use("/manager", managerProfileRouter);
 router.use("/manager", managerQuotesRouter);
 
