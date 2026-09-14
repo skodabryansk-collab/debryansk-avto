@@ -208,31 +208,14 @@ async function getManagerBrands(managerId: number): Promise<string[]> {
 
 const USED_BRAND = "С пробегом";
 
-const MANAGER_BRAND_ALIASES: Record<string, string[]> = {
-  "great wall": ["Haval City", "Great Wall"],
-};
-
-function getManagerBrandVariants(brand: string): string[] {
-  const normalized = brand.trim().toLowerCase();
-  return MANAGER_BRAND_ALIASES[normalized] ?? [brand];
-}
-
-function getQuoteBrandName(brand: string | null | undefined): string {
-  if (brand?.trim().toLowerCase() === "haval city") return "Great Wall";
-  return brand ?? "";
-}
-
 function brandInList(col: typeof carsTable.brand, brands: string[]) {
-  const { ilike, or } = require("drizzle-orm");
-  const variants = Array.from(new Set(
-    brands.flatMap(getManagerBrandVariants).map(brand => brand.toLowerCase()),
-  )).map(normalized => {
-    const original = brands.flatMap(getManagerBrandVariants).find(brand => brand.toLowerCase() === normalized);
-    return original ?? normalized;
-  });
-  if (variants.length === 0) return null;
-  if (variants.length === 1) return ilike(col, variants[0]!);
-  return or(...variants.map(b => ilike(col, b)))!;
+  const { or: drizzleOr } = require("drizzle-orm");
+  const uniqueBrands = Array.from(new Set(
+    brands.map(brand => brand.trim()).filter(Boolean),
+  ));
+  if (uniqueBrands.length === 0) return null;
+  if (uniqueBrands.length === 1) return ilike(col, uniqueBrands[0]!);
+  return drizzleOr(...uniqueBrands.map(brand => ilike(col, brand)))!;
 }
 
 function buildManagerCarFilter(mBrands: string[], requestedType?: string) {
@@ -288,9 +271,7 @@ router.get("/cars/brands", async (req, res) => {
       .from(carsTable)
       .where(whereClause)
       .orderBy(carsTable.brand);
-    const brands = Array.from(new Set(
-      rows.map(r => r.brand).filter(Boolean).map(brand => getQuoteBrandName(brand)),
-    )).sort();
+    const brands = Array.from(new Set(rows.map(r => r.brand).filter(Boolean))).sort();
     logger.info({ managerId, isAdmin, brandCount: brands.length, brands }, "[DEBUG] /cars/brands result");
     return res.json({ ok: true, data: brands });
   } catch (err) {
@@ -447,7 +428,7 @@ async function regenerateStoredQuotePdf(quote: typeof quotesTable.$inferSelect):
   }
 
   const brandDisplayName = carBrand ? await resolveBrandName(carBrand) : (carBrand || null);
-  const quoteBrand = getQuoteBrandName(carBrand);
+  const quoteBrand = carBrand;
   const carSlug = car?.externalId ?? String(snap["externalId"] ?? quote.carId);
   const carUrl = `https://debryansk-auto.ru/${carType === "new" ? "new-cars" : "cars"}/${carSlug}`;
   const qrCode = await QRCode.toDataURL(carUrl, {
@@ -745,7 +726,7 @@ router.post("/quotes", async (req, res) => {
     }
 
     const brandDisplayName = car.brand ? await resolveBrandName(car.brand) : (car.brand ?? null);
-    const quoteBrand = getQuoteBrandName(car.brand);
+    const quoteBrand = car.brand ?? "";
 
     const carSlug = car.externalId ?? String(car.id);
     const carUrl = `https://debryansk-auto.ru/${car.type === "new" ? "new-cars" : "cars"}/${carSlug}`;
@@ -940,7 +921,7 @@ router.put("/quotes/:id", async (req, res) => {
     }
 
     const brandDisplayName = carBrand ? await resolveBrandName(carBrand) : (carBrand || null);
-    const quoteBrand = getQuoteBrandName(carBrand);
+    const quoteBrand = carBrand;
 
     const carSlug = car?.externalId ?? String(snap["externalId"] ?? quote.carId);
     const carUrl = `https://debryansk-auto.ru/${carType === "new" ? "new-cars" : "cars"}/${carSlug}`;
