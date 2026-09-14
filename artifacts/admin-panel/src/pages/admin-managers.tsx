@@ -79,8 +79,8 @@ function BrandPill({ name }: { name: string }) {
 const pressClass = `transition-[background-color,border-color,transform,opacity] duration-150
   [transition-timing-function:cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]`;
 
-// Great Wall cars arrive in the Haval City feed, so this access option is
-// intentionally available only in the manager brand-assignment dialog.
+// Great Wall is intentionally available only in the manager brand-assignment
+// dialog and is not added to the global brand directory.
 const MANAGER_ONLY_BRANDS = ["Great Wall"];
 
 // ─── EditBrandsDialog ─────────────────────────────────────────────────────────
