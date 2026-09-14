@@ -14,6 +14,7 @@ import { logger } from "../lib/logger";
 import fs from "fs";
 import path from "path";
 import { acquireChrome, isPrerendererRunning } from "../lib/chrome-semaphore";
+import { normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
 
 const router: IRouter = Router();
 router.use(requireManager);
@@ -211,11 +212,12 @@ const USED_BRAND = "С пробегом";
 function brandInList(col: typeof carsTable.brand, brands: string[]) {
   const { or: drizzleOr } = require("drizzle-orm");
   const uniqueBrands = Array.from(new Set(
-    brands.map(brand => brand.trim()).filter(Boolean),
+    brands.map(normalizeManagerQuoteBrand).filter(Boolean),
   ));
   if (uniqueBrands.length === 0) return null;
-  if (uniqueBrands.length === 1) return ilike(col, uniqueBrands[0]!);
-  return drizzleOr(...uniqueBrands.map(brand => ilike(col, brand)))!;
+  const exactBrandMatch = (brand: string) => sql`lower(trim(${col})) = ${brand}`;
+  if (uniqueBrands.length === 1) return exactBrandMatch(uniqueBrands[0]!);
+  return drizzleOr(...uniqueBrands.map(exactBrandMatch))!;
 }
 
 function buildManagerCarFilter(mBrands: string[], requestedType?: string) {
