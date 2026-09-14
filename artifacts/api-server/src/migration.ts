@@ -656,6 +656,17 @@ export async function runMigration() {
     await db.execute(sql`ALTER TABLE managers ADD COLUMN IF NOT EXISTS temp_password TEXT`);
     logger.info("managers: self-registration columns ready (idempotent)");
 
+    // Temporary client-facing PDF links. Only the SHA-256 hash is stored;
+    // issuing a new link replaces the previous one for the same quote.
+    await db.execute(sql`ALTER TABLE quotes ADD COLUMN IF NOT EXISTS share_token_hash TEXT`);
+    await db.execute(sql`ALTER TABLE quotes ADD COLUMN IF NOT EXISTS share_token_expires_at TIMESTAMPTZ`);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS quotes_share_token_hash_idx
+      ON quotes (share_token_hash)
+      WHERE share_token_hash IS NOT NULL
+    `);
+    logger.info("quotes share-link columns ready (idempotent)");
+
     // ── Sales head managers: brand (text) → brands (jsonb array) ─────────────
     await db.execute(sql`ALTER TABLE sales_head_managers ADD COLUMN IF NOT EXISTS brands JSONB DEFAULT '[]'`);
     const shmBrandExists = await db.execute(sql`
