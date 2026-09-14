@@ -5,7 +5,11 @@
 - [VPS deploy correct path](vps-deploy-correct-path.md) — deploy to /opt/debryansk/api/ (not dist/); @workspace/integrations-openai-ai-server must be BUNDLED; prerender disk delete needs server restart.
 - [Prerender manual rebuild](prerender-manual-rebuild.md) — brand pages have NO auto-prerender-on-miss; clearing cache → SPA shell forever; rebuild manually via prerender.mjs --route.
 - [VPS deploy rules & script](vps-deploy-rules.md) — стандартизированный deploy: tar+sshpass, --strip-components вручную, **CRITICAL: всегда rebuild перед деплоем (никогда не доверять старому dist/), hash comparison для проверки свежести, backup, post-transfer verify, health check. Скрипт: scripts/deploy-vps.sh. **НЕ делать ручной tar extract в /opt/debryansk/api/ — сносит node_modules; openai external-пакет там живёт, без него PM2 падает с ERR_MODULE_NOT_FOUND.**
+- [VPS runtime dependency updates](vps-runtime-dependencies.md) — на VPS нет полного package manifest; npm install без него может удалить внешние runtime-модули, восстанавливать из backup и накладывать обновления безопаснее.
 - [Timeweb VPS reverse proxy](timeweb-vps.md) — IP 5.42.110.134, SSH через `VPS_SSH_PASSWORD` secret + sshpass, Nginx→Replit (34.111.179.208), ssl_buffer_size 4k обязателен.
+- [Timeweb DNS-01 propagation](timeweb-dns-01-propagation.md) — API TXT create/delete works, but authoritative NS can converge inconsistently; require a successful secondary ACME validation before unattended renewal.
+- [Audit HTTP-01 renewal](audit-http01-renewal.md) — webroot renewal is staged on the proxy; keep the HTTP redirect inside location / so the ACME location can return 200.
+- [Cross-domain reverse proxy](cross-domain-reverse-proxy.md) — при переносе домена на этот VPS upstream нужно задавать фиксированным origin IP с сохранением SNI/Host, иначе DNS создаст proxy-петлю.
 - [Vite proxy for API](vite-api-proxy.md) — Replit multi-artifact proxy chain: browser→port 8081 (Replit infra)→port 19052 (Vite)→proxy to port 8080 (API server). Port 8081 is NOT the main router.
 - [API route prefix pitfall](api-route-prefix.md) — app.use("/api", router) in app.ts: router paths must NOT include /api prefix (write "/send-email", not "/api/send-email"). Also: multer/busboy must be in esbuild externals list alongside nodemailer.
 - [Image optimization strategy](image-optimization.md) — WebP-first approach: all PNG/JPG converted to WebP (~95% size reduction), mobile variants created for hero, lazy loading + async decoding for all non-critical images, `<picture>` with srcset for responsive hero.
@@ -73,3 +77,4 @@
 - [Fuel type in stock feeds](fuel-type-feed.md) — CM Expert XML encodes diesel as a `d` suffix in modification_id; no dedicated fuel field currently exists.
 - [VIN engine enrichment priority](vin-engine-enrichment-priority.md) — use `xml_pending` before CM lookup; only exact techParamId matches may become `cm_vin`, which feed sync must never overwrite.
 - [SEO suggestion schema drift](seo-suggestion-schema-drift.md) — raw SQL fields need idempotent migrations in both dev and VPS, or the admin list can fail with 500.
+- [API source ESM test runtime](api-esm-test-runtime.md) — direct tsx integration tests do not provide the esbuild `__dirname`/`require` banner; keep source modules native-ESM compatible.
