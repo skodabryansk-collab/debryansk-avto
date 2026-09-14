@@ -15,6 +15,7 @@ import {
   type QuoteExtraEquipment, type QuoteCreditOffer, type QuoteTradeIn,
 } from "@/lib/manager-auth";
 import { useManagerAuth } from "@/lib/manager-auth";
+import { formatManagerQuoteCarTitle } from "@/lib/manager-quote-display";
 import { useLocation } from "wouter";
 
 const NBSP = "\u00a0";
@@ -176,7 +177,7 @@ function CarSearch({ onSelect }: { onSelect: (car: CarSearchResult) => void }) {
               onClick={() => onSelect(car)}
               className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
             >
-              <div className="font-medium text-sm">{car.brand} {car.model} {car.year}</div>
+              <div className="font-medium text-sm">{formatManagerQuoteCarTitle(car)}</div>
               <div className="text-xs text-slate-500 mt-0.5">
                 {car.modification || car.complectation || "—"} · {car.type === "new" ? "Новый" : "Б/у"}
                 {car.price ? ` · ${fmtRub(car.price)}` : ""}
@@ -357,7 +358,7 @@ function QuoteForm({
                   <Car className="w-5 h-5 text-[#0070b8]" />
                 </div>
                 <div>
-                  <div className="font-semibold text-slate-900">{selectedCar.brand} {selectedCar.model} {selectedCar.year}</div>
+                  <div className="font-semibold text-slate-900">{formatManagerQuoteCarTitle(selectedCar)}</div>
                   <div className="text-sm text-slate-500">{selectedCar.modification || selectedCar.complectation || "—"}</div>
                   {selectedCar.price && (
                     <div className="text-xs text-slate-400 mt-0.5">
@@ -709,7 +710,11 @@ function HistoryTable({ onEdit }: { onEdit: (q: QuoteHistoryItem) => void }) {
         <tbody className="divide-y">
           {quotes.map((q: QuoteHistoryItem) => {
             const snap = q.carSnapshot as Record<string, unknown>;
-            const carName = `${snap["brand"] ?? ""} ${snap["model"] ?? ""} ${snap["year"] ?? ""}`.trim();
+            const carName = formatManagerQuoteCarTitle({
+              brand: snap["brand"] ? String(snap["brand"]) : null,
+              model: snap["model"] ? String(snap["model"]) : null,
+              year: snap["year"] != null ? Number(snap["year"]) : null,
+            });
             const benefit = q.priceOriginal - q.priceFinal;
             const wasEdited = q.updatedAt && q.updatedAt !== q.createdAt;
             return (
