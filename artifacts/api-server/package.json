@@ -8,6 +8,7 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:manager-quotes-brand": "pnpm --dir ../../scripts exec tsx ../artifacts/api-server/src/lib/manager-quote-brand.test.ts",
     "test:calltouch": "tsc -p tsconfig.tests.json --noEmit && pnpm --dir ../../scripts exec tsx ../artifacts/api-server/scripts/test-calltouch-callback.ts",
     "prerender": "node scripts/prerender.mjs"
   },
