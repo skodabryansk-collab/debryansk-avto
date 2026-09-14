@@ -5,11 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Plus, FileDown, LogOut, Car, Pencil, BookOpen, UserPlus, UserCheck, LogIn, FileText, Clock, User, UserRound } from "lucide-react";
+import { Loader2, Search, Plus, FileDown, Share2, LogOut, Car, Pencil, BookOpen, UserPlus, UserCheck, LogIn, FileText, Clock, User, UserRound } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   searchCars, fetchCarBrands, fetchCarModels,
-  createQuote, updateQuote, regenerateQuotePdf, getMyQuotes, getManagerName, logoutManager, pdfDownloadUrl,
+  createQuote, updateQuote, regenerateQuotePdf, createQuoteShareLink, getMyQuotes, getManagerName, logoutManager, pdfDownloadUrl,
   isAdminUsingManagerPortal,
   type CarSearchResult, type QuoteDiscount, type QuoteHistoryItem,
   type QuoteExtraEquipment, type QuoteCreditOffer, type QuoteTradeIn,
@@ -17,6 +17,7 @@ import {
 import { useManagerAuth } from "@/lib/manager-auth";
 import { formatManagerQuoteCarTitle } from "@/lib/manager-quote-display";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 const NBSP = "\u00a0";
 const fmtRub = (n: number) =>
@@ -700,6 +701,7 @@ function fmtDateTime(iso: string) {
 
 function HistoryTable({ onEdit }: { onEdit: (q: QuoteHistoryItem) => void }) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { data, isLoading } = useQuery({
     queryKey: ["manager-quotes-history"],
     queryFn: getMyQuotes,
@@ -708,6 +710,35 @@ function HistoryTable({ onEdit }: { onEdit: (q: QuoteHistoryItem) => void }) {
   const regeneratePdf = useMutation({
     mutationFn: regenerateQuotePdf,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["manager-quotes-history"] }),
+  });
+  const sharePdf = useMutation({
+    mutationFn: createQuoteShareLink,
+    onSuccess: async (result) => {
+      const shareUrl = new URL(result.shareUrl, window.location.origin).toString();
+      try {
+        if (navigator.share) {
+          await navigator.share({
+            title: "Коммерческое предложение",
+            text: "Коммерческое предложение от Дебрянск Авто",
+            url: shareUrl,
+          });
+          toast({ title: "Ссылка готова", description: `Действует до ${fmtDateTime(result.expiresAt)}` });
+        } else {
+          await navigator.clipboard.writeText(shareUrl);
+          toast({ title: "Ссылка скопирована", description: `Действует до ${fmtDateTime(result.expiresAt)}` });
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        try {
+          window.prompt("Скопируйте безопасную ссылку:", shareUrl);
+        } catch {
+          toast({ title: "Ссылка создана", description: shareUrl });
+        }
+      }
+    },
+    onError: (err: Error) => {
+      toast({ title: "Не удалось создать ссылку", description: err.message, variant: "destructive" });
+    },
   });
 
   if (isLoading) return (
@@ -784,15 +815,29 @@ function HistoryTable({ onEdit }: { onEdit: (q: QuoteHistoryItem) => void }) {
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                     {q.pdfUrl ? (
-                      <a
-                        href={pdfDownloadUrl(q.id)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-[#0070b8] hover:underline text-sm"
-                      >
-                        <FileDown className="h-3.5 w-3.5" />
-                        PDF
-                      </a>
+                      <>
+                        <a
+                          href={pdfDownloadUrl(q.id)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-[#0070b8] hover:underline text-sm"
+                        >
+                          <FileDown className="h-3.5 w-3.5" />
+                          PDF
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => sharePdf.mutate(q.id)}
+                          disabled={sharePdf.isPending}
+                          className="inline-flex items-center gap-1 text-emerald-600 hover:underline text-sm disabled:cursor-wait disabled:opacity-60"
+                          title="Создать безопасную ссылку без админского токена"
+                        >
+                          {sharePdf.isPending && sharePdf.variables === q.id
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <Share2 className="h-3.5 w-3.5" />}
+                          Поделиться
+                        </button>
+                      </>
                     ) : (
                       <button
                         type="button"
