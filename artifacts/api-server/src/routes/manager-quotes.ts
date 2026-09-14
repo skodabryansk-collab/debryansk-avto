@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { createHash, randomBytes } from "crypto";
 import { db, managersTable, quotesTable, carsTable, brandsTable, locationsTable, locationBrandsTable, salesHeadManagersTable } from "@workspace/db";
 import QRCode from "qrcode";
 // @ts-ignore - no types available
@@ -20,6 +21,11 @@ const router: IRouter = Router();
 router.use(requireManager);
 
 const PRERENDER_PAUSE_FILE = process.env["PRERENDER_PAUSE_FILE"] || "/tmp/debryansk-prerender.pause";
+const SHARE_LINK_TTL_MS = 72 * 60 * 60 * 1000;
+
+function hashShareToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
 
 function getUploadsDir(): string {
   return process.env["LOCAL_UPLOADS_DIR"] || path.resolve(__dirname, "../uploads");
@@ -1064,6 +1070,8 @@ router.put("/quotes/:id", async (req, res) => {
       creditOffer: normalizedCreditOffer,
       tradeIn: (tradeIn?.priceFrom || tradeIn?.priceTo) ? tradeIn : null,
       pdfUrl: pdfUrl ? pdfUrl.replace(/^\/api\/manager\/quotes\/\d+\/pdf$/, `quotes/${quote.managerId}/${quoteId}.pdf`) : null,
+      shareTokenHash: null,
+      shareTokenExpiresAt: null,
       updatedAt: now,
     }).where(eq(quotesTable.id, quoteId));
 
@@ -1071,6 +1079,46 @@ router.put("/quotes/:id", async (req, res) => {
   } catch (err) {
     logger.error({ err }, "[quotes] update error");
     return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+router.post("/quotes/:id/share-link", async (req, res) => {
+  try {
+    const quoteId = Number(req.params["id"]);
+    const payload = getManagerPayload(req);
+    const rows = await db.select({
+      id: quotesTable.id,
+      managerId: quotesTable.managerId,
+      pdfUrl: quotesTable.pdfUrl,
+    }).from(quotesTable).where(eq(quotesTable.id, quoteId)).limit(1);
+    const quote = rows[0];
+
+    if (!quote) return res.status(404).json({ ok: false, error: "Not found" });
+    const isAdminPayload = (payload as unknown as Record<string, unknown>)["isAdmin"] === true;
+    if (quote.managerId !== payload.managerId && !isAdminPayload) {
+      return res.status(403).json({ ok: false, error: "Forbidden" });
+    }
+    if (!quote.pdfUrl) {
+      return res.status(409).json({ ok: false, error: "PDF not available" });
+    }
+
+    const token = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(Date.now() + SHARE_LINK_TTL_MS);
+    await db.update(quotesTable)
+      .set({
+        shareTokenHash: hashShareToken(token),
+        shareTokenExpiresAt: expiresAt,
+      })
+      .where(eq(quotesTable.id, quoteId));
+
+    return res.json({
+      ok: true,
+      shareUrl: `/api/quote-share/${token}/pdf`,
+      expiresAt: expiresAt.toISOString(),
+    });
+  } catch (err) {
+    logger.error({ err }, "[quotes] share-link generation error");
+    return res.status(500).json({ ok: false, error: "Не удалось создать ссылку" });
   }
 });
 
