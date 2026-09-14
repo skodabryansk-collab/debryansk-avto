@@ -210,18 +210,16 @@ async function getManagerBrands(managerId: number): Promise<string[]> {
 const USED_BRAND = "С пробегом";
 
 function brandInList(col: typeof carsTable.brand, brands: string[]) {
-  const { or: drizzleOr } = require("drizzle-orm");
   const uniqueBrands = Array.from(new Set(
     brands.map(normalizeManagerQuoteBrand).filter(Boolean),
   ));
-  if (uniqueBrands.length === 0) return null;
+  if (uniqueBrands.length === 0) return sql`false`;
   const exactBrandMatch = (brand: string) => sql`lower(trim(${col})) = ${brand}`;
   if (uniqueBrands.length === 1) return exactBrandMatch(uniqueBrands[0]!);
-  return drizzleOr(...uniqueBrands.map(exactBrandMatch))!;
+  return or(...uniqueBrands.map(exactBrandMatch))!;
 }
 
 function buildManagerCarFilter(mBrands: string[], requestedType?: string) {
-  const { or: drOr } = require("drizzle-orm");
   const hasUsed = mBrands.includes(USED_BRAND);
   const regularBrands = mBrands.filter(b => b !== USED_BRAND);
   const brandOr = brandInList(carsTable.brand, regularBrands);
@@ -234,7 +232,7 @@ function buildManagerCarFilter(mBrands: string[], requestedType?: string) {
   }
 
   if (regularBrands.length > 0 && hasUsed) {
-    return [drOr(eq(carsTable.type, "used"), brandOr!)!];
+    return [or(eq(carsTable.type, "used"), brandOr!)!];
   } else if (regularBrands.length > 0) {
     return brandOr ? [brandOr] : [eq(carsTable.type, "__none__")];
   } else if (hasUsed) {
