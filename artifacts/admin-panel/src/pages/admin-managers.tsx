@@ -79,6 +79,10 @@ function BrandPill({ name }: { name: string }) {
 const pressClass = `transition-[background-color,border-color,transform,opacity] duration-150
   [transition-timing-function:cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]`;
 
+// Great Wall cars arrive in the Haval City feed, so this access option is
+// intentionally available only in the manager brand-assignment dialog.
+const MANAGER_ONLY_BRANDS = ["Great Wall"];
+
 // ─── EditBrandsDialog ─────────────────────────────────────────────────────────
 
 function EditBrandsDialog({
@@ -102,7 +106,10 @@ function EditBrandsDialog({
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-managers"] }); onClose(); },
   });
 
-  const allBrands = brandsData?.map((b: { name: string }) => b.name) ?? [];
+  const allBrands = Array.from(new Set([
+    ...(brandsData?.map((b: { name: string }) => b.name) ?? []),
+    ...MANAGER_ONLY_BRANDS,
+  ]));
   function toggle(brand: string) {
     setSelected(prev => prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]);
   }
