@@ -104,7 +104,7 @@ function creditBlock(d: KpData): string {
   const n = cols.length;
   const labels = cols.map(c => `<div class="cr-label">${c.label}</div>`).join("");
   const vals   = cols.map(c => `<div class="cr-val">${c.val}</div>`).join("");
-  return `<div class="info-block"><div class="info-block-head">Кредитное предложение</div><div class="credit-grid" style="grid-template-columns:repeat(${n},1fr)">${labels}<div class="cr-divider"></div>${vals}</div></div>`;
+  return `<div class="info-block credit-block"><div class="info-block-head">Кредитное предложение</div><div class="credit-grid" style="grid-template-columns:repeat(${n},1fr)">${labels}<div class="cr-divider"></div>${vals}</div></div>`;
 }
 
 function tradeInBlock(d: KpData): string {
