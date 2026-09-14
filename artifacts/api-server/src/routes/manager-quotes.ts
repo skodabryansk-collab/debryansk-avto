@@ -208,11 +208,31 @@ async function getManagerBrands(managerId: number): Promise<string[]> {
 
 const USED_BRAND = "С пробегом";
 
+const MANAGER_BRAND_ALIASES: Record<string, string[]> = {
+  "great wall": ["Haval City", "Great Wall"],
+};
+
+function getManagerBrandVariants(brand: string): string[] {
+  const normalized = brand.trim().toLowerCase();
+  return MANAGER_BRAND_ALIASES[normalized] ?? [brand];
+}
+
+function getQuoteBrandName(brand: string | null | undefined): string {
+  if (brand?.trim().toLowerCase() === "haval city") return "Great Wall";
+  return brand ?? "";
+}
+
 function brandInList(col: typeof carsTable.brand, brands: string[]) {
   const { ilike, or } = require("drizzle-orm");
-  if (brands.length === 0) return null;
-  if (brands.length === 1) return ilike(col, brands[0]!);
-  return or(...brands.map(b => ilike(col, b)))!;
+  const variants = Array.from(new Set(
+    brands.flatMap(getManagerBrandVariants).map(brand => brand.toLowerCase()),
+  )).map(normalized => {
+    const original = brands.flatMap(getManagerBrandVariants).find(brand => brand.toLowerCase() === normalized);
+    return original ?? normalized;
+  });
+  if (variants.length === 0) return null;
+  if (variants.length === 1) return ilike(col, variants[0]!);
+  return or(...variants.map(b => ilike(col, b)))!;
 }
 
 function buildManagerCarFilter(mBrands: string[], requestedType?: string) {
@@ -268,7 +288,9 @@ router.get("/cars/brands", async (req, res) => {
       .from(carsTable)
       .where(whereClause)
       .orderBy(carsTable.brand);
-    const brands = rows.map(r => r.brand).filter(Boolean).sort();
+    const brands = Array.from(new Set(
+      rows.map(r => r.brand).filter(Boolean).map(brand => getQuoteBrandName(brand)),
+    )).sort();
     logger.info({ managerId, isAdmin, brandCount: brands.length, brands }, "[DEBUG] /cars/brands result");
     return res.json({ ok: true, data: brands });
   } catch (err) {
@@ -287,7 +309,7 @@ router.get("/cars/models", async (req, res) => {
     const type = String(req.query["type"] || "").trim() || undefined;
     const { and } = await import("drizzle-orm");
     const conditions = [];
-    if (brand) conditions.push(ilike(carsTable.brand, brand));
+    if (brand) conditions.push(brandInList(carsTable.brand, [brand]));
     if (type) conditions.push(eq(carsTable.type, type));
 
     if (!isAdmin && managerId) {
@@ -341,7 +363,7 @@ router.get("/cars/search", async (req, res) => {
     const { and } = await import("drizzle-orm");
     const conditions = [];
     if (type) conditions.push(eq(carsTable.type, type));
-    if (brand) conditions.push(ilike(carsTable.brand, brand));
+    if (brand) conditions.push(brandInList(carsTable.brand, [brand]));
     if (model) conditions.push(ilike(carsTable.model, model));
     if (q) {
       conditions.push(
@@ -425,6 +447,7 @@ async function regenerateStoredQuotePdf(quote: typeof quotesTable.$inferSelect):
   }
 
   const brandDisplayName = carBrand ? await resolveBrandName(carBrand) : (carBrand || null);
+  const quoteBrand = getQuoteBrandName(carBrand);
   const carSlug = car?.externalId ?? String(snap["externalId"] ?? quote.carId);
   const carUrl = `https://debryansk-auto.ru/${carType === "new" ? "new-cars" : "cars"}/${carSlug}`;
   const qrCode = await QRCode.toDataURL(carUrl, {
@@ -448,12 +471,12 @@ async function regenerateStoredQuotePdf(quote: typeof quotesTable.$inferSelect):
     kpDate: new Date().toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }),
     validUntil,
     clientSalutation: `${salutation} ${quote.clientName}`,
-    brand: carBrand,
+    brand: quoteBrand,
     contactsTitle: carType === "used"
       ? "Дебрянск Авто - автомобили с пробегом."
-      : `Дебрянск Авто - официальный дилер ${carBrand} в Брянске`,
+      : `Дебрянск Авто - официальный дилер ${quoteBrand} в Брянске`,
     brandLogo,
-    carTitle: `${carBrand} ${String(snap["model"] ?? "")}`.trim(),
+    carTitle: `${quoteBrand} ${String(snap["model"] ?? "")}`.trim(),
     carTrim: String(car?.modification ?? snap["modification"] ?? car?.complectation ?? snap["complectation"] ?? ""),
     carImage,
     specs: buildSpecsFromCar(snap),
@@ -722,6 +745,7 @@ router.post("/quotes", async (req, res) => {
     }
 
     const brandDisplayName = car.brand ? await resolveBrandName(car.brand) : (car.brand ?? null);
+    const quoteBrand = getQuoteBrandName(car.brand);
 
     const carSlug = car.externalId ?? String(car.id);
     const carUrl = `https://debryansk-auto.ru/${car.type === "new" ? "new-cars" : "cars"}/${carSlug}`;
@@ -750,12 +774,12 @@ router.post("/quotes", async (req, res) => {
       kpDate,
       validUntil: ruDate,
       clientSalutation: `${salutation} ${clientName}`,
-      brand: car.brand ?? "",
+      brand: quoteBrand,
       contactsTitle: car.type === "used"
         ? "Дебрянск Авто - автомобили с пробегом."
-        : `Дебрянск Авто - официальный дилер ${car.brand ?? ""} в Брянске`,
+        : `Дебрянск Авто - официальный дилер ${quoteBrand} в Брянске`,
       brandLogo,
-      carTitle: `${car.brand ?? ""} ${car.model ?? ""}`.trim(),
+      carTitle: `${quoteBrand} ${car.model ?? ""}`.trim(),
       carTrim: car.modification ?? car.complectation ?? "",
       carImage,
       specs: buildSpecsFromCar(carSnapshot as Record<string, unknown>),
@@ -916,6 +940,7 @@ router.put("/quotes/:id", async (req, res) => {
     }
 
     const brandDisplayName = carBrand ? await resolveBrandName(carBrand) : (carBrand || null);
+    const quoteBrand = getQuoteBrandName(carBrand);
 
     const carSlug = car?.externalId ?? String(snap["externalId"] ?? quote.carId);
     const carUrl = `https://debryansk-auto.ru/${carType === "new" ? "new-cars" : "cars"}/${carSlug}`;
@@ -942,12 +967,12 @@ router.put("/quotes/:id", async (req, res) => {
       kpDate,
       validUntil: ruDate,
       clientSalutation: `${salutation} ${clientName}`,
-      brand: carBrand,
+      brand: quoteBrand,
       contactsTitle: carType === "used"
         ? "Дебрянск Авто - автомобили с пробегом."
-        : `Дебрянск Авто - официальный дилер ${carBrand} в Брянске`,
+        : `Дебрянск Авто - официальный дилер ${quoteBrand} в Брянске`,
       brandLogo,
-      carTitle: `${carBrand} ${String(snap["model"] ?? "")}`.trim(),
+      carTitle: `${quoteBrand} ${String(snap["model"] ?? "")}`.trim(),
       carTrim: String(car?.modification ?? snap["modification"] ?? car?.complectation ?? snap["complectation"] ?? ""),
       carImage,
       specs: buildSpecsFromCar(snap),
