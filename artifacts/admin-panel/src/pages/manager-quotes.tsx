@@ -21,6 +21,10 @@ const NBSP = "\u00a0";
 const fmtRub = (n: number) =>
   n.toLocaleString("ru-RU") + NBSP + "₽";
 
+function displayQuoteBrand(brand: string | null | undefined): string {
+  return brand?.trim().toLowerCase() === "haval city" ? "Great Wall" : (brand ?? "");
+}
+
 const DISCOUNT_PRESETS = [
   { label: "Выгода по программе trade-in", key: "tradein" },
   { label: "Выгода при покупке в кредит", key: "credit" },
@@ -176,7 +180,7 @@ function CarSearch({ onSelect }: { onSelect: (car: CarSearchResult) => void }) {
               onClick={() => onSelect(car)}
               className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
             >
-              <div className="font-medium text-sm">{car.brand} {car.model} {car.year}</div>
+              <div className="font-medium text-sm">{displayQuoteBrand(car.brand)} {car.model} {car.year}</div>
               <div className="text-xs text-slate-500 mt-0.5">
                 {car.modification || car.complectation || "—"} · {car.type === "new" ? "Новый" : "Б/у"}
                 {car.price ? ` · ${fmtRub(car.price)}` : ""}
@@ -357,7 +361,7 @@ function QuoteForm({
                   <Car className="w-5 h-5 text-[#0070b8]" />
                 </div>
                 <div>
-                  <div className="font-semibold text-slate-900">{selectedCar.brand} {selectedCar.model} {selectedCar.year}</div>
+                  <div className="font-semibold text-slate-900">{displayQuoteBrand(selectedCar.brand)} {selectedCar.model} {selectedCar.year}</div>
                   <div className="text-sm text-slate-500">{selectedCar.modification || selectedCar.complectation || "—"}</div>
                   {selectedCar.price && (
                     <div className="text-xs text-slate-400 mt-0.5">
