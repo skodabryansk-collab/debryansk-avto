@@ -22,6 +22,12 @@ const NBSP = "\u00a0";
 const fmtRub = (n: number) =>
   n.toLocaleString("ru-RU") + NBSP + "₽";
 
+function roundToThousands(value: string): number | undefined {
+  const amount = Number(value.replace(",", "."));
+  if (!Number.isFinite(amount) || amount <= 0) return undefined;
+  return Math.round(amount / 1000) * 1000;
+}
+
 const DISCOUNT_PRESETS = [
   { label: "Выгода по программе trade-in", key: "tradein" },
   { label: "Выгода при покупке в кредит", key: "credit" },
@@ -261,6 +267,9 @@ function QuoteForm({
   const [extraAddToRrp, setExtraAddToRrp] = React.useState(initialData?.extraAddToRrp ?? false);
   const [creditTerm, setCreditTerm] = React.useState(initialData?.creditOffer?.term ?? "");
   const [creditRate, setCreditRate] = React.useState(initialData?.creditOffer?.rate ?? "");
+  const [creditDownPayment, setCreditDownPayment] = React.useState(
+    initialData?.creditOffer?.downPayment ? String(initialData.creditOffer.downPayment) : ""
+  );
   const [creditMonthly, setCreditMonthly] = React.useState(
     initialData?.creditOffer?.monthlyPayment ? String(initialData.creditOffer.monthlyPayment) : ""
   );
@@ -317,8 +326,14 @@ function QuoteForm({
     const extraEquipment: QuoteExtraEquipment | undefined = extraText.trim()
       ? { text: extraText.trim(), price: extraPrice ? Number(extraPrice) : undefined }
       : undefined;
-    const creditOffer: QuoteCreditOffer | undefined = (creditTerm || creditRate || creditMonthly)
-      ? { term: creditTerm.trim(), rate: creditRate.trim(), monthlyPayment: Number(creditMonthly) || 0 }
+    const downPayment = roundToThousands(creditDownPayment);
+    const creditOffer: QuoteCreditOffer | undefined = (creditTerm || creditRate || creditMonthly || downPayment)
+      ? {
+          term: creditTerm.trim(),
+          rate: creditRate.trim(),
+          monthlyPayment: Number(creditMonthly) || 0,
+          ...(downPayment ? { downPayment } : {}),
+        }
       : undefined;
     const tradeIn: QuoteTradeIn | undefined = (tradeInFrom || tradeInTo)
       ? { priceFrom: tradeInFrom ? Number(tradeInFrom) : undefined, priceTo: tradeInTo ? Number(tradeInTo) : undefined }
@@ -547,7 +562,7 @@ function QuoteForm({
           Кредитное предложение
           <span className="ml-1.5 text-xs font-normal text-slate-400">(необязательно)</span>
         </Label>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs text-slate-500">Срок кредита, мес.</Label>
             <div className="relative">
@@ -569,13 +584,32 @@ function QuoteForm({
               <Input
                 type="number"
                 min={0}
-                step={0.1}
+                step={0.01}
                 value={creditRate}
                 onChange={e => setCreditRate(e.target.value)}
-                placeholder="3,9"
+                placeholder="3,95"
                 className="pr-8 text-right"
               />
               <span className="absolute right-3 top-2.5 text-slate-400 text-sm">%</span>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-slate-500">Первоначальный взнос</Label>
+            <div className="relative">
+              <Input
+                type="number"
+                min={0}
+                step={1000}
+                value={creditDownPayment}
+                onChange={e => setCreditDownPayment(e.target.value)}
+                onBlur={() => {
+                  const rounded = roundToThousands(creditDownPayment);
+                  setCreditDownPayment(rounded ? String(rounded) : "");
+                }}
+                placeholder="500 000"
+                className="pr-8 text-right"
+              />
+              <span className="absolute right-3 top-2.5 text-slate-400 text-sm">₽</span>
             </div>
           </div>
           <div className="space-y-1.5">
