@@ -41,7 +41,7 @@ export interface KpData {
   discounts: Discount[];
   options: OptionCategory[];
   extraEquipment?: { text: string; price?: number };
-  creditOffer?: { term: string; rate: string; monthlyPayment: number };
+  creditOffer?: { term: string; rate: string; monthlyPayment: number; downPayment?: number };
   tradeIn?: { priceFrom?: number; priceTo?: number };
   salesHead?: { name: string; position: string; phone?: string; email?: string };
   dealer: {
@@ -92,10 +92,14 @@ function extraEquipBlock(d: KpData): string {
 
 function creditBlock(d: KpData): string {
   const co = d.creditOffer;
-  if (!co || (!co.term && !co.rate && !co.monthlyPayment)) return "";
+  if (!co || (!co.term && !co.rate && !co.monthlyPayment && !co.downPayment)) return "";
   const cols: Array<{ label: string; val: string }> = [];
   if (co.term) cols.push({ label: "Срок кредита", val: co.term });
-  if (co.rate) cols.push({ label: "Процентная ставка", val: co.rate });
+  if (co.rate) {
+    const rate = co.rate.trim().replace(/%$/, "").replace(".", ",");
+    cols.push({ label: "Процентная ставка", val: `${rate}%` });
+  }
+  if (co.downPayment) cols.push({ label: "Первоначальный взнос", val: fmtRub(co.downPayment) });
   if (co.monthlyPayment) cols.push({ label: "Ежемесячный платёж", val: fmtRub(co.monthlyPayment) });
   const n = cols.length;
   const labels = cols.map(c => `<div class="cr-label">${c.label}</div>`).join("");
