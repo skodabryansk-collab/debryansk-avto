@@ -16,6 +16,7 @@ import fs from "fs";
 import path from "path";
 import { acquireChrome, isPrerendererRunning } from "../lib/chrome-semaphore";
 import { normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
+import { getTenetPlusOptions } from "../lib/tenet-plus-equipment";
 import { getNewCars } from "./new-cars";
 
 const router: IRouter = Router();
@@ -173,6 +174,8 @@ async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
       ...car,
       color: feedCar.color || car.color,
       imageUrl: feedCar.images[0] || car.imageUrl,
+      complectation: feedCar.complectation || car.complectation,
+      extras: feedCar.extras || car.extras,
     };
   } catch (err) {
     logger.warn({ err, externalId: car.externalId }, "[quotes] live catalog enrichment failed; using cars row");
@@ -194,6 +197,7 @@ function buildQuoteCarSnapshot(
     price: car?.price ?? fallback["price"] ?? null,
     modification: car?.modification ?? fallback["modification"] ?? "",
     complectation: car?.complectation ?? fallback["complectation"] ?? "",
+    extras: car?.extras ?? fallback["extras"] ?? "",
     bodyType: car?.bodyType ?? fallback["bodyType"] ?? "",
     vin: car?.vin ?? fallback["vin"] ?? "",
     dealer: car?.dealer ?? fallback["dealer"] ?? "",
@@ -232,6 +236,29 @@ function parseExtrasToOptions(extras: string | null | undefined): Array<{ catego
   return Object.entries(cats)
     .filter(([, v]) => v.length > 0)
     .map(([category, items]) => ({ category, items }));
+}
+
+function buildQuoteOptions(
+  car: QuoteCar | null,
+  snapshot: Record<string, unknown>,
+): Array<{ category: string; items: string[] }> {
+  const parsed = parseExtrasToOptions(
+    car?.extras || String(snapshot["extras"] ?? ""),
+  );
+  if (parsed.length > 0) return parsed;
+
+  const source = [
+    car?.brand,
+    car?.dealer,
+    snapshot["brand"],
+    snapshot["dealer"],
+  ].filter(Boolean).join(" ");
+  if (!/tenet\s*plus/i.test(source)) return [];
+
+  return getTenetPlusOptions(
+    String(car?.model ?? snapshot["model"] ?? ""),
+    String(car?.complectation ?? snapshot["complectation"] ?? ""),
+  );
 }
 
 function buildSpecsFromCar(car: Record<string, unknown>): Array<{ icon: string; label: string; value: string }> {
