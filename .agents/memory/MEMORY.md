@@ -78,3 +78,5 @@
 - [VIN engine enrichment priority](vin-engine-enrichment-priority.md) — use `xml_pending` before CM lookup; only exact techParamId matches may become `cm_vin`, which feed sync must never overwrite.
 - [SEO suggestion schema drift](seo-suggestion-schema-drift.md) — raw SQL fields need idempotent migrations in both dev and VPS, or the admin list can fail with 500.
 - [API source ESM test runtime](api-esm-test-runtime.md) — direct tsx integration tests do not provide the esbuild `__dirname`/`require` banner; keep source modules native-ESM compatible.
+- [Python packages in Replit Nix](python-packages-replit-nix.md) — VCS packages need a local `.pythonlibs` target; the managed installer cannot parse Git URLs and system installs hit `/nix/store` permissions.
+- [Quote car snapshot freshness](quote-car-snapshot.md) — КП snapshot can predate car sync; refresh photo/color from the live catalog when creating or rebuilding PDFs.
