@@ -16,6 +16,7 @@ import fs from "fs";
 import path from "path";
 import { acquireChrome, isPrerendererRunning } from "../lib/chrome-semaphore";
 import { normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
+import { getNewCars } from "./new-cars";
 
 const router: IRouter = Router();
 router.use(requireManager);
@@ -151,6 +152,53 @@ async function fetchImageBase64(url: string): Promise<string> {
   } catch {
     return "";
   }
+}
+
+type QuoteCar = typeof carsTable.$inferSelect;
+
+/**
+ * The public new-car catalog is sourced directly from the supplier feed, while
+ * the manager quote picker reads the periodically synced cars table. Refresh
+ * the two fields that matter to the PDF when a quote is created or rebuilt so
+ * a short sync lag cannot produce a stale color or a missing photo.
+ */
+async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
+  if (!car || car.type !== "new") return car;
+
+  try {
+    const feedCar = (await getNewCars()).find((candidate) => candidate.id === car.externalId);
+    if (!feedCar) return car;
+
+    return {
+      ...car,
+      color: feedCar.color || car.color,
+      imageUrl: feedCar.images[0] || car.imageUrl,
+    };
+  } catch (err) {
+    logger.warn({ err, externalId: car.externalId }, "[quotes] live catalog enrichment failed; using cars row");
+    return car;
+  }
+}
+
+function buildQuoteCarSnapshot(
+  car: QuoteCar | null,
+  fallback: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id: car?.id ?? fallback["id"] ?? null,
+    externalId: car?.externalId ?? fallback["externalId"] ?? "",
+    brand: car?.brand ?? fallback["brand"] ?? "",
+    model: car?.model ?? fallback["model"] ?? "",
+    year: car?.year ?? fallback["year"] ?? null,
+    color: car?.color || fallback["color"] || null,
+    price: car?.price ?? fallback["price"] ?? null,
+    modification: car?.modification ?? fallback["modification"] ?? "",
+    complectation: car?.complectation ?? fallback["complectation"] ?? "",
+    bodyType: car?.bodyType ?? fallback["bodyType"] ?? "",
+    vin: car?.vin ?? fallback["vin"] ?? "",
+    dealer: car?.dealer ?? fallback["dealer"] ?? "",
+    imageUrl: car?.imageUrl || fallback["imageUrl"] || null,
+  };
 }
 
 function parseExtrasToOptions(extras: string | null | undefined): Array<{ category: string; items: string[] }> {
@@ -439,8 +487,9 @@ async function getOrCreateAdminManager(): Promise<number> {
 
 async function regenerateStoredQuotePdf(quote: typeof quotesTable.$inferSelect): Promise<string> {
   const carRows = await db.select().from(carsTable).where(eq(carsTable.externalId, quote.carId)).limit(1);
-  const car = carRows[0] ?? null;
-  const snap = quote.carSnapshot as Record<string, unknown>;
+  const car = await enrichQuoteCar(carRows[0] ?? null);
+  const snap = (quote.carSnapshot as Record<string, unknown>) ?? {};
+  const currentSnapshot = buildQuoteCarSnapshot(car, snap);
 
   const managerRows = await db.select().from(managersTable).where(eq(managersTable.id, quote.managerId)).limit(1);
   const manager = managerRows[0] ?? { id: quote.managerId, name: "Менеджер", phone: null, email: null, photoUrl: null };
@@ -483,7 +532,7 @@ async function regenerateStoredQuotePdf(quote: typeof quotesTable.$inferSelect):
   const qrCode = await QRCode.toDataURL(carUrl, {
     width: 200, margin: 1, color: { dark: "#0d0f14", light: "#f4f6f9" },
   });
-  const imageUrl = car?.imageUrl ?? String(snap["imageUrl"] ?? "");
+  const imageUrl = car?.imageUrl ?? String(currentSnapshot["imageUrl"] ?? "");
   const [brandLogo, carImage, salesHeadRows, managerPhotoBase64] = await Promise.all([
     fetchBrandLogoHtml(carBrand),
     fetchImageBase64(imageUrl),
@@ -506,10 +555,10 @@ async function regenerateStoredQuotePdf(quote: typeof quotesTable.$inferSelect):
       ? "Дебрянск Авто - автомобили с пробегом."
       : `Дебрянск Авто - официальный дилер ${quoteBrand} в Брянске`,
     brandLogo,
-    carTitle: `${quoteBrand} ${String(snap["model"] ?? "")}`.trim(),
-    carTrim: String(car?.modification ?? snap["modification"] ?? car?.complectation ?? snap["complectation"] ?? ""),
+     carTitle: `${quoteBrand} ${String(currentSnapshot["model"] ?? "")}`.trim(),
+     carTrim: String(car?.modification ?? currentSnapshot["modification"] ?? car?.complectation ?? currentSnapshot["complectation"] ?? ""),
     carImage,
-    specs: buildSpecsFromCar(snap),
+     specs: buildSpecsFromCar(currentSnapshot),
     priceBase: quote.priceOriginal,
     discounts: (quote.discounts as Array<{ label: string; value: number }>) ?? [],
     options: parseExtrasToOptions(car?.extras ?? null),
@@ -549,7 +598,9 @@ async function regenerateStoredQuotePdf(quote: typeof quotesTable.$inferSelect):
   };
 
   const objectName = await savePdfToLocal(quote.managerId, quote.id, await generatePdf(renderKp(kpData)));
-  await db.update(quotesTable).set({ pdfUrl: objectName }).where(eq(quotesTable.id, quote.id));
+  await db.update(quotesTable)
+    .set({ pdfUrl: objectName, carSnapshot: currentSnapshot })
+    .where(eq(quotesTable.id, quote.id));
   logger.info(`[quotes] Regenerated PDF for quote ${quote.id}: ${objectName}`);
   return objectName;
 }
@@ -662,7 +713,7 @@ router.post("/quotes", async (req, res) => {
     if (!carRows.length) {
       return res.status(404).json({ ok: false, error: "Car not found" });
     }
-    const car = carRows[0]!;
+    const car = (await enrichQuoteCar(carRows[0]!))!;
     const normalizedCreditOffer = normalizeCreditOffer(creditOffer);
 
     let managerId: number;
@@ -693,21 +744,7 @@ router.post("/quotes", async (req, res) => {
     const totalDiscount = (discounts ?? []).reduce((s, d) => s + (d.value ?? 0), 0);
     const priceFinal = priceBase - totalDiscount;
 
-    const carSnapshot = {
-      id: car.id,
-      externalId: car.externalId,
-      brand: car.brand,
-      model: car.model,
-      year: car.year,
-      color: car.color,
-      price: car.price,
-      modification: car.modification,
-      complectation: car.complectation,
-      bodyType: car.bodyType,
-      vin: car.vin,
-      dealer: car.dealer,
-      imageUrl: car.imageUrl,
-    };
+    const carSnapshot = buildQuoteCarSnapshot(car);
 
     const inserted = await db.insert(quotesTable).values({
       managerId,
@@ -922,8 +959,9 @@ router.put("/quotes/:id", async (req, res) => {
     }
 
     const carRows = await db.select().from(carsTable).where(eq(carsTable.externalId, quote.carId)).limit(1);
-    const car = carRows[0] ?? null;
-    const snap = quote.carSnapshot as Record<string, unknown>;
+    const car = await enrichQuoteCar(carRows[0] ?? null);
+    const snap = (quote.carSnapshot as Record<string, unknown>) ?? {};
+    const currentSnapshot = buildQuoteCarSnapshot(car, snap);
     const normalizedCreditOffer = normalizeCreditOffer(creditOffer);
 
     // priceOverride — only for KP document, never writes to cars table
@@ -983,7 +1021,7 @@ router.put("/quotes/:id", async (req, res) => {
       color: { dark: "#0d0f14", light: "#f4f6f9" },
     });
 
-    const imageUrl = car?.imageUrl ?? String(snap["imageUrl"] ?? "");
+    const imageUrl = car?.imageUrl ?? String(currentSnapshot["imageUrl"] ?? "");
     const [brandLogo, carImage, salesHeadRows] = await Promise.all([
       fetchBrandLogoHtml(carBrand),
       fetchImageBase64(imageUrl),
@@ -1006,10 +1044,10 @@ router.put("/quotes/:id", async (req, res) => {
         ? "Дебрянск Авто - автомобили с пробегом."
         : `Дебрянск Авто - официальный дилер ${quoteBrand} в Брянске`,
       brandLogo,
-      carTitle: `${quoteBrand} ${String(snap["model"] ?? "")}`.trim(),
-      carTrim: String(car?.modification ?? snap["modification"] ?? car?.complectation ?? snap["complectation"] ?? ""),
+      carTitle: `${quoteBrand} ${String(currentSnapshot["model"] ?? "")}`.trim(),
+      carTrim: String(car?.modification ?? currentSnapshot["modification"] ?? car?.complectation ?? currentSnapshot["complectation"] ?? ""),
       carImage,
-      specs: buildSpecsFromCar(snap),
+      specs: buildSpecsFromCar(currentSnapshot),
       priceBase,
       discounts: discounts ?? [],
       options: parseExtrasToOptions(car?.extras ?? null),
@@ -1069,6 +1107,7 @@ router.put("/quotes/:id", async (req, res) => {
       extraAddToRrp: addExtraToRrp,
       creditOffer: normalizedCreditOffer,
       tradeIn: (tradeIn?.priceFrom || tradeIn?.priceTo) ? tradeIn : null,
+      carSnapshot: currentSnapshot,
       pdfUrl: pdfUrl ? pdfUrl.replace(/^\/api\/manager\/quotes\/\d+\/pdf$/, `quotes/${quote.managerId}/${quoteId}.pdf`) : null,
       shareTokenHash: null,
       shareTokenExpiresAt: null,
