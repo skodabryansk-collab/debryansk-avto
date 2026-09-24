@@ -2,12 +2,25 @@ import { type Express } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { getIndexNowKey } from "../services/indexnow";
-import { getTenetPlusFeedState, getTenetPlusPublicIdSet } from "./new-cars";
+import { isManagedCmDetailPath } from "../lib/cm-business-publication";
+import {
+  getCmBusinessFeedState,
+  getCmBusinessPublicIdSet,
+  getTenetPlusFeedState,
+  getTenetPlusPublicIdSet,
+} from "./new-cars";
 
 const SITE = "https://debryansk-auto.ru";
 const CACHE_TTL = 60 * 60 * 1000;
 
-let cache: { xml: string; ts: number; tenetPlusComplete: boolean; tenetPlusIds: string } | null = null;
+let cache: {
+  xml: string;
+  ts: number;
+  tenetPlusComplete: boolean;
+  tenetPlusIds: string;
+  jelandComplete: boolean;
+  jelandIds: string;
+} | null = null;
 
 export const STATIC_PAGES = [
   { loc: "/",          changefreq: "daily",   priority: "1.0" },
@@ -45,13 +58,21 @@ function tenetIdsSignature(ids: Set<string>): string {
   return [...ids].sort().join("\u0000");
 }
 
-async function buildSitemap(tenetPlusComplete: boolean, publicTenetIds: Set<string>): Promise<string> {
+async function buildSitemap(
+  tenetPlusComplete: boolean,
+  publicTenetIds: Set<string>,
+  jelandComplete: boolean,
+  publicJelandIds: Set<string>,
+): Promise<string> {
   const [carsResult, newsResult, brandsResult, landingResult, extraResult] = await Promise.all([
     db.execute(sql`
       SELECT external_id, type, dealer, synced_at
       FROM cars
-      WHERE type <> 'new'
-         OR LOWER(BTRIM(dealer)) IS DISTINCT FROM 'tenet plus'
+       WHERE type <> 'new'
+          OR (
+            LOWER(BTRIM(dealer)) IS DISTINCT FROM 'tenet plus'
+            AND LOWER(BTRIM(dealer)) IS DISTINCT FROM 'jeland'
+          )
          OR (
            ${tenetPlusComplete}
            AND catalog_source = 'cm_business'
@@ -63,6 +84,18 @@ async function buildSitemap(tenetPlusComplete: boolean, publicTenetIds: Set<stri
              OR NULLIF(BTRIM(complectation), '') IS NOT NULL
            )
          )
+          OR (
+            LOWER(BTRIM(dealer)) = 'jeland'
+            AND ${jelandComplete}
+            AND catalog_source = 'cm_business'
+            AND cm_stock_state = 'in'
+            AND BTRIM(image_url) ~* '^https?://[^/[:space:]]+'
+            AND NULLIF(BTRIM(model), '') IS NOT NULL
+            AND (
+              NULLIF(BTRIM(modification), '') IS NOT NULL
+              OR NULLIF(BTRIM(complectation), '') IS NOT NULL
+            )
+          )
       ORDER BY synced_at DESC
     `),
     db.execute(sql`SELECT slug, updated_at FROM news ORDER BY updated_at DESC`),
@@ -94,13 +127,13 @@ async function buildSitemap(tenetPlusComplete: boolean, publicTenetIds: Set<stri
   // sections below (brands, cars, news, landings) will be silently skipped.
   for (const row of extraResult.rows as { loc: string; changefreq: string; priority: string }[]) {
     // Never allow durable SEO extras to resurrect manager-only/stale inventory URLs.
-    const normalizedLoc = row.loc === "/" ? "/" : `/${row.loc.replace(/^\/+|\/+$/g, "")}`;
-    if (/^\/new-cars\/tenet-plus-.+/i.test(normalizedLoc)) continue;
+    if (isManagedCmDetailPath(row.loc)) continue;
     emitUrl(row.loc, { lastmod: today, changefreq: row.changefreq, priority: row.priority });
   }
 
   for (const row of carsResult.rows as { external_id: string; type: string; dealer: string | null; synced_at: string }[]) {
     if (row.type === "new" && row.dealer?.trim().toLowerCase() === "tenet plus" && !publicTenetIds.has(row.external_id)) continue;
+    if (row.type === "new" && row.dealer?.trim().toLowerCase() === "jeland" && !publicJelandIds.has(row.external_id)) continue;
     const path = row.type === "new" ? "/new-cars" : "/cars";
     const enc = encodeURIComponent(row.external_id);
     emitUrl(`${path}/${enc}`, {
@@ -242,16 +275,21 @@ export function registerSitemapRoute(app: Express): void {
       const tenetPlusComplete = getTenetPlusFeedState().complete;
       const publicTenetIds = tenetPlusComplete ? getTenetPlusPublicIdSet() : new Set<string>();
       const tenetPlusIds = tenetIdsSignature(publicTenetIds);
+      const jelandComplete = getCmBusinessFeedState("Jeland").complete;
+      const publicJelandIds = jelandComplete ? getCmBusinessPublicIdSet("Jeland") : new Set<string>();
+      const jelandIds = tenetIdsSignature(publicJelandIds);
       if (cache
         && cache.tenetPlusComplete === tenetPlusComplete
         && cache.tenetPlusIds === tenetPlusIds
+        && cache.jelandComplete === jelandComplete
+        && cache.jelandIds === jelandIds
         && Date.now() - cache.ts < CACHE_TTL) {
         res.setHeader("Content-Type", "application/xml; charset=utf-8");
         res.setHeader("Cache-Control", "public, max-age=3600");
         return res.send(cache.xml);
       }
-      const xml = await buildSitemap(tenetPlusComplete, publicTenetIds);
-      cache = { xml, ts: Date.now(), tenetPlusComplete, tenetPlusIds };
+      const xml = await buildSitemap(tenetPlusComplete, publicTenetIds, jelandComplete, publicJelandIds);
+      cache = { xml, ts: Date.now(), tenetPlusComplete, tenetPlusIds, jelandComplete, jelandIds };
       res.setHeader("Content-Type", "application/xml; charset=utf-8");
       res.setHeader("Cache-Control", "public, max-age=3600");
       return res.send(xml);
