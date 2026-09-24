@@ -3,10 +3,11 @@ import { logger } from "../lib/logger";
 import { slugifyCarId } from "../lib/slugify";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { fetchTenetPlusStock } from "../services/tenet-plus-stock";
+import { fetchCmBusinessStock } from "../services/tenet-plus-stock";
 
 const router: IRouter = Router();
 const TENET_PLUS_DEALER = "Tenet Plus";
+const JELAND_DEALER = "Jeland";
 
 const FEEDS = [
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/2c3eb21beb9caa23118a56e042a13187.xml", dealer: "Jaecoo" },
@@ -16,9 +17,12 @@ const FEEDS = [
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/53fe918374eb87e8f6536b8c3bb21937.xml", dealer: "Haval City" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/913211584f8ad577ee76a703f2f13186.xml", dealer: "Jetour" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/86abbe9a79571a2757b583e323b27564.xml", dealer: "Soueast" },
-  { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/35c5c670c873d1d7bb686184b3f27398.xml", dealer: "Jeland" },
 ];
-const SOURCES: Array<{ dealer: string; url?: string }> = [...FEEDS, { dealer: TENET_PLUS_DEALER }];
+const CM_BUSINESS_DEALERS = [TENET_PLUS_DEALER, JELAND_DEALER] as const;
+const SOURCES: Array<{ dealer: string; url?: string }> = [
+  ...FEEDS,
+  ...CM_BUSINESS_DEALERS.map(dealer => ({ dealer })),
+];
 
 export interface NewCarRecord {
   id: string;
@@ -69,9 +73,20 @@ function hasUsablePhoto(url: string | null | undefined): boolean {
   return typeof url === "string" && /^https?:\/\/[^/\s]+/i.test(url.trim());
 }
 
+function hasSecurePhoto(url: string | null | undefined): boolean {
+  return typeof url === "string" && /^https:\/\/[^/\s]+/i.test(url.trim());
+}
+
+export function isCmBusinessDealer(dealer?: string | null): boolean {
+  const normalized = dealer?.trim().toLowerCase();
+  return normalized === TENET_PLUS_DEALER.toLowerCase() || normalized === JELAND_DEALER.toLowerCase();
+}
+
 export function isPublicNewCarEligible(car: PublicEligibilityInput): boolean {
-  if (car.dealer?.trim().toLowerCase() !== TENET_PLUS_DEALER.toLowerCase()) return true;
-  const hasPhoto = (car.images?.some(hasUsablePhoto) ?? false) || hasUsablePhoto(car.imageUrl);
+  if (!isCmBusinessDealer(car.dealer)) return true;
+  const photoValidator = car.dealer?.trim().toLowerCase() === JELAND_DEALER.toLowerCase()
+    ? hasSecurePhoto : hasUsablePhoto;
+  const hasPhoto = (car.images?.some(photoValidator) ?? false) || photoValidator(car.imageUrl);
   return car.stockState?.toLowerCase() === "in"
     && hasPhoto
     && Boolean(car.model?.trim())
@@ -85,6 +100,7 @@ const PUBLIC_STOCK_MAX_AGE = 60 * 60 * 1000;
 interface DealerCache {
   data: NewCarRecord[];
   ts: number;
+  sourceTs?: number;
   stale?: boolean;
 }
 
@@ -101,19 +117,32 @@ export function clearNewCarsCache() {
   tenetPlusFailureAt = 0;
 }
 
-export function getTenetPlusFeedState(): { complete: boolean; cachedCount: number } {
-  const cached = dealerCache.get(TENET_PLUS_DEALER);
+export function getCmBusinessFeedState(dealer: string): { complete: boolean; cachedCount: number } {
+  if (!isCmBusinessDealer(dealer)) return { complete: false, cachedCount: 0 };
+  const canonicalDealer = dealer.trim().toLowerCase() === JELAND_DEALER.toLowerCase()
+    ? JELAND_DEALER : TENET_PLUS_DEALER;
+  const cached = dealerCache.get(canonicalDealer);
   return {
-    complete: Boolean(cached && !cached.stale && Date.now() - cached.ts < PUBLIC_STOCK_MAX_AGE),
+    complete: Boolean(cached && !cached.stale && Date.now() - (cached.sourceTs ?? cached.ts) < PUBLIC_STOCK_MAX_AGE),
     cachedCount: cached?.data.length ?? 0,
   };
 }
 
+export function getTenetPlusFeedState(): { complete: boolean; cachedCount: number } {
+  return getCmBusinessFeedState(TENET_PLUS_DEALER);
+}
+
 /** Cross-check DB-backed public pages against the current complete CM snapshot. */
-export function getTenetPlusPublicIdSet(): Set<string> {
-  if (!getTenetPlusFeedState().complete) return new Set();
-  const cached = dealerCache.get(TENET_PLUS_DEALER);
+export function getCmBusinessPublicIdSet(dealer: string): Set<string> {
+  if (!isCmBusinessDealer(dealer) || !getCmBusinessFeedState(dealer).complete) return new Set();
+  const canonicalDealer = dealer.trim().toLowerCase() === JELAND_DEALER.toLowerCase()
+    ? JELAND_DEALER : TENET_PLUS_DEALER;
+  const cached = dealerCache.get(canonicalDealer);
   return new Set(cached?.data.filter(isPublicNewCarEligible).map(car => car.id) ?? []);
+}
+
+export function getTenetPlusPublicIdSet(): Set<string> {
+  return getCmBusinessPublicIdSet(TENET_PLUS_DEALER);
 }
 
 function getField(xml: string, field: string): string {
@@ -197,11 +226,11 @@ async function refreshDealer(feed: { url: string; dealer: string }): Promise<voi
   mergedCache = null;
 }
 
-async function refreshTenetPlus(): Promise<void> {
-  const { cars, fetchedAt, pagesFetched, rowsScanned } = await fetchTenetPlusStock();
+async function refreshCmBusinessDealer(dealer: typeof CM_BUSINESS_DEALERS[number]): Promise<void> {
+  const { cars, fetchedAt, pagesFetched, rowsScanned } = await fetchCmBusinessStock(dealer);
   const parsed: NewCarRecord[] = cars.map(c => ({
     id: c.id,
-    mark: TENET_PLUS_DEALER,
+    mark: dealer,
     model: c.model,
     modification: c.modification,
     complectation: c.complectation,
@@ -212,7 +241,7 @@ async function refreshTenetPlus(): Promise<void> {
     availability: "В наличии",
     url: "",
     images: c.images,
-    dealer: TENET_PLUS_DEALER,
+    dealer,
     maxDiscount: 0,
     creditDiscount: 0,
     tradeinDiscount: 0,
@@ -233,16 +262,18 @@ async function refreshTenetPlus(): Promise<void> {
     stockState: "in",
     sourceUpdatedAt: fetchedAt,
   }));
-  dealerCache.set(TENET_PLUS_DEALER, { data: parsed, ts: Date.now(), stale: false });
-  tenetPlusFailureAt = 0;
+  dealerCache.set(dealer, { data: parsed, ts: Date.now(), sourceTs: Date.parse(fetchedAt), stale: false });
+  if (dealer === TENET_PLUS_DEALER) tenetPlusFailureAt = 0;
   mergedCache = null;
-  logger.info({ dealer: TENET_PLUS_DEALER, count: parsed.length, pagesFetched, rowsScanned }, "new-cars: CM Business stock fetched");
+  logger.info({ dealer, count: parsed.length, pagesFetched, rowsScanned }, "new-cars: CM Business stock fetched");
 }
 
 function refreshSource(source: { dealer: string; url?: string }): Promise<void> {
   const existing = refreshInFlight.get(source.dealer);
   if (existing) return existing;
-  const work = (source.url ? refreshDealer({ dealer: source.dealer, url: source.url }) : refreshTenetPlus())
+  const work = (source.url
+    ? refreshDealer({ dealer: source.dealer, url: source.url })
+    : refreshCmBusinessDealer(source.dealer as typeof CM_BUSINESS_DEALERS[number]))
     .finally(() => refreshInFlight.delete(source.dealer));
   refreshInFlight.set(source.dealer, work);
   return work;
@@ -268,7 +299,11 @@ export async function getNewCars(): Promise<NewCarRecord[]> {
             { dealer: feed.dealer, err: String(r.reason), cachedCount: prev.data.length },
             "new-cars: feed FAILED — using previous cached data as fallback"
           );
-          dealerCache.set(feed.dealer, { ...prev, ts: feed.dealer === TENET_PLUS_DEALER ? now - CACHE_TTL + CM_RETRY_MS : now, stale: true });
+          dealerCache.set(feed.dealer, {
+            ...prev,
+            ts: isCmBusinessDealer(feed.dealer) ? now - CACHE_TTL + CM_RETRY_MS : now,
+            stale: true,
+          });
         } else {
           logger.error(
             { dealer: feed.dealer, url: feed.url, err: String(r.reason) },
@@ -302,9 +337,11 @@ export function toPublicNewCar({
 
 export async function getPublicNewCars(): Promise<NewCarRecord[]> {
   const allCars = await getNewCars();
-  const tenetPublicIds = getTenetPlusPublicIdSet();
+  const publicIdsByDealer = new Map(
+    CM_BUSINESS_DEALERS.map(dealer => [dealer, getCmBusinessPublicIdSet(dealer)] as const),
+  );
   return allCars
-    .filter(car => car.dealer.trim().toLowerCase() !== TENET_PLUS_DEALER.toLowerCase() || tenetPublicIds.has(car.id))
+    .filter(car => !isCmBusinessDealer(car.dealer) || publicIdsByDealer.get(car.dealer as typeof CM_BUSINESS_DEALERS[number])?.has(car.id))
     .filter(isPublicNewCarEligible)
     .map(toPublicNewCar);
 }
