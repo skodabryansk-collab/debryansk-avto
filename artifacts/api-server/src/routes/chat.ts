@@ -97,7 +97,7 @@ async function buildContext(): Promise<string> {
     return contextCache.text;
   }
 
-  const [locations, brands, brandLocRows, settingsRows] = await Promise.all([
+  const [locations, brands, brandLocRows, settingsRows, catalogBrandRows] = await Promise.all([
     db.select().from(locationsTable).orderBy(asc(locationsTable.sortOrder)),
     db.select().from(brandsTable),
     db.execute(sql`
@@ -108,6 +108,11 @@ async function buildContext(): Promise<string> {
       ORDER BY b.name, l.sort_order
     `),
     db.execute(sql`SELECT key, value FROM site_settings WHERE key IN ('header_phone', 'promotions_text')`).catch(() => ({ rows: [] })),
+    db.execute(sql`
+      SELECT DISTINCT BTRIM(brand) AS brand
+      FROM cars
+      WHERE type = 'new' AND brand IS NOT NULL AND BTRIM(brand) <> ''
+    `),
   ]);
 
   const settingsMap: Record<string, string> = {};
@@ -121,7 +126,19 @@ async function buildContext(): Promise<string> {
     `• ${l.title}: ${l.address} | Тел: ${l.phone ?? "+7 (4832) 63-10-00"} | ${l.hours ?? "Ежедневно 9:00–21:00"}`
   ).join("\n");
 
-  const activeBrands = brands.filter(b => !b.isServiceOnly).map(b => b.name).join(", ");
+  const availableBrands = new Map<string, string>();
+  for (const brand of brands.filter(b => !b.isServiceOnly)) {
+    const name = brand.name.trim();
+    if (name) availableBrands.set(name.toLowerCase(), name);
+  }
+  for (const row of catalogBrandRows.rows as { brand: string | null }[]) {
+    const name = row.brand?.trim();
+    if (name && !availableBrands.has(name.toLowerCase())) {
+      availableBrands.set(name.toLowerCase(), name);
+    }
+  }
+  const activeBrandNames = [...availableBrands.values()].sort((a, b) => a.localeCompare(b, "ru"));
+  const activeBrands = activeBrandNames.join(", ");
   const serviceBrands = brands.filter(b => b.isServiceOnly).map(b => b.name).join(", ");
 
   const brandLocLines = (brandLocRows.rows as any[]).map(r =>
@@ -148,7 +165,7 @@ ${serviceBrands}
 ОБЩИЙ ТЕЛЕФОН ГРУППЫ: ${settingsPhone}
 
 УСЛУГИ ГРУППЫ КОМПАНИЙ:
-- Продажа новых автомобилей (9 брендов)
+- Продажа новых автомобилей (${activeBrandNames.length} брендов)
 - Автомобили с пробегом (проверенные, с историей)
 - Трейд-ин (зачёт вашего автомобиля в счёт нового)
 - Срочный выкуп автомобилей
@@ -170,6 +187,12 @@ ${serviceBrands}
 
 export async function warmContext(): Promise<void> {
   await buildContext().catch(() => {});
+}
+
+export function invalidateNavigatorCatalogCache(): void {
+  contextCache = null;
+  dbRowsCache = null;
+  catalogTextCache = null;
 }
 
 /* ─── Smart pre-filter by brand / price keywords ─────────── */
@@ -230,6 +253,9 @@ const BRAND_KEYWORDS: Record<string, string[]> = {
   омоду:         ["omoda"],   // accusative
   омоды:         ["omoda"],   // genitive
   оможа:         ["omoda"],   // phonetic typo
+  // ── Soueast ────────────────────────────────────────────────
+  soueast:       ["soueast"],
+  соуист:        ["soueast"],
   // ── Tenet ──────────────────────────────────────────────────
   tenet:         ["tenet"],
   тенет:         ["tenet"],
@@ -504,7 +530,7 @@ function normalizeCyrToLat(str: string): string {
 
 /* ─── Parse filter params from user message ────────────────── */
 
-function parseMessageFilters(message: string): FilterParams {
+export function parseMessageFilters(message: string): FilterParams {
   const msg = normalizeCyrToLat(
     " " + message.toLowerCase().replace(/ё/g, "е").replace(/[ьъ]/g, "") + " "
   );
