@@ -1,8 +1,10 @@
 import { Router, type IRouter } from "express";
-import type { NewCarRecord } from "./new-cars";
+import { getPublicNewCars, type NewCarRecord } from "./new-cars";
 
 const router: IRouter = Router();
 
+// Keep the existing featured-card mapping for the six XML dealers unchanged.
+// Only Tenet Plus is supplied by the shared CM Business catalog.
 const FEEDS = [
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/2c3eb21beb9caa23118a56e042a13187.xml", dealer: "Jaecoo" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/9a822bd39911d610b99ad1b477ec9356.xml", dealer: "Omoda" },
@@ -10,7 +12,6 @@ const FEEDS = [
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/f8056db2c70dba547744e2e4aaa20556.xml", dealer: "Haval Pro" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/53fe918374eb87e8f6536b8c3bb21937.xml", dealer: "Haval City" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/913211584f8ad577ee76a703f2f13186.xml", dealer: "Jetour" },
-  { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/3be8e5ea72deb63eec3e56b8d9d28263.xml", dealer: "Tenet Plus" },
 ];
 
 let cache: { data: NewCarRecord[]; ts: number } | null = null;
@@ -29,8 +30,7 @@ function parseFeed(text: string, dealer: string): NewCarRecord[] {
   const cars: NewCarRecord[] = [];
   const blocks = text.match(/<car>[\s\S]*?<\/car>/g) ?? [];
   for (const block of blocks) {
-    const action = getField(block, "action");
-    if (action !== "show") continue;
+    if (getField(block, "action") !== "show") continue;
     cars.push({
       id: `${dealer}-${getField(block, "unique_id")}`,
       mark: getField(block, "mark_id"),
@@ -64,7 +64,7 @@ function parseFeed(text: string, dealer: string): NewCarRecord[] {
   return cars;
 }
 
-async function getAllCars(): Promise<NewCarRecord[]> {
+async function getXmlFeaturedCars(): Promise<NewCarRecord[]> {
   if (cache && Date.now() - cache.ts < CACHE_TTL) return cache.data;
   const results = await Promise.allSettled(
     FEEDS.map((f) => fetch(f.url).then((r) => r.text()).then((t) => parseFeed(t, f.dealer)))
@@ -74,13 +74,35 @@ async function getAllCars(): Promise<NewCarRecord[]> {
   return data;
 }
 
+const FEATURED_DEALERS = new Set([
+  "jaecoo",
+  "omoda",
+  "tenet",
+  "haval pro",
+  "haval city",
+  "jetour",
+  "tenet plus",
+]);
+
 router.get("/cars/featured", async (_req, res) => {
   try {
-    const all = await getAllCars();
+    const [xmlCars, tenetPlusCars] = await Promise.all([
+      getXmlFeaturedCars(),
+      getPublicNewCars().then(cars => cars.filter(c => c.dealer.trim().toLowerCase() === "tenet plus")).catch(() => [] as NewCarRecord[]),
+    ]);
+    const all = [...xmlCars, ...tenetPlusCars].filter(c => FEATURED_DEALERS.has(c.dealer.trim().toLowerCase()));
     const inStock = all.filter((c) => c.availability === "В наличии" && c.images.length > 0);
     const withDiscount = inStock.filter((c) => c.maxDiscount > 0);
     const sorted = [...withDiscount].sort((a, b) => b.maxDiscount - a.maxDiscount);
     let featured = sorted.slice(0, 6);
+    // Business API does not provide a Tenet Plus discount. Keep one available
+    // Tenet Plus card visible without inventing a discount or changing XML sorting.
+    const tenetPlusFeatured = inStock.find(c => c.dealer.trim().toLowerCase() === "tenet plus");
+    if (tenetPlusFeatured && !featured.some(c => c.id === tenetPlusFeatured.id)) {
+      featured = featured.length === 6
+        ? [...featured.slice(0, 5), tenetPlusFeatured]
+        : [...featured, tenetPlusFeatured];
+    }
     if (featured.length < 6) {
       const rest = inStock.filter((c) => !featured.find((f) => f.id === c.id));
       const need = 6 - featured.length;
