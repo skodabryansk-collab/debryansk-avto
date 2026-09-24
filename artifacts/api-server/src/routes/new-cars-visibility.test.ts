@@ -7,6 +7,7 @@ import {
   getTenetPlusPublicIdSet,
   isCmBusinessDealer,
   isPublicNewCarEligible,
+  resolveCmCatalogBrand,
   toPublicNewCar,
   type NewCarRecord,
 } from "./new-cars";
@@ -37,6 +38,16 @@ test("other new-car dealers retain their existing public eligibility", () => {
     dealer: "Tenet", stockState: null, model: "", modification: "",
     complectation: "", images: [],
   }), true);
+});
+
+test("dealer 9355 splits Tenet and Chery using the CM brand field", () => {
+  assert.equal(resolveCmCatalogBrand("9355", "Tenet", "Tenet"), "Tenet");
+  assert.equal(resolveCmCatalogBrand("9355", "Tenet", "CHERY"), "Chery");
+  assert.throws(() => resolveCmCatalogBrand("9355", "Tenet", ""), /supported Tenet\/Chery brand/);
+  assert.equal(resolveCmCatalogBrand("13186", "Jetour", "Chery"), "Jetour");
+  assert.equal(resolveCmCatalogBrand("9356", "OMODA", "OMODA"), "Omoda");
+  assert.equal(resolveCmCatalogBrand("13187", "JAECOO", "JAECOO"), "Jaecoo");
+  assert.equal(resolveCmCatalogBrand("27564", "Soueast", "Soueast"), "Soueast");
 });
 
 test("Jeland CM Business public stock requires in-stock, HTTPS photo, model and trim or modification", () => {
