@@ -263,11 +263,87 @@ export async function runMigration() {
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS cm_stock_id text`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS cm_stock_state text`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS source_updated_at timestamptz`);
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS cm_verified_extras text`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS engine_volume real`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS engine_power integer`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS engine_source text`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS engine_enriched_at timestamptz`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS cars_engine_enrichment_idx ON cars (engine_enriched_at)`);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cm_stock_integrations (
+        dealer_id TEXT PRIMARY KEY,
+        dealer_name TEXT NOT NULL UNIQUE,
+        mode TEXT NOT NULL DEFAULT 'options_only' CHECK (mode IN ('catalog', 'options_only')),
+        enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        last_status TEXT NOT NULL DEFAULT 'never' CHECK (last_status IN ('never', 'running', 'success', 'error')),
+        last_started_at TIMESTAMPTZ,
+        last_completed_at TIMESTAMPTZ,
+        last_success_at TIMESTAMPTZ,
+        last_error TEXT,
+        stock_count INTEGER NOT NULL DEFAULT 0,
+        matched_count INTEGER NOT NULL DEFAULT 0,
+        cars_with_options INTEGER NOT NULL DEFAULT 0,
+        options_count INTEGER NOT NULL DEFAULT 0,
+        pages_fetched INTEGER NOT NULL DEFAULT 0,
+        rows_scanned INTEGER NOT NULL DEFAULT 0,
+        duration_ms INTEGER NOT NULL DEFAULT 0,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cm_stock_sync_runs (
+        id SERIAL PRIMARY KEY,
+        trigger TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('running', 'success', 'error', 'partial')),
+        started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        completed_at TIMESTAMPTZ,
+        duration_ms INTEGER NOT NULL DEFAULT 0,
+        pages_fetched INTEGER NOT NULL DEFAULT 0,
+        rows_scanned INTEGER NOT NULL DEFAULT 0,
+        error TEXT
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cm_stock_sync_run_dealers (
+        id SERIAL PRIMARY KEY,
+        run_id INTEGER NOT NULL REFERENCES cm_stock_sync_runs(id) ON DELETE CASCADE,
+        dealer_id TEXT NOT NULL,
+        dealer_name TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('success', 'error', 'disabled')),
+        stock_count INTEGER NOT NULL DEFAULT 0,
+        matched_count INTEGER NOT NULL DEFAULT 0,
+        cars_with_options INTEGER NOT NULL DEFAULT 0,
+        options_count INTEGER NOT NULL DEFAULT 0,
+        error TEXT
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cm_stock_sync_settings (
+        id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+        interval_minutes INTEGER NOT NULL DEFAULT 30 CHECK (interval_minutes IN (30, 60, 120)),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      INSERT INTO cm_stock_integrations (dealer_id, dealer_name, mode, enabled) VALUES
+        ('28263', 'Tenet Plus', 'catalog', TRUE),
+        ('27398', 'Jeland', 'catalog', TRUE),
+        ('20556', 'Haval Pro', 'catalog', TRUE),
+        ('21937', 'Haval City', 'catalog', TRUE)
+      ON CONFLICT (dealer_id) DO NOTHING
+    `);
+    await db.execute(sql`
+      UPDATE cm_stock_integrations
+      SET mode = 'catalog', updated_at = NOW()
+      WHERE (dealer_id, dealer_name) IN (('20556', 'Haval Pro'), ('21937', 'Haval City'))
+        AND mode = 'options_only' AND last_status = 'never'
+    `);
+    await db.execute(sql`
+      INSERT INTO cm_stock_sync_settings (id, interval_minutes)
+      VALUES (1, 30)
+      ON CONFLICT (id) DO NOTHING
+    `);
 
     logger.info("Navigator schema ready (conversations, messages, cars — idempotent)");
 
