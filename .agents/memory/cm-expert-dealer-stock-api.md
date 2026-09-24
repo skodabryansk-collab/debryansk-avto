@@ -25,6 +25,12 @@ In the observed Tenet Plus stock snapshot, all 26 in-stock rows lacked affirmati
 
 **How to apply:** Keep Tenet Plus options empty with a manager warning until CM provides vehicle-specific feature fields or another verified per-VIN source is available. Do not populate from `equipmentName`, a generic description, or a guessed trim catalog.
 
+The user chose to wait for per-car Tenet Plus equipment to appear in CM rather than source it elsewhere for now.
+
+**Why:** No verified per-VIN alternative is available, and inferred equipment would be misleading.
+
+**How to apply:** Keep the empty-list warning until CM starts supplying confirmed per-car values; if the new data uses different fields, verify and map them before publication rather than assuming the existing field mapping covers them.
+
 **Why:** A dealer-specific test required scanning the global feed; filters were ignored, the scoped route was denied, and larger requested pages still returned at most 50 rows. The response includes fields that must not be exposed publicly.
 
 **Why:** The CM UI route was not documented by the public Swagger page; the user verified a generated Tenet Plus card link. The number in the link must be sourced from the CM stock identifier, not guessed.
