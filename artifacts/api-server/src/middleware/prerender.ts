@@ -2,7 +2,12 @@ import type { Request, Response, NextFunction } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
-import { getTenetPlusFeedState, getTenetPlusPublicIdSet } from "../routes/new-cars";
+import {
+  getCmBusinessFeedState,
+  getCmBusinessPublicIdSet,
+  getTenetPlusFeedState,
+  getTenetPlusPublicIdSet,
+} from "../routes/new-cars";
 
 const SITE = "https://debryansk-auto.ru";
 
@@ -70,6 +75,13 @@ const cache: PrerenderCacheState = {
 
 const TENET_PLUS_BRAND_ROUTE = "/brands/tenetplus";
 let tenetPlusBrandCacheTrusted = false;
+const JELAND_BRAND_ROUTE = "/brands/jeland";
+let jelandBrandCacheSnapshot: string | null = null;
+
+function cmBusinessSnapshotSignature(dealer: string): string {
+  const state = getCmBusinessFeedState(dealer);
+  return state.complete ? `complete:${[...getCmBusinessPublicIdSet(dealer)].sort().join("\u0000")}` : "";
+}
 
 const brandSlugCache = new Map<string, { exists: boolean; checkedAt: number }>();
 const BRAND_SLUG_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -105,7 +117,7 @@ type CachedNewCarVisibility = "public" | "missing" | "ineligible" | "unavailable
 async function cachedNewCarVisibility(externalId: string): Promise<CachedNewCarVisibility> {
   try {
     const result = await db.execute(
-      sql`SELECT dealer, model, modification, complectation, image_url, cm_stock_state
+      sql`SELECT dealer, model, modification, complectation, image_url, cm_stock_state, catalog_source
           FROM cars WHERE external_id = ${externalId} AND type = 'new' LIMIT 1`,
     );
     const row = result.rows[0] as {
@@ -115,16 +127,25 @@ async function cachedNewCarVisibility(externalId: string): Promise<CachedNewCarV
       complectation: string | null;
       image_url: string | null;
       cm_stock_state: string | null;
+      catalog_source: string | null;
     } | undefined;
 
     if (!row) return "missing";
-    if (row.dealer?.trim().toLowerCase() !== "tenet plus") return "public";
-
-    const tenetPlusPublicIds = getTenetPlusPublicIdSet();
     const usableImage = typeof row.image_url === "string"
       && /^https?:\/\/[^/\s]+/i.test(row.image_url.trim());
-    const isPublic = getTenetPlusFeedState().complete
-      && tenetPlusPublicIds.has(externalId)
+    const dealer = row.dealer?.trim().toLowerCase();
+    if (dealer !== "tenet plus" && dealer !== "jeland") return "public";
+
+    const isJeland = dealer === "jeland";
+    const complete = isJeland
+      ? getCmBusinessFeedState("Jeland").complete
+      : getTenetPlusFeedState().complete;
+    const publicIds = isJeland
+      ? getCmBusinessPublicIdSet("Jeland")
+      : getTenetPlusPublicIdSet();
+    const isPublic = complete
+      && publicIds.has(externalId)
+      && (!isJeland || row.catalog_source === "cm_business")
       && row.cm_stock_state === "in"
       && Boolean(row.model?.trim())
       && usableImage
@@ -236,6 +257,16 @@ export function updatePrerenderCache(route: string, html: string): void {
     }
     tenetPlusBrandCacheTrusted = true;
   }
+  if (route === JELAND_BRAND_ROUTE) {
+    const signature = cmBusinessSnapshotSignature("Jeland");
+    if (!signature) {
+      cache.pages.delete(route);
+      cache.gone.delete(route);
+      jelandBrandCacheSnapshot = null;
+      return;
+    }
+    jelandBrandCacheSnapshot = signature;
+  }
   cache.pages.set(route, html);
   cache.gone.delete(route);
 }
@@ -248,6 +279,7 @@ export function deletePrerenderCache(route: string): void {
 export function invalidatePrerenderCache(route: string): void {
   cache.pages.delete(route);
   if (route === TENET_PLUS_BRAND_ROUTE) tenetPlusBrandCacheTrusted = false;
+  if (route === JELAND_BRAND_ROUTE) jelandBrandCacheSnapshot = null;
   // Do NOT add to cache.gone — we want the next bot request to fall through
   // to seoMeta middleware and get fresh meta tags from the DB.
 }
@@ -286,6 +318,17 @@ export async function prerenderMiddleware(
   );
 
   const brandMatch = route.match(/^\/brands\/([^/]+)$/);
+  if (isBot && route === JELAND_BRAND_ROUTE && cache.pages.has(route)) {
+    const currentSnapshot = cmBusinessSnapshotSignature("Jeland");
+    if (!currentSnapshot || currentSnapshot !== jelandBrandCacheSnapshot) {
+      cache.pages.delete(route);
+      cache.gone.delete(route);
+      jelandBrandCacheSnapshot = null;
+      res.setHeader("Cache-Control", "no-store");
+      next();
+      return;
+    }
+  }
   if (isBot && route === TENET_PLUS_BRAND_ROUTE && cache.pages.has(route)) {
     if (!getTenetPlusFeedState().complete || !tenetPlusBrandCacheTrusted) {
       cache.pages.delete(route);
@@ -332,7 +375,7 @@ export async function prerenderMiddleware(
       // A deleted or DB-ineligible row must not leave an old Puppeteer snapshot
       // available to future crawlers. Source-incomplete records are checked
       // again once the feed reports a complete snapshot.
-      if (visibility === "missing" || (visibility === "ineligible" && getTenetPlusFeedState().complete)) {
+      if (visibility === "missing" || visibility === "ineligible") {
         cache.pages.delete(route);
         cache.gone.delete(route);
       }
