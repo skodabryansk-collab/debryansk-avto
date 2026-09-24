@@ -17,6 +17,7 @@ import path from "path";
 import { acquireChrome, isPrerendererRunning } from "../lib/chrome-semaphore";
 import { normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
 import { getTenetPlusOptions } from "../lib/tenet-plus-equipment";
+import { verifiedQuoteExtras } from "../lib/quote-car-extras";
 import {
   getNewCars, getPublicNewCars,
   getCmBusinessFeedState, getCmBusinessPublicIdSet, isCmBusinessDealer, isPublicNewCarEligible,
@@ -163,7 +164,8 @@ type QuoteCar = typeof carsTable.$inferSelect;
 async function getQuoteCarUrl(car: QuoteCar | null, snapshot: Record<string, unknown>, carType: string, carSlug: string): Promise<string> {
   const dealer = String(car?.dealer ?? snapshot["dealer"] ?? "").trim().toLowerCase();
   if (carType === "new" && isCmBusinessDealer(dealer)) {
-    const publicCars = await getPublicNewCars().catch(() => []);
+    const publicCars: Awaited<ReturnType<typeof getPublicNewCars>> =
+      await getPublicNewCars().catch(() => []);
     if (!publicCars.some(publicCar => publicCar.id === carSlug)) {
       // Manager-only, stale, or XML-only CM-business dealer cards have no public detail page.
       return "https://debryansk-auto.ru/new-cars";
@@ -183,7 +185,11 @@ async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
 
   try {
     const feedCar = (await getNewCars()).find((candidate) => candidate.id === car.externalId);
-    if (!feedCar) return car;
+    if (!feedCar) {
+      // A legacy Jeland XML row may remain while the CM scan is incomplete.
+      // Do not reuse its old XML options as verified per-car CM equipment.
+      return car.dealer?.trim().toLowerCase() === "jeland" ? { ...car, extras: "" } : car;
+    }
 
     if (isCmBusinessDealer(car.dealer) && feedCar.catalogSource === "cm_business") {
       return {
@@ -200,6 +206,7 @@ async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
         catalogSource: "cm_business",
         cmStockId: feedCar.cmStockId ?? null,
         cmStockState: feedCar.stockState ?? null,
+        extras: car.dealer?.trim().toLowerCase() === "jeland" ? feedCar.extras : car.extras,
       };
     }
 
@@ -231,7 +238,7 @@ function buildQuoteCarSnapshot(
     price: car?.price ?? fallback["price"] ?? null,
     modification: car?.modification ?? fallback["modification"] ?? "",
     complectation: car?.complectation ?? fallback["complectation"] ?? "",
-    extras: car?.extras ?? fallback["extras"] ?? "",
+    extras: verifiedQuoteExtras(car, fallback),
     bodyType: car?.bodyType ?? fallback["bodyType"] ?? "",
     vin: car?.vin ?? fallback["vin"] ?? "",
     dealer: car?.dealer ?? fallback["dealer"] ?? "",
@@ -553,6 +560,10 @@ router.get("/cars/search", async (req, res) => {
       }
       if (!car.price || car.price <= 0) inventoryWarnings.push("Нет цены");
       if (!cmStockId || !/^\d+$/.test(cmStockId)) inventoryWarnings.push("Нет ссылки на карточку CM");
+      if (dealer.trim().toLowerCase() === "jeland" &&
+          (catalogSource !== "cm_business" || !car.extras?.trim())) {
+        inventoryWarnings.push("Нет данных об опциях в CM");
+      }
 
       const lastSourceUpdate = sourceUpdatedAt?.getTime() ?? 0;
       const sourceStale = !feedState.complete || !lastSourceUpdate
@@ -672,7 +683,7 @@ async function regenerateStoredQuotePdf(quote: typeof quotesTable.$inferSelect):
      specs: buildSpecsFromCar(currentSnapshot),
     priceBase: quote.priceOriginal,
     discounts: (quote.discounts as Array<{ label: string; value: number }>) ?? [],
-    options: parseExtrasToOptions(car?.extras ?? null),
+     options: parseExtrasToOptions(String(currentSnapshot["extras"] ?? "")),
     extraEquipment: (quote.extraEquipment as { text: string; price?: number } | null) ?? undefined,
     creditOffer: storedCreditOffer
       ? {
@@ -965,7 +976,7 @@ router.post("/quotes", async (req, res) => {
       specs: buildSpecsFromCar(carSnapshot as Record<string, unknown>),
       priceBase,
       discounts: discounts ?? [],
-      options: parseExtrasToOptions(car.extras),
+       options: parseExtrasToOptions(String(carSnapshot["extras"] ?? "")),
       extraEquipment: extraEquipment?.text?.trim() ? extraEquipment : undefined,
       creditOffer: normalizedCreditOffer
         ? {
@@ -1161,7 +1172,7 @@ router.put("/quotes/:id", async (req, res) => {
       specs: buildSpecsFromCar(currentSnapshot),
       priceBase,
       discounts: discounts ?? [],
-      options: parseExtrasToOptions(car?.extras ?? null),
+       options: parseExtrasToOptions(String(currentSnapshot["extras"] ?? "")),
       extraEquipment: extraEquipment?.text?.trim() ? extraEquipment : undefined,
       creditOffer: normalizedCreditOffer
         ? {
