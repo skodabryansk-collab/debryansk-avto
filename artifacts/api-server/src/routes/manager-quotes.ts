@@ -17,6 +17,7 @@ import path from "path";
 import { acquireChrome, isPrerendererRunning } from "../lib/chrome-semaphore";
 import { normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
 import { verifiedQuoteExtras } from "../lib/quote-car-extras";
+import { getCmOptionsOnlyDealerNames, isCmOptionsOnlyDealer } from "../services/cm-stock-integrations";
 import {
   getNewCars, getPublicNewCars,
   getCmBusinessFeedState, getCmBusinessPublicIdSet, isCmBusinessDealer, isPublicNewCarEligible,
@@ -162,7 +163,10 @@ type QuoteCar = typeof carsTable.$inferSelect;
 
 async function getQuoteCarUrl(car: QuoteCar | null, snapshot: Record<string, unknown>, carType: string, carSlug: string): Promise<string> {
   const dealer = String(car?.dealer ?? snapshot["dealer"] ?? "").trim().toLowerCase();
-  if (carType === "new" && isCmBusinessDealer(dealer)) {
+  const sourcedFromCm = car?.catalogSource === "cm_business"
+    || snapshot["catalogSource"] === "cm_business"
+    || isCmBusinessDealer(dealer);
+  if (carType === "new" && sourcedFromCm) {
     const publicCars: Awaited<ReturnType<typeof getPublicNewCars>> =
       await getPublicNewCars().catch(() => []);
     if (!publicCars.some(publicCar => publicCar.id === carSlug)) {
@@ -181,15 +185,16 @@ async function getQuoteCarUrl(car: QuoteCar | null, snapshot: Record<string, unk
  */
 async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
   if (!car || car.type !== "new") return car;
+  const sourcedFromCm = car.catalogSource === "cm_business" || isCmBusinessDealer(car.dealer);
 
   try {
     const feedCar = (await getNewCars()).find((candidate) => candidate.id === car.externalId);
     if (!feedCar) {
       // CM dealer rows missing from the live feed cannot prove their equipment is current.
-      return isCmBusinessDealer(car.dealer) ? { ...car, extras: "" } : car;
+      return sourcedFromCm ? { ...car, extras: "" } : car;
     }
 
-    if (isCmBusinessDealer(car.dealer) && feedCar.catalogSource === "cm_business") {
+    if (sourcedFromCm && feedCar.catalogSource === "cm_business") {
       return {
         ...car,
         model: feedCar.model,
@@ -205,6 +210,7 @@ async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
         cmStockId: feedCar.cmStockId ?? null,
         cmStockState: feedCar.stockState ?? null,
         extras: feedCar.extras,
+        cmVerifiedExtras: feedCar.extras || null,
       };
     }
 
@@ -213,7 +219,7 @@ async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
       color: feedCar.color || car.color,
       imageUrl: feedCar.images[0] || car.imageUrl,
       complectation: feedCar.complectation || car.complectation,
-      extras: isCmBusinessDealer(car.dealer) ? "" : feedCar.extras || car.extras,
+      extras: sourcedFromCm ? "" : feedCar.extras || car.extras,
     };
   } catch (err) {
     logger.warn({ err, externalId: car.externalId }, "[quotes] live catalog enrichment failed; using cars row");
@@ -225,7 +231,9 @@ function buildQuoteCarSnapshot(
   car: QuoteCar | null,
   fallback: Record<string, unknown> = {},
 ): Record<string, unknown> {
-  const isCmBusiness = isCmBusinessDealer(String(car?.dealer ?? fallback["dealer"] ?? ""));
+  const dealer = String(car?.dealer ?? fallback["dealer"] ?? "");
+  const isCmBusiness = car?.catalogSource === "cm_business" || isCmBusinessDealer(dealer);
+  const cmOptionsOnly = isCmOptionsOnlyDealer(dealer) || fallback["cmOptionsOnly"] === true;
   return {
     id: car?.id ?? fallback["id"] ?? null,
     externalId: car?.externalId ?? fallback["externalId"] ?? "",
@@ -236,7 +244,7 @@ function buildQuoteCarSnapshot(
     price: car?.price ?? fallback["price"] ?? null,
     modification: car?.modification ?? fallback["modification"] ?? "",
     complectation: car?.complectation ?? fallback["complectation"] ?? "",
-    extras: verifiedQuoteExtras(car, fallback),
+    extras: verifiedQuoteExtras(car, { ...fallback, cmOptionsOnly }),
     bodyType: car?.bodyType ?? fallback["bodyType"] ?? "",
     vin: car?.vin ?? fallback["vin"] ?? "",
     dealer: car?.dealer ?? fallback["dealer"] ?? "",
@@ -244,6 +252,8 @@ function buildQuoteCarSnapshot(
     catalogSource: car?.catalogSource ?? fallback["catalogSource"] ?? null,
     cmStockId: car?.cmStockId ?? fallback["cmStockId"] ?? null,
     cmStockState: car?.cmStockState ?? fallback["cmStockState"] ?? null,
+    cmVerifiedExtras: car?.cmVerifiedExtras ?? fallback["cmVerifiedExtras"] ?? null,
+    cmOptionsOnly,
   };
 }
 
@@ -482,6 +492,7 @@ router.get("/cars/search", async (req, res) => {
       bodyType: carsTable.bodyType,
       driveType: carsTable.driveType,
       extras: carsTable.extras,
+      cmVerifiedExtras: carsTable.cmVerifiedExtras,
       catalogSource: carsTable.catalogSource,
       cmStockId: carsTable.cmStockId,
       cmStockState: carsTable.cmStockState,
@@ -516,8 +527,25 @@ router.get("/cars/search", async (req, res) => {
       ? carSelect.where(and(...conditions)).orderBy(carsTable.price).limit(searchLimit)
       : carSelect.orderBy(carsTable.price).limit(searchLimit));
 
-    const data = rows.map(({ catalogSource, cmStockId, cmStockState, sourceUpdatedAt, ...car }) => {
-      if (car.type !== "new" || !isCmBusinessDealer(car.dealer)) return car;
+    const optionsOnlyDealers = new Set(
+      (await getCmOptionsOnlyDealerNames()).map(name => name.trim().toLowerCase()),
+    );
+    const data = rows.map(({ catalogSource, cmStockId, cmStockState, sourceUpdatedAt, cmVerifiedExtras, ...car }) => {
+      if (car.type === "new" && optionsOnlyDealers.has(String(car.dealer ?? "").trim().toLowerCase())) {
+        const inventoryWarnings: string[] = [];
+        if (!cmVerifiedExtras?.trim()) inventoryWarnings.push("Нет данных об опциях в CM");
+        if (!cmStockId) inventoryWarnings.push("Авто не сопоставлено с карточкой склада CM по VIN");
+        return {
+          ...car,
+          cmVerifiedExtras,
+          cmOptionsOnly: true,
+          inventoryWarnings,
+          cmCardUrl: cmStockId && /^\d+$/.test(cmStockId)
+            ? `https://lk.cm.expert/stock/${cmStockId}/stock`
+            : null,
+        };
+      }
+      if (car.type !== "new" || (catalogSource !== "cm_business" && !isCmBusinessDealer(car.dealer))) return car;
 
       const dealer = car.dealer!;
       const feedState = getCmBusinessFeedState(dealer);
@@ -554,6 +582,7 @@ router.get("/cars/search", async (req, res) => {
           modification: car.modification,
           complectation: car.complectation,
           stockState: cmStockState,
+          catalogSource,
           imageUrl: car.imageUrl,
         }),
         sourceStale,
