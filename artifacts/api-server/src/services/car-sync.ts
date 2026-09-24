@@ -2,7 +2,13 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { getUsedCars, getAvitoMeta } from "../routes/cars";
-import { getNewCars, getCmBusinessFeedState, isCmBusinessDealer } from "../routes/new-cars";
+import {
+  getNewCars,
+  getCmBusinessCatalogDealerNames,
+  getCmBusinessFeedState,
+  isCmBusinessDealer,
+  type NewCarRecord,
+} from "../routes/new-cars";
 import {
   enrichCars,
   parseXmlEngineData,
@@ -58,7 +64,7 @@ export async function syncCars(): Promise<SyncStats> {
 
   const [usedCars, newCars, avitoMap] = await Promise.all([
     getUsedCars().catch(err => { logger.warn({ err }, "car-sync: used cars fetch failed"); return []; }),
-    getNewCars().catch(err => { logger.warn({ err }, "car-sync: new cars fetch failed"); return []; }),
+    getNewCars().catch((err): NewCarRecord[] => { logger.warn({ err }, "car-sync: new cars fetch failed"); return []; }),
     getAvitoMeta().catch(err => { logger.warn({ err }, "car-sync: avito fetch failed"); return new Map(); }),
   ]);
 
@@ -214,7 +220,7 @@ export async function syncCars(): Promise<SyncStats> {
     await db.execute(sql`
       INSERT INTO cars (external_id, type, brand, model, year, color, price, mileage,
                         body_type, modification, complectation, extras, description,
-                        image_url, vin, dealer, drive_type,
+                        image_url, cm_verified_extras, vin, dealer, drive_type,
                         catalog_source, cm_stock_id, cm_dms_car_id, cm_stock_state, source_updated_at,
                         fuel_type, engine_volume, engine_power, engine_source, engine_enriched_at,
                         max_discount, credit_discount, tradein_discount, synced_at)
@@ -222,6 +228,7 @@ export async function syncCars(): Promise<SyncStats> {
         ${c.id}, 'new', ${effectiveBrand}, ${c.model}, ${c.year}, ${c.color}, ${c.price},
         0, ${c.bodyType}, ${c.modification}, ${c.complectation},
         ${c.extras || null}, ${c.description || null}, ${imageUrl},
+        ${c.catalogSource === "cm_business" ? (c.extras || null) : null},
         ${c.vin || null}, ${c.dealer}, ${driveType},
         ${c.catalogSource ?? null}, ${c.cmStockId ?? null}, ${c.cmDmsCarId ?? null},
         ${c.stockState ?? null}, ${c.sourceUpdatedAt ?? null}::timestamptz,
@@ -240,6 +247,10 @@ export async function syncCars(): Promise<SyncStats> {
         body_type = CASE WHEN EXCLUDED.catalog_source = 'cm_business'
           THEN EXCLUDED.body_type ELSE cars.body_type END,
         extras = EXCLUDED.extras,
+        cm_verified_extras = CASE
+          WHEN EXCLUDED.catalog_source = 'cm_business' THEN EXCLUDED.extras
+          ELSE cars.cm_verified_extras
+        END,
         description = EXCLUDED.description,
         image_url = CASE WHEN EXCLUDED.catalog_source = 'cm_business'
           THEN EXCLUDED.image_url ELSE COALESCE(EXCLUDED.image_url, cars.image_url) END,
@@ -296,6 +307,11 @@ export async function syncCars(): Promise<SyncStats> {
   /* Delete stale cars PER TYPE so that a feed outage (0 cars returned) for one
      type never wipes out cars of that type from the database.
      Only delete within a type when we actually received at least 1 car from that feed. */
+  const catalogDealerNames = getCmBusinessCatalogDealerNames().map(name => name.trim().toLowerCase());
+  const protectCatalogDealers = catalogDealerNames.length
+    ? sql`(${sql.join(catalogDealerNames.map(name => sql`LOWER(BTRIM(dealer)) IS DISTINCT FROM ${name}`), sql` AND `)})`
+    : sql`TRUE`;
+
   const deleteByType = async (type: "new" | "used", ids: string[]) => {
     if (ids.length === 0) {
       logger.warn({ type }, "car-sync: skipping delete — feed returned 0 cars, likely a transient outage");
@@ -304,10 +320,7 @@ export async function syncCars(): Promise<SyncStats> {
     const result = await db.execute(sql`
       DELETE FROM cars
       WHERE type = ${type}
-        AND (${type} <> 'new' OR (
-          LOWER(BTRIM(dealer)) IS DISTINCT FROM 'tenet plus'
-          AND LOWER(BTRIM(dealer)) IS DISTINCT FROM 'jeland'
-        ))
+        AND (${type} <> 'new' OR ${protectCatalogDealers})
         AND external_id NOT IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})
       RETURNING external_id, type
     `).catch(err => {
@@ -325,10 +338,9 @@ export async function syncCars(): Promise<SyncStats> {
   await deleteByType("used", usedIds);
   await deleteByType("new",  newIds);
 
-  // CM Business is one global scan shared by both dealers. Reconcile each
-  // dealer independently: absence or invalid rows for Jeland must not block
-  // Tenet Plus, and neither dealer is deleted after a partial scan/upsert.
-  for (const dealer of ["Tenet Plus", "Jeland"] as const) {
+  // CM Business is one global scan. Reconcile each enabled catalog dealer
+  // independently only after its snapshot and all local upserts are complete.
+  for (const dealer of catalogDealerNames) {
     const state = getCmBusinessFeedState(dealer);
     const upsertFailed = cmBusinessUpsertFailed.has(dealer.toLowerCase());
     if (state.complete && !upsertFailed) {
