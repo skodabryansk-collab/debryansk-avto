@@ -17,7 +17,10 @@ import path from "path";
 import { acquireChrome, isPrerendererRunning } from "../lib/chrome-semaphore";
 import { normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
 import { getTenetPlusOptions } from "../lib/tenet-plus-equipment";
-import { getNewCars, getPublicNewCars, getTenetPlusFeedState, getTenetPlusPublicIdSet, isPublicNewCarEligible } from "./new-cars";
+import {
+  getNewCars, getPublicNewCars,
+  getCmBusinessFeedState, getCmBusinessPublicIdSet, isCmBusinessDealer, isPublicNewCarEligible,
+} from "./new-cars";
 
 const router: IRouter = Router();
 router.use(requireManager);
@@ -159,10 +162,10 @@ type QuoteCar = typeof carsTable.$inferSelect;
 
 async function getQuoteCarUrl(car: QuoteCar | null, snapshot: Record<string, unknown>, carType: string, carSlug: string): Promise<string> {
   const dealer = String(car?.dealer ?? snapshot["dealer"] ?? "").trim().toLowerCase();
-  if (carType === "new" && dealer === "tenet plus") {
+  if (carType === "new" && isCmBusinessDealer(dealer)) {
     const publicCars = await getPublicNewCars().catch(() => []);
     if (!publicCars.some(publicCar => publicCar.id === carSlug)) {
-      // Manager-only and stale cards have no public detail page.
+      // Manager-only, stale, or XML-only CM-business dealer cards have no public detail page.
       return "https://debryansk-auto.ru/new-cars";
     }
   }
@@ -182,7 +185,7 @@ async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
     const feedCar = (await getNewCars()).find((candidate) => candidate.id === car.externalId);
     if (!feedCar) return car;
 
-    if (car.dealer?.trim().toLowerCase() === "tenet plus" && feedCar.catalogSource === "cm_business") {
+    if (isCmBusinessDealer(car.dealer) && feedCar.catalogSource === "cm_business") {
       return {
         ...car,
         model: feedCar.model,
@@ -195,6 +198,7 @@ async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
         vin: feedCar.vin || null,
         bodyType: feedCar.bodyType || null,
         catalogSource: "cm_business",
+        cmStockId: feedCar.cmStockId ?? null,
         cmStockState: feedCar.stockState ?? null,
       };
     }
@@ -216,7 +220,7 @@ function buildQuoteCarSnapshot(
   car: QuoteCar | null,
   fallback: Record<string, unknown> = {},
 ): Record<string, unknown> {
-  const isTenetPlus = String(car?.dealer ?? fallback["dealer"] ?? "").trim().toLowerCase() === "tenet plus";
+  const isCmBusiness = isCmBusinessDealer(String(car?.dealer ?? fallback["dealer"] ?? ""));
   return {
     id: car?.id ?? fallback["id"] ?? null,
     externalId: car?.externalId ?? fallback["externalId"] ?? "",
@@ -231,7 +235,10 @@ function buildQuoteCarSnapshot(
     bodyType: car?.bodyType ?? fallback["bodyType"] ?? "",
     vin: car?.vin ?? fallback["vin"] ?? "",
     dealer: car?.dealer ?? fallback["dealer"] ?? "",
-    imageUrl: isTenetPlus && car ? car.imageUrl : car?.imageUrl || fallback["imageUrl"] || null,
+    imageUrl: isCmBusiness && car ? car.imageUrl : car?.imageUrl || fallback["imageUrl"] || null,
+    catalogSource: car?.catalogSource ?? fallback["catalogSource"] ?? null,
+    cmStockId: car?.cmStockId ?? fallback["cmStockId"] ?? null,
+    cmStockState: car?.cmStockState ?? fallback["cmStockState"] ?? null,
   };
 }
 
@@ -522,14 +529,17 @@ router.get("/cars/search", async (req, res) => {
       conditions.push(...accessFilter);
     }
 
+    const searchLimit = brand?.trim().toLowerCase() === "jeland" ? 500 : 50;
     const rows = await (conditions.length > 0
-      ? carSelect.where(and(...conditions)).orderBy(carsTable.price).limit(50)
-      : carSelect.orderBy(carsTable.price).limit(50));
+      ? carSelect.where(and(...conditions)).orderBy(carsTable.price).limit(searchLimit)
+      : carSelect.orderBy(carsTable.price).limit(searchLimit));
 
-    const tenetSourceComplete = getTenetPlusFeedState().complete;
-    const tenetPublicIds = getTenetPlusPublicIdSet();
     const data = rows.map(({ catalogSource, cmStockId, cmStockState, sourceUpdatedAt, ...car }) => {
-      if (car.type !== "new" || car.dealer?.trim().toLowerCase() !== "tenet plus") return car;
+      if (car.type !== "new" || !isCmBusinessDealer(car.dealer)) return car;
+
+      const dealer = car.dealer!;
+      const feedState = getCmBusinessFeedState(dealer);
+      const publicIds = getCmBusinessPublicIdSet(dealer);
 
       const inventoryWarnings: string[] = [];
       if (catalogSource !== "cm_business" || cmStockState?.toLowerCase() !== "in") {
@@ -545,7 +555,7 @@ router.get("/cars/search", async (req, res) => {
       if (!cmStockId || !/^\d+$/.test(cmStockId)) inventoryWarnings.push("Нет ссылки на карточку CM");
 
       const lastSourceUpdate = sourceUpdatedAt?.getTime() ?? 0;
-      const sourceStale = !tenetSourceComplete || !lastSourceUpdate
+      const sourceStale = !feedState.complete || !lastSourceUpdate
         || Date.now() - lastSourceUpdate > 90 * 60 * 1000;
       return {
         ...car,
@@ -553,7 +563,7 @@ router.get("/cars/search", async (req, res) => {
         cmCardUrl: catalogSource === "cm_business" && cmStockId && /^\d+$/.test(cmStockId)
           ? `https://lk.cm.expert/stock/${cmStockId}/stock`
           : null,
-        publicEligible: tenetPublicIds.has(car.externalId) && isPublicNewCarEligible({
+        publicEligible: publicIds.has(car.externalId) && isPublicNewCarEligible({
           dealer: car.dealer,
           model: car.model,
           modification: car.modification,
