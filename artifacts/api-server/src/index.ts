@@ -205,7 +205,14 @@ async function handlePrerenderAfterSync(
   if (process.env.PRERENDER_ENABLED !== "true") return;
   try {
     const { deletePrerendered } = await import("./lib/prerenderStorage");
-    const { deletePrerenderCache } = await import("./middleware/prerender");
+    const { deletePrerenderCache, invalidatePrerenderCache } = await import("./middleware/prerender");
+
+    // Brand detail snapshots contain live stock cards. The public API now
+    // filters Tenet Plus by source completeness and DB eligibility, so never
+    // keep an older rendered copy across a catalog sync.
+    const tenetPlusBrandRoute = "/brands/tenetplus";
+    await deletePrerendered(tenetPlusBrandRoute);
+    invalidatePrerenderCache(tenetPlusBrandRoute);
 
     for (const car of stats.removedCars) {
       const route =
