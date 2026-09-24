@@ -404,6 +404,13 @@ export async function syncCars(): Promise<SyncStats> {
 
   logger.info(stats, "car-sync: completed");
 
+  try {
+    const { invalidateNavigatorCatalogCache } = await import("../routes/chat");
+    invalidateNavigatorCatalogCache();
+  } catch (err) {
+    logger.warn({ err }, "car-sync: Navigator catalog cache invalidation failed (non-fatal)");
+  }
+
   // ── AI cache invalidation ─────────────────────────────────────────────
   // Compare post-sync model/price snapshot to the pre-sync snapshot.
   // Clear seo_ai_cache for any brand whose model list or minimum price changed,
