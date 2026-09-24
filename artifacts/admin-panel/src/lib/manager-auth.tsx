@@ -75,6 +75,10 @@ export interface CarSearchResult {
   vin: string | null;
   dealer: string | null;
   bodyType: string | null;
+  inventoryWarnings?: string[];
+  cmCardUrl?: string | null;
+  publicEligible?: boolean;
+  sourceStale?: boolean;
 }
 
 export interface QuoteDiscount { label: string; value: number; }
