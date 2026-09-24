@@ -1,7 +1,10 @@
 import { cmBusinessGet } from "../lib/cm-expert-client";
+import { slugifyCarId } from "../lib/slugify";
 
 const DEFAULT_TENET_PLUS_DEALER_ID = "28263";
 const DEFAULT_JELAND_DEALER_ID = "27398";
+const DEFAULT_HAVAL_PRO_DEALER_ID = "20556";
+const DEFAULT_HAVAL_CITY_DEALER_ID = "21937";
 const PAGE_SIZE = 50;
 const PAGE_CONCURRENCY = 10;
 const DEFAULT_MAX_PAGES = 700;
@@ -61,7 +64,7 @@ type BusinessGet = (path: string, params?: Record<string, string>) => Promise<un
 
 type CmBusinessSourceRow = TenetPlusSourceRow;
 
-interface CmBusinessSnapshot {
+export interface CmBusinessSnapshot {
   rows: CmBusinessSourceRow[];
   presentDealerIds: Set<string>;
   fetchedAt: string;
@@ -114,6 +117,15 @@ export function mapTenetPlusStockCar(row: unknown): TenetPlusStockCar | null {
 
 export function mapJelandStockCar(row: unknown): CmBusinessStockCar | null {
   return mapCmBusinessStockCar(row, "jeland");
+}
+
+export function mapCmBusinessDealerStockCar(
+  row: unknown,
+  dealerName: string,
+): CmBusinessStockCar | null {
+  const prefix = dealerName.trim().toLowerCase().replace(/[^a-z0-9а-яё]+/gi, "-").replace(/^-|-$/g, "");
+  if (!prefix) return null;
+  return mapCmBusinessStockCar(row, prefix);
 }
 
 const CM_BOOLEAN_OPTIONS: ReadonlyArray<readonly [string, string]> = [
@@ -212,7 +224,7 @@ function extractCmBusinessOptions(source: Record<string, unknown>): string[] {
   return [...options];
 }
 
-function mapCmBusinessStockCar(row: unknown, idPrefix: "tenet-plus" | "jeland"): CmBusinessStockCar | null {
+function mapCmBusinessStockCar(row: unknown, idPrefix: string): CmBusinessStockCar | null {
   if (!row || typeof row !== "object" || Array.isArray(row)) return null;
   const source = row as TenetPlusSourceRow;
   const stockId = numericStockId(source.id);
@@ -223,7 +235,7 @@ function mapCmBusinessStockCar(row: unknown, idPrefix: "tenet-plus" | "jeland"):
   if (!stockId && !dmsCarId) return null;
 
   const mapped: TenetPlusStockCar = {
-    id: stockId ? `${idPrefix}-cme-${stockId}` : `${idPrefix}-dms-${dmsCarId}`,
+    id: slugifyCarId(idPrefix, stockId ? `cme-${stockId}` : `dms-${dmsCarId}`),
     cmStockId: stockId,
     cmDmsCarId: dmsCarId,
     model: stringValue(source.model),
@@ -282,10 +294,8 @@ function projectSourceRow(row: Record<string, unknown>): CmBusinessSourceRow {
     updatedAt: row.updatedAt,
     sourceUpdatedAt: row.sourceUpdatedAt,
   };
-  if (configuredDealerIds().includes(String(row.dealerId ?? ""))) {
-    const options = extractCmBusinessOptions(row);
-    if (options.length > 0) projected.options = options;
-  }
+  const options = extractCmBusinessOptions(row);
+  if (options.length > 0) projected.options = options;
   return projected;
 }
 
@@ -391,7 +401,11 @@ const dealerConfigs = {
 };
 
 function configuredDealerIds(): string[] {
-  return Object.values(dealerConfigs).map(config => config.dealerId());
+  return [
+    ...Object.values(dealerConfigs).map(config => config.dealerId()),
+    process.env.CM_EXPERT_HAVAL_PRO_DEALER_ID?.trim() || DEFAULT_HAVAL_PRO_DEALER_ID,
+    process.env.CM_EXPERT_HAVAL_CITY_DEALER_ID?.trim() || DEFAULT_HAVAL_CITY_DEALER_ID,
+  ];
 }
 
 function carsForDealer(
@@ -454,19 +468,75 @@ export async function fetchCmBusinessStocksWith(
 let productionSnapshot: CmBusinessSnapshot | null = null;
 let productionSnapshotAt = 0;
 let productionSnapshotInFlight: Promise<CmBusinessSnapshot> | null = null;
+let productionSnapshotDealerIds = new Set<string>();
+let productionSnapshotInFlightDealerIds = new Set<string>();
 
-async function getProductionSnapshot(): Promise<CmBusinessSnapshot> {
-  if (productionSnapshot && Date.now() - productionSnapshotAt < SNAPSHOT_CACHE_TTL) return productionSnapshot;
-  if (productionSnapshotInFlight) return productionSnapshotInFlight;
-  const work = scanCmBusinessSnapshotWith(cmBusinessGet)
+export async function fetchCmBusinessIntegrationSnapshot(
+  dealerIds: string[],
+  options: { forceRefresh?: boolean } = {},
+): Promise<CmBusinessSnapshot> {
+  const requiredDealerIds = new Set([...configuredDealerIds(), ...dealerIds.map(id => id.trim()).filter(Boolean)]);
+  if (
+    !options.forceRefresh &&
+    productionSnapshot &&
+    Date.now() - productionSnapshotAt < SNAPSHOT_CACHE_TTL &&
+    [...requiredDealerIds].every(id => productionSnapshotDealerIds.has(id))
+  ) return productionSnapshot;
+  if (productionSnapshotInFlight) {
+    if ([...requiredDealerIds].every(id => productionSnapshotInFlightDealerIds.has(id))) {
+      return productionSnapshotInFlight;
+    }
+    await productionSnapshotInFlight.catch(() => undefined);
+    return fetchCmBusinessIntegrationSnapshot([...requiredDealerIds], options);
+  }
+  const work = scanCmBusinessSnapshotWith(cmBusinessGet, {}, requiredDealerIds)
     .then(snapshot => {
       productionSnapshot = snapshot;
       productionSnapshotAt = Date.now();
+      productionSnapshotDealerIds = requiredDealerIds;
       return snapshot;
     })
-    .finally(() => { productionSnapshotInFlight = null; });
+    .finally(() => {
+      productionSnapshotInFlight = null;
+      productionSnapshotInFlightDealerIds = new Set();
+    });
   productionSnapshotInFlight = work;
+  productionSnapshotInFlightDealerIds = requiredDealerIds;
   return work;
+}
+
+async function getProductionSnapshot(): Promise<CmBusinessSnapshot> {
+  return fetchCmBusinessIntegrationSnapshot(configuredDealerIds());
+}
+
+export async function fetchCmBusinessIntegrationDealerStock(
+  dealerId: string,
+  dealerName: string,
+  options: { forceRefresh?: boolean } = {},
+): Promise<CmBusinessStockResult> {
+  const expectedDealerId = dealerId.trim();
+  const snapshot = await fetchCmBusinessIntegrationSnapshot([expectedDealerId], options);
+  if (!snapshot.presentDealerIds.has(expectedDealerId)) {
+    throw new Error(`CM Expert ${dealerName} dealer was absent from the completed snapshot`);
+  }
+  const cars: CmBusinessStockCar[] = [];
+  const seenIds = new Set<string>();
+  let missingStableIdCount = 0;
+  for (const row of snapshot.rows) {
+    if (String(row.dealerId ?? "") !== expectedDealerId) continue;
+    const mapped = mapCmBusinessDealerStockCar(row, dealerName);
+    if (!mapped) {
+      missingStableIdCount++;
+      continue;
+    }
+    if (seenIds.has(mapped.id)) continue;
+    seenIds.add(mapped.id);
+    cars.push(mapped);
+  }
+  if (missingStableIdCount > 0) {
+    throw new Error(`CM Expert ${dealerName} has ${missingStableIdCount} in-stock rows without a stable identifier`);
+  }
+  return { cars, fetchedAt: snapshot.fetchedAt, pagesFetched: snapshot.pagesFetched, rowsScanned: snapshot.rowsScanned };
 }
 
 export async function fetchCmBusinessStock(dealer: "Tenet Plus" | "Jeland"): Promise<CmBusinessStockResult> {
