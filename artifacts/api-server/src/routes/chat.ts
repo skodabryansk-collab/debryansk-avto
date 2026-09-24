@@ -4,7 +4,7 @@ import { db, locationsTable, brandsTable } from "@workspace/db";
 import { asc, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { getUsedCars, type CarRecord } from "./cars";
-import { getNewCars, type NewCarRecord } from "./new-cars";
+import { getPublicNewCars, type NewCarRecord } from "./new-cars";
 
 const router = Router();
 
@@ -838,7 +838,7 @@ async function buildCarCatalog(
   let allNew: NewCarRecord[] = [];
 
   try {
-    const [ur, nr] = await Promise.allSettled([getUsedCars(), getNewCars()]);
+    const [ur, nr] = await Promise.allSettled([getUsedCars(), getPublicNewCars()]);
     if (ur.status === "fulfilled") allUsed = ur.value;
     if (nr.status === "fulfilled") allNew = nr.value;
   } catch { /* catalog unavailable — chat still works */ }
@@ -1202,7 +1202,7 @@ router.post("/chat", async (req, res) => {
     ];
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-5-mini",
+      model: process.env.OPENAI_MODEL || "openai/gpt-5-mini",
       max_completion_tokens: 8000,
       messages,
     });
@@ -1343,7 +1343,7 @@ router.post("/chat/stream", async (req, res) => {
     ];
 
     const stream = await openai.chat.completions.create({
-      model: "gpt-5-mini",
+      model: process.env.OPENAI_MODEL || "openai/gpt-5-mini",
       max_completion_tokens: 8000,
       messages: msgs,
       stream: true,
