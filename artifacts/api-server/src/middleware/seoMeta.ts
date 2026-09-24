@@ -5,7 +5,12 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { getPrerenderCache, isSsgRoute, rewriteAssetTagsToCurrent } from "./prerender";
-import { getTenetPlusFeedState, getTenetPlusPublicIdSet } from "../routes/new-cars";
+import {
+  getCmBusinessFeedState,
+  getCmBusinessPublicIdSet,
+  getTenetPlusFeedState,
+  getTenetPlusPublicIdSet,
+} from "../routes/new-cars";
 
 const BOT_UA =
   /googlebot|yandexbot|bingbot|duckduckbot|facebookexternalhit|twitterbot|telegrambot|whatsapp|slackbot|linkedinbot|applebot|baiduspider|ia_archiver|vkshare|odklbot|yandex.com\/bots|yandexadnet|yandeximages|yandexscreenshot|yandexwebmaster|msnbot|seznambot|serpstatbot|ahrefsbot|semrushbot|dotbot|mj12bot|petalbot|screamingfrog|lighthouse|claude|anthropic|squirrel|squirrelscan/i;
@@ -410,6 +415,10 @@ function isTenetPlusDealer(dealer: string | null | undefined): boolean {
   return dealer?.trim().toLowerCase() === "tenet plus";
 }
 
+function isJelandDealer(dealer: string | null | undefined): boolean {
+  return dealer?.trim().toLowerCase() === "jeland";
+}
+
 function hasUsablePublicImage(imageUrl: string | null | undefined): boolean {
   return typeof imageUrl === "string" && /^https?:\/\/[^/\s]+/i.test(imageUrl.trim());
 }
@@ -590,15 +599,36 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
         const tenetPlusPublicIdsSql = tenetPlusPublicIds.length
           ? sql`ARRAY[${sql.join(tenetPlusPublicIds.map(id => sql`${id}`), sql`, `)}]::text[]`
           : sql`ARRAY[]::text[]`;
+        const jelandSourceComplete = getCmBusinessFeedState("Jeland").complete;
+        const jelandPublicIds = [...getCmBusinessPublicIdSet("Jeland")];
+        const jelandPublicIdsSql = jelandPublicIds.length
+          ? sql`ARRAY[${sql.join(jelandPublicIds.map(id => sql`${id}`), sql`, `)}]::text[]`
+          : sql`ARRAY[]::text[]`;
         const r = await db.execute(sql`
           SELECT external_id, brand, model, year, price, max_discount, image_url, color
           FROM cars
           WHERE type = 'new'
             AND (
-              LOWER(BTRIM(dealer)) IS DISTINCT FROM 'tenet plus'
+              (
+                LOWER(BTRIM(dealer)) IS DISTINCT FROM 'tenet plus'
+                AND LOWER(BTRIM(dealer)) IS DISTINCT FROM 'jeland'
+              )
               OR (
                 ${tenetPlusSourceComplete}
                 AND external_id = ANY(${tenetPlusPublicIdsSql})
+                AND cm_stock_state = 'in'
+                AND NULLIF(BTRIM(model), '') IS NOT NULL
+                AND NULLIF(BTRIM(image_url), '') ~* '^https?://[^/[:space:]]+'
+                AND (
+                  NULLIF(BTRIM(modification), '') IS NOT NULL
+                  OR NULLIF(BTRIM(complectation), '') IS NOT NULL
+                )
+              )
+              OR (
+                LOWER(BTRIM(dealer)) = 'jeland'
+                AND ${jelandSourceComplete}
+                AND catalog_source = 'cm_business'
+                AND external_id = ANY(${jelandPublicIdsSql})
                 AND cm_stock_state = 'in'
                 AND NULLIF(BTRIM(model), '') IS NOT NULL
                 AND NULLIF(BTRIM(image_url), '') ~* '^https?://[^/[:space:]]+'
@@ -822,15 +852,26 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
     const type = carMatch[1] === "new-cars" ? "new" : "used";
     const id = decodeURIComponent(carMatch[2]);
     const result = await db.execute(
-      sql`SELECT brand, model, modification, complectation, year, price, max_discount, description, image_url, external_id, color, mileage, dealer, cm_stock_state FROM cars WHERE external_id = ${id} AND type = ${type} LIMIT 1`
+      sql`SELECT brand, model, modification, complectation, year, price, max_discount, description, image_url, external_id, color, mileage, dealer, cm_stock_state, catalog_source FROM cars WHERE external_id = ${id} AND type = ${type} LIMIT 1`
     );
-    const row = result.rows[0] as { brand: string; model: string; modification: string | null; complectation: string | null; year: number; price: number; max_discount: number | null; description: string | null; image_url: string | null; external_id: string; color: string | null; mileage: number | null; dealer: string | null; cm_stock_state: string | null } | undefined;
+    const row = result.rows[0] as { brand: string; model: string; modification: string | null; complectation: string | null; year: number; price: number; max_discount: number | null; description: string | null; image_url: string | null; external_id: string; color: string | null; mileage: number | null; dealer: string | null; cm_stock_state: string | null; catalog_source: string | null } | undefined;
     if (row) {
       const isNew = type === "new";
       if (isNew && isTenetPlusDealer(row.dealer)) {
         const tenetPlusPublicIds = getTenetPlusPublicIdSet();
         const publicStockReady = getTenetPlusFeedState().complete
           && tenetPlusPublicIds.has(row.external_id)
+          && row.cm_stock_state === "in"
+          && Boolean(row.model?.trim())
+          && hasUsablePublicImage(row.image_url)
+          && Boolean(row.modification?.trim() || row.complectation?.trim());
+        if (!publicStockReady) return null;
+      }
+      if (isNew && isJelandDealer(row.dealer)) {
+        const jelandPublicIds = getCmBusinessPublicIdSet("Jeland");
+        const publicStockReady = getCmBusinessFeedState("Jeland").complete
+          && jelandPublicIds.has(row.external_id)
+          && row.catalog_source === "cm_business"
           && row.cm_stock_state === "in"
           && Boolean(row.model?.trim())
           && hasUsablePublicImage(row.image_url)
