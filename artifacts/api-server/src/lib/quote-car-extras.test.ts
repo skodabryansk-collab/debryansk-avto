@@ -18,7 +18,19 @@ test("verified CM Jeland options survive a missing DB row via the saved quote sn
     { dealer: "Jeland", catalogSource: "cm_business", extras: "ABS" }), "");
 });
 
-test("non-Jeland quote equipment keeps its existing fallback behavior", () => {
-  assert.equal(verifiedQuoteExtras({ dealer: "Tenet Plus", extras: null },
+test("Tenet Plus options are also gated by CM provenance, without restoring old snapshots", () => {
+  assert.equal(verifiedQuoteExtras({ dealer: "Tenet Plus", extras: "Подогрев сидений" },
+    { extras: "ABS" }), "");
+  assert.equal(verifiedQuoteExtras({ dealer: "Tenet Plus", catalogSource: "cm_business", extras: "ABS" }), "ABS");
+  assert.equal(verifiedQuoteExtras({ dealer: "Tenet Plus", catalogSource: "cm_business", extras: null },
+    { catalogSource: "cm_business", extras: "ABS" }), "");
+  assert.equal(verifiedQuoteExtras(null,
+    { dealer: "Tenet Plus", catalogSource: "cm_business", extras: "ABS" }), "ABS");
+  assert.equal(verifiedQuoteExtras(null,
+    { dealer: "Tenet Plus", extras: "Подогрев сидений" }), "");
+});
+
+test("other dealers retain their quote equipment fallback", () => {
+  assert.equal(verifiedQuoteExtras({ dealer: "Tenet", extras: null },
     { extras: "Подогрев сидений" }), "Подогрев сидений");
 });
