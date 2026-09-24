@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   fetchCmBusinessStocksWith,
   fetchTenetPlusStockWith,
+  mapCmBusinessDealerStockCar,
   mapJelandStockCar,
   mapTenetPlusStockCar,
   scanCmBusinessSnapshotWith,
@@ -40,6 +41,25 @@ test("maps only allowlisted fields and preserves incomplete in-stock records", (
   });
   assert.equal("customerPhone" in (mapped ?? {}), false);
   assert.equal("margin" in (mapped ?? {}), false);
+});
+
+test("generic catalog mapping uses a dealer-specific ID and keeps private row fields out", () => {
+  const mapped = mapCmBusinessDealerStockCar({
+    id: 20556001,
+    dealerId: "private-dealer-id",
+    model: "Haval F7",
+    sellingPrice: 2_450_000,
+    hasAbs: true,
+    options: ["Подтверждённая неизвестная опция"],
+    customerPhone: "+70000000000",
+  }, "Haval Pro");
+
+  assert.equal(mapped?.id, "haval-pro-cme-20556001");
+  assert.equal(mapped?.model, "Haval F7");
+  assert.equal(mapped?.price, 2_450_000);
+  assert.deepEqual(mapped?.options, ["ABS"]);
+  assert.equal("dealerId" in (mapped ?? {}), false);
+  assert.equal("customerPhone" in (mapped ?? {}), false);
 });
 
 test("prefers CM HTTPS photos over HTTP source URLs without leaking source metadata", () => {
