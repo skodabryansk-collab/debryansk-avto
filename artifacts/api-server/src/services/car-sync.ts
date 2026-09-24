@@ -2,7 +2,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { getUsedCars, getAvitoMeta } from "../routes/cars";
-import { getNewCars } from "../routes/new-cars";
+import { getNewCars, getTenetPlusFeedState } from "../routes/new-cars";
 import {
   enrichCars,
   parseXmlEngineData,
@@ -113,6 +113,7 @@ export async function syncCars(): Promise<SyncStats> {
   const allExternalIds: string[] = [];
   const addedNewCarIds: string[] = [];
   const addedUsedCarIds: string[] = [];
+  let tenetPlusUpsertFailed = false;
 
   const parseOwners = (val: string | undefined | null): number | null => {
     if (!val) return null;
@@ -201,10 +202,9 @@ export async function syncCars(): Promise<SyncStats> {
   for (const c of newCars) {
     allExternalIds.push(c.id);
     if (!existingIds.has(c.id)) addedNewCarIds.push(c.id);
-    // image_url policy: use first image from feed when available; on conflict keep
-    // the existing non-NULL image_url rather than overwriting it with NULL — this
-    // prevents transient feed gaps (supplier forgot to upload a photo) from
-    // permanently erasing a photo we already have.
+    // CM Tenet Plus photos reflect current completeness; a missing photo must
+    // not leave a stale XML image on the manager record after the source switch.
+    // For other XML dealers, keep the existing non-NULL image on a feed gap.
     const imageUrl = c.images[0] ?? null;
     const effectiveBrand = (c.mark === 'Haval' && (c.dealer === 'Haval City' || c.dealer === 'Haval Pro'))
       ? c.dealer : c.mark;
@@ -215,6 +215,7 @@ export async function syncCars(): Promise<SyncStats> {
       INSERT INTO cars (external_id, type, brand, model, year, color, price, mileage,
                         body_type, modification, complectation, extras, description,
                         image_url, vin, dealer, drive_type,
+                        catalog_source, cm_stock_id, cm_dms_car_id, cm_stock_state, source_updated_at,
                         fuel_type, engine_volume, engine_power, engine_source, engine_enriched_at,
                         max_discount, credit_discount, tradein_discount, synced_at)
       VALUES (
@@ -222,6 +223,8 @@ export async function syncCars(): Promise<SyncStats> {
         0, ${c.bodyType}, ${c.modification}, ${c.complectation},
         ${c.extras || null}, ${c.description || null}, ${imageUrl},
         ${c.vin || null}, ${c.dealer}, ${driveType},
+        ${c.catalogSource ?? null}, ${c.cmStockId ?? null}, ${c.cmDmsCarId ?? null},
+        ${c.stockState ?? null}, ${c.sourceUpdatedAt ?? null}::timestamptz,
          NULL, ${engine?.engineVolume ?? null},
         ${engine?.enginePower ?? null}, ${engine ? "xml_pending" : null}, NULL,
         ${c.maxDiscount}, ${c.creditDiscount}, ${c.tradeinDiscount}, NOW()
@@ -234,12 +237,21 @@ export async function syncCars(): Promise<SyncStats> {
         price = EXCLUDED.price,
         modification = EXCLUDED.modification,
         complectation = EXCLUDED.complectation,
+        body_type = CASE WHEN EXCLUDED.catalog_source = 'cm_business'
+          THEN EXCLUDED.body_type ELSE cars.body_type END,
         extras = EXCLUDED.extras,
         description = EXCLUDED.description,
-        image_url = COALESCE(EXCLUDED.image_url, cars.image_url),
+        image_url = CASE WHEN EXCLUDED.catalog_source = 'cm_business'
+          THEN EXCLUDED.image_url ELSE COALESCE(EXCLUDED.image_url, cars.image_url) END,
         vin = EXCLUDED.vin,
         dealer = EXCLUDED.dealer,
         drive_type = EXCLUDED.drive_type,
+        catalog_source = EXCLUDED.catalog_source,
+        cm_stock_id = EXCLUDED.cm_stock_id,
+        cm_dms_car_id = CASE WHEN EXCLUDED.catalog_source = 'cm_business'
+          THEN EXCLUDED.cm_dms_car_id ELSE cars.cm_dms_car_id END,
+        cm_stock_state = EXCLUDED.cm_stock_state,
+        source_updated_at = EXCLUDED.source_updated_at,
         fuel_type = CASE
           WHEN cars.vin IS DISTINCT FROM EXCLUDED.vin OR cars.modification IS DISTINCT FROM EXCLUDED.modification
             THEN EXCLUDED.fuel_type
@@ -272,7 +284,10 @@ export async function syncCars(): Promise<SyncStats> {
         credit_discount = EXCLUDED.credit_discount,
         tradein_discount = EXCLUDED.tradein_discount,
         synced_at = NOW()
-    `).catch(err => logger.warn({ err, id: c.id }, "car-sync: upsert new car failed"));
+    `).catch(err => {
+      if (c.dealer.trim().toLowerCase() === "tenet plus") tenetPlusUpsertFailed = true;
+      logger.warn({ err, id: c.id }, "car-sync: upsert new car failed");
+    });
   }
 
   let removed = 0;
@@ -286,10 +301,16 @@ export async function syncCars(): Promise<SyncStats> {
       logger.warn({ type }, "car-sync: skipping delete — feed returned 0 cars, likely a transient outage");
       return;
     }
-    const idList = ids.map(id => `'${id.replace(/'/g, "''")}'`).join(",");
-    const result = await db.execute(
-      sql.raw(`DELETE FROM cars WHERE type = '${type}' AND external_id NOT IN (${idList}) RETURNING external_id, type`)
-    ).catch(() => ({ rows: [] }));
+    const result = await db.execute(sql`
+      DELETE FROM cars
+      WHERE type = ${type}
+        AND (${type} <> 'new' OR LOWER(BTRIM(dealer)) IS DISTINCT FROM 'tenet plus')
+        AND external_id NOT IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})
+      RETURNING external_id, type
+    `).catch(err => {
+      logger.warn({ err, type }, "car-sync: stale-car deletion failed");
+      return { rows: [] };
+    });
     removed += result.rows.length;
     for (const row of result.rows as { external_id: string; type: "new" | "used" }[]) {
       if (row.external_id) removedCars.push({ externalId: row.external_id, type: row.type ?? type });
@@ -300,6 +321,35 @@ export async function syncCars(): Promise<SyncStats> {
   const newIds  = newCars.map(c => c.id);
   await deleteByType("used", usedIds);
   await deleteByType("new",  newIds);
+
+  // The Business API list is global and may fail halfway through pagination.
+  // Only reconcile Tenet Plus when its snapshot reached the terminal page and
+  // all upserts succeeded; never delete its persisted stock on a partial read.
+  const tenetPlusState = getTenetPlusFeedState();
+  if (tenetPlusState.complete && !tenetPlusUpsertFailed) {
+    const tenetIds = newCars.filter(c => c.dealer.trim().toLowerCase() === "tenet plus").map(c => c.id);
+    const keepClause = tenetIds.length
+      ? sql`AND external_id NOT IN (${sql.join(tenetIds.map(id => sql`${id}`), sql`, `)})`
+      : sql``;
+    const result = await db.execute(sql`
+      DELETE FROM cars
+      WHERE type = 'new' AND LOWER(BTRIM(dealer)) = 'tenet plus'
+        ${keepClause}
+      RETURNING external_id, type
+    `).catch(err => {
+      logger.warn({ err }, "car-sync: Tenet Plus stale-car deletion failed");
+      return { rows: [] };
+    });
+    removed += result.rows.length;
+    for (const row of result.rows as { external_id: string; type: "new" | "used" }[]) {
+      if (row.external_id) removedCars.push({ externalId: row.external_id, type: "new" });
+    }
+  } else {
+    logger.warn(
+      { sourceComplete: tenetPlusState.complete, cachedCount: tenetPlusState.cachedCount, upsertFailed: tenetPlusUpsertFailed },
+      "car-sync: skipping Tenet Plus deletion — Business API snapshot not safely synced",
+    );
+  }
 
    // Used-car fuel is authoritative only from CM Expert Business stock.
    // Keep VIN enrichment for new cars, but never let XML/CM VIN inference
