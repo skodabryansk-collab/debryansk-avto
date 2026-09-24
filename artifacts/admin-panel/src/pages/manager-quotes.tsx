@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Plus, FileDown, Share2, LogOut, Car, Pencil, BookOpen, UserPlus, UserCheck, LogIn, FileText, Clock, User, UserRound } from "lucide-react";
+import { Loader2, Search, Plus, FileDown, Share2, LogOut, Car, Pencil, BookOpen, UserPlus, UserCheck, LogIn, FileText, Clock, User, UserRound, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   searchCars, fetchCarBrands, fetchCarModels,
@@ -22,6 +22,45 @@ import { useToast } from "@/hooks/use-toast";
 const NBSP = "\u00a0";
 const fmtRub = (n: number) =>
   n.toLocaleString("ru-RU") + NBSP + "₽";
+
+function CarInventoryNotices({ car }: { car: CarSearchResult }) {
+  const warnings = car.inventoryWarnings ?? [];
+  if (!warnings.length && !car.sourceStale) return null;
+
+  return (
+    <div className="mt-2 flex flex-col items-start gap-1.5" data-testid={`car-inventory-notices-${car.externalId}`}>
+      {car.sourceStale && (
+        <span className="text-xs font-medium text-amber-700" data-testid={`status-car-source-stale-${car.externalId}`}>
+          Данные об остатках могут быть устаревшими
+        </span>
+      )}
+      {warnings.length > 0 && (
+        <ul className="space-y-0.5 text-xs text-amber-800" aria-label="Предупреждения по комплектации автомобиля" data-testid={`list-car-inventory-warnings-${car.externalId}`}>
+          {warnings.map((warning, index) => (
+            <li key={`${warning}-${index}`}>{warning}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function CarCmLink({ car }: { car: CarSearchResult }) {
+  if (!car.cmCardUrl) return null;
+  return (
+    <a
+      href={car.cmCardUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`Открыть карточку ${formatManagerQuoteCarTitle(car)} в CM Expert в новой вкладке`}
+      data-testid={`link-car-cm-${car.externalId}`}
+      className="inline-flex items-center gap-1 text-xs font-medium text-[#0070b8] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2 rounded-sm"
+    >
+      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+      Открыть в CM
+    </a>
+  );
+}
 
 function roundToThousands(value: string): number | undefined {
   const amount = Number(value.replace(",", "."));
@@ -178,20 +217,26 @@ function CarSearch({ onSelect }: { onSelect: (car: CarSearchResult) => void }) {
       {searchEnabled && data?.data && data.data.length > 0 && (
         <div className="border rounded-lg divide-y max-h-72 overflow-y-auto">
           {data.data.map(car => (
-            <button
-              key={car.externalId}
-              type="button"
-              onClick={() => onSelect(car)}
-              className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
-            >
-              <div className="font-medium text-sm">{formatManagerQuoteCarTitle(car)}</div>
-              <div className="text-xs text-slate-500 mt-0.5">
-                {car.modification || car.complectation || "—"} · {car.type === "new" ? "Новый" : "Б/у"}
-                {car.price ? ` · ${fmtRub(car.price)}` : ""}
-                {car.color ? ` · ${car.color}` : ""}
+            <div key={car.externalId} className="flex items-start gap-3 px-4 py-3">
+              <button
+                type="button"
+                onClick={() => onSelect(car)}
+                data-testid={`button-select-car-${car.externalId}`}
+                className="min-w-0 flex-1 text-left rounded-sm hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2"
+              >
+                <div className="font-medium text-sm">{formatManagerQuoteCarTitle(car)}</div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  {car.modification || car.complectation || "—"} · {car.type === "new" ? "Новый" : "Б/у"}
+                  {car.price ? ` · ${fmtRub(car.price)}` : ""}
+                  {car.color ? ` · ${car.color}` : ""}
+                </div>
+                {car.vin && <div className="text-xs text-slate-400 mt-0.5">VIN: {car.vin}</div>}
+                <CarInventoryNotices car={car} />
+              </button>
+              <div className="shrink-0 pt-1">
+                <CarCmLink car={car} />
               </div>
-              {car.vin && <div className="text-xs text-slate-400 mt-0.5">VIN: {car.vin}</div>}
-            </button>
+            </div>
           ))}
         </div>
       )}
@@ -381,6 +426,8 @@ function QuoteForm({
                       Цена в каталоге: {fmtRub(selectedCar.price)}
                     </div>
                   )}
+                  <CarInventoryNotices car={selectedCar} />
+                  <CarCmLink car={selectedCar} />
                 </div>
               </div>
               <Button type="button" variant="ghost" size="sm" onClick={() => { setSelectedCar(null); setPriceOverride(""); }}>
