@@ -3,12 +3,17 @@ import { logger } from "../lib/logger";
 import { slugifyCarId } from "../lib/slugify";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { fetchCmBusinessIntegrationDealerStock } from "../services/tenet-plus-stock";
+import {
+  fetchCmBusinessIntegrationSnapshot,
+  mapCmBusinessIntegrationDealerStocksFromSnapshot,
+  type CmBusinessStockResult,
+} from "../services/tenet-plus-stock";
 import { getCmCatalogDealers, getCmOptionsOnlyDealerNames } from "../services/cm-stock-integrations";
 
 const router: IRouter = Router();
 const TENET_PLUS_DEALER = "Tenet Plus";
 const JELAND_DEALER = "Jeland";
+const TENET_CHERY_DEALER_ID = "9355";
 const DEFAULT_CM_CATALOG_DEALERS = [TENET_PLUS_DEALER, JELAND_DEALER, "Haval Pro", "Haval City"];
 
 const FEEDS = [
@@ -23,6 +28,7 @@ interface NewCarSource {
   url?: string;
   dealerId?: string;
 }
+type CmCatalogSource = NewCarSource & { dealerId: string };
 let configuredCmCatalogNames = new Set(DEFAULT_CM_CATALOG_DEALERS.map(name => name.toLowerCase()));
 
 async function getSources(): Promise<NewCarSource[]> {
@@ -94,6 +100,19 @@ export function isCmBusinessDealer(dealer?: string | null): boolean {
   return Boolean(normalized && configuredCmCatalogNames.has(normalized));
 }
 
+export function resolveCmCatalogBrand(dealerId: string, dealerName: string, sourceBrand?: string): string {
+  if (dealerId === "9356") return "Omoda";
+  if (dealerId === "13187") return "Jaecoo";
+  if (dealerId === "13186") return "Jetour";
+  if (dealerId === "27564") return "Soueast";
+  if (dealerId !== TENET_CHERY_DEALER_ID) return dealerName;
+
+  const normalizedBrand = sourceBrand?.trim().toLowerCase();
+  if (normalizedBrand === "tenet") return "Tenet";
+  if (normalizedBrand === "chery") return "Chery";
+  throw new Error("CM dealer 9355 returned a row without a supported Tenet/Chery brand");
+}
+
 export function getCmBusinessCatalogDealerNames(): string[] {
   return [...configuredCmCatalogNames];
 }
@@ -127,6 +146,7 @@ let tenetPlusFailureAt = 0;
 let lastMergedAt = 0;
 let mergedCache: NewCarRecord[] | null = null;
 let lastSourceFingerprint = "";
+const lastSourceIdentityByDealer = new Map<string, string>();
 
 export function clearNewCarsCache() {
   dealerCache.clear();
@@ -134,6 +154,7 @@ export function clearNewCarsCache() {
   lastMergedAt = 0;
   tenetPlusFailureAt = 0;
   lastSourceFingerprint = "";
+  lastSourceIdentityByDealer.clear();
 }
 
 export function getCmBusinessFeedState(dealer: string): { complete: boolean; cachedCount: number } {
@@ -240,12 +261,12 @@ async function refreshDealer(feed: { url: string; dealer: string }): Promise<voi
   mergedCache = null;
 }
 
-async function refreshCmBusinessDealer(source: { dealer: string; dealerId: string }): Promise<void> {
+function cacheCmBusinessDealerStock(source: CmCatalogSource, stock: CmBusinessStockResult): void {
   const { dealer, dealerId } = source;
-  const { cars, fetchedAt, pagesFetched, rowsScanned } = await fetchCmBusinessIntegrationDealerStock(dealerId, dealer);
+  const { cars, fetchedAt, pagesFetched, rowsScanned } = stock;
   const parsed: NewCarRecord[] = cars.map(c => ({
     id: c.id,
-    mark: dealer,
+    mark: resolveCmCatalogBrand(dealerId, dealer, c.brand),
     model: c.model,
     modification: c.modification,
     complectation: c.complectation,
@@ -288,17 +309,71 @@ function refreshSource(source: NewCarSource): Promise<void> {
   if (existing) return existing;
   const work = (source.url
     ? refreshDealer({ dealer: source.dealer, url: source.url })
-    : source.dealerId
-      ? refreshCmBusinessDealer({ dealer: source.dealer, dealerId: source.dealerId })
-      : Promise.reject(new Error(`No catalog source is configured for ${source.dealer}`)))
+    : Promise.reject(new Error(`No XML feed is configured for ${source.dealer}`)))
     .finally(() => refreshInFlight.delete(source.dealer));
   refreshInFlight.set(source.dealer, work);
   return work;
 }
 
+async function refreshCmBusinessDealers(
+  staleSources: CmCatalogSource[],
+  allSources: NewCarSource[],
+): Promise<Map<string, PromiseSettledResult<void>>> {
+  if (staleSources.length === 0) return new Map();
+  const allCmSources = allSources.filter((source): source is CmCatalogSource => Boolean(source.dealerId));
+
+  let stockResults: Map<string, PromiseSettledResult<CmBusinessStockResult>>;
+  try {
+    const snapshot = await fetchCmBusinessIntegrationSnapshot(allCmSources.map(source => source.dealerId));
+    stockResults = mapCmBusinessIntegrationDealerStocksFromSnapshot(
+      snapshot,
+      allCmSources.map(source => ({ dealerId: source.dealerId, dealerName: source.dealer })),
+    );
+  } catch (reason) {
+    stockResults = new Map(allCmSources.map(source => [
+      source.dealerId,
+      { status: "rejected", reason } as PromiseRejectedResult,
+    ]));
+  }
+
+  const refreshResults = new Map<string, PromiseSettledResult<void>>();
+  for (const source of staleSources) {
+    const stockResult = stockResults.get(source.dealerId);
+    if (!stockResult) {
+      refreshResults.set(source.dealerId, {
+        status: "rejected",
+        reason: new Error(`CM stock result missing for dealer ${source.dealerId}`),
+      });
+      continue;
+    }
+    if (stockResult.status === "rejected") {
+      refreshResults.set(source.dealerId, stockResult);
+      continue;
+    }
+    try {
+      cacheCmBusinessDealerStock(source, stockResult.value);
+      refreshResults.set(source.dealerId, { status: "fulfilled", value: undefined });
+    } catch (reason) {
+      refreshResults.set(source.dealerId, { status: "rejected", reason });
+    }
+  }
+  return refreshResults;
+}
+
 export async function getNewCars(): Promise<NewCarRecord[]> {
   const sources = await getSources();
   const sourceFingerprint = sources.map(source => `${source.dealer}:${source.url ?? source.dealerId}`).sort().join("|");
+  const sourceIdentities = new Map(sources.map(source => [
+    source.dealer,
+    source.url ?? source.dealerId ?? "",
+  ]));
+  for (const [dealer, previousIdentity] of lastSourceIdentityByDealer) {
+    if (sourceIdentities.get(dealer) === previousIdentity) continue;
+    const cached = dealerCache.get(dealer);
+    if (cached) dealerCache.set(dealer, { ...cached, ts: 0, stale: true });
+    lastSourceIdentityByDealer.delete(dealer);
+  }
+  for (const [dealer, identity] of sourceIdentities) lastSourceIdentityByDealer.set(dealer, identity);
   if (sourceFingerprint !== lastSourceFingerprint) {
     lastSourceFingerprint = sourceFingerprint;
     mergedCache = null;
@@ -311,7 +386,25 @@ export async function getNewCars(): Promise<NewCarRecord[]> {
   });
 
   if (staleFeeds.length > 0) {
-    const results = await Promise.allSettled(staleFeeds.map(refreshSource));
+    const staleCmSources = staleFeeds.filter((source): source is CmCatalogSource => Boolean(source.dealerId));
+    const staleUrlSources = staleFeeds.filter(source => !source.dealerId);
+    const [urlResults, cmResults] = await Promise.all([
+      Promise.allSettled(staleUrlSources.map(refreshSource)),
+      refreshCmBusinessDealers(staleCmSources, sources),
+    ]);
+    const urlResultsByDealer = new Map(staleUrlSources.map((source, index) => [
+      source.dealer,
+      urlResults[index]!,
+    ]));
+    const results = staleFeeds.map(source => source.dealerId
+      ? cmResults.get(source.dealerId) ?? {
+          status: "rejected" as const,
+          reason: new Error(`CM stock refresh result missing for dealer ${source.dealerId}`),
+        }
+      : urlResultsByDealer.get(source.dealer) ?? {
+          status: "rejected" as const,
+          reason: new Error(`XML feed refresh result missing for ${source.dealer}`),
+        });
     results.forEach((r, i) => {
       if (r.status === "rejected") {
         const feed = staleFeeds[i]!;
