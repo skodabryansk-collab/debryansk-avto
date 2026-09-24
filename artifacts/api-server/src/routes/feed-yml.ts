@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { getUsedCars } from "./cars";
-import { getNewCars } from "./new-cars";
+import { getPublicNewCars } from "./new-cars";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -117,7 +117,7 @@ router.get("/feed/yml", async (_req, res) => {
         logger.warn({ err: e }, "feed-yml: used cars fetch failed");
         return [];
       }),
-      getNewCars().catch((e) => {
+      getPublicNewCars().catch((e) => {
         logger.warn({ err: e }, "feed-yml: new cars fetch failed");
         return [];
       }),
