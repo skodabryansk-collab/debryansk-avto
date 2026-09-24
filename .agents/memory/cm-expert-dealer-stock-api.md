@@ -13,6 +13,12 @@ The full API record contains customer and internal commercial data. Never forwar
 
 CM Expert web card links use `https://lk.cm.expert/stock/{numericStockId}/stock`. For Tenet Plus rows mirrored from the CM feed, the numeric suffix after `cme-` in `external_id` maps to the card ID. A generated link for `tenet-plus-cme-83183067` opened the correct card, confirmed by the user. Do not assume this mapping applies to unrelated ID formats.
 
+An observed in-stock Jeland DMS row had many per-feature `has*` fields, while `equipmentName` was null; the stock adapter does not yet turn these into options. Do not infer a full options list from a trim or modification label.
+
+**Why:** A generated quote that guesses equipment from a trim may claim features the individual car does not have.
+
+**How to apply:** If importing options, audit which feature fields are reliably populated across the dealer's stock, map verified affirmative fields to localized labels, and leave unknowns absent instead of fabricating equipment.
+
 **Why:** A dealer-specific test required scanning the global feed; filters were ignored, the scoped route was denied, and larger requested pages still returned at most 50 rows. The response includes fields that must not be exposed publicly.
 
 **Why:** The CM UI route was not documented by the public Swagger page; the user verified a generated Tenet Plus card link. The number in the link must be sourced from the CM stock identifier, not guessed.
