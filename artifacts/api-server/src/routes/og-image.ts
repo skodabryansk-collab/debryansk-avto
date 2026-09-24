@@ -8,7 +8,12 @@ import { logger } from "../lib/logger";
 import { buildBrandHtml, buildCarHtml, buildCatalogHtml, buildCorporateHtml, buildServiceHtml, buildStaticPageHtml, generateOgImage } from "../services/og-generator";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import type { Response } from "express";
-import { getTenetPlusFeedState, getTenetPlusPublicIdSet } from "./new-cars";
+import {
+  getCmBusinessFeedState,
+  getCmBusinessPublicIdSet,
+  getTenetPlusFeedState,
+  getTenetPlusPublicIdSet,
+} from "./new-cars";
 
 const OG_CACHE_DIR = process.env.OG_CACHE_DIR || "/opt/debryansk/og-cache";
 const OG_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -50,9 +55,9 @@ function scheduleBackgroundGen(html: string, cachePath: string, logCtx: Record<s
     .finally(() => pendingBgGen.delete(cachePath));
 }
 
-function sendPngBuffer(res: Response, buf: Buffer): void {
+function sendPngBuffer(res: Response, buf: Buffer, cacheControl?: string): void {
   res.setHeader("Content-Type", "image/png");
-  res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=3600");
+  res.setHeader("Cache-Control", cacheControl ?? "public, max-age=86400, stale-while-revalidate=3600");
   res.send(buf);
 }
 
@@ -61,8 +66,11 @@ router.get("/og-image/brand/:slug", async (req, res) => {
   const cachePath = path.join(OG_CACHE_DIR, `brand-${slug.replace(/[^a-zA-Z0-9_-]/g, "_")}.png`);
 
   const isTenetPlusBrand = slug.toLowerCase() === "tenet-plus";
+  const isJelandBrand = slug === "jeland";
+  if (isJelandBrand) res.setHeader("Cache-Control", "no-store");
   const tenetPlusSourceComplete = getTenetPlusFeedState().complete;
-  if (!isTenetPlusBrand && await isCacheValid(cachePath) && tenetPlusSourceComplete) {
+  const jelandSourceComplete = getCmBusinessFeedState("Jeland").complete;
+  if (!isTenetPlusBrand && !isJelandBrand && await isCacheValid(cachePath) && tenetPlusSourceComplete) {
     sendCachedFile(res, cachePath);
     return;
   }
@@ -73,16 +81,36 @@ router.get("/og-image/brand/:slug", async (req, res) => {
     const tenetPlusPublicIdsSql = tenetPlusPublicIds.length
       ? sql`ARRAY[${sql.join(tenetPlusPublicIds.map(id => sql`${id}`), sql`, `)}]::text[]`
       : sql`ARRAY[]::text[]`;
+    const jelandPublicIds = [...getCmBusinessPublicIdSet("Jeland")];
+    const jelandPublicIdsSql = jelandPublicIds.length
+      ? sql`ARRAY[${sql.join(jelandPublicIds.map(id => sql`${id}`), sql`, `)}]::text[]`
+      : sql`ARRAY[]::text[]`;
     const result = await db.execute(
       sql`SELECT b.name, b.logo_url, b.is_service_only,
                  COUNT(c.id)::int AS car_count
           FROM brands b
           LEFT JOIN cars c ON c.brand ILIKE b.name AND c.type = 'new'
             AND (
-              LOWER(BTRIM(c.dealer)) IS DISTINCT FROM 'tenet plus'
+              (
+                LOWER(BTRIM(c.dealer)) IS DISTINCT FROM 'tenet plus'
+                AND LOWER(BTRIM(c.dealer)) IS DISTINCT FROM 'jeland'
+              )
               OR (
                 ${tenetPlusSourceComplete}
                 AND c.external_id = ANY(${tenetPlusPublicIdsSql})
+                AND c.cm_stock_state = 'in'
+                AND NULLIF(BTRIM(c.model), '') IS NOT NULL
+                AND NULLIF(BTRIM(c.image_url), '') ~* '^https?://[^/[:space:]]+'
+                AND (
+                  NULLIF(BTRIM(c.modification), '') IS NOT NULL
+                  OR NULLIF(BTRIM(c.complectation), '') IS NOT NULL
+                )
+              )
+              OR (
+                LOWER(BTRIM(c.dealer)) = 'jeland'
+                AND ${jelandSourceComplete}
+                AND c.catalog_source = 'cm_business'
+                AND c.external_id = ANY(${jelandPublicIdsSql})
                 AND c.cm_stock_state = 'in'
                 AND NULLIF(BTRIM(c.model), '') IS NOT NULL
                 AND NULLIF(BTRIM(c.image_url), '') ~* '^https?://[^/[:space:]]+'
@@ -155,7 +183,7 @@ router.get("/og-image/brand/:slug", async (req, res) => {
     return;
   }
 
-  sendPngBuffer(res, race.buf);
+  sendPngBuffer(res, race.buf, isJelandBrand ? "no-store" : undefined);
 });
 
 router.get("/og-image/car/:type/:id", async (req, res) => {
@@ -165,9 +193,10 @@ router.get("/og-image/car/:type/:id", async (req, res) => {
   const cachePath = path.join(OG_CACHE_DIR, `car-${carType}-${safeId}.png`);
 
   let html: string;
+  let isJeland = false;
   try {
     const result = await db.execute(
-      sql`SELECT brand, model, year, price, max_discount, image_url, dealer, cm_stock_state, modification, complectation
+      sql`SELECT brand, model, year, price, max_discount, image_url, dealer, cm_stock_state, modification, complectation, catalog_source
           FROM cars WHERE external_id = ${id} AND type = ${carType} LIMIT 1`
     );
     const row = result.rows[0] as {
@@ -181,6 +210,7 @@ router.get("/og-image/car/:type/:id", async (req, res) => {
       cm_stock_state: string | null;
       modification: string | null;
       complectation: string | null;
+      catalog_source: string | null;
     } | undefined;
 
     if (!row) {
@@ -204,10 +234,28 @@ router.get("/og-image/car/:type/:id", async (req, res) => {
         return;
       }
     }
+    isJeland = row.dealer?.trim().toLowerCase() === "jeland";
+    if (carType === "new" && isJeland) {
+      res.setHeader("Cache-Control", "no-store");
+      const jelandPublicIds = getCmBusinessPublicIdSet("Jeland");
+      const usableImage = typeof row.image_url === "string"
+        && /^https?:\/\/[^/\s]+/i.test(row.image_url.trim());
+      const publicStockReady = getCmBusinessFeedState("Jeland").complete
+        && jelandPublicIds.has(id)
+        && row.catalog_source === "cm_business"
+        && row.cm_stock_state === "in"
+        && Boolean(row.model?.trim())
+        && usableImage
+        && Boolean(row.modification?.trim() || row.complectation?.trim());
+      if (!publicStockReady) {
+        res.redirect(302, DEFAULT_OG_REDIRECT);
+        return;
+      }
+    }
 
     // Revalidate the DB-backed eligibility before serving even a cached card:
     // a formerly public Tenet Plus vehicle may have become stale or incomplete.
-    if (await isCacheValid(cachePath)) {
+    if (!isJeland && await isCacheValid(cachePath)) {
       sendCachedFile(res, cachePath);
       return;
     }
@@ -243,7 +291,7 @@ router.get("/og-image/car/:type/:id", async (req, res) => {
     return;
   }
 
-  sendPngBuffer(res, race.buf);
+  sendPngBuffer(res, race.buf, carType === "new" && isJeland ? "no-store" : undefined);
 });
 
 router.get("/og-image/service.png", async (_req, res) => {
@@ -292,6 +340,11 @@ for (const type of ["new", "used"] as const) {
     const tenetPlusPublicIdsSql = tenetPlusPublicIds.length
       ? sql`ARRAY[${sql.join(tenetPlusPublicIds.map(id => sql`${id}`), sql`, `)}]::text[]`
       : sql`ARRAY[]::text[]`;
+    const jelandSourceComplete = type !== "new" || getCmBusinessFeedState("Jeland").complete;
+    const jelandPublicIds = type === "new" ? [...getCmBusinessPublicIdSet("Jeland")] : [];
+    const jelandPublicIdsSql = jelandPublicIds.length
+      ? sql`ARRAY[${sql.join(jelandPublicIds.map(id => sql`${id}`), sql`, `)}]::text[]`
+      : sql`ARRAY[]::text[]`;
     if (type !== "new" && await isCatalogCacheValid(cachePath)) {
       sendCachedFile(res, cachePath);
       return;
@@ -300,14 +353,19 @@ for (const type of ["new", "used"] as const) {
     let count = 0;
     let minPrice = 0;
     let brands: string[] = [];
+    let includesJeland = false;
     try {
       const result = await db.execute(
         sql`SELECT COUNT(*)::int AS count, MIN(price)::int AS min_price,
+                   BOOL_OR(LOWER(BTRIM(dealer)) = 'jeland') AS includes_jeland,
                    array_agg(DISTINCT brand ORDER BY brand) FILTER (WHERE brand IS NOT NULL) AS brands
             FROM cars
             WHERE type = ${carType}
               AND (
-                LOWER(BTRIM(dealer)) IS DISTINCT FROM 'tenet plus'
+                (
+                  LOWER(BTRIM(dealer)) IS DISTINCT FROM 'tenet plus'
+                  AND LOWER(BTRIM(dealer)) IS DISTINCT FROM 'jeland'
+                )
                 OR (
                   ${tenetPlusSourceComplete}
                   AND external_id = ANY(${tenetPlusPublicIdsSql})
@@ -319,11 +377,25 @@ for (const type of ["new", "used"] as const) {
                     OR NULLIF(BTRIM(complectation), '') IS NOT NULL
                   )
                 )
+                OR (
+                  LOWER(BTRIM(dealer)) = 'jeland'
+                  AND ${jelandSourceComplete}
+                  AND catalog_source = 'cm_business'
+                  AND external_id = ANY(${jelandPublicIdsSql})
+                  AND cm_stock_state = 'in'
+                  AND NULLIF(BTRIM(model), '') IS NOT NULL
+                  AND NULLIF(BTRIM(image_url), '') ~* '^https?://[^/[:space:]]+'
+                  AND (
+                    NULLIF(BTRIM(modification), '') IS NOT NULL
+                    OR NULLIF(BTRIM(complectation), '') IS NOT NULL
+                  )
+                )
               )`
       );
-      const row = result.rows[0] as { count: number; min_price: number; brands: string[] | null } | undefined;
+      const row = result.rows[0] as { count: number; min_price: number; includes_jeland: boolean | null; brands: string[] | null } | undefined;
       count = row?.count ?? 0;
       minPrice = Number(row?.min_price ?? 0);
+      includesJeland = row?.includes_jeland ?? false;
       brands = (row?.brands ?? []).filter(Boolean).slice(0, 7);
     } catch (err) {
       logger.warn({ err }, `[og] catalog-${type} DB query failed, using defaults`);
@@ -346,7 +418,7 @@ for (const type of ["new", "used"] as const) {
       scheduleBackgroundGen(html, cachePath, { file });
       return;
     }
-    sendPngBuffer(res, race.buf);
+    sendPngBuffer(res, race.buf, includesJeland ? "no-store" : undefined);
   });
 }
 
