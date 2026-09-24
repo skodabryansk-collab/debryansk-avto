@@ -320,12 +320,22 @@ async function performCmStockSync(trigger: string): Promise<void> {
     }
 
     const hasErrors = results.some(result => result.status === "error" && result.error !== "Интеграция отключена");
+    const dealerRows = results.map(result => ({
+      dealer_id: result.dealerId,
+      dealer_name: result.dealerName,
+      status: result.status,
+      stock_count: result.stockCount,
+      matched_count: result.matchedCount,
+      cars_with_options: result.carsWithOptions,
+      options_count: result.optionsCount,
+      error: result.error,
+    }));
     await db.execute(sql`
       INSERT INTO cm_stock_sync_run_dealers
         (run_id, dealer_id, dealer_name, status, stock_count, matched_count, cars_with_options, options_count, error)
       SELECT ${runId}, dealer_id, dealer_name, status, stock_count, matched_count,
              cars_with_options, options_count, error
-      FROM jsonb_to_recordset(${JSON.stringify(results)}::jsonb) AS x(
+      FROM jsonb_to_recordset(${JSON.stringify(dealerRows)}::jsonb) AS x(
         dealer_id text, dealer_name text, status text, stock_count integer,
         matched_count integer, cars_with_options integer, options_count integer, error text
       )
