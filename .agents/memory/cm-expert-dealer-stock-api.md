@@ -19,6 +19,12 @@ An observed in-stock Jeland DMS row had many per-feature `has*` fields, while `e
 
 **How to apply:** If importing options, audit which feature fields are reliably populated across the dealer's stock, map verified affirmative fields to localized labels, and leave unknowns absent instead of fabricating equipment.
 
+In the observed Tenet Plus stock snapshot, all 26 in-stock rows lacked affirmative `has*` equipment flags and recognized equipment enums. Their `description` text was nearly identical across cars, not a per-car equipment source.
+
+**Why:** A working CM stock feed does not imply that it supplies verified equipment for every dealer; a shared options importer can legitimately produce empty lists for an entire dealer.
+
+**How to apply:** Keep Tenet Plus options empty with a manager warning until CM provides vehicle-specific feature fields or another verified per-VIN source is available. Do not populate from `equipmentName`, a generic description, or a guessed trim catalog.
+
 **Why:** A dealer-specific test required scanning the global feed; filters were ignored, the scoped route was denied, and larger requested pages still returned at most 50 rows. The response includes fields that must not be exposed publicly.
 
 **Why:** The CM UI route was not documented by the public Swagger page; the user verified a generated Tenet Plus card link. The number in the link must be sourced from the CM stock identifier, not guessed.
