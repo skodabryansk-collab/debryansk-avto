@@ -14,6 +14,7 @@ interface TenetPlusSourceRow {
   id?: unknown;
   dmsCarId?: unknown;
   dealerId?: unknown;
+  brand?: unknown;
   stockState?: unknown;
   model?: unknown;
   modificationName?: unknown;
@@ -34,6 +35,7 @@ export interface TenetPlusStockCar {
   id: string;
   cmStockId: string | null;
   cmDmsCarId: string | null;
+  brand?: string;
   model: string;
   modification: string;
   complectation: string;
@@ -238,6 +240,7 @@ function mapCmBusinessStockCar(row: unknown, idPrefix: string): CmBusinessStockC
     id: slugifyCarId(idPrefix, stockId ? `cme-${stockId}` : `dms-${dmsCarId}`),
     cmStockId: stockId,
     cmDmsCarId: dmsCarId,
+    ...(stringValue(source.brand).trim() ? { brand: stringValue(source.brand).trim() } : {}),
     model: stringValue(source.model),
     modification: stringValue(source.modificationName),
     complectation: stringValue(source.equipmentName),
@@ -280,6 +283,7 @@ function projectSourceRow(row: Record<string, unknown>): CmBusinessSourceRow {
     id: row.id,
     dmsCarId: row.dmsCarId,
     dealerId: row.dealerId,
+    ...(typeof row.brand === "string" && row.brand.trim() ? { brand: row.brand.trim() } : {}),
     stockState: row.stockState,
     model: row.model,
     modificationName: row.modificationName,
@@ -505,6 +509,54 @@ export async function fetchCmBusinessIntegrationSnapshot(
   return work;
 }
 
+export function mapCmBusinessIntegrationDealerStocksFromSnapshot(
+  snapshot: CmBusinessSnapshot,
+  dealers: Array<{ dealerId: string; dealerName: string }>,
+): Map<string, PromiseSettledResult<CmBusinessStockResult>> {
+  const results = new Map<string, PromiseSettledResult<CmBusinessStockResult>>();
+
+  for (const dealer of dealers) {
+    const dealerId = dealer.dealerId.trim();
+    try {
+      if (!snapshot.presentDealerIds.has(dealerId)) {
+        throw new Error(`CM Expert ${dealer.dealerName} dealer was absent from the completed snapshot`);
+      }
+      const cars: CmBusinessStockCar[] = [];
+      const seenIds = new Set<string>();
+      let missingStableIdCount = 0;
+      for (const row of snapshot.rows) {
+        if (String(row.dealerId ?? "") !== dealerId) continue;
+        const mapped = mapCmBusinessDealerStockCar(row, dealer.dealerName);
+        if (!mapped) {
+          missingStableIdCount++;
+          continue;
+        }
+        if (seenIds.has(mapped.id)) continue;
+        seenIds.add(mapped.id);
+        cars.push(mapped);
+      }
+      if (missingStableIdCount > 0) {
+        throw new Error(
+          `CM Expert ${dealer.dealerName} has ${missingStableIdCount} in-stock rows without a stable identifier`,
+        );
+      }
+      results.set(dealerId, {
+        status: "fulfilled",
+        value: {
+          cars,
+          fetchedAt: snapshot.fetchedAt,
+          pagesFetched: snapshot.pagesFetched,
+          rowsScanned: snapshot.rowsScanned,
+        },
+      });
+    } catch (reason) {
+      results.set(dealerId, { status: "rejected", reason });
+    }
+  }
+
+  return results;
+}
+
 async function getProductionSnapshot(): Promise<CmBusinessSnapshot> {
   return fetchCmBusinessIntegrationSnapshot(configuredDealerIds());
 }
@@ -516,27 +568,13 @@ export async function fetchCmBusinessIntegrationDealerStock(
 ): Promise<CmBusinessStockResult> {
   const expectedDealerId = dealerId.trim();
   const snapshot = await fetchCmBusinessIntegrationSnapshot([expectedDealerId], options);
-  if (!snapshot.presentDealerIds.has(expectedDealerId)) {
-    throw new Error(`CM Expert ${dealerName} dealer was absent from the completed snapshot`);
-  }
-  const cars: CmBusinessStockCar[] = [];
-  const seenIds = new Set<string>();
-  let missingStableIdCount = 0;
-  for (const row of snapshot.rows) {
-    if (String(row.dealerId ?? "") !== expectedDealerId) continue;
-    const mapped = mapCmBusinessDealerStockCar(row, dealerName);
-    if (!mapped) {
-      missingStableIdCount++;
-      continue;
-    }
-    if (seenIds.has(mapped.id)) continue;
-    seenIds.add(mapped.id);
-    cars.push(mapped);
-  }
-  if (missingStableIdCount > 0) {
-    throw new Error(`CM Expert ${dealerName} has ${missingStableIdCount} in-stock rows without a stable identifier`);
-  }
-  return { cars, fetchedAt: snapshot.fetchedAt, pagesFetched: snapshot.pagesFetched, rowsScanned: snapshot.rowsScanned };
+  const result = mapCmBusinessIntegrationDealerStocksFromSnapshot(
+    snapshot,
+    [{ dealerId: expectedDealerId, dealerName }],
+  ).get(expectedDealerId);
+  if (!result) throw new Error(`CM Expert ${dealerName} dealer result was not produced`);
+  if (result.status === "rejected") throw result.reason;
+  return result.value;
 }
 
 export async function fetchCmBusinessStock(dealer: "Tenet Plus" | "Jeland"): Promise<CmBusinessStockResult> {
