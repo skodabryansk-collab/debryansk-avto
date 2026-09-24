@@ -24,6 +24,7 @@ interface TenetPlusSourceRow {
   photos?: unknown;
   updatedAt?: unknown;
   sourceUpdatedAt?: unknown;
+  options?: unknown;
 }
 
 export interface TenetPlusStockCar {
@@ -42,6 +43,10 @@ export interface TenetPlusStockCar {
   sourceUpdatedAt: string;
 }
 
+export interface CmBusinessStockCar extends TenetPlusStockCar {
+  options?: string[];
+}
+
 export interface TenetPlusStockResult {
   cars: TenetPlusStockCar[];
   fetchedAt: string;
@@ -49,9 +54,11 @@ export interface TenetPlusStockResult {
   rowsScanned: number;
 }
 
+export interface CmBusinessStockResult extends Omit<TenetPlusStockResult, "cars"> {
+  cars: CmBusinessStockCar[];
+}
+
 type BusinessGet = (path: string, params?: Record<string, string>) => Promise<unknown>;
-export type CmBusinessStockCar = TenetPlusStockCar;
-export type CmBusinessStockResult = TenetPlusStockResult;
 
 type CmBusinessSourceRow = TenetPlusSourceRow;
 
@@ -103,14 +110,110 @@ function securePhotoUrls(source: TenetPlusSourceRow): string[] {
 
 /** Strictly map an API row into the public-field allowlist. */
 export function mapTenetPlusStockCar(row: unknown): TenetPlusStockCar | null {
-  return mapCmBusinessStockCar(row, "tenet-plus");
+  return mapCmBusinessStockCar(row, "tenet-plus") as TenetPlusStockCar | null;
 }
 
 export function mapJelandStockCar(row: unknown): CmBusinessStockCar | null {
   return mapCmBusinessStockCar(row, "jeland");
 }
 
-function mapCmBusinessStockCar(row: unknown, idPrefix: "tenet-plus" | "jeland"): CmBusinessStockCar | null {
+const JELAND_BOOLEAN_OPTIONS: ReadonlyArray<readonly [string, string]> = [
+  ["hasOnBoardComputer", "Бортовой компьютер"],
+  ["hasCruiseControl", "Круиз-контроль"],
+  ["hasAdaptiveCruiseControls", "Адаптивный круиз-контроль"],
+  ["hasTirePressureSensor", "Датчик давления в шинах"],
+  ["hasRemoteStartEngine", "Дистанционный запуск двигателя"],
+  ["hasStartEngineButton", "Запуск двигателя кнопкой"],
+  ["hasCamera360", "Камера кругового обзора 360°"],
+  ["hasCameraRear", "Камера заднего вида"],
+  ["hasParkSensorRear", "Задние парктроники"],
+  ["hasParkSensorFront", "Передние парктроники"],
+  ["hasKeylessAccess", "Бесключевой доступ"],
+  ["hasElectricTrunk", "Электропривод багажника"],
+  ["hasAbs", "ABS"],
+  ["hasEsp", "ESP"],
+  ["hasIsofix", "Крепления ISOFIX"],
+  ["hasRearDoorsLocking", "Блокировка задних дверей"],
+  ["hasAirbagFront", "Фронтальные подушки безопасности"],
+  ["hasAirbagPassengerFront", "Передняя подушка безопасности пассажира"],
+  ["hasAirbagSide", "Боковые подушки безопасности"],
+  ["hasAirbagWindow", "Шторки безопасности"],
+  ["hasLaneControlSystem", "Система контроля полосы"],
+  ["hasBlindAreaControlSystem", "Контроль слепых зон"],
+  ["hasHillStartAssist", "Помощь при старте на подъёме"],
+  ["hasCollisionAvoidanceSystem", "Система предотвращения столкновений"],
+  ["hasRainSensor", "Датчик дождя"],
+  ["hasLightSensor", "Датчик света"],
+  ["hasHeatesMirrors", "Обогрев зеркал"],
+  ["hasFogLights", "Противотуманные фары"],
+  ["hasHeatedWindscreen", "Обогрев лобового стекла"],
+  ["hasHeatedWiperSprayers", "Обогрев форсунок стеклоомывателя"],
+  ["hasElectricMirrors", "Электрорегулировка зеркал"],
+  ["hasAutoMirrorsFold", "Складывание зеркал"],
+  ["hasOemImmobiliser", "Штатный иммобилайзер"],
+  ["hasFrontSeatsVentilation", "Вентиляция передних сидений"],
+  ["hasPanoramicRoof", "Панорамная крыша"],
+  ["hasSteeringWheelHeater", "Обогрев рулевого колеса"],
+  ["hasFoldingRearSeats", "Складывание задних сидений"],
+  ["hasAudioSystem", "Аудиосистема"],
+  ["hasWirelessCharging", "Беспроводная зарядка"],
+  ["hasSocket12V", "Розетка 12 В"],
+  ["hasAndroidAuto", "Android Auto"],
+  ["hasBluetooth", "Bluetooth"],
+  ["hasAppleCarPlay", "Apple CarPlay"],
+  ["hasUSB", "USB"],
+  ["hasDriverSeatUpdown", "Регулировка водительского сиденья по высоте"],
+  ["hasEasyTrunkOpening", "Открытие багажника без помощи рук"],
+  ["hasGlonass", "ГЛОНАСС"],
+  ["hasBAS", "Система экстренного торможения BAS"],
+  ["hasHighBeamAssist", "Ассистент дальнего света"],
+  ["hasSpareMini", "Запасное колесо-докатка"],
+];
+
+const JELAND_ENUM_OPTIONS: ReadonlyArray<{
+  field: string;
+  values: Readonly<Record<string, string>>;
+}> = [
+  { field: "climate", values: { cc2zones: "Двухзонный климат-контроль" } },
+  { field: "wheelAdjusting", values: { heightandlength: "Регулировка руля по высоте и вылету" } },
+  { field: "seatsHeat", values: {
+    front: "Обогрев передних сидений",
+    all: "Обогрев всех сидений",
+  } },
+  { field: "driverSeatAdjusting", values: { electro: "Электрорегулировка водительского сиденья" } },
+  { field: "passengerSeatAdjusting", values: { electro: "Электрорегулировка пассажирского сиденья" } },
+  { field: "headLightType", values: { led: "Светодиодные фары" } },
+  { field: "wheelRimType", values: { alloy: "Легкосплавные диски" } },
+  { field: "wheelRimDiameter", values: { "18": "Колёсные диски 18 дюймов" } },
+  { field: "salon", values: { leather: "Кожаный салон" } },
+];
+
+const JELAND_KNOWN_OPTION_LABELS = new Set([
+  ...JELAND_BOOLEAN_OPTIONS.map(([, label]) => label),
+  ...JELAND_ENUM_OPTIONS.flatMap(({ values }) => Object.values(values)),
+]);
+
+function extractJelandOptions(source: Record<string, unknown>): string[] {
+  const options = new Set<string>();
+  for (const [field, label] of JELAND_BOOLEAN_OPTIONS) {
+    if (source[field] === true) options.add(label);
+  }
+  for (const { field, values } of JELAND_ENUM_OPTIONS) {
+    const value = source[field];
+    const enumValue = typeof value === "string" || typeof value === "number" ? String(value) : "";
+    if (values[enumValue]) options.add(values[enumValue]!);
+  }
+  // Snapshot rows already contain only labels. Accept those labels when
+  // mapping the projected row, but never trust arbitrary option strings.
+  if (Array.isArray(source.options)) {
+    for (const label of source.options) {
+      if (typeof label === "string" && JELAND_KNOWN_OPTION_LABELS.has(label)) options.add(label);
+    }
+  }
+  return [...options];
+}
+
+function mapCmBusinessStockCar(row: unknown, idPrefix: "tenet-plus" | "jeland"): TenetPlusStockCar | CmBusinessStockCar | null {
   if (!row || typeof row !== "object" || Array.isArray(row)) return null;
   const source = row as TenetPlusSourceRow;
   const stockId = numericStockId(source.id);
@@ -120,7 +223,7 @@ function mapCmBusinessStockCar(row: unknown, idPrefix: "tenet-plus" | "jeland"):
 
   if (!stockId && !dmsCarId) return null;
 
-  return {
+  const mapped: TenetPlusStockCar = {
     id: stockId ? `${idPrefix}-cme-${stockId}` : `${idPrefix}-dms-${dmsCarId}`,
     cmStockId: stockId,
     cmDmsCarId: dmsCarId,
@@ -135,6 +238,11 @@ function mapCmBusinessStockCar(row: unknown, idPrefix: "tenet-plus" | "jeland"):
     vin: stringValue(source.vin),
     sourceUpdatedAt: stringValue(source.sourceUpdatedAt ?? source.updatedAt),
   };
+  if (idPrefix === "jeland") {
+    const options = extractJelandOptions(source as Record<string, unknown>);
+    return options.length > 0 ? { ...mapped, options } : mapped;
+  }
+  return mapped;
 }
 
 function extractPage(payload: unknown, page: number): unknown[] {
@@ -160,7 +268,7 @@ function projectSourceRow(row: Record<string, unknown>): CmBusinessSourceRow {
     : [];
   const photos = validPhotos(cmePhotoUrls.map(photo => photo.cmeUrl)).map(cmeUrl => ({ cmeUrl }));
 
-  return {
+  const projected: CmBusinessSourceRow = {
     id: row.id,
     dmsCarId: row.dmsCarId,
     dealerId: row.dealerId,
@@ -178,6 +286,11 @@ function projectSourceRow(row: Record<string, unknown>): CmBusinessSourceRow {
     updatedAt: row.updatedAt,
     sourceUpdatedAt: row.sourceUpdatedAt,
   };
+  if (String(row.dealerId ?? "") === dealerConfigs.Jeland.dealerId()) {
+    const options = extractJelandOptions(row);
+    if (options.length > 0) projected.options = options;
+  }
+  return projected;
 }
 
 interface PaginationOptions {
