@@ -17,7 +17,7 @@ import path from "path";
 import { acquireChrome, isPrerendererRunning } from "../lib/chrome-semaphore";
 import { normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
 import { getTenetPlusOptions } from "../lib/tenet-plus-equipment";
-import { getNewCars } from "./new-cars";
+import { getNewCars, getPublicNewCars, getTenetPlusFeedState, getTenetPlusPublicIdSet, isPublicNewCarEligible } from "./new-cars";
 
 const router: IRouter = Router();
 router.use(requireManager);
@@ -157,6 +157,18 @@ async function fetchImageBase64(url: string): Promise<string> {
 
 type QuoteCar = typeof carsTable.$inferSelect;
 
+async function getQuoteCarUrl(car: QuoteCar | null, snapshot: Record<string, unknown>, carType: string, carSlug: string): Promise<string> {
+  const dealer = String(car?.dealer ?? snapshot["dealer"] ?? "").trim().toLowerCase();
+  if (carType === "new" && dealer === "tenet plus") {
+    const publicCars = await getPublicNewCars().catch(() => []);
+    if (!publicCars.some(publicCar => publicCar.id === carSlug)) {
+      // Manager-only and stale cards have no public detail page.
+      return "https://debryansk-auto.ru/new-cars";
+    }
+  }
+  return `https://debryansk-auto.ru/${carType === "new" ? "new-cars" : "cars"}/${carSlug}`;
+}
+
 /**
  * The public new-car catalog is sourced directly from the supplier feed, while
  * the manager quote picker reads the periodically synced cars table. Refresh
@@ -169,6 +181,23 @@ async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
   try {
     const feedCar = (await getNewCars()).find((candidate) => candidate.id === car.externalId);
     if (!feedCar) return car;
+
+    if (car.dealer?.trim().toLowerCase() === "tenet plus" && feedCar.catalogSource === "cm_business") {
+      return {
+        ...car,
+        model: feedCar.model,
+        modification: feedCar.modification,
+        complectation: feedCar.complectation,
+        year: feedCar.year,
+        price: feedCar.price,
+        color: feedCar.color || null,
+        imageUrl: feedCar.images[0] ?? null,
+        vin: feedCar.vin || null,
+        bodyType: feedCar.bodyType || null,
+        catalogSource: "cm_business",
+        cmStockState: feedCar.stockState ?? null,
+      };
+    }
 
     return {
       ...car,
@@ -187,6 +216,7 @@ function buildQuoteCarSnapshot(
   car: QuoteCar | null,
   fallback: Record<string, unknown> = {},
 ): Record<string, unknown> {
+  const isTenetPlus = String(car?.dealer ?? fallback["dealer"] ?? "").trim().toLowerCase() === "tenet plus";
   return {
     id: car?.id ?? fallback["id"] ?? null,
     externalId: car?.externalId ?? fallback["externalId"] ?? "",
@@ -201,7 +231,7 @@ function buildQuoteCarSnapshot(
     bodyType: car?.bodyType ?? fallback["bodyType"] ?? "",
     vin: car?.vin ?? fallback["vin"] ?? "",
     dealer: car?.dealer ?? fallback["dealer"] ?? "",
-    imageUrl: car?.imageUrl || fallback["imageUrl"] || null,
+    imageUrl: isTenetPlus && car ? car.imageUrl : car?.imageUrl || fallback["imageUrl"] || null,
   };
 }
 
@@ -463,6 +493,10 @@ router.get("/cars/search", async (req, res) => {
       bodyType: carsTable.bodyType,
       driveType: carsTable.driveType,
       extras: carsTable.extras,
+      catalogSource: carsTable.catalogSource,
+      cmStockId: carsTable.cmStockId,
+      cmStockState: carsTable.cmStockState,
+      sourceUpdatedAt: carsTable.sourceUpdatedAt,
     }).from(carsTable);
 
     const { and } = await import("drizzle-orm");
@@ -476,7 +510,8 @@ router.get("/cars/search", async (req, res) => {
           ilike(carsTable.brand, `%${q}%`),
           ilike(carsTable.model, `%${q}%`),
           ilike(carsTable.modification, `%${q}%`),
-          ilike(carsTable.vin, `%${q}%`)
+          ilike(carsTable.vin, `%${q}%`),
+          ilike(carsTable.externalId, `%${q}%`)
         )!
       );
     }
@@ -491,7 +526,46 @@ router.get("/cars/search", async (req, res) => {
       ? carSelect.where(and(...conditions)).orderBy(carsTable.price).limit(50)
       : carSelect.orderBy(carsTable.price).limit(50));
 
-    return res.json({ ok: true, data: rows });
+    const tenetSourceComplete = getTenetPlusFeedState().complete;
+    const tenetPublicIds = getTenetPlusPublicIdSet();
+    const data = rows.map(({ catalogSource, cmStockId, cmStockState, sourceUpdatedAt, ...car }) => {
+      if (car.type !== "new" || car.dealer?.trim().toLowerCase() !== "tenet plus") return car;
+
+      const inventoryWarnings: string[] = [];
+      if (catalogSource !== "cm_business" || cmStockState?.toLowerCase() !== "in") {
+        inventoryWarnings.push("Наличие в CM не подтверждено");
+      }
+      if (!car.imageUrl?.trim()) inventoryWarnings.push("Нет фото");
+      if (!car.model?.trim()) inventoryWarnings.push("Не указана модель");
+      if (!car.complectation?.trim()) inventoryWarnings.push("Не указана комплектация");
+      if (!car.modification?.trim() && !car.complectation?.trim()) {
+        inventoryWarnings.push("Нет названия модификации");
+      }
+      if (!car.price || car.price <= 0) inventoryWarnings.push("Нет цены");
+      if (!cmStockId || !/^\d+$/.test(cmStockId)) inventoryWarnings.push("Нет ссылки на карточку CM");
+
+      const lastSourceUpdate = sourceUpdatedAt?.getTime() ?? 0;
+      const sourceStale = !tenetSourceComplete || !lastSourceUpdate
+        || Date.now() - lastSourceUpdate > 90 * 60 * 1000;
+      return {
+        ...car,
+        inventoryWarnings,
+        cmCardUrl: catalogSource === "cm_business" && cmStockId && /^\d+$/.test(cmStockId)
+          ? `https://lk.cm.expert/stock/${cmStockId}/stock`
+          : null,
+        publicEligible: tenetPublicIds.has(car.externalId) && isPublicNewCarEligible({
+          dealer: car.dealer,
+          model: car.model,
+          modification: car.modification,
+          complectation: car.complectation,
+          stockState: cmStockState,
+          imageUrl: car.imageUrl,
+        }),
+        sourceStale,
+      };
+    });
+
+    return res.json({ ok: true, data });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
   }
@@ -555,7 +629,7 @@ async function regenerateStoredQuotePdf(quote: typeof quotesTable.$inferSelect):
   const brandDisplayName = carBrand ? await resolveBrandName(carBrand) : (carBrand || null);
   const quoteBrand = carBrand;
   const carSlug = car?.externalId ?? String(snap["externalId"] ?? quote.carId);
-  const carUrl = `https://debryansk-auto.ru/${carType === "new" ? "new-cars" : "cars"}/${carSlug}`;
+  const carUrl = await getQuoteCarUrl(car, snap, carType, carSlug);
   const qrCode = await QRCode.toDataURL(carUrl, {
     width: 200, margin: 1, color: { dark: "#0d0f14", light: "#f4f6f9" },
   });
@@ -844,7 +918,7 @@ router.post("/quotes", async (req, res) => {
     const quoteBrand = car.brand ?? "";
 
     const carSlug = car.externalId ?? String(car.id);
-    const carUrl = `https://debryansk-auto.ru/${car.type === "new" ? "new-cars" : "cars"}/${carSlug}`;
+    const carUrl = await getQuoteCarUrl(car, carSnapshot, car.type, carSlug);
     const qrCode = await QRCode.toDataURL(carUrl, {
       width: 200,
       margin: 1,
@@ -1042,7 +1116,7 @@ router.put("/quotes/:id", async (req, res) => {
     const quoteBrand = carBrand;
 
     const carSlug = car?.externalId ?? String(snap["externalId"] ?? quote.carId);
-    const carUrl = `https://debryansk-auto.ru/${carType === "new" ? "new-cars" : "cars"}/${carSlug}`;
+    const carUrl = await getQuoteCarUrl(car, snap, carType, carSlug);
     const qrCode = await QRCode.toDataURL(carUrl, {
       width: 200, margin: 1,
       color: { dark: "#0d0f14", light: "#f4f6f9" },
