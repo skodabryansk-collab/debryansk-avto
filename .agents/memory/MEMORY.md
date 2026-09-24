@@ -2,9 +2,8 @@
 - [CM Expert TO brand IDs](cm-to-brand-ids.md) — Haval=220, Jetour=4061303889, Soueast=2712535252; prod DB имена JETOUR/SOUEAST; VPS нужен CM_EXPERT_CLIENT_ID (9 символов, mb-...) — НЕ CMEXPERT_CLIENT_ID (11 символов, другой API)
 - [VPS production stack](vps-production-stack.md) — полный переезд на VPS: PM2+bash wrapper+.env, nginx proxy→localhost:8080, API 3.7MB esbuild bundle, symlinks для pino workers, deploy via scripts/deploy-vps.sh.
 - [OpenAI esbuild external](openai-esbuild-external.md) — только openai MUST be external; v6 SDK uses dynamic require("node:events") → crash if bundled.
-- [VPS deploy correct path](vps-deploy-correct-path.md) — deploy to /opt/debryansk/api/ (not dist/); @workspace/integrations-openai-ai-server must be BUNDLED; prerender disk delete needs server restart.
+- [VPS deploy correct path](vps-deploy-correct-path.md) — rebuild before deploying; stage and hash-check API/admin, preserve runtime node_modules, then restart PM2.
 - [Prerender manual rebuild](prerender-manual-rebuild.md) — brand pages have NO auto-prerender-on-miss; clearing cache → SPA shell forever; rebuild manually via prerender.mjs --route.
-- [VPS deploy rules & script](vps-deploy-rules.md) — стандартизированный deploy: tar+sshpass, --strip-components вручную, **CRITICAL: всегда rebuild перед деплоем (никогда не доверять старому dist/), hash comparison для проверки свежести, backup, post-transfer verify, health check. Скрипт: scripts/deploy-vps.sh. **НЕ делать ручной tar extract в /opt/debryansk/api/ — сносит node_modules; openai external-пакет там живёт, без него PM2 падает с ERR_MODULE_NOT_FOUND.**
 - [VPS runtime dependency updates](vps-runtime-dependencies.md) — на VPS нет полного package manifest; npm install без него может удалить внешние runtime-модули, восстанавливать из backup и накладывать обновления безопаснее.
 - [Timeweb VPS reverse proxy](timeweb-vps.md) — IP 5.42.110.134, SSH через `VPS_SSH_PASSWORD` secret + sshpass, Nginx→Replit (34.111.179.208), ssl_buffer_size 4k обязателен.
 - [Timeweb DNS-01 propagation](timeweb-dns-01-propagation.md) — API TXT create/delete works, but authoritative NS can converge inconsistently; require a successful secondary ACME validation before unattended renewal.
@@ -65,7 +64,7 @@
 - [H1 injection for bots](seo-h1-injection.md) — SPA shell has no H1; inject via hidden <main> block in injectMeta(); regex /<h1 class="sr-only">/ never matched shell.
 - [SEO center prod vs dev DB](seo-center-prod-db.md) — seo_suggestions/gap_runs/wordstat_snapshots are EMPTY in Replit dev DB; prod VPS has full data. Always query VPS via DATABASE_URL from /opt/debryansk/.env for real SEO center state.
 - [Workflow restart port ownership](workflow-restart-port-ownership.md) — a stale API process can survive restart and keep serving old code on port 8080; verify listener ownership before testing.
-- [VPS SSH transient refusal](vps-ssh-transient-refusal.md) — if Timeweb accepts one connection then refuses the next, use one ControlMaster session and a staged tar deploy.
+- [VPS SSH transient refusal](vps-ssh-transient-refusal.md) — when Timeweb refuses sequential SSH, keep a background ControlMaster alive; do not use ssh -f in one-off shells.
 - [Route health and safe prerender publication](route-health-integrity.md) — reconcile DB registry with every cache route; validate and atomically publish only crawl-safe snapshots.
 - [Quote PDF priority](quote-pdf-priority.md) — интерактивная генерация КП должна прерывать длительный SEO-пререндер и не оставлять КП без файла.
 - [Karpathy evaluator schedule](karpathy-evaluator-schedule.md) — оценка должна иметь ежедневный catch-up, а не зависеть только от воскресного снапшота позиций.
