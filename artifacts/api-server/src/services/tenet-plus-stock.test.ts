@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  fetchCmBusinessStocksWith,
   fetchTenetPlusStockWith,
+  mapJelandStockCar,
   mapTenetPlusStockCar,
+  scanCmBusinessSnapshotWith,
 } from "./tenet-plus-stock";
 
 test("maps only allowlisted fields and preserves incomplete in-stock records", () => {
@@ -60,6 +63,97 @@ test("uses a distinct DMS fallback identifier without inventing a stock-card lin
   assert.equal(mapped?.cmStockId, null);
   assert.equal(mapped?.cmDmsCarId, "dms-uuid");
   assert.equal(mapTenetPlusStockCar({ vin: "VIN-WITHOUT-ID" }), null);
+});
+
+test("Jeland stock identifiers are distinct from Tenet Plus identifiers", () => {
+  assert.equal(mapJelandStockCar({ id: 27398001 })?.id, "jeland-cme-27398001");
+  assert.equal(mapJelandStockCar({ dmsCarId: "dms-uuid" })?.id, "jeland-dms-dms-uuid");
+  assert.equal(mapTenetPlusStockCar({ id: 27398001 })?.id, "tenet-plus-cme-27398001");
+});
+
+test("one complete CM snapshot validates dealer presence independently", async () => {
+  const calls: string[] = [];
+  const results = await fetchCmBusinessStocksWith(async (_path, params) => {
+    calls.push(params?.page ?? "");
+    if (params?.page === "1") return [
+      { id: 1, dealerId: 28263, stockState: "in" },
+      { id: 2, dealerId: 28263, stockState: "in" },
+    ];
+    return [];
+  }, { concurrency: 2 });
+
+  assert.deepEqual(calls, ["1", "2"]);
+  assert.equal(results["Tenet Plus"].status, "fulfilled");
+  if (results["Tenet Plus"].status === "fulfilled") {
+    assert.deepEqual(results["Tenet Plus"].value.cars.map(car => car.id), [
+      "tenet-plus-cme-1", "tenet-plus-cme-2",
+    ]);
+  }
+  assert.equal(results.Jeland.status, "rejected");
+  if (results.Jeland.status === "rejected") {
+    assert.match(String(results.Jeland.reason), /Jeland dealer was absent/);
+  }
+});
+
+test("shared CM snapshot returns Jeland stock when present without rescanning", async () => {
+  let pageCalls = 0;
+  const results = await fetchCmBusinessStocksWith(async (_path, params) => {
+    pageCalls++;
+    if (params?.page === "1") return [
+      { id: 1, dealerId: 28263, stockState: "in" },
+      { id: 2, dealerId: 27398, stockState: "in" },
+    ];
+    return [];
+  }, { concurrency: 2 });
+
+  assert.equal(pageCalls, 2);
+  assert.equal(results["Tenet Plus"].status, "fulfilled");
+  assert.equal(results.Jeland.status, "fulfilled");
+  if (results.Jeland.status === "fulfilled") {
+    assert.deepEqual(results.Jeland.value.cars.map(car => car.id), ["jeland-cme-2"]);
+  }
+});
+
+test("completed snapshots retain only target dealers and projected allowlisted fields", async () => {
+  const snapshot = await scanCmBusinessSnapshotWith(async (_path, params) => {
+    if (params?.page !== "1") return [];
+    return [
+      {
+        id: 10, dealerId: 28263, stockState: "in", model: "L6",
+        photos: [{ cmeUrl: "https://cdn.example/tenet.jpg", sourceUrl: "http://private.example/a.jpg", internalId: "secret" }],
+        customerPhone: "+70000000000", margin: 999,
+      },
+      {
+        id: 11, dealerId: 27398, stockState: "in", model: "J6",
+        photos: [{ cmeUrl: "https://cdn.example/jeland.jpg", token: "private-token" }],
+        internalNotes: "private",
+      },
+      {
+        id: 12, dealerId: 99123, stockState: "in", model: "unrelated",
+        customerPhone: "+70000000001", margin: 1234,
+      },
+      { id: 13, dealerId: 87654, stockState: "in", customerPhone: "unretained override fixture" },
+      { id: 14, dealerId: 28263, stockState: "out", customerPhone: "not retained" },
+    ];
+  }, { concurrency: 1 }, ["28263", "27398", "87654"]);
+
+  assert.deepEqual(snapshot.rows.map(row => row.dealerId), [28263, 27398, 87654]);
+  assert.deepEqual([...snapshot.presentDealerIds].sort(), ["27398", "28263", "87654"]);
+  assert.equal(snapshot.rows.some(row => row.id === 14), false);
+  assert.equal(snapshot.rows.some(row => "customerPhone" in row || "margin" in row || "internalNotes" in row), false);
+  assert.deepEqual(snapshot.rows[0]?.photos, [{ cmeUrl: "https://cdn.example/tenet.jpg" }]);
+  assert.deepEqual(Object.keys(snapshot.rows[0] ?? {}).sort(), [
+    "body", "color", "dealerId", "dmsCarId", "equipmentName", "id", "model",
+    "modificationName", "photos", "photosUrls", "sellingPrice", "sourceUpdatedAt",
+    "stockState", "updatedAt", "vin", "year",
+  ].sort());
+
+  const customDealerResult = await fetchTenetPlusStockWith(async (_path, params) => (
+    params?.page === "1"
+      ? [{ id: 99, dealerId: "87654", stockState: "in" }]
+      : []
+  ), { dealerId: "87654", concurrency: 1 });
+  assert.equal(customDealerResult.cars[0]?.id, "tenet-plus-cme-99");
 });
 
 test("scans through the terminal page, filters locally, and deduplicates stable IDs", async () => {
