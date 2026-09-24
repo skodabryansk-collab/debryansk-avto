@@ -5,6 +5,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { getPrerenderCache, isSsgRoute, rewriteAssetTagsToCurrent } from "./prerender";
+import { getTenetPlusFeedState, getTenetPlusPublicIdSet } from "../routes/new-cars";
 
 const BOT_UA =
   /googlebot|yandexbot|bingbot|duckduckbot|facebookexternalhit|twitterbot|telegrambot|whatsapp|slackbot|linkedinbot|applebot|baiduspider|ia_archiver|vkshare|odklbot|yandex.com\/bots|yandexadnet|yandeximages|yandexscreenshot|yandexwebmaster|msnbot|seznambot|serpstatbot|ahrefsbot|semrushbot|dotbot|mj12bot|petalbot|screamingfrog|lighthouse|claude|anthropic|squirrel|squirrelscan/i;
@@ -178,7 +179,14 @@ const LOCAL_BUSINESS_SCHEMA = JSON.stringify({
     "longitude": 34.3636
   },
   "sameAs": ["https://vk.com/debryansk_avto"],
-  "priceRange": "₽₽₽"
+  "priceRange": "₽₽₽",
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "telephone": "+7-4832-77-77-70",
+    "contactType": "customer service",
+    "areaServed": "RU",
+    "availableLanguage": "Russian"
+  }
 });
 
 const CONTACT_PAGE_SCHEMA = JSON.stringify({
@@ -329,14 +337,15 @@ function injectMeta(
     result = result.replace("<head>", `<head>\n    ${metaBlock}`);
   }
 
-  // Inject LCP image preload + schema.org JSON-LD before </head>
+  // Inject schema.org JSON-LD before </head.
+  // OG images are metadata assets, not guaranteed LCP images. Preloading them
+  // on every route made browsers report an unused preload warning.
   const ldScripts = [
     `<script type="application/ld+json">${LOCAL_BUSINESS_SCHEMA}</script>`,
     breadcrumbLd ? `<script type="application/ld+json">${breadcrumbLd}</script>` : "",
     extraJsonLd ? `<script type="application/ld+json">${extraJsonLd}</script>` : "",
   ].filter(Boolean).join("\n    ");
-  const lcpPreload = `<link rel="preload" as="image" href="${ogImage}" fetchpriority="high" />`;
-  result = result.replace("</head>", `  ${lcpPreload}\n  ${ldScripts}\n  </head>`);
+  result = result.replace("</head>", `  ${ldScripts}\n  </head>`);
 
   // Inject main landmark + static navigation for crawlers (visually hidden)
   result = result.replace(
@@ -395,6 +404,14 @@ function fmtRub(price: number): string {
     currency: "RUB",
     maximumFractionDigits: 0,
   }).format(price);
+}
+
+function isTenetPlusDealer(dealer: string | null | undefined): boolean {
+  return dealer?.trim().toLowerCase() === "tenet plus";
+}
+
+function hasUsablePublicImage(imageUrl: string | null | undefined): boolean {
+  return typeof imageUrl === "string" && /^https?:\/\/[^/\s]+/i.test(imageUrl.trim());
 }
 
 type NewCarRow = { external_id: string; brand: string; model: string; year: number; price: number; max_discount: number | null; image_url: string | null; color: string | null };
@@ -568,9 +585,29 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
     // client-side only and invisible to crawlers without this injection).
     if (pathStr === "/new-cars") {
       try {
+        const tenetPlusSourceComplete = getTenetPlusFeedState().complete;
+        const tenetPlusPublicIds = [...getTenetPlusPublicIdSet()];
+        const tenetPlusPublicIdsSql = tenetPlusPublicIds.length
+          ? sql`ARRAY[${sql.join(tenetPlusPublicIds.map(id => sql`${id}`), sql`, `)}]::text[]`
+          : sql`ARRAY[]::text[]`;
         const r = await db.execute(sql`
           SELECT external_id, brand, model, year, price, max_discount, image_url, color
-          FROM cars WHERE type = 'new'
+          FROM cars
+          WHERE type = 'new'
+            AND (
+              LOWER(BTRIM(dealer)) IS DISTINCT FROM 'tenet plus'
+              OR (
+                ${tenetPlusSourceComplete}
+                AND external_id = ANY(${tenetPlusPublicIdsSql})
+                AND cm_stock_state = 'in'
+                AND NULLIF(BTRIM(model), '') IS NOT NULL
+                AND NULLIF(BTRIM(image_url), '') ~* '^https?://[^/[:space:]]+'
+                AND (
+                  NULLIF(BTRIM(modification), '') IS NOT NULL
+                  OR NULLIF(BTRIM(complectation), '') IS NOT NULL
+                )
+              )
+            )
           ORDER BY popularity_score DESC NULLS LAST, price ASC
           LIMIT 100
         `);
@@ -785,17 +822,27 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
     const type = carMatch[1] === "new-cars" ? "new" : "used";
     const id = decodeURIComponent(carMatch[2]);
     const result = await db.execute(
-      sql`SELECT brand, model, modification, year, price, max_discount, description, image_url, external_id, color, mileage FROM cars WHERE external_id = ${id} AND type = ${type} LIMIT 1`
+      sql`SELECT brand, model, modification, complectation, year, price, max_discount, description, image_url, external_id, color, mileage, dealer, cm_stock_state FROM cars WHERE external_id = ${id} AND type = ${type} LIMIT 1`
     );
-    const row = result.rows[0] as { brand: string; model: string; modification: string | null; year: number; price: number; max_discount: number | null; description: string | null; image_url: string | null; external_id: string; color: string | null; mileage: number | null } | undefined;
+    const row = result.rows[0] as { brand: string; model: string; modification: string | null; complectation: string | null; year: number; price: number; max_discount: number | null; description: string | null; image_url: string | null; external_id: string; color: string | null; mileage: number | null; dealer: string | null; cm_stock_state: string | null } | undefined;
     if (row) {
       const isNew = type === "new";
+      if (isNew && isTenetPlusDealer(row.dealer)) {
+        const tenetPlusPublicIds = getTenetPlusPublicIdSet();
+        const publicStockReady = getTenetPlusFeedState().complete
+          && tenetPlusPublicIds.has(row.external_id)
+          && row.cm_stock_state === "in"
+          && Boolean(row.model?.trim())
+          && hasUsablePublicImage(row.image_url)
+          && Boolean(row.modification?.trim() || row.complectation?.trim());
+        if (!publicStockReady) return null;
+      }
       const rawPrice = Number(row.price);
       const maxDiscount = isNew ? (Number(row.max_discount) || 0) : 0;
       const salePrice = isNew ? Math.max(0, rawPrice - maxDiscount) : rawPrice;
       const priceStr = new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 }).format(salePrice);
       const modShort = row.modification ? row.modification.replace(/\s*\([^)]+\)/, "").trim() : null;
-      const stockNum = row.external_id.replace(/^.*?(\d+)$/, "$1").slice(-6);
+      const stockNum = isTenetPlusDealer(row.dealer) ? "" : row.external_id.replace(/^.*?(\d+)$/, "$1").slice(-6);
       const color = row.color || null;
       const runKm = row.mileage ? Math.round(row.mileage / 1000) + " тыс. км" : null;
       // Build title: regional anchor "в Брянске" + differentiator (color/mod/run)
@@ -815,7 +862,8 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
         ? `Купить ${row.brand} ${row.model} ${row.year} в Брянске`
         : `${row.brand} ${row.model} ${row.year} с пробегом`;
       const priceLabel = isNew && maxDiscount > 0 ? `от ${priceStr}` : priceStr;
-      const description = `Купите ${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} в Брянске. Цена ${priceLabel}. Арт. №${stockNum}. Официальный дилер «Дебрянск Авто» — +7 (4832) 77-77-70.`;
+      const stockLabel = stockNum ? ` Арт. №${stockNum}.` : "";
+      const description = `Купите ${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} в Брянске. Цена ${priceLabel}.${stockLabel} Официальный дилер «Дебрянск Авто» — +7 (4832) 77-77-70.`;
       const robots = "index, follow, max-snippet:-1, max-image-preview:large";
       const breadcrumbLd = buildBreadcrumbList(pathStr, title);
       const ogType = type === "new" ? "new" : "used";
