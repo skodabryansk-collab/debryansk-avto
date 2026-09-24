@@ -330,7 +330,12 @@ export async function runMigration() {
         ('28263', 'Tenet Plus', 'catalog', TRUE),
         ('27398', 'Jeland', 'catalog', TRUE),
         ('20556', 'Haval Pro', 'catalog', TRUE),
-        ('21937', 'Haval City', 'catalog', TRUE)
+        ('21937', 'Haval City', 'catalog', TRUE),
+        ('27564', 'Soueast', 'catalog', TRUE),
+        ('9355', 'Tenet', 'catalog', TRUE),
+        ('9356', 'OMODA', 'catalog', TRUE),
+        ('13186', 'Jetour', 'catalog', TRUE),
+        ('13187', 'JAECOO', 'catalog', TRUE)
       ON CONFLICT (dealer_id) DO NOTHING
     `);
     await db.execute(sql`
