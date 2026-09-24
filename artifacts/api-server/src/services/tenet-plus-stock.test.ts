@@ -6,6 +6,7 @@ import {
   mapCmBusinessDealerStockCar,
   mapJelandStockCar,
   mapTenetPlusStockCar,
+  mapCmBusinessIntegrationDealerStocksFromSnapshot,
   scanCmBusinessSnapshotWith,
 } from "./tenet-plus-stock";
 
@@ -47,6 +48,7 @@ test("generic catalog mapping uses a dealer-specific ID and keeps private row fi
   const mapped = mapCmBusinessDealerStockCar({
     id: 20556001,
     dealerId: "private-dealer-id",
+    brand: "Chery",
     model: "Haval F7",
     sellingPrice: 2_450_000,
     hasAbs: true,
@@ -55,6 +57,7 @@ test("generic catalog mapping uses a dealer-specific ID and keeps private row fi
   }, "Haval Pro");
 
   assert.equal(mapped?.id, "haval-pro-cme-20556001");
+  assert.equal(mapped?.brand, "Chery");
   assert.equal(mapped?.model, "Haval F7");
   assert.equal(mapped?.price, 2_450_000);
   assert.deepEqual(mapped?.options, ["ABS"]);
@@ -169,6 +172,40 @@ test("shared CM snapshot returns Jeland stock when present without rescanning", 
   if (results.Jeland.status === "fulfilled") {
     assert.deepEqual(results.Jeland.value.cars.map(car => car.id), ["jeland-cme-2"]);
   }
+});
+
+test("one CM snapshot extracts dynamic catalog dealers independently", async () => {
+  const calls: string[] = [];
+  const dealers = [
+    { dealerId: "27564", dealerName: "Soueast" },
+    { dealerId: "9355", dealerName: "Tenet" },
+    { dealerId: "9356", dealerName: "OMODA" },
+    { dealerId: "13186", dealerName: "Jetour" },
+    { dealerId: "13187", dealerName: "JAECOO" },
+  ];
+  const snapshot = await scanCmBusinessSnapshotWith(async (_path, params) => {
+    calls.push(params?.page ?? "");
+    if (params?.page !== "1") return [];
+    return [
+      { id: 1, dealerId: "9355", stockState: "in", brand: "Tenet", model: "T7" },
+      { id: 2, dealerId: "9355", stockState: "in", brand: "Chery", model: "Tiggo 9" },
+      { id: 3, dealerId: "9356", stockState: "in", brand: "Omoda", model: "C5" },
+      { dealerId: "13186", stockState: "in", model: "Jetour X" },
+      { id: 5, dealerId: "13187", stockState: "out", brand: "Jaecoo", model: "J7" },
+    ];
+  }, { concurrency: 2 }, dealers.map(dealer => dealer.dealerId));
+
+  const results = mapCmBusinessIntegrationDealerStocksFromSnapshot(snapshot, dealers);
+  assert.deepEqual(calls, ["1", "2"]);
+  assert.equal(results.get("9355")?.status, "fulfilled");
+  assert.equal(results.get("9356")?.status, "fulfilled");
+  assert.equal(results.get("13187")?.status, "fulfilled");
+  const tenetResult = results.get("9355");
+  if (tenetResult?.status === "fulfilled") {
+    assert.deepEqual(tenetResult.value.cars.map(car => car.brand), ["Tenet", "Chery"]);
+  }
+  assert.equal(results.get("27564")?.status, "rejected");
+  assert.equal(results.get("13186")?.status, "rejected");
 });
 
 test("completed snapshots retain only target dealers and projected allowlisted fields", async () => {
