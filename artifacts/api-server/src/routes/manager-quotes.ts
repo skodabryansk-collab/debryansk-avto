@@ -16,7 +16,6 @@ import fs from "fs";
 import path from "path";
 import { acquireChrome, isPrerendererRunning } from "../lib/chrome-semaphore";
 import { normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
-import { getTenetPlusOptions } from "../lib/tenet-plus-equipment";
 import { verifiedQuoteExtras } from "../lib/quote-car-extras";
 import {
   getNewCars, getPublicNewCars,
@@ -186,9 +185,8 @@ async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
   try {
     const feedCar = (await getNewCars()).find((candidate) => candidate.id === car.externalId);
     if (!feedCar) {
-      // A legacy Jeland XML row may remain while the CM scan is incomplete.
-      // Do not reuse its old XML options as verified per-car CM equipment.
-      return car.dealer?.trim().toLowerCase() === "jeland" ? { ...car, extras: "" } : car;
+      // CM dealer rows missing from the live feed cannot prove their equipment is current.
+      return isCmBusinessDealer(car.dealer) ? { ...car, extras: "" } : car;
     }
 
     if (isCmBusinessDealer(car.dealer) && feedCar.catalogSource === "cm_business") {
@@ -206,7 +204,7 @@ async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
         catalogSource: "cm_business",
         cmStockId: feedCar.cmStockId ?? null,
         cmStockState: feedCar.stockState ?? null,
-        extras: car.dealer?.trim().toLowerCase() === "jeland" ? feedCar.extras : car.extras,
+        extras: feedCar.extras,
       };
     }
 
@@ -215,7 +213,7 @@ async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
       color: feedCar.color || car.color,
       imageUrl: feedCar.images[0] || car.imageUrl,
       complectation: feedCar.complectation || car.complectation,
-      extras: feedCar.extras || car.extras,
+      extras: isCmBusinessDealer(car.dealer) ? "" : feedCar.extras || car.extras,
     };
   } catch (err) {
     logger.warn({ err, externalId: car.externalId }, "[quotes] live catalog enrichment failed; using cars row");
@@ -280,29 +278,6 @@ function parseExtrasToOptions(extras: string | null | undefined): Array<{ catego
   return Object.entries(cats)
     .filter(([, v]) => v.length > 0)
     .map(([category, items]) => ({ category, items }));
-}
-
-function buildQuoteOptions(
-  car: QuoteCar | null,
-  snapshot: Record<string, unknown>,
-): Array<{ category: string; items: string[] }> {
-  const parsed = parseExtrasToOptions(
-    car?.extras || String(snapshot["extras"] ?? ""),
-  );
-  if (parsed.length > 0) return parsed;
-
-  const source = [
-    car?.brand,
-    car?.dealer,
-    snapshot["brand"],
-    snapshot["dealer"],
-  ].filter(Boolean).join(" ");
-  if (!/tenet\s*plus/i.test(source)) return [];
-
-  return getTenetPlusOptions(
-    String(car?.model ?? snapshot["model"] ?? ""),
-    String(car?.complectation ?? snapshot["complectation"] ?? ""),
-  );
 }
 
 function buildSpecsFromCar(car: Record<string, unknown>): Array<{ icon: string; label: string; value: string }> {
@@ -560,8 +535,7 @@ router.get("/cars/search", async (req, res) => {
       }
       if (!car.price || car.price <= 0) inventoryWarnings.push("Нет цены");
       if (!cmStockId || !/^\d+$/.test(cmStockId)) inventoryWarnings.push("Нет ссылки на карточку CM");
-      if (dealer.trim().toLowerCase() === "jeland" &&
-          (catalogSource !== "cm_business" || !car.extras?.trim())) {
+      if (catalogSource !== "cm_business" || !car.extras?.trim()) {
         inventoryWarnings.push("Нет данных об опциях в CM");
       }
 
