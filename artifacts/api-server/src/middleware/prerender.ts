@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { getTenetPlusFeedState, getTenetPlusPublicIdSet } from "../routes/new-cars";
 
 const SITE = "https://debryansk-auto.ru";
 
@@ -67,6 +68,9 @@ const cache: PrerenderCacheState = {
   gone: new Set(),
 };
 
+const TENET_PLUS_BRAND_ROUTE = "/brands/tenetplus";
+let tenetPlusBrandCacheTrusted = false;
+
 const brandSlugCache = new Map<string, { exists: boolean; checkedAt: number }>();
 const BRAND_SLUG_CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -92,6 +96,43 @@ async function brandExists(slug: string): Promise<boolean | null> {
     // A transient DB outage must not turn a valid brand into a false 404.
     logger.warn({ err, slug }, "prerender: unable to validate brand slug");
     return null;
+  }
+}
+
+type CachedNewCarVisibility = "public" | "missing" | "ineligible" | "unavailable";
+
+/** Cached HTML must not outlive the database/source visibility of a new car. */
+async function cachedNewCarVisibility(externalId: string): Promise<CachedNewCarVisibility> {
+  try {
+    const result = await db.execute(
+      sql`SELECT dealer, model, modification, complectation, image_url, cm_stock_state
+          FROM cars WHERE external_id = ${externalId} AND type = 'new' LIMIT 1`,
+    );
+    const row = result.rows[0] as {
+      dealer: string | null;
+      model: string | null;
+      modification: string | null;
+      complectation: string | null;
+      image_url: string | null;
+      cm_stock_state: string | null;
+    } | undefined;
+
+    if (!row) return "missing";
+    if (row.dealer?.trim().toLowerCase() !== "tenet plus") return "public";
+
+    const tenetPlusPublicIds = getTenetPlusPublicIdSet();
+    const usableImage = typeof row.image_url === "string"
+      && /^https?:\/\/[^/\s]+/i.test(row.image_url.trim());
+    const isPublic = getTenetPlusFeedState().complete
+      && tenetPlusPublicIds.has(externalId)
+      && row.cm_stock_state === "in"
+      && Boolean(row.model?.trim())
+      && usableImage
+      && Boolean(row.modification?.trim() || row.complectation?.trim());
+    return isPublic ? "public" : "ineligible";
+  } catch (err) {
+    logger.warn({ err }, "prerender: unable to validate cached new-car detail");
+    return "unavailable";
   }
 }
 
@@ -186,6 +227,15 @@ export async function loadPrerenderCacheFromDisk(): Promise<void> {
 export const loadPrerenderCacheFromGCS = loadPrerenderCacheFromDisk;
 
 export function updatePrerenderCache(route: string, html: string): void {
+  if (route === TENET_PLUS_BRAND_ROUTE) {
+    if (!getTenetPlusFeedState().complete) {
+      cache.pages.delete(route);
+      cache.gone.delete(route);
+      tenetPlusBrandCacheTrusted = false;
+      return;
+    }
+    tenetPlusBrandCacheTrusted = true;
+  }
   cache.pages.set(route, html);
   cache.gone.delete(route);
 }
@@ -197,6 +247,7 @@ export function deletePrerenderCache(route: string): void {
 
 export function invalidatePrerenderCache(route: string): void {
   cache.pages.delete(route);
+  if (route === TENET_PLUS_BRAND_ROUTE) tenetPlusBrandCacheTrusted = false;
   // Do NOT add to cache.gone — we want the next bot request to fall through
   // to seoMeta middleware and get fresh meta tags from the DB.
 }
@@ -235,6 +286,16 @@ export async function prerenderMiddleware(
   );
 
   const brandMatch = route.match(/^\/brands\/([^/]+)$/);
+  if (isBot && route === TENET_PLUS_BRAND_ROUTE && cache.pages.has(route)) {
+    if (!getTenetPlusFeedState().complete || !tenetPlusBrandCacheTrusted) {
+      cache.pages.delete(route);
+      cache.gone.delete(route);
+      res.setHeader("Cache-Control", "no-store");
+      next();
+      return;
+    }
+  }
+
   if (isBot && brandMatch && cache.pages.has(route)) {
     const exists = await brandExists(brandMatch[1]);
     if (exists === false) {
@@ -251,6 +312,39 @@ export async function prerenderMiddleware(
   if (isBot && cache.gone.has(route)) {
     res.status(410).end();
     return;
+  }
+
+  const cachedNewCarMatch = route.match(/^\/new-cars\/([^/]+)$/);
+  if (isBot && cachedNewCarMatch && cache.pages.has(route)) {
+    let externalId: string;
+    try {
+      externalId = decodeURIComponent(cachedNewCarMatch[1]);
+    } catch {
+      cache.pages.delete(route);
+      cache.gone.delete(route);
+      res.setHeader("Cache-Control", "no-store");
+      res.status(404).end();
+      return;
+    }
+
+    const visibility = await cachedNewCarVisibility(externalId);
+    if (visibility !== "public") {
+      // A deleted or DB-ineligible row must not leave an old Puppeteer snapshot
+      // available to future crawlers. Source-incomplete records are checked
+      // again once the feed reports a complete snapshot.
+      if (visibility === "missing" || (visibility === "ineligible" && getTenetPlusFeedState().complete)) {
+        cache.pages.delete(route);
+        cache.gone.delete(route);
+      }
+      res.setHeader("Cache-Control", "no-store");
+      if (visibility === "unavailable") {
+        res.status(503).end();
+      } else {
+        res.status(404).end();
+      }
+      logger.info({ route, visibility }, "prerender: blocked cached new-car detail");
+      return;
+    }
   }
 
   if (!isBot) {
