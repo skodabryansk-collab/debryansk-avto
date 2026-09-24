@@ -207,12 +207,12 @@ async function handlePrerenderAfterSync(
     const { deletePrerendered } = await import("./lib/prerenderStorage");
     const { deletePrerenderCache, invalidatePrerenderCache } = await import("./middleware/prerender");
 
-    // Brand detail snapshots contain live stock cards. The public API now
-    // filters Tenet Plus by source completeness and DB eligibility, so never
-    // keep an older rendered copy across a catalog sync.
-    const tenetPlusBrandRoute = "/brands/tenetplus";
-    await deletePrerendered(tenetPlusBrandRoute);
-    invalidatePrerenderCache(tenetPlusBrandRoute);
+    // These brand snapshots contain live CM stock cards. IDs can stay the same
+    // while photos, trims or prices change, so invalidate after every sync.
+    for (const route of ["/brands/tenetplus", "/brands/jeland"]) {
+      await deletePrerendered(route);
+      invalidatePrerenderCache(route);
+    }
 
     for (const car of stats.removedCars) {
       const route =
@@ -240,14 +240,20 @@ async function handleIndexNowAfterSync(
 ): Promise<void> {
   const { addedNewCarIds, addedUsedCarIds } = stats;
   if (!addedNewCarIds.length && !addedUsedCarIds.length) return;
-  const urls = [
-    ...addedNewCarIds.map(id => `https://debryansk-auto.ru/new-cars/${encodeURIComponent(id)}`),
-    ...addedUsedCarIds.map(id => `https://debryansk-auto.ru/cars/${encodeURIComponent(id)}`),
-  ];
   try {
+    // Manager-only Jeland cars must never be submitted for indexing.
+    const { getCmBusinessPublicIdSet } = await import("./routes/new-cars");
+    const { filterIndexableNewCarIds } = await import("./lib/cm-business-publication");
+    const publicJelandIds = getCmBusinessPublicIdSet("Jeland");
+    const publicNewIds = filterIndexableNewCarIds(addedNewCarIds, publicJelandIds);
+    const urls = [
+      ...publicNewIds.map(id => `https://debryansk-auto.ru/new-cars/${encodeURIComponent(id)}`),
+      ...addedUsedCarIds.map(id => `https://debryansk-auto.ru/cars/${encodeURIComponent(id)}`),
+    ];
+    if (!urls.length) return;
     const { pingIndexNow } = await import("./services/indexnow");
     pingIndexNow(urls).catch(err => logger.warn({ err }, "[indexnow] ping failed"));
-    logger.info({ newCount: addedNewCarIds.length, usedCount: addedUsedCarIds.length }, "[indexnow] queued ping for new cars");
+    logger.info({ newCount: publicNewIds.length, usedCount: addedUsedCarIds.length }, "[indexnow] queued ping for new cars");
   } catch (err) {
     logger.warn({ err }, "[indexnow] post-sync handler failed");
   }
