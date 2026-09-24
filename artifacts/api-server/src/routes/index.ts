@@ -4,7 +4,7 @@ import { deletePrerendered } from "../lib/prerenderStorage";
 import healthRouter from "./health";
 import chatRouter from "./chat";
 import carsRouter from "./cars";
-import newCarsRouter, { getTenetPlusFeedState } from "./new-cars";
+import newCarsRouter, { getCmBusinessFeedState, getTenetPlusFeedState } from "./new-cars";
 import featuredRouter from "./featured";
 import hhVacanciesRouter from "./hh-vacancies";
 import cmExpertRouter from "./cm-expert";
@@ -192,6 +192,12 @@ router.post("/internal/prerender-update", async (req, res) => {
     await deletePrerendered(route);
     invalidatePrerenderCache(route);
     res.status(409).json({ ok: false, route, error: "Tenet Plus source is incomplete" });
+    return;
+  }
+  if (route === "/brands/jeland" && !getCmBusinessFeedState("Jeland").complete) {
+    await deletePrerendered(route);
+    invalidatePrerenderCache(route);
+    res.status(409).json({ ok: false, route, error: "Jeland source is incomplete" });
     return;
   }
   updatePrerenderCache(route, html);
