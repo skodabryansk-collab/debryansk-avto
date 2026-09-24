@@ -379,6 +379,68 @@ export function getSyncStatus() {
   }>("GET", "/admin/navigator/sync-status");
 }
 
+export interface CmStockIntegration {
+  dealerId: string;
+  dealerName: string;
+  mode: "catalog" | "options_only";
+  enabled: boolean;
+  lastStatus: "never" | "running" | "success" | "error";
+  lastStartedAt: string | null;
+  lastCompletedAt: string | null;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+  stockCount: number;
+  matchedCount: number;
+  carsWithOptions: number;
+  optionsCount: number;
+  pagesFetched: number;
+  rowsScanned: number;
+  durationMs: number;
+}
+export interface CmStockSyncRun {
+  id: number;
+  trigger: string;
+  status: "running" | "success" | "error" | "partial";
+  started_at: string;
+  completed_at: string | null;
+  duration_ms: number;
+  pages_fetched: number;
+  rows_scanned: number;
+  error: string | null;
+  dealers: Array<{
+    dealer_id: string;
+    dealer_name: string;
+    status: "success" | "error" | "disabled";
+    stock_count: number;
+    matched_count: number;
+    cars_with_options: number;
+    options_count: number;
+    error: string | null;
+  }>;
+}
+export interface CmStockAdminState {
+  connection: "credentials_configured" | "credentials_missing";
+  running: boolean;
+  intervalMinutes: number;
+  integrations: CmStockIntegration[];
+  recentRuns: CmStockSyncRun[];
+}
+export function getCmStockState() {
+  return api<{ ok: true; data: CmStockAdminState }>("GET", "/admin/cm-stock").then(r => r.data);
+}
+export function saveCmStockInterval(intervalMinutes: number) {
+  return api<{ ok: true; intervalMinutes: number }>("PUT", "/admin/cm-stock/settings", { intervalMinutes });
+}
+export function addCmStockIntegration(data: { dealerId: string; dealerName: string; mode: "catalog" | "options_only" }) {
+  return api<{ ok: true }>("POST", "/admin/cm-stock/integrations", data);
+}
+export function setCmStockIntegrationEnabled(dealerId: string, enabled: boolean) {
+  return api<{ ok: true }>("PATCH", `/admin/cm-stock/integrations/${encodeURIComponent(dealerId)}`, { enabled });
+}
+export function startCmStockSync() {
+  return api<{ ok: boolean; started: boolean; running: boolean; message: string }>("POST", "/admin/cm-stock/sync");
+}
+
 /* Cache rebuild */
 export interface OpStatus {
   status: "idle" | "running";
