@@ -2,16 +2,44 @@ import { Router, type IRouter } from "express";
 import { db, brandsTable, brandPageContentTable } from "@workspace/db";
 import { asc, eq, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
-import { getNewCars } from "./new-cars";
+import { getPublicNewCars, getTenetPlusFeedState, getTenetPlusPublicIdSet } from "./new-cars";
 import { getUsedCars } from "./cars";
 
 const router: IRouter = Router();
 
 const BRANDS_CACHE_TTL_MS = 5 * 60 * 1000;
-let _brandsCache: { data: unknown[]; ts: number } | null = null;
+let _brandsCache: { data: unknown[]; ts: number; tenetPlusComplete: boolean; tenetPlusIds: string } | null = null;
+
+function tenetIdsSignature(ids: Set<string>): string {
+  return [...ids].sort().join("\u0000");
+}
+
+async function countPublicTenetPlusDbRows(publicIds: Set<string>): Promise<number> {
+  if (publicIds.size === 0) return 0;
+  const rows = await db.execute(sql`
+    SELECT external_id
+    FROM cars
+    WHERE type = 'new'
+      AND LOWER(BTRIM(dealer)) = 'tenet plus'
+      AND catalog_source = 'cm_business'
+      AND cm_stock_state = 'in'
+      AND BTRIM(image_url) ~* '^https?://[^/[:space:]]+'
+      AND NULLIF(BTRIM(model), '') IS NOT NULL
+      AND (
+        NULLIF(BTRIM(modification), '') IS NOT NULL
+        OR NULLIF(BTRIM(complectation), '') IS NOT NULL
+      )
+  `);
+  return new Set((rows.rows as { external_id: string }[])
+    .map(row => row.external_id)
+    .filter(id => publicIds.has(id))).size;
+}
 
 /* ── GET /api/brands  — full brand list with car counts ────── */
 router.get("/", async (_req, res) => {
+  const tenetPlusComplete = getTenetPlusFeedState().complete;
+  const publicTenetIds = tenetPlusComplete ? getTenetPlusPublicIdSet() : new Set<string>();
+  const tenetPlusIds = tenetIdsSignature(publicTenetIds);
   try {
     const rows = await db
       .select()
@@ -24,8 +52,8 @@ router.get("/", async (_req, res) => {
     let usedCount = 0;
     try {
       const [newCars, usedCars] = await Promise.all([
-        getNewCars().catch((err) => {
-          logger?.warn({ err }, "public-brands: getNewCars failed, falling back to DB counts");
+        getPublicNewCars().catch((err) => {
+          logger?.warn({ err }, "public-brands: getPublicNewCars failed, falling back to DB counts");
           return [];
         }),
         getUsedCars().catch((err) => {
@@ -36,10 +64,13 @@ router.get("/", async (_req, res) => {
 
       if (newCars.length > 0 || usedCars.length > 0) {
         for (const c of newCars) {
+          if (c.dealer.trim().toLowerCase() === "tenet plus") continue;
           const key = c.dealer.toLowerCase();
           newCounts[key] = (newCounts[key] ?? 0) + 1;
         }
         usedCount = usedCars.length;
+
+        newCounts["tenet plus"] = await countPublicTenetPlusDbRows(publicTenetIds);
       } else {
         throw new Error("feed caches empty");
       }
@@ -48,6 +79,8 @@ router.get("/", async (_req, res) => {
       const countRows = await db.execute(sql`
         SELECT LOWER(dealer) AS dealer_key, type, COUNT(*)::int AS cnt
         FROM cars
+        WHERE type <> 'new'
+           OR LOWER(BTRIM(dealer)) IS DISTINCT FROM 'tenet plus'
         GROUP BY LOWER(dealer), type
       `);
       newCounts = {};
@@ -59,6 +92,7 @@ router.get("/", async (_req, res) => {
           newCounts[r.dealer_key] = (newCounts[r.dealer_key] ?? 0) + Number(r.cnt);
         }
       }
+      newCounts["tenet plus"] = await countPublicTenetPlusDbRows(publicTenetIds);
     }
 
     const data = rows.map(brand => {
@@ -74,10 +108,30 @@ router.get("/", async (_req, res) => {
       return { ...brand, carCount: count };
     });
 
-    _brandsCache = { data, ts: Date.now() };
-    return res.json({ ok: true, data });
+    const latestComplete = getTenetPlusFeedState().complete;
+    const latestIds = latestComplete ? getTenetPlusPublicIdSet() : new Set<string>();
+    const unchangedSnapshot = tenetPlusComplete
+      && latestComplete
+      && tenetIdsSignature(latestIds) === tenetPlusIds;
+    const publicData = unchangedSnapshot ? data : data.map(brand => {
+      const name = (brand as { name?: string }).name?.toLowerCase() ?? "";
+      return name === "tenet plus" ? { ...brand, carCount: 0 } : brand;
+    });
+
+    _brandsCache = {
+      data: publicData,
+      ts: Date.now(),
+      tenetPlusComplete: latestComplete,
+      tenetPlusIds: tenetIdsSignature(latestIds),
+    };
+    return res.json({ ok: true, data: publicData });
   } catch (err) {
-    if (_brandsCache && Date.now() - _brandsCache.ts < BRANDS_CACHE_TTL_MS) {
+    const currentComplete = getTenetPlusFeedState().complete;
+    const currentIds = currentComplete ? getTenetPlusPublicIdSet() : new Set<string>();
+    if (_brandsCache
+      && _brandsCache.tenetPlusComplete === currentComplete
+      && _brandsCache.tenetPlusIds === tenetIdsSignature(currentIds)
+      && Date.now() - _brandsCache.ts < BRANDS_CACHE_TTL_MS) {
       return res.json({ ok: true, data: _brandsCache.data });
     }
     return res.status(500).json({ ok: false, error: String(err) });
@@ -147,7 +201,7 @@ router.get("/:slug", async (req, res) => {
     // For a separately managed brand page without car_mark, use the exact
     // brand name. Never use fuzzy matching: Tenet and Tenet Plus are separate
     // brand pages and must not share inventory.
-    const allNewCars = await getNewCars();
+    const allNewCars = await getPublicNewCars();
     let brandCarsRaw: Awaited<typeof allNewCars> = [];
     const feedNames = new Set([
       (brand.carMark?.trim() || brand.name).toLowerCase(),
@@ -157,6 +211,41 @@ router.get("/:slug", async (req, res) => {
     // Fallback: exact mark match (for brands where dealer ≠ car_mark but mark matches)
     if (brandCarsRaw.length === 0) {
       brandCarsRaw = allNewCars.filter(c => feedNames.has(c.mark.toLowerCase()));
+    }
+    const isTenetPlusBrand = brand.name.trim().toLowerCase() === "tenet plus"
+      || brand.carMark?.trim().toLowerCase() === "tenet plus";
+    if (isTenetPlusBrand) {
+      const publicTenetIds = getTenetPlusPublicIdSet();
+      if (!getTenetPlusFeedState().complete || publicTenetIds.size === 0) {
+        brandCarsRaw = [];
+      } else {
+        const eligibleRows = await db.execute(sql`
+          SELECT external_id
+          FROM cars
+          WHERE type = 'new'
+            AND LOWER(BTRIM(dealer)) = 'tenet plus'
+            AND catalog_source = 'cm_business'
+            AND cm_stock_state = 'in'
+            AND BTRIM(image_url) ~* '^https?://[^/[:space:]]+'
+            AND NULLIF(BTRIM(model), '') IS NOT NULL
+            AND (
+              NULLIF(BTRIM(modification), '') IS NOT NULL
+              OR NULLIF(BTRIM(complectation), '') IS NOT NULL
+            )
+        `);
+        const eligibleIds = new Set((eligibleRows.rows as { external_id: string }[])
+          .map(row => row.external_id)
+          .filter(id => publicTenetIds.has(id)));
+        brandCarsRaw = brandCarsRaw.filter(car =>
+          car.dealer.trim().toLowerCase() === "tenet plus" && eligibleIds.has(car.id),
+        );
+        const latestPublicIds = getTenetPlusPublicIdSet();
+        if (!getTenetPlusFeedState().complete) {
+          brandCarsRaw = [];
+        } else {
+          brandCarsRaw = brandCarsRaw.filter(car => latestPublicIds.has(car.id));
+        }
+      }
     }
 
     const brandCars = brandCarsRaw.sort((a, b) => a.price - b.price)
