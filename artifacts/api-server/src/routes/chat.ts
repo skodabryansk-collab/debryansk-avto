@@ -4,7 +4,7 @@ import { db, locationsTable, brandsTable } from "@workspace/db";
 import { asc, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { getUsedCars, type CarRecord } from "./cars";
-import { getPublicNewCars, type NewCarRecord } from "./new-cars";
+import { getPublicNewCars, isCmBusinessDealer, type NewCarRecord } from "./new-cars";
 
 const router = Router();
 
@@ -87,6 +87,7 @@ interface CatalogTextCache {
   text: string;
   map: Map<string, ChatCarItem>;
   total: number;
+  cmPublicIds: string;
   expiresAt: number;
 }
 let catalogTextCache: CatalogTextCache | null = null;
@@ -646,12 +647,26 @@ async function buildCarCatalogFromDB(
     catalogTextCache = null; // invalidate text cache when rows refresh
   }
 
+  // The cars table is manager-oriented; never let non-public CM Business stock
+  // leak into the public chat catalog.
+  const publicNewCars = await getPublicNewCars().catch(() => []);
+  const cmPublicIds = publicNewCars
+    .filter(car => isCmBusinessDealer(car.dealer))
+    .map(car => car.id)
+    .sort()
+    .join("|");
+  const cmPublicIdSet = new Set(cmPublicIds ? cmPublicIds.split("|") : []);
+  allDbCars = allDbCars.filter(car =>
+    car.type !== "new" || !isCmBusinessDealer(car.dealer) || cmPublicIdSet.has(car.external_id)
+  );
+
   // Parse filters early — required to decide if the catalog text cache is applicable
   const { brandTerms, bodyTypeTerms, driveTerms, priceMax, priceMin, typeFilter } = parseMessageFilters(message);
   const hasFilter = brandTerms.length > 0 || bodyTypeTerms.length > 0 || driveTerms.length > 0 || priceMax !== null || priceMin !== null || typeFilter !== null;
 
   // Early return from catalog text cache — only for unfiltered, unpinned requests
-  if (pinnedIds.length === 0 && !hasFilter && catalogTextCache && catalogTextCache.expiresAt > Date.now()) {
+  if (pinnedIds.length === 0 && !hasFilter && catalogTextCache
+    && catalogTextCache.cmPublicIds === cmPublicIds && catalogTextCache.expiresAt > Date.now()) {
     return { lines: catalogTextCache.text, map: catalogTextCache.map, total: catalogTextCache.total };
   }
 
@@ -812,7 +827,7 @@ async function buildCarCatalogFromDB(
 
   // Store in catalog text cache only when no filter and no pinned cars
   if (pinnedIds.length === 0 && !hasFilter) {
-    catalogTextCache = { text: fullText, map, total: lines.length, expiresAt: Date.now() + 30 * 60 * 1000 };
+    catalogTextCache = { text: fullText, map, total: lines.length, cmPublicIds, expiresAt: Date.now() + 30 * 60 * 1000 };
   }
 
   return { lines: fullText, map, total: lines.length };
