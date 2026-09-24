@@ -245,7 +245,7 @@ async function refreshCmBusinessDealer(dealer: typeof CM_BUSINESS_DEALERS[number
     maxDiscount: 0,
     creditDiscount: 0,
     tradeinDiscount: 0,
-    extras: "",
+    extras: dealer === JELAND_DEALER ? (c.options?.join(", ") ?? "") : "",
     description: "",
     vin: c.vin,
     doorsCount: 0,
