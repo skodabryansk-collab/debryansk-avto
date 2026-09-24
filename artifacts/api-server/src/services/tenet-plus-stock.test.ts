@@ -102,7 +102,8 @@ test("maps only verified Jeland booleans and enum values to Russian option label
     "Колёсные диски 18 дюймов",
     "Кожаный салон",
   ]);
-  assert.equal("options" in (mapTenetPlusStockCar({ id: 27398002, hasOnBoardComputer: true }) ?? {}), false);
+  assert.deepEqual(mapTenetPlusStockCar({ id: 27398002, hasOnBoardComputer: true })?.options, ["Бортовой компьютер"]);
+  assert.equal(mapTenetPlusStockCar({ id: 27398003 })?.options, undefined);
   assert.equal(mapJelandStockCar({ id: 27398003, hasCruiseControl: false })?.options, undefined);
   assert.equal(mapJelandStockCar({ id: 27398004 })?.options, undefined);
 });
@@ -157,7 +158,7 @@ test("completed snapshots retain only target dealers and projected allowlisted f
       {
         id: 10, dealerId: 28263, stockState: "in", model: "L6",
         photos: [{ cmeUrl: "https://cdn.example/tenet.jpg", sourceUrl: "http://private.example/a.jpg", internalId: "secret" }],
-        customerPhone: "+70000000000", margin: 999,
+        customerPhone: "+70000000000", margin: 999, hasCruiseControl: true,
       },
       {
         id: 11, dealerId: 27398, stockState: "in", model: "J6",
@@ -179,6 +180,8 @@ test("completed snapshots retain only target dealers and projected allowlisted f
   assert.equal(snapshot.rows.some(row => row.id === 14), false);
   assert.equal(snapshot.rows.some(row => "customerPhone" in row || "margin" in row || "internalNotes" in row), false);
   assert.deepEqual(snapshot.rows[0]?.photos, [{ cmeUrl: "https://cdn.example/tenet.jpg" }]);
+  assert.deepEqual(snapshot.rows[0]?.options, ["Круиз-контроль"]);
+  assert.deepEqual(mapTenetPlusStockCar(snapshot.rows[0])?.options, ["Круиз-контроль"]);
   assert.deepEqual(snapshot.rows[1]?.options, ["Бортовой компьютер", "Двухзонный климат-контроль"]);
   assert.deepEqual(mapJelandStockCar(snapshot.rows[1])?.options, [
     "Бортовой компьютер", "Двухзонный климат-контроль",
@@ -188,7 +191,7 @@ test("completed snapshots retain only target dealers and projected allowlisted f
   assert.equal("customerName" in (snapshot.rows[1] ?? {}), false);
   assert.deepEqual(Object.keys(snapshot.rows[0] ?? {}).sort(), [
     "body", "color", "dealerId", "dmsCarId", "equipmentName", "id", "model",
-    "modificationName", "photos", "photosUrls", "sellingPrice", "sourceUpdatedAt",
+    "modificationName", "options", "photos", "photosUrls", "sellingPrice", "sourceUpdatedAt",
     "stockState", "updatedAt", "vin", "year",
   ].sort());
   assert.deepEqual(Object.keys(snapshot.rows[1] ?? {}).sort(), [
