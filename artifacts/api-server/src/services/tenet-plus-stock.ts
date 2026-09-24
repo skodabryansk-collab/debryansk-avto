@@ -41,11 +41,10 @@ export interface TenetPlusStockCar {
   images: string[];
   vin: string;
   sourceUpdatedAt: string;
-}
-
-export interface CmBusinessStockCar extends TenetPlusStockCar {
   options?: string[];
 }
+
+export type CmBusinessStockCar = TenetPlusStockCar;
 
 export interface TenetPlusStockResult {
   cars: TenetPlusStockCar[];
@@ -110,14 +109,14 @@ function securePhotoUrls(source: TenetPlusSourceRow): string[] {
 
 /** Strictly map an API row into the public-field allowlist. */
 export function mapTenetPlusStockCar(row: unknown): TenetPlusStockCar | null {
-  return mapCmBusinessStockCar(row, "tenet-plus") as TenetPlusStockCar | null;
+  return mapCmBusinessStockCar(row, "tenet-plus");
 }
 
 export function mapJelandStockCar(row: unknown): CmBusinessStockCar | null {
   return mapCmBusinessStockCar(row, "jeland");
 }
 
-const JELAND_BOOLEAN_OPTIONS: ReadonlyArray<readonly [string, string]> = [
+const CM_BOOLEAN_OPTIONS: ReadonlyArray<readonly [string, string]> = [
   ["hasOnBoardComputer", "Бортовой компьютер"],
   ["hasCruiseControl", "Круиз-контроль"],
   ["hasAdaptiveCruiseControls", "Адаптивный круиз-контроль"],
@@ -170,7 +169,7 @@ const JELAND_BOOLEAN_OPTIONS: ReadonlyArray<readonly [string, string]> = [
   ["hasSpareMini", "Запасное колесо-докатка"],
 ];
 
-const JELAND_ENUM_OPTIONS: ReadonlyArray<{
+const CM_ENUM_OPTIONS: ReadonlyArray<{
   field: string;
   values: Readonly<Record<string, string>>;
 }> = [
@@ -188,17 +187,17 @@ const JELAND_ENUM_OPTIONS: ReadonlyArray<{
   { field: "salon", values: { leather: "Кожаный салон" } },
 ];
 
-const JELAND_KNOWN_OPTION_LABELS = new Set([
-  ...JELAND_BOOLEAN_OPTIONS.map(([, label]) => label),
-  ...JELAND_ENUM_OPTIONS.flatMap(({ values }) => Object.values(values)),
+const CM_KNOWN_OPTION_LABELS = new Set([
+  ...CM_BOOLEAN_OPTIONS.map(([, label]) => label),
+  ...CM_ENUM_OPTIONS.flatMap(({ values }) => Object.values(values)),
 ]);
 
-function extractJelandOptions(source: Record<string, unknown>): string[] {
+function extractCmBusinessOptions(source: Record<string, unknown>): string[] {
   const options = new Set<string>();
-  for (const [field, label] of JELAND_BOOLEAN_OPTIONS) {
+  for (const [field, label] of CM_BOOLEAN_OPTIONS) {
     if (source[field] === true) options.add(label);
   }
-  for (const { field, values } of JELAND_ENUM_OPTIONS) {
+  for (const { field, values } of CM_ENUM_OPTIONS) {
     const value = source[field];
     const enumValue = typeof value === "string" || typeof value === "number" ? String(value) : "";
     if (values[enumValue]) options.add(values[enumValue]!);
@@ -207,13 +206,13 @@ function extractJelandOptions(source: Record<string, unknown>): string[] {
   // mapping the projected row, but never trust arbitrary option strings.
   if (Array.isArray(source.options)) {
     for (const label of source.options) {
-      if (typeof label === "string" && JELAND_KNOWN_OPTION_LABELS.has(label)) options.add(label);
+      if (typeof label === "string" && CM_KNOWN_OPTION_LABELS.has(label)) options.add(label);
     }
   }
   return [...options];
 }
 
-function mapCmBusinessStockCar(row: unknown, idPrefix: "tenet-plus" | "jeland"): TenetPlusStockCar | CmBusinessStockCar | null {
+function mapCmBusinessStockCar(row: unknown, idPrefix: "tenet-plus" | "jeland"): CmBusinessStockCar | null {
   if (!row || typeof row !== "object" || Array.isArray(row)) return null;
   const source = row as TenetPlusSourceRow;
   const stockId = numericStockId(source.id);
@@ -238,11 +237,8 @@ function mapCmBusinessStockCar(row: unknown, idPrefix: "tenet-plus" | "jeland"):
     vin: stringValue(source.vin),
     sourceUpdatedAt: stringValue(source.sourceUpdatedAt ?? source.updatedAt),
   };
-  if (idPrefix === "jeland") {
-    const options = extractJelandOptions(source as Record<string, unknown>);
-    return options.length > 0 ? { ...mapped, options } : mapped;
-  }
-  return mapped;
+  const options = extractCmBusinessOptions(source as Record<string, unknown>);
+  return options.length > 0 ? { ...mapped, options } : mapped;
 }
 
 function extractPage(payload: unknown, page: number): unknown[] {
@@ -286,8 +282,8 @@ function projectSourceRow(row: Record<string, unknown>): CmBusinessSourceRow {
     updatedAt: row.updatedAt,
     sourceUpdatedAt: row.sourceUpdatedAt,
   };
-  if (String(row.dealerId ?? "") === dealerConfigs.Jeland.dealerId()) {
-    const options = extractJelandOptions(row);
+  if (configuredDealerIds().includes(String(row.dealerId ?? ""))) {
+    const options = extractCmBusinessOptions(row);
     if (options.length > 0) projected.options = options;
   }
   return projected;
