@@ -71,6 +71,42 @@ test("Jeland stock identifiers are distinct from Tenet Plus identifiers", () => 
   assert.equal(mapTenetPlusStockCar({ id: 27398001 })?.id, "tenet-plus-cme-27398001");
 });
 
+test("maps only verified Jeland booleans and enum values to Russian option labels", () => {
+  const mapped = mapJelandStockCar({
+    id: 27398002,
+    hasOnBoardComputer: true,
+    hasCruiseControl: false,
+    hasAdaptiveCruiseControls: "true",
+    hasWarranty: true,
+    hasAftermarketImmobiliser: true,
+    climate: "cc2zones",
+    wheelAdjusting: "heightandlength",
+    seatsHeat: "front",
+    driverSeatAdjusting: "electro",
+    passengerSeatAdjusting: "not-observed",
+    headLightType: "led",
+    wheelRimType: "alloy",
+    wheelRimDiameter: 18,
+    salon: "leather",
+    unknownFeature: true,
+  });
+
+  assert.deepEqual(mapped?.options, [
+    "Бортовой компьютер",
+    "Двухзонный климат-контроль",
+    "Регулировка руля по высоте и вылету",
+    "Обогрев передних сидений",
+    "Электрорегулировка водительского сиденья",
+    "Светодиодные фары",
+    "Легкосплавные диски",
+    "Колёсные диски 18 дюймов",
+    "Кожаный салон",
+  ]);
+  assert.equal("options" in (mapTenetPlusStockCar({ id: 27398002, hasOnBoardComputer: true }) ?? {}), false);
+  assert.equal(mapJelandStockCar({ id: 27398003, hasCruiseControl: false })?.options, undefined);
+  assert.equal(mapJelandStockCar({ id: 27398004 })?.options, undefined);
+});
+
 test("one complete CM snapshot validates dealer presence independently", async () => {
   const calls: string[] = [];
   const results = await fetchCmBusinessStocksWith(async (_path, params) => {
@@ -126,7 +162,8 @@ test("completed snapshots retain only target dealers and projected allowlisted f
       {
         id: 11, dealerId: 27398, stockState: "in", model: "J6",
         photos: [{ cmeUrl: "https://cdn.example/jeland.jpg", token: "private-token" }],
-        internalNotes: "private",
+        internalNotes: "private", hasOnBoardComputer: true, hasCruiseControl: false,
+        climate: "cc2zones", salon: "unobserved", customerName: "private customer",
       },
       {
         id: 12, dealerId: 99123, stockState: "in", model: "unrelated",
@@ -142,10 +179,22 @@ test("completed snapshots retain only target dealers and projected allowlisted f
   assert.equal(snapshot.rows.some(row => row.id === 14), false);
   assert.equal(snapshot.rows.some(row => "customerPhone" in row || "margin" in row || "internalNotes" in row), false);
   assert.deepEqual(snapshot.rows[0]?.photos, [{ cmeUrl: "https://cdn.example/tenet.jpg" }]);
+  assert.deepEqual(snapshot.rows[1]?.options, ["Бортовой компьютер", "Двухзонный климат-контроль"]);
+  assert.deepEqual(mapJelandStockCar(snapshot.rows[1])?.options, [
+    "Бортовой компьютер", "Двухзонный климат-контроль",
+  ]);
+  assert.equal("hasOnBoardComputer" in (snapshot.rows[1] ?? {}), false);
+  assert.equal("climate" in (snapshot.rows[1] ?? {}), false);
+  assert.equal("customerName" in (snapshot.rows[1] ?? {}), false);
   assert.deepEqual(Object.keys(snapshot.rows[0] ?? {}).sort(), [
     "body", "color", "dealerId", "dmsCarId", "equipmentName", "id", "model",
     "modificationName", "photos", "photosUrls", "sellingPrice", "sourceUpdatedAt",
     "stockState", "updatedAt", "vin", "year",
+  ].sort());
+  assert.deepEqual(Object.keys(snapshot.rows[1] ?? {}).sort(), [
+    "body", "color", "dealerId", "dmsCarId", "equipmentName", "id", "model",
+    "modificationName", "options", "photos", "photosUrls", "sellingPrice",
+    "sourceUpdatedAt", "stockState", "updatedAt", "vin", "year",
   ].sort());
 
   const customDealerResult = await fetchTenetPlusStockWith(async (_path, params) => (
