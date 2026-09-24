@@ -4,7 +4,7 @@ import { getPublicNewCars, type NewCarRecord } from "./new-cars";
 const router: IRouter = Router();
 
 // Keep the existing featured-card mapping for the six XML dealers unchanged.
-// Only Tenet Plus is supplied by the shared CM Business catalog.
+// Tenet Plus and Jeland are supplied by the shared CM Business catalog.
 const FEEDS = [
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/2c3eb21beb9caa23118a56e042a13187.xml", dealer: "Jaecoo" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/9a822bd39911d610b99ad1b477ec9356.xml", dealer: "Omoda" },
@@ -82,17 +82,25 @@ const FEATURED_DEALERS = new Set([
   "haval city",
   "jetour",
   "tenet plus",
+  "jeland",
 ]);
 
 router.get("/cars/featured", async (_req, res) => {
   try {
-    const [xmlCars, tenetPlusCars] = await Promise.all([
+    const [xmlCars, cmBusinessCars] = await Promise.all([
       getXmlFeaturedCars(),
-      getPublicNewCars().then(cars => cars.filter(c => c.dealer.trim().toLowerCase() === "tenet plus")).catch(() => [] as NewCarRecord[]),
+      getPublicNewCars().then(cars => cars.filter(c => ["tenet plus", "jeland"].includes(c.dealer.trim().toLowerCase()))).catch(() => [] as NewCarRecord[]),
     ]);
-    const all = [...xmlCars, ...tenetPlusCars].filter(c => FEATURED_DEALERS.has(c.dealer.trim().toLowerCase()));
+    const all = [...xmlCars, ...cmBusinessCars].filter(c => FEATURED_DEALERS.has(c.dealer.trim().toLowerCase()));
     const inStock = all.filter((c) => c.availability === "В наличии" && c.images.length > 0);
-    const withDiscount = inStock.filter((c) => c.maxDiscount > 0);
+    const jelandCars = inStock.filter(c =>
+      c.dealer.trim().toLowerCase() === "jeland"
+      && c.images.some(image => /^https:\/\/[^/\s]+/i.test(image.trim()))
+    );
+    // Do not interpret Jeland CM Business inventory as a discount.
+    const withDiscount = inStock.filter((c) =>
+      c.maxDiscount > 0 && c.dealer.trim().toLowerCase() !== "jeland"
+    );
     const sorted = [...withDiscount].sort((a, b) => b.maxDiscount - a.maxDiscount);
     let featured = sorted.slice(0, 6);
     // Business API does not provide a Tenet Plus discount. Keep one available
@@ -104,13 +112,33 @@ router.get("/cars/featured", async (_req, res) => {
         : [...featured, tenetPlusFeatured];
     }
     if (featured.length < 6) {
-      const rest = inStock.filter((c) => !featured.find((f) => f.id === c.id));
+      const rest = inStock.filter((c) =>
+        !["tenet plus", "jeland"].includes(c.dealer.trim().toLowerCase())
+        && !featured.find((f) => f.id === c.id)
+      );
       const need = 6 - featured.length;
       const byDealer = new Map<string, NewCarRecord>();
       for (const c of rest) {
         if (!byDealer.has(c.dealer)) byDealer.set(c.dealer, c);
       }
       featured = [...featured, ...Array.from(byDealer.values()).slice(0, need)];
+    }
+    // Like Tenet Plus, include one Jeland in-stock card even though the CM API
+    // does not supply a promotional discount. Require a secure usable photo.
+    const jelandFeatured = jelandCars[0];
+    if (jelandFeatured && !featured.some(c => c.id === jelandFeatured.id)) {
+      if (featured.length < 6) {
+        featured = [...featured, jelandFeatured];
+      } else {
+        let targetIndex = -1;
+        for (let index = featured.length - 1; index >= 0; index--) {
+          if (!["tenet plus", "jeland"].includes(featured[index]!.dealer.trim().toLowerCase())) {
+            targetIndex = index;
+            break;
+          }
+        }
+        if (targetIndex >= 0) featured = featured.map((c, index) => index === targetIndex ? jelandFeatured : c);
+      }
     }
     res.json({ ok: true, data: featured });
   } catch (err) {
