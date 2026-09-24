@@ -649,7 +649,7 @@ async function buildCarCatalogFromDB(
 
   // The cars table is manager-oriented; never let non-public CM Business stock
   // leak into the public chat catalog.
-  const publicNewCars = await getPublicNewCars().catch(() => []);
+  const publicNewCars: NewCarRecord[] = await getPublicNewCars().catch((): NewCarRecord[] => []);
   const cmPublicIds = publicNewCars
     .filter(car => isCmBusinessDealer(car.dealer))
     .map(car => car.id)
