@@ -2,13 +2,26 @@ import { Router, type IRouter } from "express";
 import { db, brandsTable, brandPageContentTable } from "@workspace/db";
 import { asc, eq, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
-import { getPublicNewCars, getTenetPlusFeedState, getTenetPlusPublicIdSet } from "./new-cars";
+import {
+  getCmBusinessFeedState,
+  getCmBusinessPublicIdSet,
+  getPublicNewCars,
+  getTenetPlusFeedState,
+  getTenetPlusPublicIdSet,
+} from "./new-cars";
 import { getUsedCars } from "./cars";
 
 const router: IRouter = Router();
 
 const BRANDS_CACHE_TTL_MS = 5 * 60 * 1000;
-let _brandsCache: { data: unknown[]; ts: number; tenetPlusComplete: boolean; tenetPlusIds: string } | null = null;
+let _brandsCache: {
+  data: unknown[];
+  ts: number;
+  tenetPlusComplete: boolean;
+  tenetPlusIds: string;
+  jelandComplete: boolean;
+  jelandIds: string;
+} | null = null;
 
 function tenetIdsSignature(ids: Set<string>): string {
   return [...ids].sort().join("\u0000");
@@ -35,11 +48,35 @@ async function countPublicTenetPlusDbRows(publicIds: Set<string>): Promise<numbe
     .filter(id => publicIds.has(id))).size;
 }
 
+async function countPublicJelandDbRows(publicIds: Set<string>): Promise<number> {
+  if (publicIds.size === 0) return 0;
+  const rows = await db.execute(sql`
+    SELECT external_id
+    FROM cars
+    WHERE type = 'new'
+      AND LOWER(BTRIM(dealer)) = 'jeland'
+      AND catalog_source = 'cm_business'
+      AND cm_stock_state = 'in'
+      AND BTRIM(image_url) ~* '^https?://[^/[:space:]]+'
+      AND NULLIF(BTRIM(model), '') IS NOT NULL
+      AND (
+        NULLIF(BTRIM(modification), '') IS NOT NULL
+        OR NULLIF(BTRIM(complectation), '') IS NOT NULL
+      )
+  `);
+  return new Set((rows.rows as { external_id: string }[])
+    .map(row => row.external_id)
+    .filter(id => publicIds.has(id))).size;
+}
+
 /* ── GET /api/brands  — full brand list with car counts ────── */
 router.get("/", async (_req, res) => {
   const tenetPlusComplete = getTenetPlusFeedState().complete;
   const publicTenetIds = tenetPlusComplete ? getTenetPlusPublicIdSet() : new Set<string>();
   const tenetPlusIds = tenetIdsSignature(publicTenetIds);
+  const jelandComplete = getCmBusinessFeedState("Jeland").complete;
+  const publicJelandIds = jelandComplete ? getCmBusinessPublicIdSet("Jeland") : new Set<string>();
+  const jelandIds = tenetIdsSignature(publicJelandIds);
   try {
     const rows = await db
       .select()
@@ -65,12 +102,14 @@ router.get("/", async (_req, res) => {
       if (newCars.length > 0 || usedCars.length > 0) {
         for (const c of newCars) {
           if (c.dealer.trim().toLowerCase() === "tenet plus") continue;
+          if (c.dealer.trim().toLowerCase() === "jeland") continue;
           const key = c.dealer.toLowerCase();
           newCounts[key] = (newCounts[key] ?? 0) + 1;
         }
         usedCount = usedCars.length;
 
         newCounts["tenet plus"] = await countPublicTenetPlusDbRows(publicTenetIds);
+        newCounts["jeland"] = await countPublicJelandDbRows(publicJelandIds);
       } else {
         throw new Error("feed caches empty");
       }
@@ -81,6 +120,7 @@ router.get("/", async (_req, res) => {
         FROM cars
         WHERE type <> 'new'
            OR LOWER(BTRIM(dealer)) IS DISTINCT FROM 'tenet plus'
+           AND LOWER(BTRIM(dealer)) IS DISTINCT FROM 'jeland'
         GROUP BY LOWER(dealer), type
       `);
       newCounts = {};
@@ -93,6 +133,7 @@ router.get("/", async (_req, res) => {
         }
       }
       newCounts["tenet plus"] = await countPublicTenetPlusDbRows(publicTenetIds);
+      newCounts["jeland"] = await countPublicJelandDbRows(publicJelandIds);
     }
 
     const data = rows.map(brand => {
@@ -110,12 +151,19 @@ router.get("/", async (_req, res) => {
 
     const latestComplete = getTenetPlusFeedState().complete;
     const latestIds = latestComplete ? getTenetPlusPublicIdSet() : new Set<string>();
-    const unchangedSnapshot = tenetPlusComplete
+    const latestJelandComplete = getCmBusinessFeedState("Jeland").complete;
+    const latestJelandIds = latestJelandComplete ? getCmBusinessPublicIdSet("Jeland") : new Set<string>();
+    const tenetSnapshotUnchanged = tenetPlusComplete
       && latestComplete
       && tenetIdsSignature(latestIds) === tenetPlusIds;
-    const publicData = unchangedSnapshot ? data : data.map(brand => {
+    const jelandSnapshotUnchanged = jelandComplete
+      && latestJelandComplete
+      && tenetIdsSignature(latestJelandIds) === jelandIds;
+    const publicData = data.map(brand => {
       const name = (brand as { name?: string }).name?.toLowerCase() ?? "";
-      return name === "tenet plus" ? { ...brand, carCount: 0 } : brand;
+      if (name === "tenet plus" && !tenetSnapshotUnchanged) return { ...brand, carCount: 0 };
+      if (name === "jeland" && !jelandSnapshotUnchanged) return { ...brand, carCount: 0 };
+      return brand;
     });
 
     _brandsCache = {
@@ -123,14 +171,20 @@ router.get("/", async (_req, res) => {
       ts: Date.now(),
       tenetPlusComplete: latestComplete,
       tenetPlusIds: tenetIdsSignature(latestIds),
+      jelandComplete: latestJelandComplete,
+      jelandIds: tenetIdsSignature(latestJelandIds),
     };
     return res.json({ ok: true, data: publicData });
   } catch (err) {
     const currentComplete = getTenetPlusFeedState().complete;
     const currentIds = currentComplete ? getTenetPlusPublicIdSet() : new Set<string>();
+    const currentJelandComplete = getCmBusinessFeedState("Jeland").complete;
+    const currentJelandIds = currentJelandComplete ? getCmBusinessPublicIdSet("Jeland") : new Set<string>();
     if (_brandsCache
       && _brandsCache.tenetPlusComplete === currentComplete
       && _brandsCache.tenetPlusIds === tenetIdsSignature(currentIds)
+      && _brandsCache.jelandComplete === currentJelandComplete
+      && _brandsCache.jelandIds === tenetIdsSignature(currentJelandIds)
       && Date.now() - _brandsCache.ts < BRANDS_CACHE_TTL_MS) {
       return res.json({ ok: true, data: _brandsCache.data });
     }
@@ -241,6 +295,39 @@ router.get("/:slug", async (req, res) => {
         );
         const latestPublicIds = getTenetPlusPublicIdSet();
         if (!getTenetPlusFeedState().complete) {
+          brandCarsRaw = [];
+        } else {
+          brandCarsRaw = brandCarsRaw.filter(car => latestPublicIds.has(car.id));
+        }
+      }
+    }
+    if (brand.slug === "jeland") {
+      const publicJelandIds = getCmBusinessPublicIdSet("Jeland");
+      if (!getCmBusinessFeedState("Jeland").complete || publicJelandIds.size === 0) {
+        brandCarsRaw = [];
+      } else {
+        const eligibleRows = await db.execute(sql`
+          SELECT external_id
+          FROM cars
+          WHERE type = 'new'
+            AND LOWER(BTRIM(dealer)) = 'jeland'
+            AND catalog_source = 'cm_business'
+            AND cm_stock_state = 'in'
+            AND BTRIM(image_url) ~* '^https?://[^/[:space:]]+'
+            AND NULLIF(BTRIM(model), '') IS NOT NULL
+            AND (
+              NULLIF(BTRIM(modification), '') IS NOT NULL
+              OR NULLIF(BTRIM(complectation), '') IS NOT NULL
+            )
+        `);
+        const eligibleIds = new Set((eligibleRows.rows as { external_id: string }[])
+          .map(row => row.external_id)
+          .filter(id => publicJelandIds.has(id)));
+        brandCarsRaw = brandCarsRaw.filter(car =>
+          car.dealer.trim().toLowerCase() === "jeland" && eligibleIds.has(car.id),
+        );
+        const latestPublicIds = getCmBusinessPublicIdSet("Jeland");
+        if (!getCmBusinessFeedState("Jeland").complete) {
           brandCarsRaw = [];
         } else {
           brandCarsRaw = brandCarsRaw.filter(car => latestPublicIds.has(car.id));
