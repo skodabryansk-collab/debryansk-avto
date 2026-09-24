@@ -3,8 +3,10 @@ import { logger } from "../lib/logger";
 import { slugifyCarId } from "../lib/slugify";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { fetchTenetPlusStock } from "../services/tenet-plus-stock";
 
 const router: IRouter = Router();
+const TENET_PLUS_DEALER = "Tenet Plus";
 
 const FEEDS = [
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/2c3eb21beb9caa23118a56e042a13187.xml", dealer: "Jaecoo" },
@@ -15,8 +17,8 @@ const FEEDS = [
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/913211584f8ad577ee76a703f2f13186.xml", dealer: "Jetour" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/86abbe9a79571a2757b583e323b27564.xml", dealer: "Soueast" },
   { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/35c5c670c873d1d7bb686184b3f27398.xml", dealer: "Jeland" },
-  { url: "https://media.cm.expert/stock/export/cmexpert/auto.ru/pc/new/3be8e5ea72deb63eec3e56b8d9d28263.xml", dealer: "Tenet Plus" },
 ];
+const SOURCES: Array<{ dealer: string; url?: string }> = [...FEEDS, { dealer: TENET_PLUS_DEALER }];
 
 export interface NewCarRecord {
   id: string;
@@ -46,9 +48,39 @@ export interface NewCarRecord {
   notRegisteredInRussia: boolean;
   acceptedAutoruExclusive: boolean;
   popularity_score: number;
+  catalogSource?: "cm_business";
+  cmStockId?: string | null;
+  cmDmsCarId?: string | null;
+  stockState?: string | null;
+  sourceUpdatedAt?: string | null;
+}
+
+interface PublicEligibilityInput {
+  dealer: string | null;
+  model: string | null;
+  modification: string | null;
+  complectation: string | null;
+  stockState?: string | null;
+  images?: string[] | null;
+  imageUrl?: string | null;
+}
+
+function hasUsablePhoto(url: string | null | undefined): boolean {
+  return typeof url === "string" && /^https?:\/\/[^/\s]+/i.test(url.trim());
+}
+
+export function isPublicNewCarEligible(car: PublicEligibilityInput): boolean {
+  if (car.dealer?.trim().toLowerCase() !== TENET_PLUS_DEALER.toLowerCase()) return true;
+  const hasPhoto = (car.images?.some(hasUsablePhoto) ?? false) || hasUsablePhoto(car.imageUrl);
+  return car.stockState?.toLowerCase() === "in"
+    && hasPhoto
+    && Boolean(car.model?.trim())
+    && Boolean(car.complectation?.trim() || car.modification?.trim());
 }
 
 const CACHE_TTL = 30 * 60 * 1000;
+const CM_RETRY_MS = 60 * 1000;
+const PUBLIC_STOCK_MAX_AGE = 60 * 60 * 1000;
 
 interface DealerCache {
   data: NewCarRecord[];
@@ -57,6 +89,8 @@ interface DealerCache {
 }
 
 const dealerCache: Map<string, DealerCache> = new Map();
+const refreshInFlight = new Map<string, Promise<void>>();
+let tenetPlusFailureAt = 0;
 let lastMergedAt = 0;
 let mergedCache: NewCarRecord[] | null = null;
 
@@ -64,6 +98,22 @@ export function clearNewCarsCache() {
   dealerCache.clear();
   mergedCache = null;
   lastMergedAt = 0;
+  tenetPlusFailureAt = 0;
+}
+
+export function getTenetPlusFeedState(): { complete: boolean; cachedCount: number } {
+  const cached = dealerCache.get(TENET_PLUS_DEALER);
+  return {
+    complete: Boolean(cached && !cached.stale && Date.now() - cached.ts < PUBLIC_STOCK_MAX_AGE),
+    cachedCount: cached?.data.length ?? 0,
+  };
+}
+
+/** Cross-check DB-backed public pages against the current complete CM snapshot. */
+export function getTenetPlusPublicIdSet(): Set<string> {
+  if (!getTenetPlusFeedState().complete) return new Set();
+  const cached = dealerCache.get(TENET_PLUS_DEALER);
+  return new Set(cached?.data.filter(isPublicNewCarEligible).map(car => car.id) ?? []);
 }
 
 function getField(xml: string, field: string): string {
@@ -147,25 +197,78 @@ async function refreshDealer(feed: { url: string; dealer: string }): Promise<voi
   mergedCache = null;
 }
 
+async function refreshTenetPlus(): Promise<void> {
+  const { cars, fetchedAt, pagesFetched, rowsScanned } = await fetchTenetPlusStock();
+  const parsed: NewCarRecord[] = cars.map(c => ({
+    id: c.id,
+    mark: TENET_PLUS_DEALER,
+    model: c.model,
+    modification: c.modification,
+    complectation: c.complectation,
+    year: c.year,
+    price: c.price,
+    color: c.color,
+    bodyType: c.bodyType,
+    availability: "В наличии",
+    url: "",
+    images: c.images,
+    dealer: TENET_PLUS_DEALER,
+    maxDiscount: 0,
+    creditDiscount: 0,
+    tradeinDiscount: 0,
+    extras: "",
+    description: "",
+    vin: c.vin,
+    doorsCount: 0,
+    wheel: "",
+    armored: "",
+    custom: "",
+    phone: "",
+    notRegisteredInRussia: false,
+    acceptedAutoruExclusive: false,
+    popularity_score: 0,
+    catalogSource: "cm_business",
+    cmStockId: c.cmStockId,
+    cmDmsCarId: c.cmDmsCarId,
+    stockState: "in",
+    sourceUpdatedAt: fetchedAt,
+  }));
+  dealerCache.set(TENET_PLUS_DEALER, { data: parsed, ts: Date.now(), stale: false });
+  tenetPlusFailureAt = 0;
+  mergedCache = null;
+  logger.info({ dealer: TENET_PLUS_DEALER, count: parsed.length, pagesFetched, rowsScanned }, "new-cars: CM Business stock fetched");
+}
+
+function refreshSource(source: { dealer: string; url?: string }): Promise<void> {
+  const existing = refreshInFlight.get(source.dealer);
+  if (existing) return existing;
+  const work = (source.url ? refreshDealer({ dealer: source.dealer, url: source.url }) : refreshTenetPlus())
+    .finally(() => refreshInFlight.delete(source.dealer));
+  refreshInFlight.set(source.dealer, work);
+  return work;
+}
+
 export async function getNewCars(): Promise<NewCarRecord[]> {
   const now = Date.now();
-  const staleFeeds = FEEDS.filter(f => {
-    const c = dealerCache.get(f.dealer);
+  const staleFeeds = SOURCES.filter(source => {
+    const c = dealerCache.get(source.dealer);
+    if (source.dealer === TENET_PLUS_DEALER && tenetPlusFailureAt && now - tenetPlusFailureAt < CM_RETRY_MS) return false;
     return !c || now - c.ts >= CACHE_TTL;
   });
 
   if (staleFeeds.length > 0) {
-    const results = await Promise.allSettled(staleFeeds.map(f => refreshDealer(f)));
+    const results = await Promise.allSettled(staleFeeds.map(refreshSource));
     results.forEach((r, i) => {
       if (r.status === "rejected") {
-        const feed = staleFeeds[i];
+        const feed = staleFeeds[i]!;
         const prev = dealerCache.get(feed.dealer);
+        if (feed.dealer === TENET_PLUS_DEALER) tenetPlusFailureAt = now;
         if (prev) {
           logger.warn(
             { dealer: feed.dealer, err: String(r.reason), cachedCount: prev.data.length },
             "new-cars: feed FAILED — using previous cached data as fallback"
           );
-          dealerCache.set(feed.dealer, { ...prev, ts: now, stale: true });
+          dealerCache.set(feed.dealer, { ...prev, ts: feed.dealer === TENET_PLUS_DEALER ? now - CACHE_TTL + CM_RETRY_MS : now, stale: true });
         } else {
           logger.error(
             { dealer: feed.dealer, url: feed.url, err: String(r.reason) },
@@ -179,7 +282,7 @@ export async function getNewCars(): Promise<NewCarRecord[]> {
 
   if (!mergedCache) {
     const data: NewCarRecord[] = [];
-    for (const feed of FEEDS) {
+    for (const feed of SOURCES) {
       const c = dealerCache.get(feed.dealer);
       if (c) data.push(...c.data);
     }
@@ -190,12 +293,37 @@ export async function getNewCars(): Promise<NewCarRecord[]> {
   return mergedCache;
 }
 
+export function toPublicNewCar({
+  catalogSource: _source, cmStockId: _stockId, cmDmsCarId: _dmsId,
+  stockState: _stockState, sourceUpdatedAt: _sourceUpdatedAt, ...publicCar
+}: NewCarRecord): NewCarRecord {
+  return publicCar;
+}
+
+export async function getPublicNewCars(): Promise<NewCarRecord[]> {
+  const allCars = await getNewCars();
+  const tenetPublicIds = getTenetPlusPublicIdSet();
+  return allCars
+    .filter(car => car.dealer.trim().toLowerCase() !== TENET_PLUS_DEALER.toLowerCase() || tenetPublicIds.has(car.id))
+    .filter(isPublicNewCarEligible)
+    .map(toPublicNewCar);
+}
+
 /* ── Debug endpoint: проверить доступность фидов напрямую ── */
 router.get("/debug/feeds", async (_req, res) => {
   const checks = await Promise.allSettled(
-    FEEDS.map(async (feed) => {
+    SOURCES.map(async (feed) => {
       const start = Date.now();
       try {
+        if (!feed.url) {
+          const cached = dealerCache.get(feed.dealer);
+          return {
+            dealer: feed.dealer, source: "cm_business", status: cached && !cached.stale ? 200 : 503,
+            cars: cached?.data.length ?? 0, ms: 0, ok: Boolean(cached && !cached.stale),
+            cacheAge: cached ? Math.round((Date.now() - cached.ts) / 1000) + "s" : "no cache",
+            stale: cached?.stale ?? true,
+          };
+        }
         const r = await fetch(feed.url, {
           headers: { "User-Agent": "Mozilla/5.0" },
           signal: AbortSignal.timeout(15_000),
@@ -232,14 +360,14 @@ router.get("/debug/feeds", async (_req, res) => {
     ok: true,
     mergedAt: lastMergedAt ? new Date(lastMergedAt).toISOString() : null,
     results: checks.map((c, i) =>
-      c.status === "fulfilled" ? c.value : { dealer: FEEDS[i].dealer, error: String((c as PromiseRejectedResult).reason) }
+      c.status === "fulfilled" ? c.value : { dealer: SOURCES[i]!.dealer, error: String((c as PromiseRejectedResult).reason) }
     ),
   });
 });
 
 router.get("/cars/new", async (req, res) => {
   try {
-    let data = await getNewCars();
+    let data = await getPublicNewCars();
     const hasDiscount = req.query.hasDiscount === "true";
     const sort = req.query.sort as string | undefined;
     const limit = parseInt(req.query.limit as string) || 0;
