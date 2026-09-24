@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
-import { updatePrerenderCache, getPrerenderCache } from "../middleware/prerender";
+import { updatePrerenderCache, getPrerenderCache, invalidatePrerenderCache } from "../middleware/prerender";
+import { deletePrerendered } from "../lib/prerenderStorage";
 import healthRouter from "./health";
 import chatRouter from "./chat";
 import carsRouter from "./cars";
-import newCarsRouter from "./new-cars";
+import newCarsRouter, { getTenetPlusFeedState } from "./new-cars";
 import featuredRouter from "./featured";
 import hhVacanciesRouter from "./hh-vacancies";
 import cmExpertRouter from "./cm-expert";
@@ -171,7 +172,7 @@ function isSsgProtected(route: string): boolean {
   return false;
 }
 
-router.post("/internal/prerender-update", (req, res) => {
+router.post("/internal/prerender-update", async (req, res) => {
   const secret = req.headers["x-prerender-secret"];
   if (secret !== process.env.PRERENDER_INTERNAL_SECRET) {
     res.status(403).json({ ok: false });
@@ -185,6 +186,12 @@ router.post("/internal/prerender-update", (req, res) => {
   // Never overwrite SSG routes — they have correct FAQPage schema
   if (isSsgProtected(route)) {
     res.json({ ok: true, route, skipped: true, reason: "SSG protected" });
+    return;
+  }
+  if (route === "/brands/tenetplus" && !getTenetPlusFeedState().complete) {
+    await deletePrerendered(route);
+    invalidatePrerenderCache(route);
+    res.status(409).json({ ok: false, route, error: "Tenet Plus source is incomplete" });
     return;
   }
   updatePrerenderCache(route, html);
