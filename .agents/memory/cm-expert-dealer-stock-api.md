@@ -1,11 +1,11 @@
 ---
 name: CM Expert dealer stock API
-description: Observed pagination, filtering, stock-state, and data-exposure behavior for the Business API DMS car list.
+description: Verified global-list behavior and the authorized single-car GET/PATCH methods for CM Expert Business API.
 ---
 
 ## Rule
 
-Treat `/dealers/dms/cars` as a global list and filter rows by `dealerId` and `stockState` locally. In the observed API, dealer-related query parameters did not filter the list, and `/dealers/{dealerId}/dms/cars` returned 403. The `page` parameter works; `perPage` increased the page size but was capped at 50 even when requesting 100. The response is a plain array without total-page metadata, so continue until a page is shorter than 50 or empty, and deduplicate by a stable record ID.
+Treat `/dealers/dms/cars` as a global list and filter rows by `dealerId` and `stockState` locally. Dealer-related query parameters did not filter the list, and the dealer-scoped list `/dealers/{dealerId}/dms/cars` returned 403. Do not confuse that list route with the single-car GET documented below. The `page` parameter works; `perPage` is capped at 50. The response is a plain array without total-page metadata, so continue until a page is shorter than 50 or empty, and deduplicate by a stable record ID.
 
 `stockState: "in"` is the stock-present value used by the existing sync code; `saleStatus` is a separate field and should not replace it as the inventory criterion.
 
@@ -39,8 +39,8 @@ The user chose to wait for per-car Tenet Plus equipment to appear in CM rather t
 
 ## Refreshing one car from the quote form
 
-A manager-triggered refresh must read a complete fresh CM snapshot but change only the selected, exactly identified car. Catalog refreshes must set or clear verified equipment together with catalog equipment; options-only refreshes must leave the source catalog untouched. Treat a successful fetch time, not CM's last edit time, as the freshness signal. Reject the update if the car's identifiers change while CM is being read.
+Use `GET /dealers/{dealerId}/dms/cars/{dmsCarId}` for a manager-triggered single-car refresh. This route was validated against production and returned the exact DmsCar. `dmsCarId` is the DMS identifier, not CM Expert's numeric `id` (`cmStockId` in our database); URL-encode both path segments. Access requires permission for the dealer and an enabled dealer stock. `PATCH` on this same path writes changes to CM and must not be used to pull data into our database.
 
-**Why:** CM has no verified single-car Business API read in this integration; quote PDFs prefer verified equipment over catalog equipment, and bulk sync can run concurrently with a manager's refresh. Without these rules the screen can claim success while a PDF contains stale options or a different car is overwritten.
+**Why:** The global list ignores `id`, `stockId`, `dmsCarId`, `vin`, and `dealerId` query filters, so a full scan is slow. The direct GET avoids that scan while preserving exact identity checks; quote PDFs prefer verified equipment over catalog equipment, and bulk sync can run concurrently with a manager's refresh.
 
-**How to apply:** Match dealer, valid VIN and any known CM IDs against the completed snapshot; perform a guarded one-row update, then compute warnings from the saved row. Mark the row as manually verified so quote creation and later PDF regeneration do not overwrite it with a separately cached supplier feed. Do not infer missing equipment from the trim or hide warnings CM cannot resolve.
+**How to apply:** Require a DMS ID and valid VIN before offering the action; call the direct GET, then validate dealer ID, DMS ID, VIN, and any known numeric CM stock ID. Perform a guarded one-row update, compute warnings from the saved row, and mark the row manually verified so quote creation and later PDF regeneration do not overwrite it with a separate cached supplier feed. Never forward raw CM records, and do not fall back to a global scan when the DMS ID is missing.
