@@ -61,7 +61,6 @@
 - [Prerender title sync from og:title](prerender-title-fix.md) — prerender.ts served cached HTML with wrong `<title>` (SPA default); fix: extract og:title from cached HTML and use it as `<title>` before res.send.
 - [News SEO & gallery](news-seo-and-gallery.md) — stale JS hash на VPS news pages, deploy fix (rm news/ before upload), og:image/type/NewsArticle fixes, mobile gallery HeroGallery on all screens.
 - [H1 injection for bots](seo-h1-injection.md) — SPA shell has no H1; inject via hidden <main> block in injectMeta(); regex /<h1 class="sr-only">/ never matched shell.
-- [SEO center prod vs dev DB](seo-center-prod-db.md) — seo_suggestions/gap_runs/wordstat_snapshots are EMPTY in Replit dev DB; prod VPS has full data. Always query VPS via DATABASE_URL from /opt/debryansk/.env for real SEO center state.
 - [Workflow restart port ownership](workflow-restart-port-ownership.md) — a stale API process can survive restart and keep serving old code on port 8080; verify listener ownership before testing.
 - [VPS SSH transient refusal](vps-ssh-transient-refusal.md) — when Timeweb refuses sequential SSH, keep a background ControlMaster alive; do not use ssh -f in one-off shells.
 - [Route health and safe prerender publication](route-health-integrity.md) — reconcile DB registry with every cache route; validate and atomically publish only crawl-safe snapshots.
