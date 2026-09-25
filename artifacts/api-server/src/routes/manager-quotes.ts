@@ -28,6 +28,7 @@ import {
 } from "../services/cm-car-refresh";
 import {
   getNewCars, getPublicNewCars,
+  type NewCarRecord,
   getCmBusinessPublicIdSet, isCmBusinessDealer, isPublicNewCarEligible,
 } from "./new-cars";
 
@@ -191,44 +192,61 @@ async function getQuoteCarUrl(car: QuoteCar | null, snapshot: Record<string, unk
  * the two fields that matter to the PDF when a quote is created or rebuilt so
  * a short sync lag cannot produce a stale color or a missing photo.
  */
-async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
-  if (!car || car.type !== "new") return car;
+type QuoteCarFeedMergeFields = Pick<
+  QuoteCar,
+  | "type" | "externalId" | "dealer" | "catalogSource" | "cmRefreshedAt"
+  | "model" | "modification" | "complectation" | "year" | "price" | "color"
+  | "imageUrl" | "vin" | "bodyType" | "cmStockId" | "cmStockState"
+  | "extras" | "cmVerifiedExtras"
+>;
+
+export function mergeQuoteCarWithFeed<T extends QuoteCarFeedMergeFields>(
+  car: T,
+  feedCar: NewCarRecord | undefined,
+): T {
+  if (car.cmRefreshedAt) return car;
   const sourcedFromCm = car.catalogSource === "cm_business" || isCmBusinessDealer(car.dealer);
+
+  if (!feedCar) {
+    // CM dealer rows missing from the live feed cannot prove their equipment is current.
+    return (sourcedFromCm ? { ...car, extras: "" } : car) as T;
+  }
+
+  if (sourcedFromCm && feedCar.catalogSource === "cm_business") {
+    return {
+      ...car,
+      model: feedCar.model,
+      modification: feedCar.modification,
+      complectation: feedCar.complectation,
+      year: feedCar.year,
+      price: feedCar.price,
+      color: feedCar.color || null,
+      imageUrl: feedCar.images[0] ?? null,
+      vin: feedCar.vin || null,
+      bodyType: feedCar.bodyType || null,
+      catalogSource: "cm_business",
+      cmStockId: feedCar.cmStockId ?? null,
+      cmStockState: feedCar.stockState ?? null,
+      extras: feedCar.extras,
+      cmVerifiedExtras: feedCar.extras || null,
+    } as T;
+  }
+
+  return {
+    ...car,
+    color: feedCar.color || car.color,
+    imageUrl: feedCar.images[0] || car.imageUrl,
+    complectation: feedCar.complectation || car.complectation,
+    extras: sourcedFromCm ? "" : feedCar.extras || car.extras,
+  } as T;
+}
+
+async function enrichQuoteCar(car: QuoteCar | null): Promise<QuoteCar | null> {
+  if (!car || car.type !== "new" || car.cmRefreshedAt) return car;
 
   try {
     const feedCar = (await getNewCars()).find((candidate) => candidate.id === car.externalId);
-    if (!feedCar) {
-      // CM dealer rows missing from the live feed cannot prove their equipment is current.
-      return sourcedFromCm ? { ...car, extras: "" } : car;
-    }
-
-    if (sourcedFromCm && feedCar.catalogSource === "cm_business") {
-      return {
-        ...car,
-        model: feedCar.model,
-        modification: feedCar.modification,
-        complectation: feedCar.complectation,
-        year: feedCar.year,
-        price: feedCar.price,
-        color: feedCar.color || null,
-        imageUrl: feedCar.images[0] ?? null,
-        vin: feedCar.vin || null,
-        bodyType: feedCar.bodyType || null,
-        catalogSource: "cm_business",
-        cmStockId: feedCar.cmStockId ?? null,
-        cmStockState: feedCar.stockState ?? null,
-        extras: feedCar.extras,
-        cmVerifiedExtras: feedCar.extras || null,
-      };
-    }
-
-    return {
-      ...car,
-      color: feedCar.color || car.color,
-      imageUrl: feedCar.images[0] || car.imageUrl,
-      complectation: feedCar.complectation || car.complectation,
-      extras: sourcedFromCm ? "" : feedCar.extras || car.extras,
-    };
+    return mergeQuoteCarWithFeed(car, feedCar);
   } catch (err) {
     logger.warn({ err, externalId: car.externalId }, "[quotes] live catalog enrichment failed; using cars row");
     return car;
