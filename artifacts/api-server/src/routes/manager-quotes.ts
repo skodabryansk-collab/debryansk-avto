@@ -4,7 +4,7 @@ import { db, managersTable, quotesTable, carsTable, brandsTable, locationsTable,
 import QRCode from "qrcode";
 // @ts-ignore - no types available
 
-import { eq, ilike, or, desc, sql } from "drizzle-orm";
+import { and, eq, ilike, or, desc, sql } from "drizzle-orm";
 import { requireManager, getManagerPayload } from "../middlewares/requireManager";
 import { renderKp, type KpData } from "../templates/kp/render";
 import puppeteer from "puppeteer";
@@ -17,10 +17,18 @@ import path from "path";
 import { acquireChrome, isPrerendererRunning } from "../lib/chrome-semaphore";
 import { normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
 import { verifiedQuoteExtras } from "../lib/quote-car-extras";
-import { getCmOptionsOnlyDealerNames, isCmOptionsOnlyDealer } from "../services/cm-stock-integrations";
+import {
+  getCmStockIntegrations, isCmOptionsOnlyDealer,
+  type CmStockIntegration,
+} from "../services/cm-stock-integrations";
+import { fetchCmBusinessIntegrationSnapshot } from "../services/tenet-plus-stock";
+import {
+  buildCmRefreshGuard, buildCmRefreshUpdate, enabledCmIntegrationForDealer, findCmRefreshCandidate,
+  hasCmRefreshChanges, normalizeValidatedVin,
+} from "../services/cm-car-refresh";
 import {
   getNewCars, getPublicNewCars,
-  getCmBusinessFeedState, getCmBusinessPublicIdSet, isCmBusinessDealer, isPublicNewCarEligible,
+  getCmBusinessPublicIdSet, isCmBusinessDealer, isPublicNewCarEligible,
 } from "./new-cars";
 
 const router: IRouter = Router();
@@ -394,6 +402,112 @@ function buildManagerCarFilter(mBrands: string[], requestedType?: string) {
   return [eq(carsTable.type, "__none__")];
 }
 
+type CarSearchRow = {
+  id: number;
+  externalId: string;
+  type: string;
+  brand: string | null;
+  model: string | null;
+  year: number | null;
+  modification: string | null;
+  complectation: string | null;
+  color: string | null;
+  price: number | null;
+  imageUrl: string | null;
+  vin: string | null;
+  dealer: string | null;
+  bodyType: string | null;
+  driveType: string | null;
+  extras: string | null;
+  cmVerifiedExtras: string | null;
+  catalogSource: string | null;
+  cmStockId: string | null;
+  cmDmsCarId: string | null;
+  cmStockState: string | null;
+  sourceUpdatedAt: Date | null;
+  syncedAt: Date | null;
+};
+
+export function projectCarSearchResult(
+  row: CarSearchRow,
+  enabledIntegrations: CmStockIntegration[],
+): Record<string, unknown> {
+  const {
+    catalogSource, cmStockId, cmStockState, sourceUpdatedAt, syncedAt: _syncedAt,
+    cmVerifiedExtras, cmDmsCarId: _cmDmsCarId,
+    ...car
+  } = row;
+  const enabledDealerNames = new Set(enabledIntegrations.map(integration => integration.dealerName.trim().toLowerCase()));
+  const cmRefreshAvailable = car.type === "new"
+    && !!car.dealer
+    && enabledDealerNames.has(car.dealer.trim().toLowerCase());
+
+  if (car.type === "new" && isCmOptionsOnlyDealer(car.dealer)) {
+    const inventoryWarnings: string[] = [];
+    if (!cmVerifiedExtras?.trim()) inventoryWarnings.push("Нет данных об опциях в CM");
+    if (!cmStockId) inventoryWarnings.push("Авто не сопоставлено с карточкой склада CM по VIN");
+    return {
+      ...car,
+      cmVerifiedExtras,
+      cmOptionsOnly: true,
+      cmRefreshAvailable,
+      inventoryWarnings,
+      cmCardUrl: cmStockId && /^\d+$/.test(cmStockId)
+        ? `https://lk.cm.expert/stock/${cmStockId}/stock`
+        : null,
+    };
+  }
+  if (car.type !== "new" || (catalogSource !== "cm_business" && !isCmBusinessDealer(car.dealer))) {
+    return cmRefreshAvailable ? { ...car, cmRefreshAvailable } : car;
+  }
+
+  const dealer = car.dealer!;
+  const publicIds = getCmBusinessPublicIdSet(dealer);
+  const inventoryWarnings: string[] = [];
+  if (catalogSource !== "cm_business" || cmStockState?.toLowerCase() !== "in") inventoryWarnings.push("Наличие в CM не подтверждено");
+  if (!car.imageUrl?.trim()) inventoryWarnings.push("Нет фото");
+  if (!car.model?.trim()) inventoryWarnings.push("Не указана модель");
+  if (!car.complectation?.trim()) inventoryWarnings.push("Не указана комплектация");
+  if (!car.modification?.trim() && !car.complectation?.trim()) inventoryWarnings.push("Нет названия модификации");
+  if (!car.price || car.price <= 0) inventoryWarnings.push("Нет цены");
+  if (!cmStockId || !/^\d+$/.test(cmStockId)) inventoryWarnings.push("Нет ссылки на карточку CM");
+  if (catalogSource !== "cm_business" || !car.extras?.trim()) inventoryWarnings.push("Нет данных об опциях в CM");
+
+  const sourceStale = !row.syncedAt || Date.now() - row.syncedAt.getTime() > 90 * 60 * 1000;
+  return {
+    ...car,
+    cmRefreshAvailable,
+    inventoryWarnings,
+    cmCardUrl: catalogSource === "cm_business" && cmStockId && /^\d+$/.test(cmStockId)
+      ? `https://lk.cm.expert/stock/${cmStockId}/stock`
+      : null,
+    publicEligible: publicIds.has(car.externalId) && isPublicNewCarEligible({
+      dealer: car.dealer,
+      model: car.model,
+      modification: car.modification,
+      complectation: car.complectation,
+      stockState: cmStockState,
+      catalogSource,
+      imageUrl: car.imageUrl,
+    }),
+    sourceStale,
+  };
+}
+
+export function buildCmRefreshResponse(
+  row: CarSearchRow,
+  integration: CmStockIntegration,
+  updated: boolean,
+  refreshedAt: string,
+) {
+  return {
+    ok: true as const,
+    data: projectCarSearchResult(row, [integration]),
+    updated,
+    refreshedAt,
+  };
+}
+
 function salesHeadBrandLookup(carType: string | null, carBrand: string | null) {
   const lookupBrand = carType === "used" ? USED_BRAND : (carBrand ?? "");
   return sql`${salesHeadManagersTable.brands} @> ${JSON.stringify([lookupBrand])}::jsonb`;
@@ -493,10 +607,12 @@ router.get("/cars/search", async (req, res) => {
       driveType: carsTable.driveType,
       extras: carsTable.extras,
       cmVerifiedExtras: carsTable.cmVerifiedExtras,
+      cmDmsCarId: carsTable.cmDmsCarId,
       catalogSource: carsTable.catalogSource,
       cmStockId: carsTable.cmStockId,
       cmStockState: carsTable.cmStockState,
       sourceUpdatedAt: carsTable.sourceUpdatedAt,
+      syncedAt: carsTable.syncedAt,
     }).from(carsTable);
 
     const { and } = await import("drizzle-orm");
@@ -527,71 +643,150 @@ router.get("/cars/search", async (req, res) => {
       ? carSelect.where(and(...conditions)).orderBy(carsTable.price).limit(searchLimit)
       : carSelect.orderBy(carsTable.price).limit(searchLimit));
 
-    const optionsOnlyDealers = new Set(
-      (await getCmOptionsOnlyDealerNames()).map(name => name.trim().toLowerCase()),
-    );
-    const data = rows.map(({ catalogSource, cmStockId, cmStockState, sourceUpdatedAt, cmVerifiedExtras, ...car }) => {
-      if (car.type === "new" && optionsOnlyDealers.has(String(car.dealer ?? "").trim().toLowerCase())) {
-        const inventoryWarnings: string[] = [];
-        if (!cmVerifiedExtras?.trim()) inventoryWarnings.push("Нет данных об опциях в CM");
-        if (!cmStockId) inventoryWarnings.push("Авто не сопоставлено с карточкой склада CM по VIN");
-        return {
-          ...car,
-          cmVerifiedExtras,
-          cmOptionsOnly: true,
-          inventoryWarnings,
-          cmCardUrl: cmStockId && /^\d+$/.test(cmStockId)
-            ? `https://lk.cm.expert/stock/${cmStockId}/stock`
-            : null,
-        };
-      }
-      if (car.type !== "new" || (catalogSource !== "cm_business" && !isCmBusinessDealer(car.dealer))) return car;
-
-      const dealer = car.dealer!;
-      const feedState = getCmBusinessFeedState(dealer);
-      const publicIds = getCmBusinessPublicIdSet(dealer);
-
-      const inventoryWarnings: string[] = [];
-      if (catalogSource !== "cm_business" || cmStockState?.toLowerCase() !== "in") {
-        inventoryWarnings.push("Наличие в CM не подтверждено");
-      }
-      if (!car.imageUrl?.trim()) inventoryWarnings.push("Нет фото");
-      if (!car.model?.trim()) inventoryWarnings.push("Не указана модель");
-      if (!car.complectation?.trim()) inventoryWarnings.push("Не указана комплектация");
-      if (!car.modification?.trim() && !car.complectation?.trim()) {
-        inventoryWarnings.push("Нет названия модификации");
-      }
-      if (!car.price || car.price <= 0) inventoryWarnings.push("Нет цены");
-      if (!cmStockId || !/^\d+$/.test(cmStockId)) inventoryWarnings.push("Нет ссылки на карточку CM");
-      if (catalogSource !== "cm_business" || !car.extras?.trim()) {
-        inventoryWarnings.push("Нет данных об опциях в CM");
-      }
-
-      const lastSourceUpdate = sourceUpdatedAt?.getTime() ?? 0;
-      const sourceStale = !feedState.complete || !lastSourceUpdate
-        || Date.now() - lastSourceUpdate > 90 * 60 * 1000;
-      return {
-        ...car,
-        inventoryWarnings,
-        cmCardUrl: catalogSource === "cm_business" && cmStockId && /^\d+$/.test(cmStockId)
-          ? `https://lk.cm.expert/stock/${cmStockId}/stock`
-          : null,
-        publicEligible: publicIds.has(car.externalId) && isPublicNewCarEligible({
-          dealer: car.dealer,
-          model: car.model,
-          modification: car.modification,
-          complectation: car.complectation,
-          stockState: cmStockState,
-          catalogSource,
-          imageUrl: car.imageUrl,
-        }),
-        sourceStale,
-      };
-    });
+    const integrations = await getCmStockIntegrations();
+    const data = rows.map(row => projectCarSearchResult(row, integrations.filter(item => item.enabled)));
 
     return res.json({ ok: true, data });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+router.post("/cars/:id/refresh-cm", async (req, res): Promise<void> => {
+  try {
+    const idString = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const carId = Number(idString);
+    if (!Number.isSafeInteger(carId) || carId <= 0) {
+      res.status(400).json({ ok: false, error: "Некорректный идентификатор автомобиля" });
+      return;
+    }
+
+    const [local] = await db.select().from(carsTable).where(eq(carsTable.id, carId)).limit(1);
+    if (!local) {
+      res.status(404).json({ ok: false, error: "Автомобиль не найден" });
+      return;
+    }
+
+    const payload = getManagerPayload(req) as unknown as Record<string, unknown>;
+    const isAdmin = payload["isAdmin"] === true;
+    const managerId = payload["managerId"] as number | undefined;
+    if (!isAdmin) {
+      if (!managerId) {
+        res.status(403).json({ ok: false, error: "Нет доступа к автомобилю" });
+        return;
+      }
+      const brands = await getManagerBrands(managerId);
+      const access = buildManagerCarFilter(brands, "new");
+      const authorizedRows = await db.select({ id: carsTable.id })
+        .from(carsTable)
+        .where(and(eq(carsTable.id, local.id), eq(carsTable.type, "new"), ...access))
+        .limit(1);
+      if (local.type !== "new" || authorizedRows.length !== 1) {
+        res.status(403).json({ ok: false, error: "Нет доступа к автомобилю" });
+        return;
+      }
+    }
+    if (local.type !== "new") {
+      res.status(403).json({ ok: false, error: "Обновление CM доступно только для новых автомобилей" });
+      return;
+    }
+    if (!local.dealer?.trim()) {
+      res.status(409).json({ ok: false, error: "Автомобиль не связан с интеграцией CM Expert" });
+      return;
+    }
+
+    const integrations = await getCmStockIntegrations();
+    const integration = enabledCmIntegrationForDealer(integrations, local.dealer);
+    if (!integration) {
+      res.status(503).json({ ok: false, error: "Для дилера не настроена активная интеграция CM Expert" });
+      return;
+    }
+
+    if (!normalizeValidatedVin(local.vin)) {
+      res.status(409).json({ ok: false, error: "VIN автомобиля некорректен для точного сопоставления с CM" });
+      return;
+    }
+
+    let snapshot;
+    try {
+      snapshot = await fetchCmBusinessIntegrationSnapshot([integration.dealerId], { forceRefresh: true });
+    } catch {
+      res.status(503).json({ ok: false, error: "Не удалось получить полный свежий снимок CM Expert" });
+      return;
+    }
+    if (!snapshot.presentDealerIds.has(integration.dealerId)) {
+      res.status(503).json({ ok: false, error: "Дилер отсутствует в полном снимке CM Expert" });
+      return;
+    }
+
+    const candidate = findCmRefreshCandidate(local, snapshot.rows, integration.dealerId, integration.dealerName);
+    if (candidate.status === "no_match" || candidate.status === "mismatch") {
+      res.status(409).json({ ok: false, error: "Автомобиль не сопоставлен с CM по VIN и стабильным идентификаторам" });
+      return;
+    }
+    if (candidate.status === "ambiguous") {
+      res.status(409).json({ ok: false, error: "В CM найдено несколько автомобилей с совпадающими идентификаторами" });
+      return;
+    }
+    if (candidate.status === "invalid_vin") {
+      res.status(409).json({ ok: false, error: "VIN автомобиля некорректен для точного сопоставления с CM" });
+      return;
+    }
+    if (candidate.status !== "match") {
+      res.status(409).json({ ok: false, error: "Автомобиль не сопоставлен с CM Expert" });
+      return;
+    }
+
+    const { sourceRow, car: mapped } = candidate;
+    const rawStockState = (sourceRow as unknown as Record<string, unknown>).stockState;
+    const updates = buildCmRefreshUpdate(integration.mode, mapped, local.brand, rawStockState, snapshot.fetchedAt);
+
+    const updated = hasCmRefreshChanges(local as unknown as Record<string, unknown>, updates);
+    const changed = await db.update(carsTable)
+      .set(updates)
+      .where(and(...buildCmRefreshGuard(local)))
+      .returning({ id: carsTable.id });
+    if (changed.length !== 1) {
+      res.status(409).json({ ok: false, error: "Автомобиль изменился во время обновления; повторите запрос" });
+      return;
+    }
+
+    const [refreshed] = await db.select({
+      id: carsTable.id,
+      externalId: carsTable.externalId,
+      type: carsTable.type,
+      brand: carsTable.brand,
+      model: carsTable.model,
+      year: carsTable.year,
+      modification: carsTable.modification,
+      complectation: carsTable.complectation,
+      color: carsTable.color,
+      price: carsTable.price,
+      imageUrl: carsTable.imageUrl,
+      vin: carsTable.vin,
+      dealer: carsTable.dealer,
+      bodyType: carsTable.bodyType,
+      driveType: carsTable.driveType,
+      extras: carsTable.extras,
+      cmVerifiedExtras: carsTable.cmVerifiedExtras,
+      cmDmsCarId: carsTable.cmDmsCarId,
+      catalogSource: carsTable.catalogSource,
+      cmStockId: carsTable.cmStockId,
+      cmStockState: carsTable.cmStockState,
+      sourceUpdatedAt: carsTable.sourceUpdatedAt,
+      syncedAt: carsTable.syncedAt,
+    }).from(carsTable).where(and(
+      eq(carsTable.id, local.id),
+      eq(carsTable.type, "new"),
+      eq(carsTable.dealer, local.dealer),
+    )).limit(1);
+    if (!refreshed) {
+      res.status(409).json({ ok: false, error: "Не удалось прочитать обновлённую карточку автомобиля" });
+      return;
+    }
+    res.json(buildCmRefreshResponse(refreshed, integration, updated, snapshot.fetchedAt));
+  } catch {
+    res.status(500).json({ ok: false, error: "Не удалось обновить данные автомобиля из CM Expert" });
   }
 });
 
