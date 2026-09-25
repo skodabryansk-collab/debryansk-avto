@@ -4,8 +4,10 @@ import { and } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import {
   buildCmRefreshResponse,
+  mergeQuoteCarWithFeed,
   projectCarSearchResult,
 } from "../routes/manager-quotes";
+import type { NewCarRecord } from "../routes/new-cars";
 import {
   buildCmRefreshUpdate,
   buildCmRefreshGuard,
@@ -84,9 +86,10 @@ test("options-only refresh updates only the CM overlay and preserves XML catalog
   if (match.status !== "match") return;
 
   const updates = buildCmRefreshUpdate("options_only", match.car, "XML Brand", "in", "2026-01-02T00:00:00.000Z");
-  assert.deepEqual(Object.keys(updates).sort(), ["cmDmsCarId", "cmStockId", "cmVerifiedExtras"]);
+  assert.deepEqual(Object.keys(updates).sort(), ["cmDmsCarId", "cmRefreshedAt", "cmStockId", "cmVerifiedExtras"]);
   assert.equal(updates.cmVerifiedExtras, "ABS");
   assert.equal(updates.cmStockId, "4321");
+  assert.equal(updates.cmRefreshedAt.toISOString(), "2026-01-02T00:00:00.000Z");
 
   const catalogUpdates = buildCmRefreshUpdate(
     "catalog", match.car, "XML Brand", "in", "2026-01-02T00:00:00.000Z",
@@ -94,6 +97,7 @@ test("options-only refresh updates only the CM overlay and preserves XML catalog
   assert.equal(catalogUpdates.extras, "ABS");
   assert.equal(catalogUpdates.cmVerifiedExtras, "ABS", "catalog refresh must update the PDF-preferred overlay");
   assert.equal(catalogUpdates.syncedAt.toISOString(), "2026-01-02T00:00:00.000Z");
+  assert.equal(catalogUpdates.cmRefreshedAt.toISOString(), "2026-01-02T00:00:00.000Z");
 
   const noOptionCar = findCmRefreshCandidate(
     { vin, cmStockId: null, cmDmsCarId: null },
@@ -189,4 +193,69 @@ test("refresh updated flag detects timestamp-only changes", () => {
   const next = new Date("2026-01-01T00:00:01.000Z");
   assert.equal(hasCmRefreshChanges({ sourceUpdatedAt: previous }, { sourceUpdatedAt: next }), true);
   assert.equal(hasCmRefreshChanges({ sourceUpdatedAt: previous }, { sourceUpdatedAt: new Date(previous) }), false);
+});
+
+test("quote enrichment preserves manually refreshed DB values but retains live-feed enrichment for unmarked rows", () => {
+  const baseCar = {
+    type: "new" as const,
+    externalId: "quote-car",
+    dealer: "Dealer",
+    catalogSource: "cm_business",
+    model: "DB model",
+    modification: "DB trim",
+    complectation: "DB package",
+    year: 2025,
+    price: 2_000_000,
+    color: "DB color",
+    imageUrl: "https://db.example/car.jpg",
+    vin,
+    bodyType: "SUV",
+    cmStockId: "4321",
+    cmStockState: "in",
+    extras: "DB options",
+    cmVerifiedExtras: "DB verified options",
+  };
+  const liveFeed = {
+    id: "quote-car",
+    mark: "Test",
+    model: "Stale feed model",
+    modification: "Stale feed trim",
+    complectation: "Stale feed package",
+    year: 2020,
+    price: 1,
+    color: "Stale feed color",
+    bodyType: "Sedan",
+    availability: "",
+    url: "",
+    images: ["https://feed.example/stale.jpg"],
+    dealer: "Dealer",
+    maxDiscount: 0,
+    creditDiscount: 0,
+    tradeinDiscount: 0,
+    extras: "Stale feed options",
+    description: "",
+    vin: "STALE",
+    doorsCount: 4,
+    wheel: "",
+    armored: "",
+    custom: "",
+    phone: "",
+    notRegisteredInRussia: false,
+    acceptedAutoruExclusive: false,
+    popularity_score: 0,
+    catalogSource: "cm_business" as const,
+    cmStockId: "9999",
+    stockState: "out",
+    sourceUpdatedAt: null,
+  } as NewCarRecord;
+
+  const refreshedCar = { ...baseCar, cmRefreshedAt: new Date() };
+  assert.equal(mergeQuoteCarWithFeed(refreshedCar, liveFeed), refreshedCar);
+  const unmarkedCar = { ...baseCar, cmRefreshedAt: null };
+  const enriched = mergeQuoteCarWithFeed(unmarkedCar, liveFeed);
+  assert.equal(enriched.model, "Stale feed model");
+  assert.equal(enriched.color, "Stale feed color");
+  assert.equal(enriched.imageUrl, "https://feed.example/stale.jpg");
+  assert.equal(enriched.extras, "Stale feed options");
+  assert.equal(enriched.cmVerifiedExtras, "Stale feed options");
 });
