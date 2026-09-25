@@ -77,4 +77,4 @@
 - [API source ESM test runtime](api-esm-test-runtime.md) — direct tsx integration tests do not provide the esbuild `__dirname`/`require` banner; keep source modules native-ESM compatible.
 - [Python packages in Replit Nix](python-packages-replit-nix.md) — VCS packages need a local `.pythonlibs` target; the managed installer cannot parse Git URLs and system installs hit `/nix/store` permissions.
 - [Quote car snapshot freshness](quote-car-snapshot.md) — КП snapshot can predate car sync; refresh photo/color from the live catalog when creating or rebuilding PDFs.
-- [CM Expert dealer stock paging](cm-expert-dealer-stock-api.md) — the DMS list is global; filter locally, whitelist public fields, and use the verified `/stock/{id}/stock` card URL.
+- [CM Expert stock API](cm-expert-dealer-stock-api.md) — list filters are ignored; refresh one car with GET by dealerId + DMS ID; PATCH on that path writes to CM.
