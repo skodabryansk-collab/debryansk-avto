@@ -25,33 +25,46 @@ export function normalizeValidatedVin(value: unknown): string {
   return vin.length === 17 ? vin : "";
 }
 
+export function buildCmBusinessCarLookupPath(dealerId: string, dmsCarId: string): string {
+  return `/dealers/${encodeURIComponent(dealerId)}/dms/cars/${encodeURIComponent(dmsCarId)}`;
+}
+
+export function cmBusinessHttpStatus(error: unknown): number | null {
+  if (!(error instanceof Error)) return null;
+  const match = error.message.match(/:\s(\d{3})(?:\s|$)/);
+  return match ? Number(match[1]) : null;
+}
+
 export function findCmRefreshCandidate(
   local: { vin: string | null; cmStockId: string | null; cmDmsCarId: string | null },
-  rows: unknown[],
+  value: unknown,
   dealerId: string,
   dealerName: string,
 ): CmRefreshCandidateResult {
   const vin = normalizeValidatedVin(local.vin);
   if (!vin) return { status: "invalid_vin" };
 
-  const sameVinRows = rows.filter((value): value is Record<string, unknown> =>
-    Boolean(value && typeof value === "object" && !Array.isArray(value))
-    && String((value as Record<string, unknown>).dealerId ?? "") === dealerId
-    && normalizeValidatedVin((value as Record<string, unknown>).vin) === vin,
-  );
-  if (sameVinRows.length === 0) return { status: "no_match" };
+  if (!value || typeof value !== "object") return { status: "no_match" };
+  if (Array.isArray(value)) return { status: value.length > 1 ? "ambiguous" : "mismatch" };
 
-  const matches: Array<{ car: CmBusinessStockCar; sourceRow: Record<string, unknown> }> = [];
-  for (const sourceRow of sameVinRows) {
-    const car = mapCmBusinessDealerStockCar(sourceRow, dealerName);
-    if (!car || (!car.cmStockId && !car.cmDmsCarId) || normalizeValidatedVin(car.vin) !== vin) continue;
-    if (local.cmStockId && local.cmStockId !== car.cmStockId) continue;
-    if (local.cmDmsCarId && local.cmDmsCarId !== car.cmDmsCarId) continue;
-    matches.push({ car, sourceRow });
+  const sourceRow = value as Record<string, unknown>;
+  const localDmsCarId = local.cmDmsCarId?.trim();
+  if (!localDmsCarId) return { status: "mismatch" };
+  if (
+    String(sourceRow.dealerId ?? "") !== dealerId
+    || String(sourceRow.dmsCarId ?? "").trim() !== localDmsCarId
+    || normalizeValidatedVin(sourceRow.vin) !== vin
+  ) {
+    return { status: "mismatch" };
   }
-  if (matches.length === 0) return { status: "mismatch" };
-  if (matches.length > 1) return { status: "ambiguous" };
-  return { status: "match", ...matches[0]! };
+
+  const car = mapCmBusinessDealerStockCar(sourceRow, dealerName);
+  if (!car || (!car.cmStockId && !car.cmDmsCarId) || normalizeValidatedVin(car.vin) !== vin) {
+    return { status: "mismatch" };
+  }
+  if (local.cmStockId && local.cmStockId !== car.cmStockId) return { status: "mismatch" };
+  if (car.cmDmsCarId !== localDmsCarId) return { status: "mismatch" };
+  return { status: "match", car, sourceRow };
 }
 
 export function buildCmRefreshUpdate(
