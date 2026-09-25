@@ -43,4 +43,4 @@ A manager-triggered refresh must read a complete fresh CM snapshot but change on
 
 **Why:** CM has no verified single-car Business API read in this integration; quote PDFs prefer verified equipment over catalog equipment, and bulk sync can run concurrently with a manager's refresh. Without these rules the screen can claim success while a PDF contains stale options or a different car is overwritten.
 
-**How to apply:** Match dealer, valid VIN and any known CM IDs against the completed snapshot; perform a guarded one-row update, then compute warnings from the saved row. Do not infer missing equipment from the trim or hide warnings CM cannot resolve.
+**How to apply:** Match dealer, valid VIN and any known CM IDs against the completed snapshot; perform a guarded one-row update, then compute warnings from the saved row. Mark the row as manually verified so quote creation and later PDF regeneration do not overwrite it with a separately cached supplier feed. Do not infer missing equipment from the trim or hide warnings CM cannot resolve.
