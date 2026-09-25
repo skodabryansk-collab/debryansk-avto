@@ -79,6 +79,7 @@ export interface CarSearchResult {
   cmCardUrl?: string | null;
   publicEligible?: boolean;
   sourceStale?: boolean;
+  cmRefreshAvailable?: boolean;
 }
 
 export interface QuoteDiscount { label: string; value: number; }
@@ -113,6 +114,15 @@ export function searchCars(opts: {
   if (opts.model) params.set("model", opts.model);
   if (opts.type) params.set("type", opts.type);
   return managerApi("GET", `/cars/search?${params}`);
+}
+
+export function refreshManagerCarFromCm(id: number): Promise<{
+  ok: true;
+  data: CarSearchResult;
+  updated: boolean;
+  refreshedAt: string;
+}> {
+  return managerApi("POST", `/cars/${id}/refresh-cm`);
 }
 
 export function fetchCarBrands(type?: string): Promise<{ ok: boolean; data: string[] }> {
