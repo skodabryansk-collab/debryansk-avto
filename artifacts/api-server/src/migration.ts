@@ -223,6 +223,7 @@ export async function runMigration() {
         image_url TEXT,
         vin TEXT,
         dealer TEXT,
+        cm_refreshed_at TIMESTAMPTZ,
         synced_at TIMESTAMPTZ DEFAULT NOW(),
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
@@ -264,6 +265,7 @@ export async function runMigration() {
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS cm_stock_state text`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS source_updated_at timestamptz`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS cm_verified_extras text`);
+    await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS cm_refreshed_at timestamptz`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS engine_volume real`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS engine_power integer`);
     await db.execute(sql`ALTER TABLE cars ADD COLUMN IF NOT EXISTS engine_source text`);
