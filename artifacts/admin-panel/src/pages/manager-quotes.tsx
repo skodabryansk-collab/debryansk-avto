@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Plus, FileDown, Share2, LogOut, Car, Pencil, BookOpen, UserPlus, UserCheck, LogIn, FileText, Clock, User, UserRound, ExternalLink } from "lucide-react";
+import { Loader2, Search, Plus, FileDown, Share2, LogOut, ImageOff, Pencil, BookOpen, UserPlus, UserCheck, LogIn, FileText, Clock, User, UserRound, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   searchCars, fetchCarBrands, fetchCarModels,
@@ -59,6 +59,31 @@ function CarCmLink({ car }: { car: CarSearchResult }) {
       <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
       Открыть в CM
     </a>
+  );
+}
+
+function SelectedCarPhoto({ car }: { car: CarSearchResult }) {
+  const imageUrl = car.imageUrl?.trim() || null;
+  const [failedUrl, setFailedUrl] = React.useState<string | null>(null);
+  const hasPhoto = imageUrl !== null && failedUrl !== imageUrl;
+
+  return (
+    <div className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white sm:h-20 sm:w-28">
+      {hasPhoto ? (
+        <img
+          src={imageUrl}
+          alt={`Фото автомобиля ${formatManagerQuoteCarTitle(car)}`}
+          className="h-full w-full object-contain"
+          onError={() => setFailedUrl(imageUrl)}
+          data-testid="img-selected-car"
+        />
+      ) : (
+        <div className="flex flex-col items-center justify-center gap-1 text-slate-500" role="img" aria-label="Фото автомобиля отсутствует" data-testid="status-selected-car-no-photo">
+          <ImageOff className="h-5 w-5" aria-hidden="true" />
+          <span className="text-[10px] font-medium leading-none">Фото нет</span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -414,11 +439,9 @@ function QuoteForm({
         {selectedCar ? (
           <div className="border rounded-lg p-4 bg-slate-50 space-y-3">
             <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-[#0070b8]/10 rounded-lg flex items-center justify-center flex-none">
-                  <Car className="w-5 h-5 text-[#0070b8]" />
-                </div>
-                <div>
+              <div className="flex min-w-0 items-start gap-3">
+                <SelectedCarPhoto car={selectedCar} />
+                <div className="min-w-0">
                   <div className="font-semibold text-slate-900">{formatManagerQuoteCarTitle(selectedCar)}</div>
                   <div className="text-sm text-slate-500">{selectedCar.modification || selectedCar.complectation || "—"}</div>
                   {selectedCar.price && (
@@ -430,7 +453,7 @@ function QuoteForm({
                   <CarCmLink car={selectedCar} />
                 </div>
               </div>
-              <Button type="button" variant="ghost" size="sm" onClick={() => { setSelectedCar(null); setPriceOverride(""); }}>
+              <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={() => { setSelectedCar(null); setPriceOverride(""); }}>
                 Изменить
               </Button>
             </div>
