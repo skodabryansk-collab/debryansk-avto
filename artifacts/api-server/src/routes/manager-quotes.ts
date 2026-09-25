@@ -15,15 +15,16 @@ import { logger } from "../lib/logger";
 import fs from "fs";
 import path from "path";
 import { acquireChrome, isPrerendererRunning } from "../lib/chrome-semaphore";
+import { cmBusinessGet } from "../lib/cm-expert-client";
 import { normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
 import { verifiedQuoteExtras } from "../lib/quote-car-extras";
 import {
   getCmStockIntegrations, isCmOptionsOnlyDealer,
   type CmStockIntegration,
 } from "../services/cm-stock-integrations";
-import { fetchCmBusinessIntegrationSnapshot } from "../services/tenet-plus-stock";
 import {
-  buildCmRefreshGuard, buildCmRefreshUpdate, enabledCmIntegrationForDealer, findCmRefreshCandidate,
+  buildCmBusinessCarLookupPath, buildCmRefreshGuard, buildCmRefreshUpdate,
+  cmBusinessHttpStatus, enabledCmIntegrationForDealer, findCmRefreshCandidate,
   hasCmRefreshChanges, normalizeValidatedVin,
 } from "../services/cm-car-refresh";
 import {
@@ -452,13 +453,15 @@ export function projectCarSearchResult(
 ): Record<string, unknown> {
   const {
     catalogSource, cmStockId, cmStockState, sourceUpdatedAt, syncedAt: _syncedAt,
-    cmVerifiedExtras, cmDmsCarId: _cmDmsCarId,
+    cmVerifiedExtras, cmDmsCarId,
     ...car
   } = row;
   const enabledDealerNames = new Set(enabledIntegrations.map(integration => integration.dealerName.trim().toLowerCase()));
   const cmRefreshAvailable = car.type === "new"
     && !!car.dealer
-    && enabledDealerNames.has(car.dealer.trim().toLowerCase());
+    && enabledDealerNames.has(car.dealer.trim().toLowerCase())
+    && !!cmDmsCarId?.trim()
+    && !!normalizeValidatedVin(car.vin);
 
   if (car.type === "new" && isCmOptionsOnlyDealer(car.dealer)) {
     const inventoryWarnings: string[] = [];
@@ -725,19 +728,28 @@ router.post("/cars/:id/refresh-cm", async (req, res): Promise<void> => {
       return;
     }
 
-    let snapshot;
-    try {
-      snapshot = await fetchCmBusinessIntegrationSnapshot([integration.dealerId], { forceRefresh: true });
-    } catch {
-      res.status(503).json({ ok: false, error: "Не удалось получить полный свежий снимок CM Expert" });
-      return;
-    }
-    if (!snapshot.presentDealerIds.has(integration.dealerId)) {
-      res.status(503).json({ ok: false, error: "Дилер отсутствует в полном снимке CM Expert" });
+    const dmsCarId = local.cmDmsCarId?.trim();
+    if (!dmsCarId) {
+      res.status(409).json({ ok: false, error: "У автомобиля нет DMS ID для точечного запроса в CM" });
       return;
     }
 
-    const candidate = findCmRefreshCandidate(local, snapshot.rows, integration.dealerId, integration.dealerName);
+    let cmResponse: unknown;
+    try {
+      cmResponse = await cmBusinessGet(buildCmBusinessCarLookupPath(integration.dealerId, dmsCarId));
+    } catch (error) {
+      const status = cmBusinessHttpStatus(error);
+      if (status === 404) {
+        res.status(409).json({ ok: false, error: "Автомобиль с этим DMS ID не найден в CM Expert" });
+      } else if (status === 403) {
+        res.status(503).json({ ok: false, error: "У интеграции CM Expert нет доступа к складу этого дилера" });
+      } else {
+        res.status(503).json({ ok: false, error: "Не удалось получить автомобиль из CM Expert по DMS ID" });
+      }
+      return;
+    }
+
+    const candidate = findCmRefreshCandidate(local, cmResponse, integration.dealerId, integration.dealerName);
     if (candidate.status === "no_match" || candidate.status === "mismatch") {
       res.status(409).json({ ok: false, error: "Автомобиль не сопоставлен с CM по VIN и стабильным идентификаторам" });
       return;
@@ -757,7 +769,8 @@ router.post("/cars/:id/refresh-cm", async (req, res): Promise<void> => {
 
     const { sourceRow, car: mapped } = candidate;
     const rawStockState = (sourceRow as unknown as Record<string, unknown>).stockState;
-    const updates = buildCmRefreshUpdate(integration.mode, mapped, local.brand, rawStockState, snapshot.fetchedAt);
+    const refreshedAt = new Date().toISOString();
+    const updates = buildCmRefreshUpdate(integration.mode, mapped, local.brand, rawStockState, refreshedAt);
 
     const updated = hasCmRefreshChanges(local as unknown as Record<string, unknown>, updates);
     const changed = await db.update(carsTable)
@@ -802,7 +815,7 @@ router.post("/cars/:id/refresh-cm", async (req, res): Promise<void> => {
       res.status(409).json({ ok: false, error: "Не удалось прочитать обновлённую карточку автомобиля" });
       return;
     }
-    res.json(buildCmRefreshResponse(refreshed, integration, updated, snapshot.fetchedAt));
+    res.json(buildCmRefreshResponse(refreshed, integration, updated, refreshedAt));
   } catch {
     res.status(500).json({ ok: false, error: "Не удалось обновить данные автомобиля из CM Expert" });
   }
