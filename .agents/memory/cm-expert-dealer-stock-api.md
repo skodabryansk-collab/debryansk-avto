@@ -36,3 +36,11 @@ The user chose to wait for per-car Tenet Plus equipment to appear in CM rather t
 **Why:** The CM UI route was not documented by the public Swagger page; the user verified a generated Tenet Plus card link. The number in the link must be sourced from the CM stock identifier, not guessed.
 
 **How to apply:** When building a dealer-scoped importer, scan to the terminal page with bounded concurrency, filter by dealer and exact stock state, surface truncation if a safe page limit is reached, map a strict public-field allowlist, and generate CM links only from verified CM stock IDs.
+
+## Refreshing one car from the quote form
+
+A manager-triggered refresh must read a complete fresh CM snapshot but change only the selected, exactly identified car. Catalog refreshes must set or clear verified equipment together with catalog equipment; options-only refreshes must leave the source catalog untouched. Treat a successful fetch time, not CM's last edit time, as the freshness signal. Reject the update if the car's identifiers change while CM is being read.
+
+**Why:** CM has no verified single-car Business API read in this integration; quote PDFs prefer verified equipment over catalog equipment, and bulk sync can run concurrently with a manager's refresh. Without these rules the screen can claim success while a PDF contains stale options or a different car is overwritten.
+
+**How to apply:** Match dealer, valid VIN and any known CM IDs against the completed snapshot; perform a guarded one-row update, then compute warnings from the saved row. Do not infer missing equipment from the trim or hide warnings CM cannot resolve.
