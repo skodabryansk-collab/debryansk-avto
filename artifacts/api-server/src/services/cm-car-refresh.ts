@@ -67,6 +67,7 @@ export function buildCmRefreshUpdate(
       cmVerifiedExtras: options,
       cmDmsCarId: car.cmDmsCarId,
       cmStockId: car.cmStockId,
+      cmRefreshedAt: new Date(fetchedAt),
     };
   }
   const parsedUpdatedAt = car.sourceUpdatedAt ? new Date(car.sourceUpdatedAt) : new Date(fetchedAt);
@@ -89,6 +90,7 @@ export function buildCmRefreshUpdate(
     sourceUpdatedAt: Number.isNaN(parsedUpdatedAt.getTime()) ? new Date(fetchedAt) : parsedUpdatedAt,
     cmVerifiedExtras: options,
     syncedAt: new Date(fetchedAt),
+    cmRefreshedAt: new Date(fetchedAt),
   };
 }
 
