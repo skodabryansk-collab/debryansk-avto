@@ -5,10 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Plus, FileDown, Share2, LogOut, ImageOff, Pencil, BookOpen, UserPlus, UserCheck, LogIn, FileText, Clock, User, UserRound, ExternalLink } from "lucide-react";
+import { Loader2, Search, Plus, FileDown, Share2, LogOut, ImageOff, Pencil, BookOpen, UserPlus, UserCheck, LogIn, FileText, Clock, User, UserRound, ExternalLink, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  searchCars, fetchCarBrands, fetchCarModels,
+  searchCars, fetchCarBrands, fetchCarModels, refreshManagerCarFromCm,
   createQuote, updateQuote, regenerateQuotePdf, createQuoteShareLink, getMyQuotes, getManagerName, logoutManager, pdfDownloadUrl,
   isAdminUsingManagerPortal,
   type CarSearchResult, type QuoteDiscount, type QuoteHistoryItem,
@@ -311,6 +311,14 @@ function QuoteForm({
     if (initialData) return String(initialData.priceOriginal ?? "");
     return "";
   });
+  const priceEdited = React.useRef(!!initialData);
+  const [refreshingCarId, setRefreshingCarId] = React.useState<number | null>(null);
+  const [refreshFeedback, setRefreshFeedback] = React.useState<{
+    carId: number;
+    kind: "success" | "error";
+    message: string;
+  } | null>(null);
+  const quoteQueryClient = useQueryClient();
   const [clientName, setClientName] = React.useState(initialData?.clientName ?? "");
   const [clientGender, setClientGender] = React.useState<"male" | "female" | "">(
     initialData?.clientGender ?? ""
@@ -382,6 +390,37 @@ function QuoteForm({
     },
   });
 
+  async function handleRefreshFromCm() {
+    if (!selectedCar || refreshingCarId !== null) return;
+    const carId = selectedCar.id;
+    setRefreshingCarId(carId);
+    setRefreshFeedback(null);
+    try {
+      const result = await refreshManagerCarFromCm(carId);
+      setSelectedCar(result.data);
+      if (!priceEdited.current && !isEditing) {
+        setPriceOverride(result.data.price != null ? String(result.data.price) : "");
+      }
+      const time = new Date(result.refreshedAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+      setRefreshFeedback({
+        carId,
+        kind: "success",
+        message: result.updated
+          ? `Данные автомобиля обновлены из CM в ${time}. Предупреждения проверены заново.`
+          : `Данные сверены с CM в ${time}. Изменений нет, предупреждения актуальны.`,
+      });
+      quoteQueryClient.invalidateQueries({ queryKey: ["car-search"] });
+    } catch (err) {
+      setRefreshFeedback({
+        carId,
+        kind: "error",
+        message: `Не удалось обновить данные из CM: ${err instanceof Error ? err.message : "ошибка соединения"}. Данные в форме не изменены.`,
+      });
+    } finally {
+      setRefreshingCarId(null);
+    }
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedCar) { setError("Выберите автомобиль"); return; }
@@ -450,10 +489,40 @@ function QuoteForm({
                     </div>
                   )}
                   <CarInventoryNotices car={selectedCar} />
-                  <CarCmLink car={selectedCar} />
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <CarCmLink car={selectedCar} />
+                    {!isEditing && selectedCar.cmRefreshAvailable && (selectedCar.sourceStale || !!selectedCar.inventoryWarnings?.length) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 border-[#0070b8]/30 text-[#0070b8] hover:bg-[#0070b8]/5"
+                        disabled={refreshingCarId !== null}
+                        onClick={handleRefreshFromCm}
+                        data-testid="button-refresh-selected-car-from-cm"
+                      >
+                        {refreshingCarId === selectedCar.id
+                          ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                          : <RefreshCw className="h-4 w-4" aria-hidden="true" />}
+                        {refreshingCarId === selectedCar.id ? "Обновляем из CM…" : "Обновить из CM"}
+                      </Button>
+                    )}
+                  </div>
+                  {refreshFeedback?.carId === selectedCar.id && (
+                    <div
+                      role={refreshFeedback.kind === "error" ? "alert" : "status"}
+                      className={`mt-2 flex items-start gap-1.5 text-xs font-medium ${refreshFeedback.kind === "error" ? "text-rose-700" : "text-emerald-700"}`}
+                      data-testid="status-selected-car-cm-refresh"
+                    >
+                      {refreshFeedback.kind === "error"
+                        ? <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        : <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                      {refreshFeedback.message}
+                    </div>
+                  )}
                 </div>
               </div>
-              <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={() => { setSelectedCar(null); setPriceOverride(""); }}>
+              <Button type="button" variant="ghost" size="sm" className="shrink-0" disabled={refreshingCarId !== null} onClick={() => { setSelectedCar(null); setPriceOverride(""); priceEdited.current = false; setRefreshFeedback(null); }}>
                 Изменить
               </Button>
             </div>
@@ -464,7 +533,7 @@ function QuoteForm({
                   type="number"
                   min={0}
                   value={priceOverride}
-                  onChange={e => setPriceOverride(e.target.value)}
+                  onChange={e => { setPriceOverride(e.target.value); priceEdited.current = true; }}
                   placeholder={selectedCar.price ? String(selectedCar.price) : "из каталога"}
                   className="pr-8 text-right"
                 />
@@ -481,7 +550,7 @@ function QuoteForm({
             </div>
           </div>
         ) : (
-          <CarSearch onSelect={(car) => { setSelectedCar(car); setPriceOverride(car.price ? String(car.price) : ""); }} />
+          <CarSearch onSelect={(car) => { setSelectedCar(car); setPriceOverride(car.price ? String(car.price) : ""); priceEdited.current = false; setRefreshFeedback(null); }} />
         )}
       </div>
 
