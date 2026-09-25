@@ -9,8 +9,10 @@ import {
 } from "../routes/manager-quotes";
 import type { NewCarRecord } from "../routes/new-cars";
 import {
+  buildCmBusinessCarLookupPath,
   buildCmRefreshUpdate,
   buildCmRefreshGuard,
+  cmBusinessHttpStatus,
   enabledCmIntegrationForDealer,
   findCmRefreshCandidate,
   hasCmRefreshChanges,
@@ -57,12 +59,17 @@ test("CM refresh refuses unavailable, mismatched, and ambiguous exact matches", 
     durationMs: 0,
   };
   assert.equal(enabledCmIntegrationForDealer([integration], "Dealer"), undefined);
-  const local = { vin, cmStockId: null, cmDmsCarId: null };
-  assert.deepEqual(findCmRefreshCandidate(local, [], "dealer-1", "Dealer").status, "no_match");
+  const local = { vin, cmStockId: "4321", cmDmsCarId: "dms-4321" };
+  assert.deepEqual(findCmRefreshCandidate(local, null, "dealer-1", "Dealer").status, "no_match");
+  assert.equal(
+    findCmRefreshCandidate({ ...local, cmDmsCarId: null }, cmRow, "dealer-1", "Dealer").status,
+    "mismatch",
+    "a DMS ID is required for the point lookup",
+  );
 
   const mismatch = findCmRefreshCandidate(
     { ...local, cmStockId: "9999" },
-    [cmRow],
+    cmRow,
     "dealer-1",
     "Dealer",
   );
@@ -71,14 +78,32 @@ test("CM refresh refuses unavailable, mismatched, and ambiguous exact matches", 
   const ambiguous = findCmRefreshCandidate(local, [cmRow, { ...cmRow, id: 4322 }], "dealer-1", "Dealer");
   assert.equal(ambiguous.status, "ambiguous");
 
-  const wrongDealer = findCmRefreshCandidate(local, [{ ...cmRow, dealerId: "other" }], "dealer-1", "Dealer");
-  assert.equal(wrongDealer.status, "no_match");
+  const wrongDealer = findCmRefreshCandidate(local, { ...cmRow, dealerId: "other" }, "dealer-1", "Dealer");
+  assert.equal(wrongDealer.status, "mismatch");
+
+  const wrongDmsCarId = findCmRefreshCandidate(local, { ...cmRow, dmsCarId: "other" }, "dealer-1", "Dealer");
+  assert.equal(wrongDmsCarId.status, "mismatch");
+
+  const wrongVin = findCmRefreshCandidate(local, { ...cmRow, vin: "2HGCM82633A004352" }, "dealer-1", "Dealer");
+  assert.equal(wrongVin.status, "mismatch");
+});
+
+test("CM point lookup encodes DMS IDs as a path segment and parses HTTP statuses safely", () => {
+  assert.equal(
+    buildCmBusinessCarLookupPath("dealer/1", "dms/ID ?"),
+    "/dealers/dealer%2F1/dms/cars/dms%2FID%20%3F",
+  );
+  assert.equal(
+    cmBusinessHttpStatus(new Error("CM Expert https://lk.cm.expert/api/v1/path: 403 {\"error\":\"forbidden\"}")),
+    403,
+  );
+  assert.equal(cmBusinessHttpStatus(new Error("network timeout")), null);
 });
 
 test("options-only refresh updates only the CM overlay and preserves XML catalog fields", () => {
   const match = findCmRefreshCandidate(
-    { vin, cmStockId: null, cmDmsCarId: null },
-    [cmRow],
+    { vin, cmStockId: "4321", cmDmsCarId: "dms-4321" },
+    cmRow,
     "dealer-1",
     "Dealer",
   );
@@ -100,8 +125,8 @@ test("options-only refresh updates only the CM overlay and preserves XML catalog
   assert.equal(catalogUpdates.cmRefreshedAt.toISOString(), "2026-01-02T00:00:00.000Z");
 
   const noOptionCar = findCmRefreshCandidate(
-    { vin, cmStockId: null, cmDmsCarId: null },
-    [{ ...cmRow, hasAbs: false }],
+    { vin, cmStockId: "4321", cmDmsCarId: "dms-4321" },
+    { ...cmRow, hasAbs: false },
     "dealer-1",
     "Dealer",
   );
@@ -163,6 +188,11 @@ test("shared car-search projection clears catalog warnings after a successful re
 
   assert.deepEqual(result.inventoryWarnings, []);
   assert.equal(result.cmRefreshAvailable, true);
+  assert.equal(
+    projectCarSearchResult({ ...row, cmDmsCarId: null }, [integration]).cmRefreshAvailable,
+    false,
+    "the refresh action is only offered when a DMS ID supports a point lookup",
+  );
   assert.equal(result.id, row.id, "search projection must retain the DB car ID for selected-car actions");
 
   const refreshedAt = new Date().toISOString();
