@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deploy Дебрянск Авто to Timeweb VPS
-# Usage: bash scripts/deploy-vps.sh [--skip-frontend] [--skip-api] [--skip-admin]
+# Usage: bash scripts/deploy-vps.sh [--skip-frontend] [--skip-api] [--skip-admin] [--skip-uploads]
 # Run from workspace root: /home/runner/workspace
 #
 # READ .agents/skills/vps-deploy/SKILL.md before modifying this script!
@@ -15,21 +15,47 @@ fail() { echo "[deploy] ERROR: $*" >&2; exit 1; }
 [ -z "${VPS_SSH_PASSWORD:-}" ] && fail "VPS_SSH_PASSWORD env var not set"
 
 # ── SSH helper (ALWAYS use sshpass wrapper) ──────────────────────────────────
+SSH_OPTS=(-o StrictHostKeyChecking=no -o ConnectTimeout=30)
+if [[ -n "${VPS_CONTROL_PATH:-}" ]]; then
+  SSH_OPTS+=(-o BatchMode=yes -o ControlMaster=no -o "ControlPath=$VPS_CONTROL_PATH")
+fi
+
 ssh_vps() {
-  sshpass -p "$VPS_SSH_PASSWORD" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$VPS_HOST" "$@"
+  sshpass -p "$VPS_SSH_PASSWORD" ssh "${SSH_OPTS[@]}" "$VPS_HOST" "$@"
+}
+
+scp_vps() {
+  sshpass -p "$VPS_SSH_PASSWORD" scp "${SSH_OPTS[@]}" "$@"
 }
 
 SKIP_FRONTEND=0
 SKIP_API=0
 SKIP_ADMIN=0
+SKIP_UPLOADS=0
 for arg in "$@"; do
   [[ "$arg" == "--skip-frontend" ]] && SKIP_FRONTEND=1
   [[ "$arg" == "--skip-api" ]] && SKIP_API=1
   [[ "$arg" == "--skip-admin" ]] && SKIP_ADMIN=1
+  [[ "$arg" == "--skip-uploads" ]] && SKIP_UPLOADS=1
 done
 
 log "=== Дебрянск Авто → VPS Deploy ==="
-log "Flags: frontend=$SKIP_FRONTEND api=$SKIP_API admin=$SKIP_ADMIN"
+log "Flags: frontend=$SKIP_FRONTEND api=$SKIP_API admin=$SKIP_ADMIN uploads=$SKIP_UPLOADS"
+
+# Rebuild every artifact selected for this deployment so stale dist files
+# cannot be transferred by mistake.
+if [[ "$SKIP_API" -eq 0 ]]; then
+  log "Rebuilding API..."
+  pnpm --filter @workspace/api-server run build
+fi
+if [[ "$SKIP_FRONTEND" -eq 0 ]]; then
+  log "Rebuilding frontend..."
+  pnpm --filter @workspace/debryansk-avto run build
+fi
+if [[ "$SKIP_ADMIN" -eq 0 ]]; then
+  log "Rebuilding admin panel..."
+  pnpm --filter @workspace/admin-panel run build
+fi
 
 # ════════════════════════════════════════════════════════════════════════════
 # 1. PRE-FLIGHT CHECKS (local)
@@ -73,7 +99,7 @@ if [[ "$SKIP_API" -eq 0 ]]; then
     dist/thread-stream-worker.mjs \
     dist/kp-template.html \
     dist/logo-da.svg \
-  | sshpass -p "$VPS_SSH_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_HOST" \
+  | ssh_vps \
     "tar xzf - -C /opt/debryansk/api/ --strip-components=1"
   cd ../..
   log "API uploaded"
@@ -81,13 +107,13 @@ if [[ "$SKIP_API" -eq 0 ]]; then
   # Sync scripts (prerender + ssg + node_modules symlink)
   log "Syncing scripts..."
   ssh_vps "mkdir -p /opt/debryansk/scripts /opt/debryansk/api/scripts"
-  sshpass -p "$VPS_SSH_PASSWORD" scp -o StrictHostKeyChecking=no \
+  scp_vps \
     artifacts/api-server/scripts/prerender.mjs \
     "$VPS_HOST:/opt/debryansk/scripts/prerender.mjs"
-  sshpass -p "$VPS_SSH_PASSWORD" scp -o StrictHostKeyChecking=no \
+  scp_vps \
     artifacts/api-server/scripts/prerender.mjs \
     "$VPS_HOST:/opt/debryansk/api/scripts/prerender.mjs"
-  sshpass -p "$VPS_SSH_PASSWORD" scp -o StrictHostKeyChecking=no \
+  scp_vps \
     artifacts/debryansk-avto/scripts/ssg.mjs \
     "$VPS_HOST:/opt/debryansk/scripts/ssg.mjs"
   ssh_vps "if [ -d /opt/debryansk/scripts/node_modules ] && [ ! -L /opt/debryansk/scripts/node_modules ]; then rm -rf /opt/debryansk/scripts/node_modules; fi; ln -sfn /opt/debryansk/api/node_modules /opt/debryansk/scripts/node_modules"
@@ -104,7 +130,7 @@ if [[ "$SKIP_FRONTEND" -eq 0 ]]; then
   # persist across deploys and cause browsers to load outdated code bundles.
   ssh_vps "rm -rf /opt/debryansk/frontend/news/"
   cd artifacts/debryansk-avto
-  tar czf - dist/public/ | sshpass -p "$VPS_SSH_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_HOST" \
+  tar czf - dist/public/ | ssh_vps \
     "tar xzf - -C /opt/debryansk/frontend/ --strip-components=2"
   cd ../..
   log "Frontend uploaded"
@@ -116,8 +142,26 @@ fi
 if [[ "$SKIP_ADMIN" -eq 0 ]]; then
   log "Uploading admin panel..."
   cd artifacts/admin-panel
-  tar czf - dist/public/ | sshpass -p "$VPS_SSH_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_HOST" \
-    "mkdir -p /opt/debryansk/admin && tar xzf - -C /opt/debryansk/admin/ --strip-components=2"
+  tar czf - dist/public/ | ssh_vps \
+    'set -eu
+     stage="/opt/debryansk/admin.stage.$$"
+     backup="/opt/debryansk/admin.bak.$(date +%s)"
+     cleanup() {
+       if [ -d "$backup" ] && [ ! -e /opt/debryansk/admin ]; then
+         mv "$backup" /opt/debryansk/admin
+       fi
+       rm -rf "$stage"
+     }
+     trap cleanup EXIT
+     mkdir -p "$stage"
+     tar xzf - -C "$stage" --strip-components=2
+     test -f "$stage/index.html"
+     grep -q "/admin/assets/" "$stage/index.html"
+     if [ -e /opt/debryansk/admin ]; then
+       mv /opt/debryansk/admin "$backup"
+     fi
+     mv "$stage" /opt/debryansk/admin
+     trap - EXIT'
   cd ../..
   log "Admin uploaded"
 fi
@@ -125,12 +169,14 @@ fi
 # ════════════════════════════════════════════════════════════════════════════
 # 6. TRANSFER UPLOADS (logos, static assets)
 # ════════════════════════════════════════════════════════════════════════════
-log "Syncing static uploads..."
-cd artifacts/api-server
-tar czf - uploads/ | sshpass -p "$VPS_SSH_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_HOST" \
-  "tar xzf - -C /opt/debryansk/ --strip-components=0"
-cd ../..
-log "Uploads synced"
+if [[ "$SKIP_UPLOADS" -eq 0 ]]; then
+  log "Syncing static uploads..."
+  cd artifacts/api-server
+  tar czf - uploads/ | ssh_vps \
+    "tar xzf - -C /opt/debryansk/ --strip-components=0"
+  cd ../..
+  log "Uploads synced"
+fi
 
 # ════════════════════════════════════════════════════════════════════════════
 # 7. POST-TRANSFER VERIFY (on VPS)
@@ -140,6 +186,7 @@ log "Verifying deployed files..."
 ssh_vps "
   ERRORS=0
   [ -f /opt/debryansk/api/index.mjs ]      || { echo 'MISSING: api/index.mjs'; ERRORS=1; }
+  [ -f /opt/debryansk/api/geo-citation-check.mjs ] || { echo 'MISSING: api/geo-citation-check.mjs'; ERRORS=1; }
   [ -f /opt/debryansk/frontend/index.html ] || { echo 'MISSING: frontend/index.html'; ERRORS=1; }
   [ -f /opt/debryansk/admin/index.html ]    || { echo 'MISSING: admin/index.html'; ERRORS=1; }
   exit \$ERRORS
