@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle, CheckCircle2, CircleSlash, Clock3, ExternalLink,
   Globe2, Link2, MessageSquareQuote, RefreshCw, SearchX,
@@ -7,9 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   getGeoCitationReport,
+  getGeoCitationRefreshStatus,
   getSeoAutopilotSuggestions,
+  startGeoCitationRefresh,
   type GeoCitationProviderStatus,
   type GeoCitationQuery,
+  type GeoCitationRefreshState,
   type GeoCitationWeek,
   type SeoSuggestion,
 } from "@/lib/api";
@@ -329,17 +333,42 @@ function LatestSummary({
 }
 
 export default function SeoGeoCitationsTab() {
-  const { data: report, isLoading, isFetching, error, refetch } = useQuery({
+  const queryClient = useQueryClient();
+  const { data: report, isLoading, isFetching, error } = useQuery({
     queryKey: ["seo-geo-citations"],
     queryFn: getGeoCitationReport,
     staleTime: 60_000,
   });
+  const refreshStatusQuery = useQuery({
+    queryKey: ["seo-geo-citations-refresh-status"],
+    queryFn: getGeoCitationRefreshStatus,
+    staleTime: 0,
+    refetchInterval: query => query.state.data?.status === "running" ? 3000 : false,
+  });
+  const refreshMutation = useMutation({
+    mutationFn: startGeoCitationRefresh,
+    onSuccess: (state) => {
+      queryClient.setQueryData(["seo-geo-citations-refresh-status"], state);
+    },
+  });
+  const refreshState = refreshStatusQuery.data;
+  const handledCompletion = useRef<string | null>(null);
+  useEffect(() => {
+    const finishedAt = refreshState?.finishedAt;
+    if (refreshState?.status !== "completed" || !finishedAt || handledCompletion.current === finishedAt) return;
+    handledCompletion.current = finishedAt;
+    void queryClient.invalidateQueries({ queryKey: ["seo-geo-citations"] });
+  }, [queryClient, refreshState?.finishedAt, refreshState?.status]);
+
   const { data: geoSuggestionsData } = useQuery({
     queryKey: ["seo-geo-suggestions"],
     queryFn: () => getSeoAutopilotSuggestions({ type: "geo", limit: 100 }),
     staleTime: 60_000,
   });
   const geoSuggestions = (geoSuggestionsData?.data ?? []) as SeoSuggestion[];
+  const isRefreshRunning = refreshState?.status === "running";
+  const isRefreshStarting = refreshMutation.isPending;
+  const isRefreshBusy = isRefreshRunning || isRefreshStarting;
 
   const emptyState = report?.status === "empty" || report?.status === "invalid";
   return (
@@ -356,11 +385,38 @@ export default function SeoGeoCitationsTab() {
             Упоминания и ссылки на сайт в ответах AI-поиска. Это наблюдаемые ответы, а не полное покрытие выдачи.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`mr-2 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
-          Обновить данные
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refreshMutation.mutate()}
+          disabled={isFetching || isRefreshBusy || refreshStatusQuery.isLoading}
+        >
+          <RefreshCw className={`mr-2 h-3.5 w-3.5 ${isFetching || isRefreshBusy ? "animate-spin" : ""}`} />
+          {isRefreshStarting ? "Запускаем…" : isRefreshRunning ? "Замер выполняется…" : "Запустить GEO-замер"}
         </Button>
       </div>
+
+      {isRefreshRunning && (
+        <div role="status" className="flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
+          <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
+          <div>
+            <p className="font-semibold">Идёт новый GEO-замер</p>
+            <p className="mt-1 text-violet-800">
+              Запросы выполняются на сервере. Можно перейти на другую страницу — отчёт обновится автоматически после завершения.
+            </p>
+          </div>
+        </div>
+      )}
+      {refreshState?.status === "failed" && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          {refreshState.message || "GEO-замер завершился с ошибкой."}
+        </div>
+      )}
+      {refreshMutation.isError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          Не удалось запустить GEO-замер: {refreshMutation.error.message}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-4">
