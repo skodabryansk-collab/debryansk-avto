@@ -105,7 +105,7 @@ pnpm run geo:citations -- --list-sources
 ```
 
 - **Perplexity**: официальный `https://api.perplexity.ai/chat/completions`, ключ `GEO_PERPLEXITY_API_KEY` (или `PERPLEXITY_API_KEY`), модель `sonar`; URL и модель можно переопределить через `GEO_PERPLEXITY_API_URL` и `GEO_PERPLEXITY_MODEL`.
-- **ChatGPT с веб-поиском**: официальный OpenAI Responses API с инструментом `web_search_preview`, ключ `GEO_CHATGPT_API_KEY`, `OPENAI_API_KEY` или `AI_INTEGRATIONS_OPENAI_API_KEY`; модель `GEO_CHATGPT_MODEL` (по умолчанию `gpt-4.1`). URL можно переопределить через `GEO_CHATGPT_API_URL`.
+- **ChatGPT с веб-поиском**: OpenAI Responses API с инструментом `web_search_preview`, ключ `GEO_CHATGPT_API_KEY`, `OPENAI_API_KEY` или `AI_INTEGRATIONS_OPENAI_API_KEY`. Для Timeweb AI Gateway по умолчанию используется модель `openai/gpt-4.1`, для прямого OpenAI API — `gpt-4.1`; модель и URL можно переопределить через `GEO_CHATGPT_MODEL` и `GEO_CHATGPT_API_URL`.
 - **Google AI Overviews**: стабильный публичный API получения ответа не предоставлен, поэтому недельный запуск сохраняет статус `unavailable` и не создаёт `checks`.
 - **Bing Copilot**: стабильный публичный API получения ответа не предоставлен, поэтому недельный запуск сохраняет статус `unavailable` и не создаёт `checks`.
 
