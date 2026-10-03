@@ -192,9 +192,16 @@ function LatestSummary({
                   </div>
                 )}
                 {provider.failedQueries.length > 0 && (
-                  <p className="mt-2 text-[11px] text-amber-700">
-                    Не получено ответов: {provider.failedQueries.length}
-                  </p>
+                  <div className="mt-2 space-y-1">
+                    <p className="text-[11px] text-amber-700">
+                      Не получено ответов: {provider.failedQueries.length}
+                    </p>
+                    {provider.status === "error" && provider.failedQueries[0]?.reason && (
+                      <p className="text-[11px] leading-relaxed text-red-700">
+                        Первая ошибка: {provider.failedQueries[0].reason}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             );
