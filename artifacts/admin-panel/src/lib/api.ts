@@ -594,6 +594,25 @@ export function getGeoCitationReport() {
   return api<GeoCitationReportResponse>("GET", "/admin/seo/geo-citations");
 }
 
+export interface GeoCitationRefreshState {
+  status: "idle" | "running" | "completed" | "failed";
+  startedAt: string | null;
+  finishedAt: string | null;
+  message: string | null;
+}
+export function getGeoCitationRefreshStatus() {
+  return api<{ ok: true; data: GeoCitationRefreshState }>(
+    "GET",
+    "/admin/seo/geo-citations/refresh-status",
+  ).then(r => r.data);
+}
+export function startGeoCitationRefresh() {
+  return api<{ ok: true; data: GeoCitationRefreshState }>(
+    "POST",
+    "/admin/seo/geo-citations/refresh",
+  ).then(r => r.data);
+}
+
 /* ── Route Health ─────────────────────────────────────────────────────── */
 export interface RouteHealthItem {
   route: string;
