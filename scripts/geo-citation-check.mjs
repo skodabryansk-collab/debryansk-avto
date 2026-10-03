@@ -145,6 +145,17 @@ function normalizeProvider(value) {
   return PROVIDER_ALIASES.get(normalized) || normalized;
 }
 
+function defaultChatGptModel(endpoint) {
+  try {
+    if (new URL(endpoint).hostname.toLowerCase() === "api.timeweb.ai") {
+      return "openai/gpt-4.1";
+    }
+  } catch {
+    // Keep the direct OpenAI default when a custom endpoint is not a valid URL.
+  }
+  return "gpt-4.1";
+}
+
 function sourceStatus(providerId) {
   if (providerId === "google-ai-overviews") {
     return {
@@ -179,11 +190,13 @@ function sourceStatus(providerId) {
       process.env.GEO_CHATGPT_API_KEY ||
       process.env.OPENAI_API_KEY ||
       process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    const endpoint = process.env.GEO_CHATGPT_API_URL || openAiResponsesUrl();
     return {
       kind: "api",
       status: apiKey ? "configured" : "unavailable",
       label: "ChatGPT с веб-поиском",
-      endpoint: process.env.GEO_CHATGPT_API_URL || openAiResponsesUrl(),
+      endpoint,
+      model: process.env.GEO_CHATGPT_MODEL || defaultChatGptModel(endpoint),
       authEnv: "GEO_CHATGPT_API_KEY, OPENAI_API_KEY или AI_INTEGRATIONS_OPENAI_API_KEY",
       reason: apiKey
         ? null
@@ -483,7 +496,8 @@ function printSources() {
   for (const provider of PROVIDERS) {
     const source = sourceStatus(provider.id);
     const endpoint = source.endpoint ? ` → ${source.endpoint}` : "";
-    console.log(`- ${provider.label}: ${source.status}${endpoint}`);
+    const model = source.model ? ` (модель: ${source.model})` : "";
+    console.log(`- ${provider.label}: ${source.status}${endpoint}${model}`);
     if (source.reason) console.log(`  ${source.reason}`);
   }
 }
@@ -611,7 +625,7 @@ async function captureProviderQuery(providerId, query) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: process.env.GEO_CHATGPT_MODEL || "gpt-4.1",
+        model: source.model,
         tools: [{ type: "web_search_preview" }],
         input: query.query,
       }),
