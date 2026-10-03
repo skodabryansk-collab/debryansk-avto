@@ -1,4 +1,7 @@
 import { Router, type IRouter } from "express";
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/requireAdmin";
@@ -40,6 +43,73 @@ export interface SeoAuditItem extends SeoPageItem {
 const STATIC_ROUTES = Object.keys(STATIC_META);
 
 let lastAudit: { ranAt: string; items: SeoAuditItem[] } | null = null;
+
+interface GeoCitationRefreshState {
+  status: "idle" | "running" | "completed" | "failed";
+  startedAt: string | null;
+  finishedAt: string | null;
+  message: string | null;
+}
+
+let geoCitationRefreshState: GeoCitationRefreshState = {
+  status: "idle",
+  startedAt: null,
+  finishedAt: null,
+  message: null,
+};
+let geoCitationRefreshRun = 0;
+
+function startGeoCitationRefresh(): GeoCitationRefreshState {
+  if (geoCitationRefreshState.status === "running") return geoCitationRefreshState;
+
+  const scriptPath = resolve(__dirname, "geo-citation-check.mjs");
+  if (!existsSync(scriptPath)) {
+    throw new Error("GEO citation measurement script is missing from the API build.");
+  }
+
+  const startedAt = new Date().toISOString();
+  const runId = ++geoCitationRefreshRun;
+  const child = spawn(process.execPath, [scriptPath, "--weekly"], {
+    cwd: process.cwd(),
+    env: process.env,
+    stdio: "ignore",
+  });
+
+  geoCitationRefreshState = {
+    status: "running",
+    startedAt,
+    finishedAt: null,
+    message: "Замер запущен. Отчёт обновится после завершения.",
+  };
+
+  let settled = false;
+  const finish = (status: "completed" | "failed", message: string) => {
+    if (settled || runId !== geoCitationRefreshRun) return;
+    settled = true;
+    geoCitationRefreshState = {
+      status,
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      message,
+    };
+  };
+
+  child.once("error", (err) => {
+    logger.error({ err }, "[admin-seo] GEO citation measurement process failed to start");
+    finish("failed", "Не удалось запустить GEO-замер. Проверьте логи сервера.");
+  });
+  child.once("close", (code, signal) => {
+    if (code === 0) {
+      logger.info({ runId }, "[admin-seo] GEO citation measurement completed");
+      finish("completed", "Замер завершён, отчёт сохранён. Проверьте статусы источников.");
+      return;
+    }
+    logger.error({ runId, code, signal }, "[admin-seo] GEO citation measurement failed");
+    finish("failed", "GEO-замер завершился с ошибкой. Проверьте логи сервера и доступность AI-провайдеров.");
+  });
+
+  return geoCitationRefreshState;
+}
 
 interface BrandCatalogInfo {
   brandName: string;
@@ -399,6 +469,25 @@ router.get("/geo-citations", async (_req, res): Promise<void> => {
     logger.warn({ status: report.status }, "[admin-seo] GEO citation report is unavailable");
   }
   res.json({ ok: true, ...report });
+});
+
+router.get("/geo-citations/refresh-status", (_req, res): void => {
+  res.json({ ok: true, data: geoCitationRefreshState });
+});
+
+router.post("/geo-citations/refresh", (req, res): void => {
+  if (geoCitationRefreshState.status === "running") {
+    res.status(202).json({ ok: true, data: geoCitationRefreshState });
+    return;
+  }
+  try {
+    const state = startGeoCitationRefresh();
+    req.log.info({ startedAt: state.startedAt }, "[admin-seo] GEO citation measurement started");
+    res.status(202).json({ ok: true, data: state });
+  } catch (err) {
+    logger.error({ err }, "[admin-seo] GEO citation measurement could not be started");
+    res.status(500).json({ ok: false, error: "Не удалось запустить GEO-замер." });
+  }
 });
 
 router.post("/recrawl", async (req, res) => {
