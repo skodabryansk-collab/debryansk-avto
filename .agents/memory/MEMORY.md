@@ -70,6 +70,7 @@
 - [Visitor conversion calls](visitor-conversion-calls.md) — completed >30 сек; звонки и заявки уникальны в rolling-окне 24 часа с учётом границы периода.
 - [Non-interactive post-merge schema sync](post-merge-drizzle.md) — post-merge запускается без TTY; Drizzle push должен использовать non-interactive entry point.
 - [GEO active hypothesis ownership](geo-active-hypothesis.md) — legacy applied rows without an evaluation schedule must not block new GEO recommendations forever.
+- [GEO measurement refresh](geo-citation-refresh.md) — the admin GEO button starts a fresh weekly measurement, not just a reread of the saved report; account for AI-provider request costs.
 - [Yandex Webmaster indexing samples](webmaster-indexing-samples.md) — v4 uses /indexing/samples, not /crawling/samples; read the tail because offset=0 can be historical.
 - [Fuel type in stock feeds](fuel-type-feed.md) — CM Expert XML encodes diesel as a `d` suffix in modification_id; no dedicated fuel field currently exists.
 - [VIN engine enrichment priority](vin-engine-enrichment-priority.md) — use `xml_pending` before CM lookup; only exact techParamId matches may become `cm_vin`, which feed sync must never overwrite.
