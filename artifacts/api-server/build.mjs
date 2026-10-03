@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { rm } from "node:fs/promises";
+import { rm, cp, mkdir } from "node:fs/promises";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
@@ -52,7 +52,6 @@ async function buildAll() {
       "nodemailer",
       "multer",
       "busboy",
-      "@google-cloud/storage",
       "google-auth-library",
       "jsonwebtoken",
       "handlebars",
@@ -68,7 +67,7 @@ async function buildAll() {
       "@aws-sdk/*",
       "@azure/*",
       "@opentelemetry/*",
-      "@google-cloud/*",
+      // "@google-cloud/*" -- removed: no longer used, all storage is local filesystem
       "@google/*",
       "googleapis",
       "firebase-admin",
@@ -105,6 +104,11 @@ async function buildAll() {
       "puppeteer",
       "puppeteer-core",
       "electron",
+      // OpenAI SDK v6 uses dynamic require("node:events") which esbuild can't bundle
+      "openai",
+      // NOTE: @workspace/integrations-openai-ai-server must be BUNDLED (not external)
+      // because it does not exist as a separate package on the VPS. Only "openai" itself
+      // is truly external (dynamic require crash). The wrapper package is safe to bundle.
     ],
     sourcemap: "linked",
     plugins: [
@@ -125,7 +129,31 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
   });
 }
 
-buildAll().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+async function copyTemplates() {
+  const srcDir = path.resolve(artifactDir, "src/templates/kp");
+  const dstDir = path.resolve(artifactDir, "dist");
+  await mkdir(dstDir, { recursive: true });
+  for (const file of ["kp-template.html", "logo-da.svg"]) {
+    try {
+      await cp(path.join(srcDir, file), path.join(dstDir, file));
+    } catch {
+      // file may not exist yet, skip silently
+    }
+  }
+}
+
+async function copyGeoCitationScript() {
+  const src = path.resolve(artifactDir, "../../scripts/geo-citation-check.mjs");
+  const dst = path.resolve(artifactDir, "dist/geo-citation-check.mjs");
+  await cp(src, dst);
+}
+
+buildAll()
+  .then(async () => {
+    await copyTemplates();
+    await copyGeoCitationScript();
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
