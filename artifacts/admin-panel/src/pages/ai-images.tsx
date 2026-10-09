@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  getAiSessions, createAiSession, getAiMessages,
+  getAiSessions, createAiSession, getAiMessages, getAiImageModels,
   generateAiImage, deleteAiSession, getAiStats,
   getBrandLogo, uploadBrandLogo, deleteBrandLogo, updateBrandLogoSettings,
   getBrandFonts, uploadBrandFont, deleteBrandFont,
@@ -56,28 +56,6 @@ const AI_THEME = `
   }
 `;
 
-const MODELS = [
-  { value: "gemini/gemini-3.1-flash-image-preview", label: "Gemini 3.1 Flash" },
-  { value: "gemini/gemini-3-pro-image-preview", label: "Gemini 3 Pro" },
-  { value: "openai/gpt-image-2", label: "GPT Image 2" },
-  { value: "black_forest_labs/flux-2-max", label: "Flux 2 Max · image-to-image" },
-  { value: "black_forest_labs/flux-2-pro", label: "Flux 2 Pro · image-to-image" },
-  { value: "black_forest_labs/flux-2-klein-9b", label: "Flux 2 Klein 9B · image-to-image" },
-];
-
-/** Модели, поддерживающие image-to-image через вложения */
-const IMAGE_INPUT_MODELS = new Set([
-  "gemini/gemini-3.1-flash-image-preview",
-  "gemini/gemini-3-pro-image-preview",
-  "black_forest_labs/flux-2-max",
-  "black_forest_labs/flux-2-pro",
-  "black_forest_labs/flux-2-klein-9b",
-]);
-const FLUX_MODELS = new Set([
-  "black_forest_labs/flux-2-max",
-  "black_forest_labs/flux-2-pro",
-  "black_forest_labs/flux-2-klein-9b",
-]);
 const DEFAULT_IMAGE_INPUT_MODEL = "gemini/gemini-3.1-flash-image-preview";
 
 const SIZES = [
@@ -376,6 +354,11 @@ export default function AiImagesPage() {
   const fontInputRef = useRef<HTMLInputElement>(null);
 
   /* ── Queries ─────────────────────────────────────────────── */
+  const { data: modelData, isLoading: modelsLoading, error: modelsError } = useQuery({
+    queryKey: ["ai-image-models"], queryFn: getAiImageModels, staleTime: 60_000,
+  });
+  const models = modelData?.data ?? [];
+  const selectedModel = models.find(m => m.value === model);
   const { data: sessionsData } = useQuery({
     queryKey: ["ai-sessions"],
     queryFn: getAiSessions,
@@ -499,19 +482,23 @@ export default function AiImagesPage() {
         return;
       }
     }
-    setFiles(prev => [...prev, ...arr].slice(0, 5));
-    // Auto-switch to a Gemini model if current model doesn't support image input
+    const limit = selectedModel?.referenceLimit ?? 5;
+    if (files.length + arr.length > limit) {
+      toast({ title: "Слишком много изображений", description: `Выбранная модель принимает не больше ${limit} фото.`, variant: "destructive" });
+      return;
+    }
+    setFiles(prev => [...prev, ...arr]);
     setModel(prev => {
-      if (!IMAGE_INPUT_MODELS.has(prev)) {
+      if (!models.find(m => m.value === prev)?.imageToImage) {
         toast({
           title: "Модель переключена на Gemini",
-          description: "GPT Image 2 не поддерживает вложения. Используется Gemini 3.1 Flash.",
+          description: "Выбранная модель не принимает фото через Timeweb. Используется Gemini 3.1 Flash.",
         });
         return DEFAULT_IMAGE_INPUT_MODEL;
       }
       return prev;
     });
-  }, [toast]);
+  }, [toast, models, selectedModel?.referenceLimit, files.length]);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -522,16 +509,19 @@ export default function AiImagesPage() {
   /* ── Generate ────────────────────────────────────────────── */
   const handleGenerate = async () => {
     if (!prompt.trim() || isGenerating) return;
-    if (FLUX_MODELS.has(model) && files.length === 0) {
-      const hasPreviousImage = messages.some(m => m.role === "assistant" && !!m.result_url);
-      if (!hasPreviousImage) {
+    if (!selectedModel?.available) return;
+    const hasReference = files.length > 0 || (!skipAutoRef && messages.some(m => m.role === "assistant" && !!m.result_url));
+    if (hasReference && !selectedModel.imageToImage) {
+      toast({ title: "Модель не поддерживает исходное фото", description: "Выберите другую модель или генерацию с нуля.", variant: "destructive" });
+      return;
+    }
+    if (!selectedModel.textToImage && !hasReference) {
         toast({
-          title: "Flux работает с исходным изображением",
-          description: "Прикрепите фото или сначала создайте изображение через Gemini.",
+          title: "Нужно исходное изображение",
+          description: "Эта модель работает с фото. Прикрепите его или используйте предыдущий результат.",
           variant: "destructive",
         });
-        return;
-      }
+      return;
     }
     if (!activeSessionId) {
       const sess = await createMutation.mutateAsync();
@@ -547,7 +537,7 @@ export default function AiImagesPage() {
     fd.append("prompt", prompt.trim());
     fd.append("model", model);
     fd.append("size", size);
-    if (model === "openai/gpt-image-2") fd.append("quality", quality);
+    if (selectedModel?.supportsQuality) fd.append("quality", quality);
     if (useSystemPrompt) {
       fd.append("include_system_prompt", "true");
       if (activeSystemPromptId) fd.append("system_prompt_id", String(activeSystemPromptId));
@@ -819,12 +809,12 @@ export default function AiImagesPage() {
             <select
               value={model}
               onChange={e => setModel(e.target.value)}
-              className="text-xs rounded-lg px-2 py-1 h-8 border"
+              className="min-w-0 max-w-[210px] sm:max-w-[300px] text-xs rounded-lg px-2 py-1 h-8 border"
               style={{ background: "var(--ai-surface)", color: "var(--ai-text-muted)", borderColor: "var(--ai-border)" }}
             >
-              {MODELS.map(m => (
-                <option key={m.value} value={m.value}>
-                  {IMAGE_INPUT_MODELS.has(m.value) ? `🖼 ${m.label}` : m.label}
+              {models.map(m => (
+                <option key={m.value} value={m.value} disabled={!m.available || (files.length > 0 && (!m.imageToImage || files.length > m.referenceLimit))}>
+                  {m.label}{!m.textToImage ? " · только с фото" : m.imageToImage ? " · с фото / с нуля" : " · только с нуля"}{!m.available ? " · недоступна" : ""}
                 </option>
               ))}
             </select>
@@ -1003,12 +993,12 @@ export default function AiImagesPage() {
                 <select
                   value={model}
                   onChange={e => setModel(e.target.value)}
-                  className="hidden lg:block text-xs rounded-xl px-3 h-11 border flex-shrink-0"
+                  className="hidden lg:block max-w-[260px] text-xs rounded-xl px-3 h-11 border flex-shrink-0"
                   style={{ background: "var(--ai-surface)", color: "var(--ai-text-muted)", borderColor: "var(--ai-border)" }}
                 >
-                  {MODELS.map(m => (
-                    <option key={m.value} value={m.value}>
-                      {IMAGE_INPUT_MODELS.has(m.value) ? `🖼 ${m.label}` : m.label}
+                  {models.map(m => (
+                    <option key={m.value} value={m.value} disabled={!m.available || (files.length > 0 && (!m.imageToImage || files.length > m.referenceLimit))}>
+                      {m.label}{!m.textToImage ? " · только с фото" : m.imageToImage ? " · с фото / с нуля" : " · только с нуля"}{!m.available ? " · недоступна" : ""}
                     </option>
                   ))}
                 </select>
@@ -1024,7 +1014,7 @@ export default function AiImagesPage() {
                 </select>
 
                 {/* Quality select — only GPT Image 2 */}
-                {model === "openai/gpt-image-2" && (
+                {selectedModel?.supportsQuality && (
                   <select
                     value={quality}
                     onChange={e => setQuality(e.target.value)}
@@ -1037,7 +1027,7 @@ export default function AiImagesPage() {
 
                 <Button
                   onClick={handleGenerate}
-                  disabled={isGenerating || !prompt.trim()}
+                  disabled={isGenerating || !prompt.trim() || modelsLoading || !selectedModel?.available}
                   className="ml-auto h-11 px-5 font-semibold text-sm min-w-[140px]"
                   style={{
                     background: "var(--ai-accent)",
@@ -1054,6 +1044,10 @@ export default function AiImagesPage() {
                   }
                 </Button>
               </div>
+              <p className="mt-2 text-[11px]" style={{ color: modelsError ? "#f87171" : "var(--ai-text-muted)" }}>
+                {modelsError ? `Не удалось загрузить модели: ${String(modelsError)}` : modelsLoading ? "Загрузка моделей…" :
+                  `${selectedModel?.label ?? "Выберите модель"} · до ${selectedModel?.referenceLimit ?? 5} исходных фото. ${selectedModel?.reason ?? ""}`}
+              </p>
             </div>
           ) : null}
         </div>
