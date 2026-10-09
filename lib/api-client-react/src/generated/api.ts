@@ -16,6 +16,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AiImageModelCatalogue,
   HealthStatus
 } from './api.schemas';
 
@@ -28,6 +29,83 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+export const getListAiImageModelsUrl = () => {
+
+
+
+
+  return `/api/admin/ai-images/models`
+}
+
+/**
+ * @summary Available image models and verified generation capabilities
+ */
+export const listAiImageModels = async ( options?: RequestInit): Promise<AiImageModelCatalogue> => {
+
+  return customFetch<AiImageModelCatalogue>(getListAiImageModelsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAiImageModelsQueryKey = () => {
+    return [
+    `/api/admin/ai-images/models`
+    ] as const;
+    }
+
+
+export const getListAiImageModelsQueryOptions = <TData = Awaited<ReturnType<typeof listAiImageModels>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAiImageModels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAiImageModelsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAiImageModels>>> = ({ signal }) => listAiImageModels({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAiImageModels>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAiImageModelsQueryResult = NonNullable<Awaited<ReturnType<typeof listAiImageModels>>>
+export type ListAiImageModelsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Available image models and verified generation capabilities
+ */
+
+export function useListAiImageModels<TData = Awaited<ReturnType<typeof listAiImageModels>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAiImageModels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAiImageModelsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 
 
