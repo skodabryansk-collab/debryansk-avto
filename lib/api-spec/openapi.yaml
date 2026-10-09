@@ -11,6 +11,19 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /admin/ai-images/models:
+    get:
+      operationId: listAiImageModels
+      summary: Available image models and verified generation capabilities
+      responses:
+        "200":
+          description: Image model catalogue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiImageModelCatalogue"
+        "401":
+          description: Administrator authentication required
   /healthz:
     get:
       operationId: healthCheck
@@ -26,6 +39,36 @@ paths:
                 $ref: "#/components/schemas/HealthStatus"
 components:
   schemas:
+    AiImageModelCatalogue:
+      type: object
+      required: [ok, data]
+      properties:
+        ok:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiImageModel"
+    AiImageModel:
+      type: object
+      required: [value, label, textToImage, imageToImage, supportsQuality, referenceLimit, available, reason]
+      properties:
+        value:
+          type: string
+        label:
+          type: string
+        textToImage:
+          type: boolean
+        imageToImage:
+          type: boolean
+        supportsQuality:
+          type: boolean
+        referenceLimit:
+          type: integer
+        available:
+          type: boolean
+        reason:
+          type: string
     HealthStatus:
       type: object
       properties:
