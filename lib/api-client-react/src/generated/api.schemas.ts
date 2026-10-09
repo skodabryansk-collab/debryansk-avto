@@ -5,6 +5,22 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface AiImageModel {
+  value: string;
+  label: string;
+  textToImage: boolean;
+  imageToImage: boolean;
+  supportsQuality: boolean;
+  referenceLimit: number;
+  available: boolean;
+  reason: string;
+}
+
+export interface AiImageModelCatalogue {
+  ok: boolean;
+  data: AiImageModel[];
+}
+
 export interface HealthStatus {
   status: string;
 }
