@@ -1,14 +1,4 @@
-/**
- * Timeweb AI Gateway — image generation client.
- * Endpoint: https://api.timeweb.ai/v1
- * Auth: TIMEWEB_AI_GATEWAY_KEY (Bearer)
- *
- * Image with reference flow (Files API):
- *   1. POST /v1/files  →  file_id
- *   2. POST /v1/responses  with input_file: { file_id }  →  generated image
- *   3. DELETE /v1/files/:file_id  (cleanup)
- */
-
+/** Timeweb adapters: Gemini chat, GPT/FLUX multipart edits, Runway JSON referenceImages. */
 export interface TokenUsage {
   total_tokens: number;
   input_tokens: number;
@@ -16,377 +6,183 @@ export interface TokenUsage {
   input_image_tokens: number;
   output_tokens: number;
 }
+export interface ImageResult { buffer: Buffer; usage: TokenUsage }
+export interface ReferenceFile { buffer: Buffer; mime: string }
+export const ALLOWED_QUALITY = ["low", "medium", "high"] as const;
+export type ImageQuality = typeof ALLOWED_QUALITY[number];
+export const IMAGE_SIZES = ["1024x1024", "1024x1792", "1792x1024"] as const;
+export type ImageSize = typeof IMAGE_SIZES[number];
 
-export interface ImageResult {
-  buffer: Buffer;
-  usage: TokenUsage;
+function model(value: string, label: string, family: "gemini" | "gpt" | "flux" | "runway", available = true, reason = "") {
+  return {
+    value, label, family, available, reason,
+    textToImage: value !== "runway/gen4_image_turbo",
+    imageToImage: available,
+    supportsQuality: family === "gpt",
+    referenceLimit: value.startsWith("runway/gen4") ? 3 : 5,
+  };
 }
 
-export const ALLOWED_MODELS = [
-  "gemini/gemini-3-pro-image-preview",
-  "gemini/gemini-3.1-flash-image-preview",
-  "openai/gpt-image-2",
-  "black_forest_labs/flux-2-max",
-  "black_forest_labs/flux-2-pro",
-  "black_forest_labs/flux-2-klein-9b",
+// Capabilities reflect the gateway endpoints, not just the upstream vendor's claims.
+export const IMAGE_MODELS = [
+  model("gemini/gemini-3.1-flash-image-preview", "Gemini 3.1 Flash", "gemini"),
+  model("gemini/gemini-3-pro-image-preview", "Gemini 3 Pro", "gemini"),
+  model("openai/gpt-image-2.5-flare", "GPT Image 2.5 Flare", "gpt"),
+  model("openai/gpt-image-2.5-sunburst", "GPT Image 2.5 Sunburst", "gpt"),
+  model("openai/gpt-image-2", "GPT Image 2", "gpt"),
+  model("black_forest_labs/flux-2-max", "FLUX.2 Max", "flux"),
+  model("black_forest_labs/flux-2-pro", "FLUX.2 Pro", "flux"),
+  model("black_forest_labs/flux-2-klein-9b", "FLUX.2 Klein 9B", "flux"),
+  model("runway/gen4_image", "Runway Gen-4 Image", "runway", true, "Timeweb помечает модель как устаревшую, но генерация через API проверена."),
+  model("runway/gen4_image_turbo", "Runway Gen-4 Image Turbo", "runway", true, "Нужно исходное фото. Timeweb помечает модель как устаревшую, но API работает."),
+  model("runway/seedream5_pro", "Seedream 5 Pro", "runway", true, "Timeweb помечает модель как устаревшую, но генерация через API проверена."),
+  model("runway/seedream5_lite", "Seedream 5 Lite", "runway", true, "Минимальное разрешение — около 4 Мп. Timeweb помечает модель как устаревшую."),
 ] as const;
-
-export type ImageModel = (typeof ALLOWED_MODELS)[number];
-export const FLUX_MODELS = [
-  "black_forest_labs/flux-2-max",
-  "black_forest_labs/flux-2-pro",
-  "black_forest_labs/flux-2-klein-9b",
-] as const;
-
-export const IMAGE_SIZES = ["1024x1024", "1024x1792", "1792x1024"] as const;
-export type ImageSize = (typeof IMAGE_SIZES)[number];
-
+export const ALLOWED_MODELS = IMAGE_MODELS.filter(m => m.available).map(m => m.value);
+export type ImageModel = typeof IMAGE_MODELS[number]["value"];
+export const FLUX_MODELS = IMAGE_MODELS.filter(m => m.family === "flux").map(m => m.value);
 const BASE_URL = "https://api.timeweb.ai/v1";
 
-function getKey(): string {
+export function getImageModel(value: string) {
+  const config = IMAGE_MODELS.find(m => m.value === value);
+  if (!config?.available) throw new Error(config?.reason || `Модель '${value}' недоступна.`);
+  return config;
+}
+function getKey() {
   const key = process.env["TIMEWEB_AI_GATEWAY_KEY"];
   if (!key) throw new Error("TIMEWEB_AI_GATEWAY_KEY не задан");
   return key;
 }
-
-function assertModel(model: string): asserts model is ImageModel {
-  if (!(ALLOWED_MODELS as readonly string[]).includes(model)) {
-    throw new Error(`Модель '${model}' не разрешена. Допустимые: ${ALLOWED_MODELS.join(", ")}`);
+function validateSize(size: string) {
+  if (!(IMAGE_SIZES as readonly string[]).includes(size)) throw new Error(`Недопустимый размер: ${size}`);
+}
+function runwaySize(model: string, size: string) {
+  if (model.endsWith("seedream5_lite")) {
+    return size === "1024x1024" ? "2048x2048" : size === "1024x1792" ? "1440x2560" : "2560x1440";
   }
+  return size === "1024x1024" ? size : size === "1024x1792" ? "1080x1920" : "1920x1080";
 }
-
-interface TimewebImageResponse {
-  data: Array<{ b64_json?: string; url?: string }>;
-  usage?: {
-    total_tokens?: number;
-    input_tokens?: number;
-    input_tokens_details?: { text_tokens?: number; image_tokens?: number };
-    output_tokens?: number;
-  };
-}
-
-type TimewebImagePayload = {
+type Payload = {
   data?: Array<{ b64_json?: string; url?: string }>;
-  usage?: TimewebImageResponse["usage"];
-};
-
-// Responses API types (used for image-with-reference)
-interface TimewebResponseOutput {
-  type: string;
-  result?: string;       // image_generation_call: base64 image
-  content?: Array<{
-    type: string;
-    text?: string;
-    image_url?: { url: string };
-    b64_json?: string;
-  }>;
-}
-
-interface TimewebResponsesResult {
-  id?: string;
-  output?: TimewebResponseOutput[];
   usage?: {
-    total_tokens?: number;
-    input_tokens?: number;
-    output_tokens?: number;
+    total_tokens?: number; input_tokens?: number; output_tokens?: number;
+    prompt_tokens?: number; completion_tokens?: number;
+    input_tokens_details?: { text_tokens?: number; image_tokens?: number };
   };
-}
-
-// ─── Upload a file to Timeweb Files API ──────────────────────────────────────
-
-async function uploadFileToTimeweb(
-  buffer: Buffer,
-  mime: string,
-  filename: string,
-  model: string,
-): Promise<string> {
-  // Timeweb Files API only accepts PNG/JPG — convert WebP on the fly
-  let finalBuffer = buffer;
-  let finalMime = mime;
-  let finalName = filename;
-
-  if (mime.includes("webp")) {
-    try {
-      const sharp = (await import("sharp")).default;
-      finalBuffer = await sharp(buffer).png().toBuffer();
-      finalMime = "image/png";
-      finalName = filename.replace(/\.webp$/i, ".png");
-    } catch { /* keep original if sharp fails */ }
-  }
-
-  const form = new FormData();
-  form.append("purpose", "user_data");
-  form.append("file", new Blob([Uint8Array.from(finalBuffer)], { type: finalMime }), finalName);
-  form.append("target_model_names", model);
-
-  const res = await fetch(`${BASE_URL}/files`, {
+};
+async function request(path: string, body: FormData | Record<string, unknown>): Promise<Payload> {
+  const multipart = body instanceof FormData;
+  const res = await fetch(`${BASE_URL}${path}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${getKey()}` },
-    body: form,
-    signal: AbortSignal.timeout(30_000),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Timeweb Files upload error ${res.status}: ${text.slice(0, 200)}`);
-  }
-
-  const data = await res.json() as { id: string; status?: string };
-  if (!data.id) throw new Error("Timeweb Files API не вернул file_id");
-  return data.id;
-}
-
-// Fire-and-forget cleanup to avoid accumulating files on Timeweb
-function deleteFileFromTimeweb(fileId: string): void {
-  fetch(`${BASE_URL}/files/${fileId}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${getKey()}` },
-    signal: AbortSignal.timeout(10_000),
-  }).catch(() => { /* ignore cleanup errors */ });
-}
-
-// ─── Extract base64 image from /v1/responses output ──────────────────────────
-
-function extractB64FromResponsesOutput(output: TimewebResponseOutput[]): string | null {
-  for (const item of output) {
-    // Format 1: { type: "image_generation_call", result: "<b64>" }
-    if (item.type === "image_generation_call" && item.result) {
-      return item.result;
-    }
-    // Format 2: content array with b64_json or image_url data:
-    if (Array.isArray(item.content)) {
-      for (const c of item.content) {
-        if (c.b64_json) return c.b64_json;
-        if (c.image_url?.url?.startsWith("data:image")) {
-          // Strip data URI prefix: "data:image/png;base64,<b64>"
-          const match = c.image_url.url.match(/^data:image\/[^;]+;base64,(.+)$/s);
-          if (match?.[1]) return match[1];
-        }
-      }
-    }
-  }
-  return null;
-}
-
-// ─── Public API ──────────────────────────────────────────────────────────────
-
-/**
- * Generate an image from a text prompt only.
- */
-export const ALLOWED_QUALITY = ["low", "medium", "high"] as const;
-export type ImageQuality = typeof ALLOWED_QUALITY[number];
-
-export async function generateImage(
-  prompt: string,
-  model: string,
-  size: string = "1024x1024",
-  quality?: ImageQuality,
-): Promise<ImageResult> {
-  assertModel(model);
-  if ((FLUX_MODELS as readonly string[]).includes(model)) {
-    throw new Error(
-      "Flux через Timeweb сейчас доступен в режиме image-to-image. " +
-      "Прикрепите исходное изображение или выберите Gemini для генерации с нуля.",
-    );
-  }
-
-  // quality is only supported by GPT Image 2 via /images/generations
-  const supportsQuality = model.includes("gpt-image");
-  const bodyParams: Record<string, unknown> = { model, prompt, n: 1, size, response_format: "b64_json" };
-  if (supportsQuality && quality && (ALLOWED_QUALITY as readonly string[]).includes(quality)) {
-    bodyParams["quality"] = quality;
-  }
-
-  const res = await fetch(`${BASE_URL}/images/generations`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${getKey()}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(bodyParams),
+    headers: { Authorization: `Bearer ${getKey()}`, ...(!multipart ? { "Content-Type": "application/json" } : {}) },
+    body: multipart ? body : JSON.stringify(body),
     signal: AbortSignal.timeout(240_000),
   });
-
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Timeweb API error ${res.status}: ${text.slice(0, 300)}`);
+    throw new Error(`Timeweb ${path}: HTTP ${res.status}: ${text.slice(0, 500)}`);
   }
-
-  const json = (await res.json()) as TimewebImageResponse;
+  return await res.json() as Payload;
+}
+export async function generateImage(prompt: string, model: string, size = "1024x1024", quality?: ImageQuality): Promise<ImageResult> {
+  const config = getImageModel(model);
+  validateSize(size);
+  if (!config.textToImage) throw new Error(`${config.label}: прикрепите исходное изображение.`);
+  const body: Record<string, unknown> = { model, prompt, n: 1, size: config.family === "runway" ? runwaySize(model, size) : size };
+  if (config.supportsQuality && quality) body.quality = quality;
+  const json = await request("/images/generations", body);
   return { buffer: await extractImageBuffer(json), usage: extractUsage(json) };
 }
 
-export interface ReferenceFile {
-  buffer: Buffer;
-  mime: string;
-}
-
-/**
- * Generate an image using one or more reference images.
- * All files are passed as image_url parts inside a single user message
- * so the model can see every reference (e.g. base image + logo).
- */
 export async function generateImageWithReference(
-  files: ReferenceFile[],
-  prompt: string,
-  model: string,
-  size: string = "1024x1024",
+  files: ReferenceFile[], prompt: string, model: string, size = "1024x1024", quality?: ImageQuality,
 ): Promise<ImageResult> {
-  assertModel(model);
-
-  // Convert WebP → PNG for each file (maximum compatibility)
-  const prepared: ReferenceFile[] = await Promise.all(
-    files.map(async ({ buffer, mime }) => {
-      if (mime.includes("webp")) {
-        try {
-          const sharp = (await import("sharp")).default;
-          return { buffer: await sharp(buffer).png().toBuffer(), mime: "image/png" };
-        } catch { /* keep original */ }
-      }
-      return { buffer, mime };
-    }),
-  );
-
-  if ((FLUX_MODELS as readonly string[]).includes(model)) {
-    return generateFluxImageWithReference(prepared, prompt, model);
+  const config = getImageModel(model);
+  validateSize(size);
+  if (!config.imageToImage) throw new Error(`${config.label} не поддерживает исходные изображения через Timeweb.`);
+  if (!files.length || files.length > config.referenceLimit) {
+    throw new Error(`Прикрепите от 1 до ${config.referenceLimit} изображений.`);
   }
-
-  // Build content array: all images first, then the text prompt
-  const imageParts = prepared.map(({ buffer, mime }) => ({
-    type: "image_url" as const,
-    image_url: { url: `data:${mime};base64,${buffer.toString("base64")}` },
-  }));
-
-  // ── /chat/completions with image_url → parse message.images ─────────────
-  // Gemini image models return generated images in message.images[], NOT in
-  // message.content (which is null). This is the correct path for image-to-image.
-  try {
-    const res = await fetch(`${BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${getKey()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "user",
-            content: [
-              ...imageParts,
-              { type: "text", text: prompt },
-            ],
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(240_000),
+  const sharp = (await import("sharp")).default;
+  // Decode and normalize ALL references; invalid uploads must not be silently ignored.
+  const prepared = await Promise.all(files.map(async ({ buffer }) => ({
+    buffer: await sharp(buffer).rotate().png().toBuffer(), mime: "image/png",
+  })));
+  if (config.family === "runway") {
+    const references = prepared.map((f, index) => {
+      const uri = `data:${f.mime};base64,${f.buffer.toString("base64")}`;
+      if (uri.length > 5 * 1024 * 1024) throw new Error("Runway: исходное фото превышает 5 МБ после подготовки. Уменьшите разрешение.");
+      return { uri, ...(!model.includes("seedream") ? { tag: `ref${index + 1}` } : {}) };
     });
-
-    if (res.ok) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const json = await res.json() as any;
-      const msg = json?.choices?.[0]?.message;
-
-      // Primary: message.images[] (Gemini image models via Timeweb)
-      const imgUrl: string | undefined = msg?.images?.[0]?.image_url?.url;
-      if (imgUrl) {
-        const b64Match = imgUrl.match(/^data:image\/[^;]+;base64,(.+)$/s);
-        if (b64Match?.[1]) {
-          return { buffer: Buffer.from(b64Match[1], "base64"), usage: zeroUsage() };
-        }
-      }
-
-      // Fallback: message.content as array with image parts
-      const content = msg?.content;
-      if (Array.isArray(content)) {
-        for (const part of content) {
-          const partUrl: string | undefined = part?.image_url?.url;
-          if (partUrl?.startsWith("data:image")) {
-            const m = partUrl.match(/^data:image\/[^;]+;base64,(.+)$/s);
-            if (m?.[1]) return { buffer: Buffer.from(m[1], "base64"), usage: zeroUsage() };
-          }
-          if (part?.b64_json) return { buffer: Buffer.from(part.b64_json as string, "base64"), usage: zeroUsage() };
-        }
-      }
-    }
-  } catch { /* fall through to plain generation */ }
-
-  // ── Fallback: plain generation without reference ──────────────────────────
-  return generateImage(prompt, model, size);
-}
-
-/**
- * FLUX.2 uses the native /images/edits endpoint through Timeweb.
- * The endpoint returns a short-lived BFL URL, so fetch it immediately and
- * keep the rest of the image pipeline provider-agnostic.
- */
-async function generateFluxImageWithReference(
-  files: ReferenceFile[],
-  prompt: string,
-  model: string,
-): Promise<ImageResult> {
+    const json = await request("/images/generations", { model, prompt, size: runwaySize(model, size), n: 1, referenceImages: references });
+    return { buffer: await extractImageBuffer(json), usage: extractUsage(json) };
+  }
+  if (config.family === "gemini") {
+    const json = await request("/chat/completions", {
+      model,
+      messages: [{ role: "user", content: [
+        ...prepared.map(f => ({ type: "image_url", image_url: { url: `data:${f.mime};base64,${f.buffer.toString("base64")}` } })),
+        { type: "text", text: prompt },
+      ] }],
+    });
+    const chat = json as Payload & { choices?: Array<{ message?: {
+      images?: Array<{ image_url?: { url?: string } }>;
+      content?: string | Array<{ image_url?: { url?: string }; b64_json?: string }>;
+    } }> };
+    const msg = chat.choices?.[0]?.message;
+    const image = msg?.images?.[0]?.image_url?.url;
+    const content = Array.isArray(msg?.content) ? msg.content : [];
+    const fallback = content.find(p => p.image_url?.url || p.b64_json);
+    return {
+      buffer: await extractImageBuffer({ data: [{ url: image || fallback?.image_url?.url, b64_json: fallback?.b64_json }] }),
+      usage: extractUsage(json),
+    };
+  }
   const form = new FormData();
   form.append("model", model);
   form.append("prompt", prompt);
-
-  files.slice(0, 8).forEach(({ buffer, mime }, index) => {
-    const extension = mime.split("/")[1]?.replace("jpeg", "jpg") || "png";
-    const field = index === 0 ? "image" : `image_${index + 1}`;
-    form.append(
-      field,
-      new Blob([Uint8Array.from(buffer)], { type: mime }),
-      `reference-${index + 1}.${extension}`,
-    );
-  });
-
-  const res = await fetch(`${BASE_URL}/images/edits`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${getKey()}` },
-    body: form,
-    signal: AbortSignal.timeout(240_000),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Timeweb Flux image edit error ${res.status}: ${text.slice(0, 300)}`);
+  if (config.family === "gpt") {
+    form.append("size", size);
+    if (quality) form.append("quality", quality);
+  } else {
+    const [width, height] = size.split("x");
+    form.append("width", width!);
+    form.append("height", height!);
   }
-
-  const json = (await res.json()) as TimewebImagePayload;
-  return {
-    buffer: await extractImageBuffer(json),
-    usage: extractUsage(json),
-  };
+  prepared.forEach((f, index) => {
+    const field = config.family === "flux" && index > 0 ? `image_${index + 1}` : "image";
+    form.append(field, new Blob([Uint8Array.from(f.buffer)], { type: f.mime }), `reference-${index + 1}.png`);
+  });
+  const json = await request("/images/edits", form);
+  return { buffer: await extractImageBuffer(json), usage: extractUsage(json) };
 }
 
-async function extractImageBuffer(json: TimewebImagePayload): Promise<Buffer> {
+async function extractImageBuffer(json: Payload): Promise<Buffer> {
   const item = json.data?.[0];
-  if (item?.b64_json) return Buffer.from(item.b64_json, "base64");
-
-  const url = item?.url;
-  if (url?.startsWith("data:image/")) {
-    const match = url.match(/^data:image\/[^;]+;base64,(.+)$/s);
-    if (match?.[1]) return Buffer.from(match[1], "base64");
+  let buffer: Buffer | undefined;
+  if (item?.b64_json) buffer = Buffer.from(item.b64_json, "base64");
+  else if (item?.url?.startsWith("data:image/")) {
+    const match = item.url.match(/^data:image\/[^;]+;base64,(.+)$/s);
+    if (match?.[1]) buffer = Buffer.from(match[1], "base64");
+  } else if (item?.url) {
+    const url = new URL(item.url);
+    if (url.protocol !== "https:") throw new Error("Timeweb вернул небезопасную ссылку на изображение.");
+    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) throw new Error(`Не удалось скачать изображение: HTTP ${res.status}`);
+    buffer = Buffer.from(await res.arrayBuffer());
   }
-
-  if (url) {
-    const imageRes = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-    if (imageRes.ok) return Buffer.from(await imageRes.arrayBuffer());
-  }
-
-  throw new Error("Timeweb API вернул пустой результат изображения");
+  if (!buffer?.length) throw new Error("Timeweb API не вернул изображение. Исходные фото не были заменены генерацией с нуля.");
+  const sharp = (await import("sharp")).default;
+  await sharp(buffer).metadata();
+  return buffer;
 }
-
-function zeroUsage(): TokenUsage {
-  return { total_tokens: 0, input_tokens: 0, input_text_tokens: 0, input_image_tokens: 0, output_tokens: 0 };
-}
-
-function extractUsage(json: TimewebImagePayload): TokenUsage {
+function extractUsage(json: Payload): TokenUsage {
   const u = json.usage;
   return {
     total_tokens: u?.total_tokens ?? 0,
-    input_tokens: u?.input_tokens ?? 0,
+    input_tokens: u?.input_tokens ?? u?.prompt_tokens ?? 0,
     input_text_tokens: u?.input_tokens_details?.text_tokens ?? 0,
     input_image_tokens: u?.input_tokens_details?.image_tokens ?? 0,
-    output_tokens: u?.output_tokens ?? 0,
+    output_tokens: u?.output_tokens ?? u?.completion_tokens ?? 0,
   };
 }
