@@ -9,6 +9,24 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Available image models and verified generation capabilities
+ */
+export const ListAiImageModelsResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string(),
+  "textToImage": zod.boolean(),
+  "imageToImage": zod.boolean(),
+  "supportsQuality": zod.boolean(),
+  "referenceLimit": zod.number(),
+  "available": zod.boolean(),
+  "reason": zod.string()
+}))
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */
