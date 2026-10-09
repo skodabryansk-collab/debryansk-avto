@@ -1,4 +1,9 @@
+import type { AiImageModelCatalogue } from "@workspace/api-client-react";
 const API_BASE = "/api";
+
+export function getAiImageModels() {
+  return api<AiImageModelCatalogue>("GET", "/admin/ai-images/models");
+}
 
 function getToken(): string | null {
   return localStorage.getItem("admin_token");
