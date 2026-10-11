@@ -63,7 +63,7 @@
 - [News SEO & gallery](news-seo-and-gallery.md) — stale JS hash на VPS news pages, deploy fix (rm news/ before upload), og:image/type/NewsArticle fixes, mobile gallery HeroGallery on all screens.
 - [H1 injection for bots](seo-h1-injection.md) — SPA shell has no H1; inject via hidden <main> block in injectMeta(); regex /<h1 class="sr-only">/ never matched shell.
 - [Workflow restart port ownership](workflow-restart-port-ownership.md) — a stale API process can survive restart and keep serving old code on port 8080; verify listener ownership before testing.
-- [VPS SSH transient refusal](vps-ssh-transient-refusal.md) — when Timeweb refuses sequential SSH, keep a background ControlMaster alive; do not use ssh -f in one-off shells.
+- [VPS SSH transient refusal](vps-ssh-transient-refusal.md) — use a foreground ControlMaster; `ControlPersist` can detach it and leave a stale socket.
 - [Route health and safe prerender publication](route-health-integrity.md) — reconcile DB registry with every cache route; validate and atomically publish only crawl-safe snapshots.
 - [Quote PDF priority](quote-pdf-priority.md) — интерактивная генерация КП должна прерывать длительный SEO-пререндер и не оставлять КП без файла.
 - [Karpathy evaluator schedule](karpathy-evaluator-schedule.md) — оценка должна иметь ежедневный catch-up, а не зависеть только от воскресного снапшота позиций.
