@@ -1,5 +1,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
+import { format, subDays } from "date-fns";
+import { ru } from "date-fns/locale";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -13,20 +15,39 @@ import type {
   VisitorActivityCell, VisitorActivityMetric, VisitorActivityMode, VisitorActivityResult,
   ConversionResult,
 } from "@/lib/api";
-import { Clock3, ExternalLink, TrendingUp, TrendingDown, Minus, AlertCircle, Phone, FileText, PhoneMissed, Users } from "lucide-react";
+import { Clock3, ExternalLink, TrendingUp, TrendingDown, Minus, AlertCircle, Phone, FileText, PhoneMissed, Users, CalendarDays } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { DateRange } from "react-day-picker";
 
-type Period = "today" | "7d" | "30d";
+type Period = "today" | "7d" | "30d" | "custom";
 
-function dateStr(daysAgo: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return d.toISOString().split("T")[0];
+function dateStr(date: Date): string {
+  return format(date, "yyyy-MM-dd");
 }
 
 function periodDates(period: Period): { date1: string; date2: string } {
-  if (period === "today") return { date1: dateStr(0), date2: dateStr(0) };
-  if (period === "30d") return { date1: dateStr(30), date2: dateStr(1) };
-  return { date1: dateStr(7), date2: dateStr(1) };
+  const today = new Date();
+  if (period === "today") return { date1: dateStr(today), date2: dateStr(today) };
+  if (period === "30d") return { date1: dateStr(subDays(today, 30)), date2: dateStr(subDays(today, 1)) };
+  return { date1: dateStr(subDays(today, 7)), date2: dateStr(subDays(today, 1)) };
+}
+
+function displayRange(from?: Date, to?: Date) {
+  if (!from) return "Выберите даты";
+  const left = format(from, "d MMM yyyy", { locale: ru });
+  return to ? `${left} — ${format(to, "d MMM yyyy", { locale: ru })}` : `${left} — …`;
+}
+
+function reportToday() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Moscow",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(new Date());
+  const part = (type: string) => Number(parts.find(item => item.type === type)?.value);
+  return new Date(part("year"), part("month") - 1, part("day"));
 }
 
 function formatNum(n: number): string {
@@ -425,11 +446,11 @@ function ConversionFunnelLegacy({ period }: { period: Period }) {
 }
 
 
-function ConversionFunnel({ period }: { period: Period }) {
+function ConversionFunnel({ period, date1, date2 }: { period: Period; date1: string; date2: string }) {
   const q = useQuery<ConversionResult>({
-    queryKey: ["conversion", period],
-    queryFn: () => getConversion(period),
-    refetchInterval: 5 * 60_000,
+    queryKey: ["conversion", period, date1, date2],
+    queryFn: () => getConversion(period, period === "custom" ? date1 : undefined, period === "custom" ? date2 : undefined),
+    refetchInterval: period === "custom" ? false : 5 * 60_000,
     staleTime: 60_000,
     retry: 1,
   });
@@ -914,15 +935,20 @@ function ActivityHeatmap({
 
 export default function VisitorsPage() {
   const [period, setPeriod] = React.useState<Period>("7d");
+  const [customRange, setCustomRange] = React.useState<DateRange>({ from: undefined });
+  const [draftRange, setDraftRange] = React.useState<DateRange>({ from: undefined });
+  const [calendarOpen, setCalendarOpen] = React.useState(false);
   const [updatedAt, setUpdatedAt] = React.useState<string>("");
   const [activityMetric, setActivityMetric] = React.useState<VisitorActivityMetric>("visits");
   const [activityMode, setActivityMode] = React.useState<VisitorActivityMode>("average");
-  const { date1, date2 } = periodDates(period);
+  const presetDates = periodDates(period === "custom" ? "7d" : period);
+  const date1 = period === "custom" && customRange.from ? dateStr(customRange.from) : presetDates.date1;
+  const date2 = period === "custom" && customRange.to ? dateStr(customRange.to) : presetDates.date2;
 
   const summaryQ = useQuery({
-    queryKey: ["metrika-summary", period],
-    queryFn: () => getMetrikaSummary(period),
-    refetchInterval: 60_000,
+    queryKey: ["metrika-summary", period, date1, date2],
+    queryFn: () => getMetrikaSummary(period, period === "custom" ? date1 : undefined, period === "custom" ? date2 : undefined),
+    refetchInterval: period === "custom" ? false : 60_000,
     retry: 1,
   });
 
@@ -945,8 +971,8 @@ export default function VisitorsPage() {
   });
 
   const activityQ = useQuery({
-    queryKey: ["metrika-activity", period, activityMode],
-    queryFn: () => getVisitorActivity(period, activityMode),
+    queryKey: ["metrika-activity", period, activityMode, date1, date2],
+    queryFn: () => getVisitorActivity(period === "custom" ? "7d" : period, activityMode, period === "custom" ? date1 : undefined, period === "custom" ? date2 : undefined),
     staleTime: 30_000,
     refetchInterval: 60_000,
     retry: 1,
@@ -964,7 +990,7 @@ export default function VisitorsPage() {
   const prev = s?.previous;
   const loading = summaryQ.isLoading;
 
-  const periodLabel: Record<Period, string> = {
+  const periodLabel: Record<Exclude<Period, "custom">, string> = {
     today: "Сегодня",
     "7d": "7 дней",
     "30d": "30 дней",
@@ -981,12 +1007,13 @@ export default function VisitorsPage() {
             {updatedAt && <span className="ml-2 text-slate-400">· обновлено в {updatedAt}</span>}
           </p>
         </div>
-        <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
-          {(["today", "7d", "30d"] as Period[]).map(p => (
+        <div className="flex flex-wrap items-center gap-1 rounded-xl bg-slate-100 p-1">
+          {(["today", "7d", "30d"] as const).map(p => (
             <button
               key={p}
               onClick={() => {
                 setPeriod(p);
+                setCustomRange({ from: undefined });
                 setActivityMode(p === "today" ? "total" : "average");
               }}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -998,6 +1025,71 @@ export default function VisitorsPage() {
               {periodLabel[p]}
             </button>
           ))}
+          <Popover open={calendarOpen} onOpenChange={(open) => {
+            setCalendarOpen(open);
+            if (open) setDraftRange(period === "custom" ? customRange : { from: undefined });
+          }}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Выбрать произвольный период"
+                aria-expanded={calendarOpen}
+                className={`flex min-h-9 min-w-0 items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] ${
+                  period === "custom" ? "bg-white text-[#0070b8] shadow-sm" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <CalendarDays className="h-4 w-4 shrink-0" />
+                <span className="max-w-[240px] truncate">
+                  {period === "custom" ? displayRange(customRange.from, customRange.to) : "Произвольный период"}
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" side="bottom" sideOffset={8} className="w-[min(94vw,350px)] rounded-xl border-slate-200 bg-white p-3 shadow-xl">
+              <div className="mb-2 px-1">
+                <div className="text-sm font-semibold text-slate-800">Период отчёта</div>
+                <div className="mt-0.5 text-xs text-slate-500">
+                  {!draftRange.from ? "Выберите начальную дату" : !draftRange.to ? "Теперь выберите конечную дату" : displayRange(draftRange.from, draftRange.to)}
+                </div>
+              </div>
+              <Calendar
+                mode="range"
+                selected={draftRange}
+                onSelect={(range) => {
+                  if (!range) {
+                    setDraftRange({ from: undefined });
+                    return;
+                  }
+                  const next = { from: range.from, to: range.to };
+                  setDraftRange(next);
+                  if (next.from && next.to) {
+                    setCustomRange(next);
+                    setPeriod("custom");
+                    setActivityMode("average");
+                    setCalendarOpen(false);
+                  }
+                }}
+                defaultMonth={draftRange.from ?? new Date()}
+                disabled={{ after: reportToday() }}
+                locale={ru}
+                numberOfMonths={1}
+                className="mx-auto p-1 [--cell-size:2.45rem]"
+                classNames={{
+                  day: "group/day relative aspect-square h-full w-full select-none p-0 text-center",
+                  range_middle: "rounded-none bg-blue-50",
+                  range_start: "rounded-l-md bg-[#0070b8] text-white",
+                  range_end: "rounded-r-md bg-[#0070b8] text-white",
+                }}
+              />
+              <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  className="rounded-md px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                  onClick={() => setDraftRange({ from: undefined })}
+                >Сбросить выбор</button>
+                <span className="text-[11px] text-slate-400">Отчёт обновится после второй даты</span>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
@@ -1090,7 +1182,7 @@ export default function VisitorsPage() {
         </div>
       </div>
 
-      <ConversionFunnel period={period} />
+      <ConversionFunnel period={period} date1={date1} date2={date2} />
 
       <ActivityHeatmap
         data={activityQ.data}
