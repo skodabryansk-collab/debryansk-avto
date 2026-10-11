@@ -35,8 +35,8 @@ function periodDates(period: Period): { date1: string; date2: string } {
 
 function displayRange(from?: Date, to?: Date) {
   if (!from) return "Выберите даты";
-  const left = format(from, "d MMM yyyy", { locale: ru });
-  return to ? `${left} — ${format(to, "d MMM yyyy", { locale: ru })}` : `${left} — …`;
+  const left = format(from, "dd.MM.yyyy");
+  return to ? `${left} — ${format(to, "dd.MM.yyyy")}` : `${left} — …`;
 }
 
 function reportToday() {
@@ -1044,11 +1044,25 @@ export default function VisitorsPage() {
                 </span>
               </button>
             </PopoverTrigger>
-            <PopoverContent align="end" side="bottom" sideOffset={8} className="w-[min(94vw,350px)] rounded-xl border-slate-200 bg-white p-3 shadow-xl">
-              <div className="mb-2 px-1">
-                <div className="text-sm font-semibold text-slate-800">Период отчёта</div>
-                <div className="mt-0.5 text-xs text-slate-500">
-                  {!draftRange.from ? "Выберите начальную дату" : !draftRange.to ? "Теперь выберите конечную дату" : displayRange(draftRange.from, draftRange.to)}
+            <PopoverContent align="end" side="bottom" sideOffset={8} className="w-[min(calc(100vw-1rem),390px)] max-w-[calc(100vw-1rem)] max-h-[min(88dvh,620px)] overflow-y-auto rounded-xl border-slate-200 bg-white p-4 shadow-xl">
+              <div className="px-1">
+                <div className="text-base font-semibold text-slate-900">Период отчёта</div>
+                <div className="mt-3 grid grid-cols-2 gap-2" aria-label="Выбранный диапазон дат">
+                  <div className={`min-w-0 rounded-lg border px-3 py-2 ${draftRange.from ? "border-[#0070b8]/30 bg-sky-50" : "border-slate-200 bg-slate-50"}`}>
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Начало</div>
+                    <div className="mt-0.5 truncate text-sm font-semibold text-slate-900">
+                      {draftRange.from ? format(draftRange.from, "dd.MM.yyyy") : "Выберите дату"}
+                    </div>
+                  </div>
+                  <div className={`min-w-0 rounded-lg border px-3 py-2 ${draftRange.to ? "border-[#0070b8]/30 bg-sky-50" : "border-slate-200 bg-slate-50"}`}>
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Конец</div>
+                    <div className="mt-0.5 truncate text-sm font-semibold text-slate-900">
+                      {draftRange.to ? format(draftRange.to, "dd.MM.yyyy") : "Выберите дату"}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 px-1 text-xs font-medium text-slate-600" aria-live="polite">
+                  {!draftRange.from ? "Выберите дату начала" : !draftRange.to ? "Теперь выберите дату окончания" : "Проверьте диапазон и выберите новые даты или закройте календарь"}
                 </div>
               </div>
               <Calendar
@@ -1072,8 +1086,12 @@ export default function VisitorsPage() {
                 disabled={{ after: reportToday() }}
                 locale={ru}
                 numberOfMonths={1}
-                className="mx-auto p-1 [--cell-size:2.45rem]"
+                className="w-full p-1 [--cell-size:2.75rem]"
                 classNames={{
+                  root: "w-full",
+                  months: "w-full",
+                  month: "w-full",
+                  table: "w-full border-collapse",
                   day: "group/day relative aspect-square h-full w-full select-none p-0 text-center",
                   range_middle: "rounded-none bg-blue-50",
                   range_start: "rounded-l-md bg-[#0070b8] text-white",
@@ -1086,7 +1104,7 @@ export default function VisitorsPage() {
                   className="rounded-md px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                   onClick={() => setDraftRange({ from: undefined })}
                 >Сбросить выбор</button>
-                <span className="text-[11px] text-slate-400">Отчёт обновится после второй даты</span>
+                <span className="text-right text-xs text-slate-500">Отчёт обновится после выбора обеих дат</span>
               </div>
             </PopoverContent>
           </Popover>
