@@ -10,3 +10,9 @@ When the Timeweb VPS accepts one SSH command but refuses the next, avoid a multi
 **How to apply:** Wait for SSH to recover, establish one SSH ControlMaster session, stream a staged tar bundle through it, install atomically, restart PM2, then verify both localhost and the public domain. If the master drops, stream the staged tar bundle directly into one authenticated SSH command that unpacks, installs, and restarts PM2—never resume with many short connections. For `scp` over that master, use `-o ControlPath=<socket>` (not `-S "ssh -S <socket>"`, which treats the whole string as an executable path).
 
 In this Replit shell, run a long-lived `ssh -M -N` master with `ShellExec(run_in_background: true)`, not `ssh -f` in a one-off shell: the latter can be reaped when the command returns, leaving a dead socket. Multiplexed clients need `-o BatchMode=yes -o ControlMaster=no -o ControlPath=<socket>` so they fail immediately instead of prompting for a password if the master disappears.
+
+Do not set `ControlPersist` on this foreground master: it makes SSH fork/detach, and the Replit task runner can reap the detached client, leaving a stale socket.
+
+**Why:** A disconnected master reported successful startup but could not serve multiplexed deploy commands.
+
+**How to apply:** Keep `ssh -M -N` in the long-running background task without `ControlPersist`; confirm `ssh -O check` returns `Master running` before deployment.
