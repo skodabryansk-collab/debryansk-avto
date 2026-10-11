@@ -1084,7 +1084,7 @@ export interface VisitorActivityCell {
 }
 export interface VisitorActivityResult {
   ok: boolean;
-  period: "today" | "7d" | "30d";
+  period: "today" | "7d" | "30d" | "custom";
   mode: VisitorActivityMode;
   date1: string;
   date2: string;
@@ -1096,8 +1096,11 @@ export interface VisitorActivityResult {
   };
 }
 
-export function getMetrikaSummary(period: "today" | "7d" | "30d") {
-  return api<MetrikaSummaryResult>("GET", `/admin/metrika/summary?period=${period}`);
+export function getMetrikaSummary(period: "today" | "7d" | "30d" | "custom", date1?: string, date2?: string) {
+  const params = new URLSearchParams({ period });
+  if (date1) params.set("date1", date1);
+  if (date2) params.set("date2", date2);
+  return api<MetrikaSummaryResult>("GET", `/admin/metrika/summary?${params}`);
 }
 export function getMetrikaChart(date1: string, date2: string) {
   return api<MetrikaChartResult>("GET", `/admin/metrika/chart?date1=${date1}&date2=${date2}`);
@@ -1111,8 +1114,11 @@ export function getMetrikaPages(date1: string, date2: string) {
 export function getMetrikaOnline() {
   return api<MetrikaOnlineResult>("GET", "/admin/metrika/online");
 }
-export function getVisitorActivity(period: "today" | "7d" | "30d", mode: VisitorActivityMode) {
-  return api<VisitorActivityResult>("GET", `/admin/metrika/activity?period=${period}&mode=${mode}`);
+export function getVisitorActivity(period: "today" | "7d" | "30d", mode: VisitorActivityMode, date1?: string, date2?: string) {
+  const params = new URLSearchParams({ period, mode });
+  if (date1) params.set("date1", date1);
+  if (date2) params.set("date2", date2);
+  return api<VisitorActivityResult>("GET", `/admin/metrika/activity?${params}`);
 }
 
 export interface LiveOnlineResult {
@@ -1766,8 +1772,11 @@ export interface ConversionResult {
   availability: { metrika: boolean; leads: boolean; calltouch: boolean };
 }
 
-export function getConversion(period: "today" | "7d" | "30d") {
-  return api<ConversionResult>("GET", `/admin/metrika/conversion?period=${period}`);
+export function getConversion(period: "today" | "7d" | "30d" | "custom", date1?: string, date2?: string) {
+  const params = new URLSearchParams({ period });
+  if (date1) params.set("date1", date1);
+  if (date2) params.set("date2", date2);
+  return api<ConversionResult>("GET", `/admin/metrika/conversion?${params}`);
 }
 
 /* ── Brand font with brand association ─────────────────────── */
