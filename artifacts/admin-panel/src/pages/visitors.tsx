@@ -27,7 +27,7 @@ function dateStr(date: Date): string {
 }
 
 function periodDates(period: Period): { date1: string; date2: string } {
-  const today = new Date();
+  const today = reportToday();
   if (period === "today") return { date1: dateStr(today), date2: dateStr(today) };
   if (period === "30d") return { date1: dateStr(subDays(today, 30)), date2: dateStr(subDays(today, 1)) };
   return { date1: dateStr(subDays(today, 7)), date2: dateStr(subDays(today, 1)) };
