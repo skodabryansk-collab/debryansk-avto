@@ -272,6 +272,27 @@ function moscowDateStr(daysAgo = 0): string {
   return date.toISOString().slice(0, 10);
 }
 
+function shiftIsoDate(value: string, days: number): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function readCustomRange(raw1: unknown, raw2: unknown): { date1: string; date2: string } | null {
+  if (raw1 === undefined && raw2 === undefined) return null;
+  const date1 = typeof raw1 === "string" ? raw1 : "";
+  const date2 = typeof raw2 === "string" ? raw2 : "";
+  const validDate = (value: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const parsed = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  };
+  if (!validDate(date1) || !validDate(date2) || date1 > date2 || date2 > moscowDateStr()) {
+    throw new Error("Укажите корректный диапазон дат не позднее сегодняшнего дня");
+  }
+  return { date1, date2 };
+}
+
 function formatDuration(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
@@ -366,14 +387,18 @@ router.get("/preview", async (_req, res) => {
    ───────────────────────────────────────────────────────────── */
 router.get("/summary", async (req, res) => {
   try {
-    const period = (req.query["period"] as string) || "7d";
-    const cacheKey = `summary:${period}`;
-    const cached = cacheGet<unknown>(cacheKey);
-    if (cached) { res.json(cached); return; }
-
+    const requestedPeriod = (req.query["period"] as string) || "7d";
+    const customRange = readCustomRange(req.query["date1"], req.query["date2"]);
+    const period = customRange ? "custom" : requestedPeriod;
     let date1: string, date2: string, prevDate1: string, prevDate2: string;
-    const today = dateStr(0);
-    if (period === "today") {
+    if (customRange) {
+      date1 = customRange.date1;
+      date2 = customRange.date2;
+      const duration = Math.round((Date.parse(`${date2}T00:00:00Z`) - Date.parse(`${date1}T00:00:00Z`)) / 86_400_000) + 1;
+      prevDate2 = shiftIsoDate(date1, -1);
+      prevDate1 = shiftIsoDate(prevDate2, -(duration - 1));
+    } else if (period === "today") {
+      const today = dateStr(0);
       date1 = today; date2 = today;
       prevDate1 = dateStr(1); prevDate2 = dateStr(1);
     } else if (period === "30d") {
@@ -383,6 +408,9 @@ router.get("/summary", async (req, res) => {
       date1 = dateStr(7); date2 = dateStr(1);
       prevDate1 = dateStr(14); prevDate2 = dateStr(8);
     }
+    const cacheKey = `summary:${period}:${date1}:${date2}`;
+    const cached = cacheGet<unknown>(cacheKey);
+    if (cached) { res.json(cached); return; }
 
     const metrics = "ym:s:visits,ym:s:users,ym:s:pageviews,ym:s:bounceRate,ym:s:avgVisitDurationSeconds";
     const [curr, prev] = await Promise.all([
@@ -412,6 +440,10 @@ router.get("/summary", async (req, res) => {
     res.json(result);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("диапазон дат")) {
+      res.status(400).json({ ok: false, error: msg });
+      return;
+    }
     logger.error({ err }, "[metrika] /summary failed");
     res.status(500).json({ ok: false, error: msg });
   }
@@ -433,7 +465,7 @@ router.get("/chart", async (req, res) => {
       dimensions: "ym:s:date",
       metrics: "ym:s:visits,ym:s:users",
       sort: "ym:s:date",
-      limit: 62,
+      limit: 10000,
     });
 
     const rows = r.data.map(row => ({
@@ -532,8 +564,15 @@ router.get("/pages", async (req, res) => {
 router.get("/activity", async (req, res) => {
   const period = (req.query["period"] as string) || "7d";
   const mode = req.query["mode"] === "total" ? "total" : "average";
-  const safePeriod = period === "today" || period === "30d" ? period : "7d";
-  const { date1, date2 } = activityRange(safePeriod);
+  let customRange: { date1: string; date2: string } | null;
+  try {
+    customRange = readCustomRange(req.query["date1"], req.query["date2"]);
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    return;
+  }
+  const safePeriod = customRange ? "custom" : period === "today" || period === "30d" ? period : "7d";
+  const { date1, date2 } = customRange ?? activityRange(safePeriod);
   const cacheKey = `activity:${safePeriod}:${mode}:${date1}:${date2}`;
 
   try {
@@ -547,7 +586,7 @@ router.get("/activity", async (req, res) => {
       dimensions: "ym:s:date,ym:s:hour",
       metrics: "ym:s:visits",
       sort: "ym:s:date,ym:s:hour",
-      limit: 1000,
+      limit: 100000,
       timezone: "Europe/Moscow",
     }, { attempts: 2, requestTimeoutMs: 8_000 });
     const leadsPromise = db.execute(sql`
@@ -664,10 +703,23 @@ router.get("/activity", async (req, res) => {
    ───────────────────────────────────────────────────────────── */
 router.get("/conversion", async (req, res) => {
   const period = (req.query["period"] as string) || "7d";
-  const safePeriod = (period === "today" || period === "30d" ? period : "7d") as "today" | "7d" | "30d";
+  let customRange: { date1: string; date2: string } | null;
+  try {
+    customRange = readCustomRange(req.query["date1"], req.query["date2"]);
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    return;
+  }
+  const safePeriod = customRange ? "custom" : (period === "today" || period === "30d" ? period : "7d");
 
   let date1: string, date2: string, prevDate1: string, prevDate2: string;
-  if (safePeriod === "today") {
+  if (customRange) {
+    date1 = customRange.date1;
+    date2 = customRange.date2;
+    const duration = Math.round((Date.parse(`${date2}T00:00:00Z`) - Date.parse(`${date1}T00:00:00Z`)) / 86_400_000) + 1;
+    prevDate2 = shiftIsoDate(date1, -1);
+    prevDate1 = shiftIsoDate(prevDate2, -(duration - 1));
+  } else if (safePeriod === "today") {
     date1 = moscowDateStr(0); date2 = moscowDateStr(0);
     prevDate1 = moscowDateStr(1); prevDate2 = moscowDateStr(1);
   } else if (safePeriod === "30d") {
@@ -678,7 +730,7 @@ router.get("/conversion", async (req, res) => {
     prevDate1 = moscowDateStr(14); prevDate2 = moscowDateStr(8);
   }
 
-  const cacheKey = `conversion:${safePeriod}:${date1}`;
+  const cacheKey = `conversion:${safePeriod}:${date1}:${date2}`;
   const cached = cacheGet<unknown>(cacheKey);
   if (cached) { res.json(cached); return; }
 
