@@ -5,6 +5,7 @@ import { db, leadsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { enqueueCalltouchCallback } from "../services/calltouch-callback";
 import { escapeLeadBodyForHtml, validateLeadBody } from "../services/lead-validation";
+import { formatNavigatorChatHistoryRows } from "../services/navigator-chat-history";
 
 const router: IRouter = Router();
 
@@ -220,8 +221,14 @@ function hr() {
   return `<div style="height:1px;background:#e8edf2;margin:18px 28px 0"></div>`;
 }
 
-function chatHistorySection(history: string) {
-  if (!history) return "";
+function chatHistorySection(history: string, source = "") {
+  if (!history) {
+    if (source !== "Навигатор (чат)") return "";
+    return hr() + `<div style="margin:14px 28px 0;font-family:Arial,sans-serif">
+      <div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Диалог с навигатором</div>
+      <div style="background:#fff8e8;border:1px solid #f4d58d;border-radius:8px;padding:12px 14px;color:#755b19;font-size:12px;line-height:1.5">История переписки не прикрепилась к этой заявке.</div>
+    </div>`;
+  }
   const lines = history.split("\n").filter(l => l.trim());
   if (lines.length === 0) return "";
   const rows = lines.map(line => {
@@ -241,6 +248,30 @@ function chatHistorySection(history: string) {
   </div>`;
 }
 
+async function resolveNavigatorChatHistory(body: Record<string, string>) {
+  const submitted = typeof body.chatHistory === "string" ? body.chatHistory.trim() : "";
+  if (submitted) return { history: submitted, source: "client" as const };
+  if (body.source !== "Навигатор (чат)" || !body.navigatorSessionId || body.navigatorSessionId.length > 128) {
+    return { history: "", source: "missing" as const };
+  }
+
+  try {
+    const result = await db.execute(sql`
+      SELECT m.role, m.content
+      FROM messages m
+      JOIN conversations c ON c.id = m.conversation_id
+      WHERE c.session_id = ${body.navigatorSessionId}
+      ORDER BY m.created_at DESC, m.id DESC
+      LIMIT 12
+    `);
+    const history = formatNavigatorChatHistoryRows(result.rows as { role: string; content: unknown }[]);
+    return { history, source: history ? "database" as const : "missing" as const };
+  } catch (err) {
+    console.warn("[email] navigator chat history fallback failed", err instanceof Error ? err.message : String(err));
+    return { history: "", source: "missing" as const };
+  }
+}
+
 /* ── HTML builders for each form ── */
 
 function buildCallbackHtml(d: Record<string, string>) {
@@ -252,7 +283,7 @@ function buildCallbackHtml(d: Record<string, string>) {
       ["Телефон",         d.phone],
       ["Дата / время",    new Date().toLocaleString("ru-RU")],
     ]) +
-    chatHistorySection(d.chatHistory ?? "") +
+    chatHistorySection(d.chatHistory ?? "", d.source) +
     hr() +
     actionBlock(d.phone, undefined, "Перезвонить клиенту", BLUE),
     BLUE
@@ -294,7 +325,7 @@ function buildTestDriveHtml(d: Record<string, string>) {
       ["Дилерский центр", d.dealer],
       ["Комментарий",     d.comment],
     ]) +
-    chatHistorySection(d.chatHistory ?? "") +
+    chatHistorySection(d.chatHistory ?? "", d.source) +
     hr() +
     actionBlock(d.phone, undefined, "Подтвердить запись и позвонить клиенту", accent),
     accent
@@ -317,7 +348,7 @@ function buildCreditHtml(d: Record<string, string>) {
       ["Итоговая сумма",       d.totalAmount],
       ["Дилерский центр",      d.dealer],
     ]) +
-    chatHistorySection(d.chatHistory ?? "") +
+    chatHistorySection(d.chatHistory ?? "", d.source) +
     hr() +
     actionBlock(d.phone, undefined, "Проконсультировать клиента по кредиту", accent),
     accent
@@ -359,7 +390,7 @@ function buildTradeInHtml(d: Record<string, string>) {
       ["Комментарий",    d.comment],
     ]) +
     targetSection +
-    chatHistorySection(d.chatHistory ?? "") +
+    chatHistorySection(d.chatHistory ?? "", d.source) +
     hr() +
     actionBlock(d.phone, undefined, "Связаться и уточнить оценку", accent),
     accent
@@ -557,7 +588,7 @@ function buildServiceHtml(d: Record<string, string>) {
     banner("🔧", "Запись на сервис", accent) +
     heading("Новая запись на сервис", "Клиент хочет записаться на техническое обслуживание или ремонт") +
     dataTable(rows) +
-    chatHistorySection(d.chatHistory ?? "") +
+    chatHistorySection(d.chatHistory ?? "", d.source) +
     hr() +
     actionBlock(d.phone, undefined, "Записать клиента на сервис", accent),
     accent
@@ -619,7 +650,8 @@ router.post(
         buyoutEstimate = { estimateMin: Number(body.estimateMin), estimateMax: Number(body.estimateMax) };
       }
 
-      const emailBody = escapeLeadBodyForHtml(body);
+      const transcript = await resolveNavigatorChatHistory(body);
+      const emailBody = escapeLeadBodyForHtml({ ...body, chatHistory: transcript.history });
 
       // Build HTML
       let html = "";
@@ -670,6 +702,13 @@ router.post(
         html,
         attachments,
       });
+      if (body.source === "Навигатор (чат)") {
+        console.info("[email] Navigator transcript attachment", {
+          type,
+          source: transcript.source,
+          messageCount: transcript.history ? transcript.history.split("\n").filter(Boolean).length : 0,
+        });
+      }
 
       // Save lead to database (retry once on failure so transient DB hiccups don't lose leads)
       const carParts = [body.carMark, body.carModel, body.carYear].filter(Boolean).join(" ");
