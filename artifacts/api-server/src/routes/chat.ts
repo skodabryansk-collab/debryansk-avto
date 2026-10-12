@@ -1317,21 +1317,6 @@ router.post("/chat/stream", async (req, res) => {
     // Immediately signal that the request is being processed
     sendEvt({ t: "thinking" });
 
-    // FAQ fast-path: answer contact/address/hours/form questions without calling OpenAI
-    if (!isProactive) {
-      const faqResult = await tryFaqAnswer(trimmed);
-      if (faqResult) {
-        sendEvt({ t: "done", reply: faqResult.reply, action: faqResult.action, cars: [], message_id: null });
-        return res.end();
-      }
-    }
-
-    const pinnedIds = history
-      .filter(m => m.role === "assistant" && Array.isArray(m.car_ids) && (m.car_ids?.length ?? 0) > 0)
-      .flatMap(m => m.car_ids ?? [])
-      .filter((id, idx, arr) => arr.indexOf(id) === idx)
-      .slice(0, 10);
-
     const userSavePromise: Promise<number | null> =
       session_id && consented_at && session_id.length <= 128 && !isProactive
         ? (async () => {
@@ -1355,6 +1340,31 @@ router.post("/chat/stream", async (req, res) => {
             }
           })()
         : Promise.resolve(null);
+
+    // FAQ fast-path: answer contact/address/hours/form questions without calling OpenAI
+    if (!isProactive) {
+      const faqResult = await tryFaqAnswer(trimmed);
+      if (faqResult) {
+        sendEvt({ t: "done", reply: faqResult.reply, action: faqResult.action, cars: [], message_id: null });
+        res.end();
+        void userSavePromise
+          .then(convId => {
+            if (!convId) return;
+            return db.execute(sql`
+              INSERT INTO messages (conversation_id, role, content)
+              VALUES (${convId}, 'assistant', ${faqResult.reply})
+            `);
+          })
+          .catch(err => logger.warn({ err }, "Chat/stream FAQ: failed to save assistant message"));
+        return;
+      }
+    }
+
+    const pinnedIds = history
+      .filter(m => m.role === "assistant" && Array.isArray(m.car_ids) && (m.car_ids?.length ?? 0) > 0)
+      .flatMap(m => m.car_ids ?? [])
+      .filter((id, idx, arr) => arr.indexOf(id) === idx)
+      .slice(0, 10);
 
     const catalogQuery = isProactive && page_context
       ? `${page_context.brand} ${page_context.model}`
