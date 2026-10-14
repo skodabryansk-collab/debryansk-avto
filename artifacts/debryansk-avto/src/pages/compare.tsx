@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "wouter";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, X, Heart, Car, Scale, Calendar, Gauge, Palette, Trash2, Check, Minus } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import SEO from "@/components/SEO";
@@ -55,7 +55,6 @@ function allExtras(cars: any[]): string[] {
 }
 
 export default function ComparePage() {
-  const prefersReduced = useReducedMotion();
   const { compare, removeFromCompare, clearCompare } = useCarStorage();
   const commonExtras = allExtras(compare);
   const hasExtras = commonExtras.length > 0;
@@ -63,9 +62,10 @@ export default function ComparePage() {
   return (
     <Layout>
       <SEO
-        title="Сравнение автомобилей"
-        description="Сравните автомобили по параметрам: цена, пробег, год, комплектация, коробка, привод, опции. До 3 авто в сравнении."
+        title="Сравнение автомобилей в Брянске"
+        description="Сравните до трёх новых и подержанных автомобилей по цене, году, пробегу, комплектации, коробке передач, приводу и опциям."
         canonical="/compare"
+        robots="noindex, follow"
         breadcrumbs={[
           { name: "Главная", url: "/" },
           { name: "Сравнение", url: "/compare" },
@@ -74,17 +74,17 @@ export default function ComparePage() {
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {compare.length === 0 ? (
           <motion.div
-            initial={prefersReduced ? false : { opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-16 sm:py-24"
           >
             <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
               <Scale className="w-8 h-8 text-slate-400" />
             </div>
-            <h2 className="text-xl font-extrabold text-slate-900 mb-2">Нет автомобилей для сравнения</h2>
+            <h1 className="text-xl font-extrabold text-slate-900 mb-2">Нет автомобилей для сравнения</h1>
             <p className="text-slate-500 text-sm mb-6">Добавьте автомобили из каталога — до 3 штук</p>
             <Link href="/cars">
-              <span className="inline-flex items-center gap-2 bg-primary text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-[#0058a0] transition-colors">
+              <span className="inline-flex items-center gap-2 bg-[#0070b8] text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-[#0058a0] transition-colors">
                 <Car className="w-4 h-4" />
                 В каталог
               </span>
@@ -111,7 +111,7 @@ export default function ComparePage() {
                 {compare.map(car => (
                   <motion.div
                     key={car.id}
-                    initial={prefersReduced ? false : { opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     className="bg-white rounded-2xl border border-slate-100 overflow-hidden"
@@ -134,13 +134,13 @@ export default function ComparePage() {
                     </div>
                     <div className="p-4">
                       <Link href={car.type === "used" ? `/cars/${encodeURIComponent(car.id)}` : `/new-cars/${encodeURIComponent(car.id)}`}>
-                        <h3 className="font-bold text-base hover:text-primary transition-colors">
+                        <h3 className="font-bold text-base hover:text-[#0070b8] transition-colors">
                           {car.mark} {car.model}
                         </h3>
                       </Link>
-                      <p className="text-xl font-extrabold text-primary mt-1">{formatPrice(car.price)}</p>
+                      <p className="text-xl font-extrabold text-[#0070b8] mt-1">{formatPrice(car.price)}</p>
                       <Link href={car.type === "used" ? `/cars/${encodeURIComponent(car.id)}` : `/new-cars/${encodeURIComponent(car.id)}`}>
-                        <button className="w-full mt-3 py-2.5 rounded-xl bg-primary text-white font-bold text-sm hover:bg-[#005a9a] transition-colors">
+                        <button className="w-full mt-3 py-2.5 rounded-xl bg-[#0070b8] text-white font-bold text-sm hover:bg-[#005a9a] transition-colors">
                           Оставить заявку
                         </button>
                       </Link>
@@ -195,7 +195,7 @@ export default function ComparePage() {
                     {compare.map(car => (
                       <motion.div
                         key={car.id}
-                        initial={prefersReduced ? false : { opacity: 0, scale: 0.9 }}
+                        initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
                         className="relative"
@@ -218,13 +218,13 @@ export default function ComparePage() {
                           </div>
                           <div className="p-3">
                             <Link href={car.type === "used" ? `/cars/${encodeURIComponent(car.id)}` : `/new-cars/${encodeURIComponent(car.id)}`}>
-                              <h3 className="font-bold text-sm leading-tight hover:text-primary transition-colors cursor-pointer">
+                              <h3 className="font-bold text-sm leading-tight hover:text-[#0070b8] transition-colors cursor-pointer">
                                 {car.mark} {car.model}
                               </h3>
                             </Link>
-                            <p className="text-lg font-extrabold text-primary mt-1">{formatPrice(car.price)}</p>
+                            <p className="text-lg font-extrabold text-[#0070b8] mt-1">{formatPrice(car.price)}</p>
                             <Link href={car.type === "used" ? `/cars/${encodeURIComponent(car.id)}` : `/new-cars/${encodeURIComponent(car.id)}`}>
-                              <button className="w-full mt-2 py-2 rounded-xl bg-primary text-white font-bold text-xs hover:bg-[#005a9a] transition-colors">
+                              <button className="w-full mt-2 py-2 rounded-xl bg-[#0070b8] text-white font-bold text-xs hover:bg-[#005a9a] transition-colors">
                                 Оставить заявку
                               </button>
                             </Link>
@@ -256,7 +256,7 @@ export default function ComparePage() {
                   {hasExtras && (
                     <React.Fragment>
                       <div className="col-span-full h-px bg-slate-200 my-1" />
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider py-2">Опции и комплектация</div>
+                      <div className="text-[10px] font-bold text-[#0070b8] uppercase tracking-wider py-2">Опции и комплектация</div>
                       {compare.map(car => (
                         <div key={car.id} className="py-2" />
                       ))}
