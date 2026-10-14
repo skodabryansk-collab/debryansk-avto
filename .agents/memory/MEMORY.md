@@ -15,6 +15,7 @@
 - [GitHub API upload](github-api-upload.md) — sync changed files through GitHub proxy without raw tokens; trim CodeExecution shell filenames to remove trailing CRLF.
 - [GitHub auto-sync policy](github-auto-sync-policy.md) — ALWAYS sync to GitHub after completing any task that modifies files. User expects this to happen automatically without being asked.
 - [Auto.ru Dealer API](autoru-api.md) — catalog proxy: host apiauto.ru, auth header x-authorization (no Bearer/Vertis prefix), brands+models via /1.0/search/cars/breadcrumbs.
+- [Auto.ru stock image resizing](autoru-image-resize.md) — avatars.avto.ru ignores width/height query parameters; resize stock photos server-side behind a host/path allowlist.
 - [Calltouch REST API](calltouch-api.md) — правильный endpoint: calls-service/RestAPI/{siteId}/calls-diary/calls (не call-service/v1 и не calls-service/v1).
 - [Yandex Metrika CSP endpoint](yandex-metrika-csp.md) — Metrika loads a secondary script from mc.yandex.com; allow it alongside mc.yandex.ru in script-src.
 - [Phone normalization](phone-normalization.md) — normalizePhone/phoneHref util at src/lib/normalizePhone.ts. Digit[1]='9' → mobile 3-digit code (+7 (9XX) XXX-XX-XX), else landline 4-digit (+7 (XXXX) XX-XX-XX).
