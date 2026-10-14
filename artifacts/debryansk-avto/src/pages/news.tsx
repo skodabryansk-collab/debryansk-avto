@@ -77,9 +77,9 @@ function ArticleCard({ article, index }: { article: NewsArticle; index: number }
               <Clock className="w-3 h-3" />
               <span>{article.readTime ?? 3} мин</span>
             </div>
-            <h3 className="font-bold text-xl sm:text-2xl leading-snug text-white mb-2 group-hover:text-white/90 transition-colors">
+            <h2 className="font-bold text-xl sm:text-2xl leading-snug text-white mb-2 group-hover:text-white/90 transition-colors">
               {article.title}
-            </h3>
+            </h2>
             <p className="text-white/70 text-sm leading-relaxed line-clamp-2 max-w-lg">
               {article.excerpt ?? ""}
             </p>
@@ -128,9 +128,9 @@ function ArticleCard({ article, index }: { article: NewsArticle; index: number }
           <span>{article.readTime ?? 3} мин</span>
         </div>
         <Link href={`/news/${article.slug}`}>
-          <h3 className="font-bold text-sm sm:text-base text-slate-900 leading-snug group-hover:text-primary transition-colors mb-2">
+          <h2 className="font-bold text-sm sm:text-base text-slate-900 leading-snug group-hover:text-primary transition-colors mb-2">
             {article.title}
-          </h3>
+          </h2>
         </Link>
         <p className="text-slate-500 text-xs sm:text-sm leading-relaxed">
           {article.excerpt ?? ""}
