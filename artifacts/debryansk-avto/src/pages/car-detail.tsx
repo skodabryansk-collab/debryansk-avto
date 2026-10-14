@@ -424,6 +424,7 @@ export default function UsedCarDetail() {
   const driveLabel = parseDriveLabel(car.driveType ?? "", car.modification);
   const engine = parseEngine(car.modification);
   const ownersLabel = formatOwners(car.ownersNumber);
+  const listingCode = car.id.replace(/\D/g, "").slice(-8) || car.id.slice(-8);
 
   const specs = [
     { label: "Год выпуска", value: String(car.year), icon: <Calendar className="w-4 h-4 text-[#0070b8]" /> },
@@ -600,8 +601,8 @@ export default function UsedCarDetail() {
     <Layout showMobileStickyBar={false} navigatorMobileBottomOffset="bottom-[92px]">
       {car && (
         <SEO
-          title={`${car.mark} ${car.model} ${car.year} год за ${formatPrice(car.price)}`}
-          description={`Автомобиль ${car.mark} ${car.model}, ${car.year} год, пробег ${formatRun(car.run)}, кузов ${car.bodyType}, цвет ${car.color}, комплектация ${car.modification}. Дебрянск Авто.`}
+          title={`${car.mark} ${car.model} ${car.year} б/у · №${listingCode} — Дебрянск Авто`}
+          description={`Лот №${listingCode}: ${car.mark} ${car.model}, ${car.year} год, пробег ${formatRun(car.run)}. Цена ${formatPrice(car.price)}. Дебрянск Авто, Брянск.`}
           canonical={`/cars/${car.id}`}
           image={car.images.filter(Boolean)[0] || "/opengraph.jpg"}
           type="product"
