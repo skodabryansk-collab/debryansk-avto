@@ -2,11 +2,20 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
 import multer from "multer";
 import sharp from "sharp";
-import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import {
+  ObjectStorageService,
+  ObjectNotFoundError,
+  type LocalFile,
+  peekPendingUpload,
+  resolvePendingUpload,
+} from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
+const optimizedImageCache = new Map<string, Buffer>();
+const MAX_OPTIMIZED_IMAGE_CACHE = 96;
+const OPTIMIZED_WIDTHS = new Set([320, 480, 640, 800, 960, 1280, 1600]);
 
 const memUpload = multer({
   storage: multer.memoryStorage(),
@@ -19,7 +28,7 @@ const IMAGE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp
  * POST /storage/uploads/image
  *
  * Accepts a multipart image upload, compresses + converts to WebP via sharp,
- * uploads the result to GCS, and returns the serving objectPath.
+ * saves to local disk, and returns the serving objectPath.
  * GIF files pass through unmodified.
  * Non-image files are rejected — use /storage/uploads/request-url instead.
  */
@@ -38,8 +47,8 @@ router.post("/storage/uploads/image", memUpload.single("file"), async (req: Requ
 
     let buffer: Buffer;
     let contentType: string;
-
     let extension = "";
+
     if (IMAGE_TYPES.has(mime)) {
       buffer = await sharp(req.file.buffer)
         .resize({ width: 2000, height: 2000, fit: "inside", withoutEnlargement: true })
@@ -80,9 +89,10 @@ function isUploadRequestBody(body: unknown): body is UploadRequestBody {
 /**
  * POST /storage/uploads/request-url
  *
- * Request a presigned URL for file upload.
- * The client sends JSON metadata (name, size, contentType) — NOT the file.
- * Then uploads the file directly to the returned presigned URL.
+ * Request a server-side upload URL for non-image files (PDF etc.).
+ * Returns an uploadURL (pointing to our own server) and the final objectPath
+ * that the caller must persist — the extension is already included.
+ * Client then PUTs file body directly to uploadURL.
  */
 router.post("/storage/uploads/request-url", async (req: Request, res: Response) => {
   if (!isUploadRequestBody(req.body)) {
@@ -93,8 +103,7 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
   try {
     const { name, size, contentType } = req.body;
 
-    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-    const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+    const { uploadURL, objectPath } = await objectStorageService.getObjectEntityUploadURL(contentType);
 
     res.json({
       uploadURL,
@@ -108,24 +117,65 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
 });
 
 /**
- * GET /storage/public-objects/*
+ * PUT /storage/uploads/direct/:token
  *
- * Serve public assets from PUBLIC_OBJECT_SEARCH_PATHS.
- * These are unconditionally public — no authentication or ACL checks.
- * IMPORTANT: Always provide this endpoint when object storage is set up.
+ * Server-side direct upload handler.  The token must have been issued by a
+ * prior call to POST /storage/uploads/request-url.  Unknown tokens are
+ * rejected immediately before any body is read, preventing unauthorised disk
+ * writes and memory/disk exhaustion.  Body is streamed directly to disk with
+ * a 50 MB hard cap.
+ */
+router.put("/storage/uploads/direct/:token", async (req: Request, res: Response) => {
+  const token = req.params.token as string;
+
+  // Validate token BEFORE reading any body — reject unknown tokens immediately.
+  const pending = peekPendingUpload(token);
+  if (!pending) {
+    res.status(403).json({ error: "Invalid or expired upload token" });
+    return;
+  }
+
+  const contentLengthHeader = req.headers["content-length"];
+  const contentLengthHint = contentLengthHeader ? Number(Array.isArray(contentLengthHeader) ? contentLengthHeader[0] : contentLengthHeader) : undefined;
+
+  try {
+    // Consume the token so it cannot be replayed.
+    resolvePendingUpload(token);
+
+    const savedPath = await objectStorageService.saveDirectUploadStream(
+      token,
+      pending,
+      req,
+      contentLengthHint,
+    );
+    res.status(200).json({ objectPath: savedPath });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    if (msg.includes("exceeds maximum")) {
+      res.status(413).json({ error: "File exceeds maximum upload size (50 MB)" });
+    } else {
+      req.log.error({ err: error }, "Error in direct upload");
+      res.status(500).json({ error: "Failed to save upload" });
+    }
+  }
+});
+
+/**
+ * GET /storage/public-objects/*filePath
+ *
+ * Serve public assets from uploads directory.
  */
 router.get("/storage/public-objects/*filePath", async (req: Request, res: Response) => {
   try {
     const raw = req.params.filePath;
     const filePath = Array.isArray(raw) ? raw.join("/") : raw;
-    const file = await objectStorageService.searchPublicObject(filePath);
-    if (!file) {
+    const localFile = await objectStorageService.searchPublicObject(filePath);
+    if (!localFile) {
       res.status(404).json({ error: "File not found" });
       return;
     }
 
-    const response = await objectStorageService.downloadObject(file);
-
+    const response = await objectStorageService.downloadObject(localFile);
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
 
@@ -142,36 +192,65 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
 });
 
 /**
- * GET /storage/objects/*
+ * GET /storage/objects/*path
  *
- * Serve object entities from PRIVATE_OBJECT_DIR.
- * These are served from a separate path from /public-objects and can optionally
- * be protected with authentication or ACL checks based on the use case.
+ * Serve uploaded files from local disk.
+ * This also serves call recordings stored under call-recordings/<callId>.mp3
  */
 router.get("/storage/objects/*path", async (req: Request, res: Response) => {
   try {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
     const objectPath = `/objects/${wildcardPath}`;
-    const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+    const localFile = await objectStorageService.getObjectEntityFile(objectPath);
 
-    // --- Protected route example (uncomment when using replit-auth) ---
-    // if (!req.isAuthenticated()) {
-    //   res.status(401).json({ error: "Unauthorized" });
-    //   return;
-    // }
-    // const canAccess = await objectStorageService.canAccessObjectEntity({
-    //   userId: req.user.id,
-    //   objectFile,
-    //   requestedPermission: ObjectPermission.READ,
-    // });
-    // if (!canAccess) {
-    //   res.status(403).json({ error: "Forbidden" });
-    //   return;
-    // }
+    if (req.query.format !== undefined || req.query.width !== undefined) {
+      const width = Number(req.query.width);
+      if (req.query.format !== "webp" || !Number.isInteger(width) || !OPTIMIZED_WIDTHS.has(width)) {
+        res.status(400).json({ error: "Unsupported image variant" });
+        return;
+      }
 
-    const response = await objectStorageService.downloadObject(objectFile);
+      const cacheKey = `${objectPath}:webp:${width}`;
+      let image = optimizedImageCache.get(cacheKey);
+      if (!image) {
+        const source = await objectStorageService.downloadObject(localFile);
+        if (!source.ok || !source.body) {
+          res.status(source.status).end();
+          return;
+        }
+        const sourceSize = Number(source.headers.get("content-length") ?? 0);
+        if (Number.isFinite(sourceSize) && sourceSize > 20 * 1024 * 1024) {
+          res.status(413).json({ error: "Image is too large to resize" });
+          return;
+        }
+        const sourceBuffer = Buffer.from(await source.arrayBuffer());
+        const metadata = await sharp(sourceBuffer, { failOn: "none" }).metadata();
+        if (!metadata.width || !metadata.height || !metadata.format) {
+          res.status(415).json({ error: "Stored object is not a supported image" });
+          return;
+        }
+        image = await sharp(sourceBuffer, { failOn: "none", animated: (metadata.pages ?? 1) > 1 })
+          .rotate()
+          .resize({ width, fit: "inside", withoutEnlargement: true })
+          .webp({ quality: 82, effort: 4 })
+          .toBuffer();
+        if (optimizedImageCache.size >= MAX_OPTIMIZED_IMAGE_CACHE) {
+          const oldestKey = optimizedImageCache.keys().next().value;
+          if (oldestKey) optimizedImageCache.delete(oldestKey);
+        }
+        optimizedImageCache.set(cacheKey, image);
+      }
 
+      res.status(200)
+        .setHeader("Content-Type", "image/webp")
+        .setHeader("Content-Length", String(image.byteLength))
+        .setHeader("Cache-Control", "public, max-age=31536000, immutable")
+        .end(image);
+      return;
+    }
+
+    const response = await objectStorageService.downloadObject(localFile);
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
 
