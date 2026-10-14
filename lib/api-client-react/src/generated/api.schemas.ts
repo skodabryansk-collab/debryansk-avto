@@ -25,3 +25,10 @@ export interface HealthStatus {
   status: string;
 }
 
+export type GetCarImageThumbnailParams = {
+/**
+ * Auto.ru stock image URL from avatars.avto.ru
+ */
+src: string;
+};
+
