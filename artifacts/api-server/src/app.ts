@@ -60,7 +60,7 @@ app.use((_req, res, next) => {
       "object-src 'none'",
       "frame-ancestors 'self'",
       "form-action 'self'",
-      "script-src 'self' 'sha256-nQKN0dGS1qJ7QPnoWgFic7YygByYTQYyyz8o7FwTooY=' 'sha256-uR3FizX7z6+vU2R8m98HnYu9uV/I41xtWaYxXgIPTIo=' https://api-maps.yandex.ru https://mc.yandex.ru https://mod.calltouch.ru https://*.yandex.ru https://*.yastatic.net https://*.calltouch.ru",
+      "script-src 'self' 'sha256-nQKN0dGS1qJ7QPnoWgFic7YygByYTQYyyz8o7FwTooY=' 'sha256-uR3FizX7z6+vU2R8m98HnYu9uV/I41xtWaYxXgIPTIo=' https://api-maps.yandex.ru https://mc.yandex.ru https://mc.yandex.com https://mod.calltouch.ru https://*.yandex.ru https://*.yastatic.net https://*.calltouch.ru",
       "style-src 'self' 'unsafe-inline' https://api-maps.yandex.ru https://*.yastatic.net",
       "img-src 'self' data: blob: https: http:",
       "font-src 'self' data: https:",
