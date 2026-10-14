@@ -32,10 +32,8 @@ declare global {
   }
 }
 
-const DA_PRIMARY = "#0070b8";
-
 function makePinSvg(color: string, num: number, active: boolean): string {
-  const isBlue = color === DA_PRIMARY;
+  const isBlue = color === "#0070b8";
   const gid = `g${num}${active ? "a" : ""}`;
   const grad = isBlue
     ? `<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a8ad4"/><stop offset="100%" stop-color="#0058a0"/></linearGradient>`
@@ -58,6 +56,15 @@ function makePinSvg(color: string, num: number, active: boolean): string {
 </svg>`;
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function makeMarkerElement(
   loc: DealerLocation,
   isActive: boolean,
@@ -72,7 +79,7 @@ function makeMarkerElement(
     ? `<div style="margin-top:6px">
         <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px">Дилер</div>
         ${loc.brands.map(b =>
-          `<span style="display:inline-block;background:#dbeafe;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:600;color:#1d4ed8;margin:2px 2px 0 0">${b}</span>`
+          `<span style="display:inline-block;background:#dbeafe;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:600;color:#1d4ed8;margin:2px 2px 0 0">${escapeHtml(b)}</span>`
         ).join("")}
       </div>`
     : "";
@@ -81,17 +88,17 @@ function makeMarkerElement(
     ? `<div style="margin-top:6px">
         <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px">Сервис</div>
         ${(loc.serviceBrands ?? []).map(b =>
-          `<span style="display:inline-block;background:#fed7aa;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:600;color:#c2410c;margin:2px 2px 0 0">${b}</span>`
+          `<span style="display:inline-block;background:#fed7aa;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:600;color:#c2410c;margin:2px 2px 0 0">${escapeHtml(b)}</span>`
         ).join("")}
       </div>`
     : "";
 
   const phoneHtml = loc.phone
-    ? `<a href="${phoneHref(loc.phone)}" onclick="event.stopPropagation()" style="display:inline-block;margin-top:10px;background:linear-gradient(135deg,${DA_PRIMARY},#0058a0);color:#fff;padding:7px 18px;border-radius:10px;font-size:12px;font-weight:700;text-decoration:none">Позвонить</a>`
+    ? `<a href="${phoneHref(loc.phone)}" style="display:inline-block;margin-top:10px;background:linear-gradient(135deg,#0070b8,#0058a0);color:#fff;padding:7px 18px;border-radius:10px;font-size:12px;font-weight:700;text-decoration:none">Позвонить</a>`
     : "";
 
   const hoursHtml = loc.hours
-    ? `<div style="font-size:11px;color:#64748b;margin-top:4px">${loc.hours}</div>`
+    ? `<div style="font-size:11px;color:#64748b;margin-top:4px">${escapeHtml(loc.hours)}</div>`
     : "";
 
   const pinW = Math.round(36 * scale);
@@ -100,7 +107,7 @@ function makeMarkerElement(
   wrapper.style.cssText = `position:relative;display:block;width:${pinW}px;height:${pinH}px;cursor:pointer;user-select:none;transform:translate(-${pinW / 2}px,-${pinH}px);`;
 
   wrapper.innerHTML = `
-    <div class="da-ym-popup" onclick="event.stopPropagation()" style="
+    <div class="da-ym-popup" style="
       display:${isActive ? "block" : "none"};
       position:absolute;
       bottom:${pinH + 8}px;
@@ -116,8 +123,8 @@ function makeMarkerElement(
       z-index:10;
       pointer-events:auto;
     ">
-      <div style="font-size:13px;font-weight:800;color:#0f172a;line-height:1.3;margin-bottom:2px">${loc.short}</div>
-      <div style="font-size:11px;color:#475569;margin-bottom:4px">${loc.address}</div>
+      <div style="font-size:13px;font-weight:800;color:#0f172a;line-height:1.3;margin-bottom:2px">${escapeHtml(loc.short)}</div>
+      <div style="font-size:11px;color:#475569;margin-bottom:4px">${escapeHtml(loc.address)}</div>
       ${hoursHtml}
       ${dealerBrandsHtml}
       ${serviceBrandsHtml}
@@ -125,9 +132,11 @@ function makeMarkerElement(
     </div>
     ${makePinSvg(loc.color, num, isActive)}
   `;
+  wrapper.querySelector(".da-ym-popup")?.addEventListener("click", (e) => e.stopPropagation());
 
   wrapper.addEventListener("click", (e) => {
     e.stopPropagation();
+    if ((e.target as HTMLElement).closest("a")) return;
     const popup = wrapper.querySelector(".da-ym-popup") as HTMLElement;
     if (!popup) return;
     const willOpen = popup.style.display === "none";
