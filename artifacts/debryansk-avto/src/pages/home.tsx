@@ -378,7 +378,7 @@ const HomeNewsSection = () => {
             <FadeIn key={n.id} delay={i * 0.1}>
               <Link href={`/news/${n.slug}`} className="block bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
                 <div className="h-44 sm:h-48 overflow-hidden relative">
-                  {n.image && <img src={n.image} alt={n.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />}
+                  {n.image && <img src={n.image} alt={n.title} width={640} height={352} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />}
                   {n.category && <span className="absolute top-3 left-3 px-2.5 py-1 bg-[#0070b8] text-white text-[11px] font-bold rounded-full">{n.category}</span>}
                 </div>
                 <div className="p-5">
@@ -572,7 +572,7 @@ function SpecialOffersSection({ onOpenModal }: { onOpenModal: (type: ModalType) 
         onClick={() => window.location.href = `/new-cars/${encodeURIComponent(car.id)}`}>
         <div className="relative h-40 sm:h-44 overflow-hidden bg-slate-100 shrink-0">
           {img ? (
-            <img src={img} alt={`${car.mark} ${car.model}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
+            <img src={img} alt={`${car.mark} ${car.model}`} width={640} height={384} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-slate-300">
               <Car className="w-12 h-12" />
@@ -1099,8 +1099,11 @@ export default function Home() {
             <img
               src={heroDynamic}
               alt="Автосалон Дебрянск Авто"
+              width={1920}
+              height={1080}
               className="w-full h-full object-cover object-center"
               loading="eager"
+              fetchPriority="high"
               decoding="async"
               onError={e => {
                 e.currentTarget.src = "https://images.unsplash.com/photo-1567818735868-e71b99932e29?auto=format&fit=crop&q=85&w=1920";
@@ -1804,7 +1807,7 @@ export default function Home() {
         <div className="container mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 mb-10 sm:mb-12">
             <div className="col-span-2 sm:col-span-1 lg:col-span-1">
-              <img src={logoPng} alt="Дебрянск Авто" className="h-8 sm:h-9 w-auto mb-4 sm:mb-5 opacity-50 hover:opacity-100 transition-opacity" />
+              <img src={logoPng} alt="Дебрянск Авто" width={180} height={45} loading="lazy" decoding="async" className="h-8 sm:h-9 w-auto mb-4 sm:mb-5 opacity-50 hover:opacity-100 transition-opacity" />
               <p className="text-sm text-slate-500 mb-4 sm:mb-5 leading-relaxed">
                 Территория Автомобилей. Группа компаний с {apiBrands.length || 13} брендами в Брянске с 2011 года.
               </p>
