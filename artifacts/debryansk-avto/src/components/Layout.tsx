@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { ymGoal } from "@/lib/ym";
+import { ensureLeadSubmissionMetadata } from "../lib/leadSubmission";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -57,7 +58,7 @@ function CallbackModal({ onClose }: { onClose: () => void }) {
       fd.append("type", "callback");
       fd.append("name", name);
       fd.append("phone", phone);
-      const res = await fetch("/api/send-email", { method: "POST", body: fd });
+      const res = await fetch("/api/send-email", { method: "POST", body: ensureLeadSubmissionMetadata(fd) });
       if (res.ok) ymGoal("callback_submit");
     } catch (_) {}
     setLoading(false);
@@ -68,13 +69,16 @@ function CallbackModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="callback-modal-title"
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
         transition={{ duration: 0.2 }}
         className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
       >
-        <button onClick={onClose} className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors">
+        <button type="button" onClick={onClose} aria-label="Закрыть окно заказа звонка" className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] flex items-center justify-center transition-colors">
           <X className="w-4 h-4 text-slate-600" />
         </button>
         {sent ? (
@@ -85,27 +89,29 @@ function CallbackModal({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-6 sm:p-8">
-            <h3 className="text-xl font-extrabold mb-1">Заказать звонок</h3>
+            <h2 id="callback-modal-title" className="text-xl font-extrabold mb-1">Заказать звонок</h2>
             <p className="text-sm text-slate-500 mb-5">Оставьте контакты и мы перезвоним вам в ближайшее время.</p>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-bold text-slate-700 mb-1 block">Имя</label>
+                <label htmlFor="callback-name" className="text-xs font-bold text-slate-700 mb-1 block">Имя</label>
                 <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
                   <User className="w-4 h-4 text-slate-400" />
                   <input
+                    id="callback-name" name="name" autoComplete="name"
                     type="text" required value={name} onChange={e => setName(e.target.value)}
-                    className="bg-transparent flex-1 text-sm outline-none placeholder:text-slate-400"
+                    className="bg-transparent flex-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] placeholder:text-slate-400"
                     placeholder="Ваше имя"
                   />
                 </div>
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-700 mb-1 block">Телефон</label>
+                <label htmlFor="callback-phone" className="text-xs font-bold text-slate-700 mb-1 block">Телефон</label>
                 <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
                   <Phone className="w-4 h-4 text-slate-400" />
                   <input
+                    id="callback-phone" name="tel" autoComplete="tel"
                     type="tel" required value={phone} onChange={e => setPhone(formatPhone(e.target.value))}
-                    className="bg-transparent flex-1 text-sm outline-none placeholder:text-slate-400"
+                    className="bg-transparent flex-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] placeholder:text-slate-400"
                     placeholder="+7 (___) ___-__-__"
                     maxLength={18} inputMode="tel"
                   />
@@ -226,6 +232,13 @@ export default function Layout({
       ...(commonHoursSpec ? { "openingHoursSpecification": commonHoursSpec } : {}),
       "sameAs": ["https://vk.com/debryansk_avto"],
       "foundingDate": "2011",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "telephone": "+7-4832-77-77-70",
+        "contactType": "customer service",
+        "areaServed": "RU",
+        "availableLanguage": "Russian",
+      },
       ...(departments.length > 0 ? { "department": departments } : {}),
       ...(reviewStats && reviewStats.overallCount > 0 ? {
         "aggregateRating": {
@@ -274,6 +287,9 @@ export default function Layout({
       <Helmet>
         <script type="application/ld+json">{globalDealerLd}</script>
       </Helmet>
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:font-bold focus:text-[#0070b8] focus:shadow-lg">
+        Перейти к основному содержимому
+      </a>
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#111317] text-white">
         {/* Top info bar */}
@@ -467,7 +483,7 @@ export default function Layout({
             </Link>
           </div>
 
-          <button className="lg:hidden p-1.5 text-white/60 hover:text-white" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+          <button type="button" aria-label={mobileMenuOpen ? "Закрыть меню" : "Открыть меню"} aria-expanded={mobileMenuOpen} className="lg:hidden p-1.5 text-white/60 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
@@ -477,7 +493,7 @@ export default function Layout({
           {mobileMenuOpen && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
-              className="overflow-hidden border-t border-white/[0.07] bg-[#111317]">
+              id="site-mobile-menu" className="overflow-hidden border-t border-white/[0.07] bg-[#111317]">
               <div className="px-4 py-3 flex flex-col gap-0.5">
                 <Link href="/new-cars" onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-2 text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors">
@@ -545,7 +561,7 @@ export default function Layout({
       <div className="h-[6.25rem]" />
 
       {/* Main content — extra bottom padding on mobile so sticky bar never covers content */}
-      <main className="flex-1 pb-[68px] md:pb-0">
+      <main id="main-content" tabIndex={-1} className="flex-1 pb-[68px] md:pb-0 focus:outline-none">
         {children}
       </main>
 
