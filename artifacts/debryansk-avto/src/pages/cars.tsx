@@ -798,7 +798,7 @@ export default function UsedCars() {
                 )}
 
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-2 mt-10">
+                  <div className="flex flex-nowrap items-center justify-center gap-1 sm:gap-2 mt-10 px-1">
                     <button disabled={page === 1} onClick={() => setPage(p => p - 1)} aria-label="Предыдущая страница"
                       className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:border-[#0070b8] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2">
                       <ChevronLeft className="w-4 h-4" />
@@ -806,16 +806,22 @@ export default function UsedCars() {
                     {Array.from({ length: totalPages }).map((_, i) => {
                       const p = i + 1;
                       if (p === 1 || p === totalPages || Math.abs(p - page) <= 1) {
+                        const compactNeighbor =
+                          p !== 1 &&
+                          p !== totalPages &&
+                          Math.abs(p - page) === 1 &&
+                          page !== 1 &&
+                          page !== totalPages;
                         return (
                           <a key={p} href={getCatalogPageHref(p)} onClick={e => { e.preventDefault(); setPage(p); }}
                             aria-current={page === p ? "page" : undefined}
-                            className={`w-9 h-9 rounded-full text-sm font-bold transition-all ${
+                            className={`${compactNeighbor ? "hidden sm:inline-flex" : "inline-flex"} h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all ${
                               page === p ? "bg-[#0070b8] text-white" : "border border-slate-200 text-slate-600 hover:border-[#0070b8]"
                             }`}
                           >{p}</a>
                         );
                       }
-                      if (Math.abs(p - page) === 2) return <span key={p} className="text-slate-300">…</span>;
+                      if (Math.abs(p - page) === 2) return <span key={p} className="w-4 shrink-0 text-center text-slate-300">…</span>;
                       return null;
                     })}
                     <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} aria-label="Следующая страница"
