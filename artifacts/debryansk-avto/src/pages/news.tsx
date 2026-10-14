@@ -10,11 +10,10 @@ interface NewsArticle {
   id: number;
   title: string;
   excerpt: string | null;
-  content: string | null;
   category: string | null;
   image: string | null;
   imageMobile: string | null;
-  publishedAt: string | null;
+  publishedAt: string | Date | null;
   readTime: number | null;
   slug: string;
 }
@@ -26,7 +25,7 @@ async function fetchNews(): Promise<NewsArticle[]> {
   return json.ok ? json.data : [];
 }
 
-function formatDate(dateStr: string) {
+function formatDate(dateStr: string | Date) {
   const d = new Date(dateStr);
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
 }
@@ -49,11 +48,16 @@ function ArticleCard({ article, index }: { article: NewsArticle; index: number }
             {article.imageMobile && (
               <source media="(max-width: 639px)" srcSet={article.imageMobile} />
             )}
-            <img
-              src={article.image ?? ""}
+            {article.image ? <img
+              src={article.image}
               alt={article.title}
+              width={1280}
+              height={720}
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-            />
+            /> : <div aria-hidden="true" className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-600" />}
           </picture>
 
           {/* Gradient overlay — transparent top, dark bottom */}
@@ -105,13 +109,16 @@ function ArticleCard({ article, index }: { article: NewsArticle; index: number }
             {article.imageMobile && (
               <source media="(max-width: 639px)" srcSet={article.imageMobile} />
             )}
-            <img
-              src={article.image ?? ""}
+            {article.image ? <img
+              src={article.image}
               alt={article.title}
+              width={800}
+              height={416}
               loading="lazy"
+              fetchPriority="low"
               decoding="async"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
+            /> : <div aria-hidden="true" className="w-full h-full bg-slate-100" />}
           </picture>
         </div>
       </Link>
