@@ -9,6 +9,14 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Serve a resized WebP thumbnail for a stock car image
+ */
+export const GetCarImageThumbnailQueryParams = zod.object({
+  "src": zod.coerce.string().url().describe('Auto.ru stock image URL from avatars.avto.ru')
+})
+
+
+/**
  * @summary Available image models and verified generation capabilities
  */
 export const ListAiImageModelsResponse = zod.object({
