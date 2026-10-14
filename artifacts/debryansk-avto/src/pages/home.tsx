@@ -945,6 +945,8 @@ export default function Home() {
             <motion.img
               src={miniLogo}
               alt="Д"
+              width={32}
+              height={32}
               className="h-8 w-8 object-contain absolute left-0"
               animate={{ opacity: scrolled ? 1 : 0, scale: scrolled ? 1 : 0.6 }}
               transition={{ duration: 0.25 }}
@@ -952,6 +954,8 @@ export default function Home() {
             <motion.img
               src={logoWhiteSvg}
               alt="Дебрянск Авто"
+              width={168}
+              height={28}
               className="h-7 sm:h-8 w-auto"
               animate={{ opacity: scrolled ? 0 : 1, x: scrolled ? -10 : 0 }}
               transition={{ duration: 0.25 }}
@@ -1232,6 +1236,8 @@ export default function Home() {
                           <img
                             src={b.logoUrl}
                             alt={b.name}
+                            width={240}
+                            height={120}
                             className="w-full object-contain transition-all duration-500 group-hover:scale-110 drop-shadow-[0_2px_4px_rgba(0,0,0,0.08)]"
                             style={{ maxWidth: "85%", maxHeight: "70%" }}
                             loading="lazy"
@@ -1327,6 +1333,8 @@ export default function Home() {
               <img
                 src={logoWhiteSvg}
                 alt="Дебрянск Авто"
+                width={360}
+                height={60}
                 className="h-[47px] sm:h-[78px] w-auto mb-6 sm:mb-7"
               />
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight mb-4 sm:mb-5 text-white"
