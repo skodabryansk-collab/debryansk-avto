@@ -561,7 +561,7 @@ export default function Layout({
       <div className="h-[6.25rem]" />
 
       {/* Main content — extra bottom padding on mobile so sticky bar never covers content */}
-      <main id="main-content" tabIndex={-1} className="flex-1 pb-[68px] md:pb-0 focus:outline-none">
+      <main id="main-content" tabIndex={-1} className="flex-1 pb-[68px] md:pb-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2">
         {children}
       </main>
 
