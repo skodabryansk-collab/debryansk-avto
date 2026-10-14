@@ -8,4 +8,5 @@
 
 export * from './aiImageModel';
 export * from './aiImageModelCatalogue';
+export * from './getCarImageThumbnailParams';
 export * from './healthStatus';
