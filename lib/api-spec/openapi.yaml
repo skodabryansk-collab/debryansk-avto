@@ -11,6 +11,30 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /cars/image-thumbnail:
+    get:
+      operationId: getCarImageThumbnail
+      summary: Serve a resized WebP thumbnail for a stock car image
+      parameters:
+        - name: src
+          in: query
+          required: true
+          description: Auto.ru stock image URL from avatars.avto.ru
+          schema:
+            type: string
+            format: uri
+      responses:
+        "200":
+          description: Resized WebP image
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid or unsupported image URL
+        "502":
+          description: Source image could not be processed
   /admin/ai-images/models:
     get:
       operationId: listAiImageModels
