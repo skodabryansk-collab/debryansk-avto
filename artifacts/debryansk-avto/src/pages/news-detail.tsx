@@ -42,7 +42,9 @@ function getArticleDescription(article: NewsArticle): string {
     .replace(/&nbsp;|&#160;/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return (article.excerpt?.trim() || plainContent || `Новость «${article.title}» от Дебрянск Авто.`).slice(0, 155);
+  const excerpt = article.excerpt?.trim() ?? "";
+  const isPlaceholderExcerpt = /^(?:скоро(?:\s+в\s+продаже)?)[.!…\s]*$/i.test(excerpt);
+  return ((!isPlaceholderExcerpt && excerpt) || plainContent || `Новость «${article.title}» от Дебрянск Авто.`).slice(0, 155);
 }
 
 /** Returns the effective images array for an article — prefers images[], falls back to image */
