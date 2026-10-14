@@ -18,6 +18,7 @@ import { useCarStorage } from "@/hooks/useCarStorage";
 import { HomeActionBtn } from "@/components/HomeActionBtn";
 import { TradeInModal } from "@/components/modals/TradeInModal";
 import SEO from "@/components/SEO";
+import { buildDealerLocationSchema } from "@/lib/structured-data";
 import { SiVk, SiTelegram } from "react-icons/si";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -749,6 +750,12 @@ export default function Home() {
       }));
   }, [apiLocations]);
 
+  const commonHours = React.useMemo(() => {
+    if (!apiLocations.length) return "Ежедневно 9:00–21:00";
+    const unique = [...new Set(apiLocations.map(location => location.hours).filter(Boolean))];
+    return (unique[0] as string | undefined) ?? "Ежедневно 9:00–21:00";
+  }, [apiLocations]);
+
   const dealerLocations = React.useMemo(() =>
     apiLocations.map((loc, i) => ({
       id: loc.id,
@@ -761,74 +768,12 @@ export default function Home() {
       hours: loc.hours,
     })), [apiLocations]);
 
-  function parseHoursSpec(raw: string | null | undefined): object[] | null {
-    if (!raw) return null;
-    const m = /ежедневно\s+(\d{1,2}:\d{2})[–\-](\d{1,2}:\d{2})/i.exec(raw);
-    if (m) {
-      const pad = (t: string) => t.length < 5 ? "0" + t : t;
-      return [{ "@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"], "opens": pad(m[1]), "closes": pad(m[2]) }];
-    }
-    return null;
-  }
-
-  const commonHours = React.useMemo(() => {
-    if (!apiLocations.length) return "Ежедневно 9:00–21:00";
-    const unique = [...new Set(apiLocations.map(l => l.hours).filter(Boolean))];
-    return (unique.length >= 1 ? unique[0] as string : null) ?? "Ежедневно 9:00–21:00";
-  }, [apiLocations]);
-
-  const organizationSchema = {
-    "@type": "Organization",
-    "name": "Дебрянск Авто",
-    "url": "https://debryansk-auto.ru",
-    "logo": "https://debryansk-auto.ru/favicon.svg",
-    "description": "Группа компаний по продаже, сервису и финансированию автомобилей в Брянске.",
-    "address": {
-      "@type": "PostalAddress",
-      "streetAddress": "ул. Советская, д. 77",
-      "postalCode": "241050",
-      "addressLocality": "Брянск",
-      "addressRegion": "Брянская область",
-      "addressCountry": "RU"
-    },
-    "contactPoint": {
-      "@type": "ContactPoint",
-      "telephone": "+7-4832-77-77-70",
-      "contactType": "sales"
-    },
-    "sameAs": [
-      "https://vk.com/debryanskavto",
-      "https://t.me/debryanskavto"
-    ]
-  };
-
-  const localBusinessSchema = {
-    "@type": "AutoDealer",
-    "name": "Дебрянск Авто",
-    "image": "https://debryansk-auto.ru/opengraph.jpg",
-    "address": {
-      "@type": "PostalAddress",
-      "streetAddress": "ул. Курганская, 10",
-      "addressLocality": "Брянск",
-      "addressRegion": "Брянская область",
-      "postalCode": "241050",
-      "addressCountry": "RU"
-    },
-    "geo": {
-      "@type": "GeoCoordinates",
-      "latitude": "53.243562",
-      "longitude": "34.363408"
-    },
-    "telephone": "+7-4832-77-77-70",
-    ...(parseHoursSpec(commonHours) ? { "openingHoursSpecification": parseHoursSpec(commonHours) } : {}),
-    "priceRange": "$$₽",
-    "paymentAccepted": "Наличные, кредит"
-  };
-
   const webSiteSchema = {
     "@type": "WebSite",
+    "@id": "https://debryansk-auto.ru/#website",
     "url": "https://debryansk-auto.ru",
     "name": "Дебрянск Авто",
+    "publisher": { "@id": "https://debryansk-auto.ru/#organization" },
     "potentialAction": {
       "@type": "SearchAction",
       "target": "https://debryansk-auto.ru/cars?q={search_term_string}",
@@ -898,8 +843,7 @@ export default function Home() {
         description="Новые и подержанные автомобили, сервис, кредит и трейд-ин в Брянске. Официальные дилерские центры Дебрянск Авто работают с 2011 года."
         canonical="/"
         jsonLd={[
-          organizationSchema,
-          localBusinessSchema,
+          ...apiLocations.map(buildDealerLocationSchema),
           webSiteSchema
         ]}
         breadcrumbs={[
@@ -1240,7 +1184,7 @@ export default function Home() {
                             height={120}
                             className="w-full object-contain transition-all duration-500 group-hover:scale-110 drop-shadow-[0_2px_4px_rgba(0,0,0,0.08)]"
                             style={{ maxWidth: "85%", maxHeight: "70%" }}
-                            loading="lazy"
+                            loading={i === 0 ? "eager" : "lazy"}
                             decoding="async"
                             onError={e => { e.currentTarget.style.display = "none"; }}
                           />
