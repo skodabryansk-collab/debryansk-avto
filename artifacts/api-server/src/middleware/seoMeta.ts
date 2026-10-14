@@ -17,13 +17,41 @@ const BOT_UA =
 
 const SITE = "https://debryansk-auto.ru";
 const DEFAULT_OG_IMAGE = `${SITE}/opengraph.jpg`;
+const META_TITLE_LIMIT = 70;
+const META_DESCRIPTION_LIMIT = 155;
+
+function truncateAtWord(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  const prefix = value.slice(0, Math.max(1, maxLength - 1));
+  const lastSpace = prefix.lastIndexOf(" ");
+  const end = lastSpace > maxLength * 0.6 ? lastSpace : prefix.length;
+  return `${prefix.slice(0, end).trimEnd()}…`;
+}
+
+function formatMetaTitle(value: string): string {
+  const title = value.trim();
+  const siteSuffixMatch = title.match(/\s*[|—–-]\s*Дебрянск Авто$/i);
+  if (siteSuffixMatch) {
+    const prefix = title.slice(0, -siteSuffixMatch[0].length).trimEnd();
+    const suffix = " — Дебрянск Авто";
+    return title.length <= META_TITLE_LIMIT
+      ? title
+      : `${truncateAtWord(prefix, META_TITLE_LIMIT - suffix.length)}${suffix}`;
+  }
+  const fullTitle = title.includes("Дебрянск Авто") ? title : `${title} — Дебрянск Авто`;
+  return truncateAtWord(fullTitle, META_TITLE_LIMIT);
+}
+
+function formatMetaDescription(value: string): string {
+  return truncateAtWord(value.trim(), META_DESCRIPTION_LIMIT);
+}
 
 const DEFAULT_ROBOTS = "index, follow, max-snippet:-1, max-image-preview:large";
 
 const DEFAULT_META = {
-  title: "Дебрянск Авто — официальный автосалон в Брянске | Продажа, сервис, кредит",
-  description: "Официальный дилер Haval, Jetour, OMODA, JAECOO, Soueast, Volkswagen, SKODA, EXEED, Tenet и Mercedes-Benz в Брянске. 4 дилерских центра. Продажа, сервис и финансирование с 2011 года.",
-  h1: "Дебрянск Авто — официальный дилер автомобилей в Брянске",
+  title: "Автомобили и сервис в Брянске — Дебрянск Авто",
+  description: "Новые и подержанные автомобили, сервис, кредит и трейд-ин в Брянске. Официальные дилерские центры Дебрянск Авто работают с 2011 года.",
+  h1: "Автомобили и сервис в Брянске",
   robots: DEFAULT_ROBOTS,
 };
 
@@ -31,7 +59,7 @@ export const STATIC_META: Record<string, { title: string; description: string; h
   "/": DEFAULT_META,
   "/brands": {
     title: "Бренды автомобилей и официальный сервис в Брянске — Дебрянск Авто",
-    description: "Официальные дилеры новых автомобилей и сервисные бренды в Брянске. Каталог автомобилей с пробегом, адреса дилерских центров и актуальные предложения Дебрянск Авто.",
+    description: "Официальные дилеры новых автомобилей и сервисные бренды в Брянске. Каталог машин с пробегом, адреса центров и предложения Дебрянск Авто.",
     h1: "Бренды автомобилей и сервис Дебрянск Авто в Брянске",
     robots: DEFAULT_ROBOTS,
   },
@@ -67,7 +95,7 @@ export const STATIC_META: Record<string, { title: string; description: string; h
   },
   "/about": {
     title: "О компании Дебрянск Авто — группа компаний 9 БР",
-    description: "«Дебрянск Авто» — официальный мультибрендовый дилер в Брянске с 2011 года. 10 брендов: Haval, Jetour, OMODA, Jaecoo, Soueast. 4 дилерских центра.",
+    description: "«Дебрянск Авто» — официальный мультибрендовый дилер в Брянске с 2011 года. 10 брендов и 4 дилерских центра: продажа, сервис и финансирование.",
     h1: "О компании Дебрянск Авто",
     robots: DEFAULT_ROBOTS,
   },
@@ -112,6 +140,18 @@ export const STATIC_META: Record<string, { title: string; description: string; h
     description: "Актуальные акции на покупку автомобилей от официального дилера Дебрянск Авто в Брянске. Скидки, выгодный кредит, трейд-ин бонусы.",
     h1: "Акции и спецпредложения Дебрянск Авто",
     robots: DEFAULT_ROBOTS,
+  },
+  "/compare": {
+    title: "Сравнение автомобилей в Брянске — Дебрянск Авто",
+    description: "Сравните до трёх новых и подержанных автомобилей по цене, году, пробегу, комплектации, коробке передач, приводу и опциям.",
+    h1: "Сравнение автомобилей",
+    robots: "noindex, follow",
+  },
+  "/favorites": {
+    title: "Избранные автомобили в Брянске — Дебрянск Авто",
+    description: "Сохранённые новые автомобили и машины с пробегом в одном списке. Вернитесь к выбранным моделям, сравните цены и откройте карточку.",
+    h1: "Избранные автомобили",
+    robots: "noindex, follow",
   },
 };
 
@@ -274,6 +314,8 @@ function injectMeta(
   ogType?: string,
 ): string {
   let result = html;
+  const pageTitle = formatMetaTitle(title);
+  const pageDescription = formatMetaDescription(description);
 
   // Strip ALL existing title/canonical/description/og/twitter tags to avoid duplicates
   // (React Helmet may have injected its own set into Puppeteer-rendered HTML)
@@ -308,27 +350,33 @@ function injectMeta(
   if (preservedLd.length > 0) {
     result = result.replace("</head>", `  ${preservedLd.join("\n  ")}\n  </head>`);
   }
-  // SSG templates can contain their own sr-only H1. Remove it here because
-  // the semantic main block below is the single authoritative H1 for every
-  // server-enriched response.
+  // Remove a previously injected offscreen SEO main from cached prerenders.
+  // Older snapshots contain an unmarked H1 there and otherwise retain a
+  // duplicate alongside the page's visible heading.
+  result = result.replace(
+    /<main aria-label="Основной контент" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">[\s\S]*?<\/main>\s*/gi,
+    "",
+  );
+  result = result.replace(/<h1\b[^>]*data-seo-h1-fallback[^>]*>[\s\S]*?<\/h1>\s*/gi, "");
   result = result.replace(/<h1 class="sr-only">[^<]*<\/h1>\s*/g, "");
+  const needsFallbackH1 = !/<h1\b/i.test(result);
 
   // Insert clean, deduplicated meta block right after <meta name="viewport"...>
   const metaBlock = [
-    `<title>${title}</title>`,
-    `<link rel="canonical" href="${canonical}" />`,
-    `<meta name="description" content="${description}" />`,
+    `<title>${esc(pageTitle)}</title>`,
+    `<link rel="canonical" href="${esc(canonical)}" />`,
+    `<meta name="description" content="${esc(pageDescription)}" />`,
     `<meta name="robots" content="${robots || "index, follow"}" />`,
-    `<meta property="og:title" content="${title}" />`,
-    `<meta property="og:description" content="${description}" />`,
-    `<meta property="og:url" content="${canonical}" />`,
-    `<meta property="og:image" content="${ogImage}" />`,
+    `<meta property="og:title" content="${esc(pageTitle)}" />`,
+    `<meta property="og:description" content="${esc(pageDescription)}" />`,
+    `<meta property="og:url" content="${esc(canonical)}" />`,
+    `<meta property="og:image" content="${esc(ogImage)}" />`,
     `<meta property="og:site_name" content="Дебрянск Авто" />`,
     `<meta property="og:type" content="${ogType || "website"}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
-    `<meta name="twitter:title" content="${title}" />`,
-    `<meta name="twitter:description" content="${description}" />`,
-    `<meta name="twitter:image" content="${ogImage}" />`,
+    `<meta name="twitter:title" content="${esc(pageTitle)}" />`,
+    `<meta name="twitter:description" content="${esc(pageDescription)}" />`,
+    `<meta name="twitter:image" content="${esc(ogImage)}" />`,
   ].join("\n    ");
 
   const beforeViewport = result;
@@ -357,7 +405,7 @@ function injectMeta(
     /<div id="root"><\/div>/,
     `<div id="root"></div>
     <main aria-label="Основной контент" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">
-      <h1>${h1}</h1>
+      ${needsFallbackH1 ? `<h1 data-seo-h1-fallback="true">${esc(h1)}</h1>` : ""}
       <nav aria-label="Основная навигация">
         <a href="/new-cars">Новые автомобили в Брянске</a>
         <a href="/cars">Автомобили с пробегом в Брянске</a>
@@ -737,9 +785,16 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
       published_at: string | null; updated_at: string | null; content: string | null;
     } | undefined;
     if (row) {
-      const newsDesc = row.excerpt
-        ? (row.excerpt.length > 155 ? row.excerpt.slice(0, 152) + "…" : row.excerpt)
-        : "Актуальная новость автомобильного рынка от дилерского центра «Дебрянск Авто» в Брянске.";
+      const articleText = (row.content || "")
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;|&#160;/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const newsDesc = formatMetaDescription(
+        row.excerpt?.trim() || articleText || `Новость «${row.title}» от Дебрянск Авто в Брянске.`,
+      );
       // Use article's own image for og:image — prefer first gallery image, fall back to cover image
       const articleImage = (row.images && row.images.length > 0 ? row.images[0] : null) || row.image || DEFAULT_OG_IMAGE;
       const articleImageFull = articleImage.startsWith("http") ? articleImage : `${SITE}${articleImage}`;
@@ -773,14 +828,17 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
       const breadcrumbLd = buildBreadcrumbList(pathStr, row.title);
       // Inject article body text as hidden block so bots can read content
       const bodyHtml = row.content
-        ? `<article aria-label="${row.title}" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">` +
-          `<h1>${row.title}</h1>` +
+        ? `<article aria-label="${esc(row.title)}" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">` +
+          `<p><strong>${esc(row.title)}</strong></p>` +
            `<p>Автор: Редакция Дебрянск Авто${row.published_at ? ` · Опубликовано: ${datePublished}` : ""}</p>` +
-          row.content.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "").slice(0, 8000) +
+          row.content
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+            .replace(/<h1\b[^>]*>[\s\S]*?<\/h1>/gi, "")
+            .slice(0, 8000) +
           `</article>`
         : undefined;
       return {
-        title: `${row.title} | Дебрянск Авто`,
+        title: row.title,
         description: newsDesc,
         canonical: `${SITE}/news/${slug}`,
         ogImage: articleImageFull,
@@ -883,28 +941,18 @@ async function resolveMetaBase(pathStr: string): Promise<MetaResult | null> {
       const salePrice = isNew ? Math.max(0, rawPrice - maxDiscount) : rawPrice;
       const priceStr = new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 }).format(salePrice);
       const modShort = row.modification ? row.modification.replace(/\s*\([^)]+\)/, "").trim() : null;
-      const stockNum = isTenetPlusDealer(row.dealer) ? "" : row.external_id.replace(/^.*?(\d+)$/, "$1").slice(-6);
+      const listingCode = row.external_id.replace(/\D/g, "").slice(-8) || row.external_id.slice(-8);
       const color = row.color || null;
       const runKm = row.mileage ? Math.round(row.mileage / 1000) + " тыс. км" : null;
-      // Build title: regional anchor "в Брянске" + differentiator (color/mod/run)
-      let title;
-      if (isNew) {
-        const full = `Купить ${row.brand} ${row.model} ${row.year} в Брянске${modShort ? `, ${modShort}` : ""}${color ? `, ${color}` : ""} | Дебрянск Авто`;
-        const noColor = `Купить ${row.brand} ${row.model} ${row.year} в Брянске${modShort ? `, ${modShort}` : ""} | Дебрянск Авто`;
-        const noMod = `Купить ${row.brand} ${row.model} ${row.year} в Брянске | Дебрянск Авто`;
-        title = full.length <= 70 ? full : (noColor.length <= 70 ? noColor : noMod);
-      } else {
-        const full = `${row.brand} ${row.model} ${row.year} б/у в Брянске${runKm ? `, ${runKm}` : ""}${color ? `, ${color}` : ""} | Дебрянск Авто`;
-        const noColor = `${row.brand} ${row.model} ${row.year} б/у в Брянске${runKm ? `, ${runKm}` : ""} | Дебрянск Авто`;
-        const noRun = `${row.brand} ${row.model} ${row.year} б/у в Брянске | Дебрянск Авто`;
-        title = full.length <= 70 ? full : (noColor.length <= 70 ? noColor : noRun);
-      }
+      const title = `${row.brand} ${row.model} ${row.year}${isNew ? " новый" : " б/у"} · №${listingCode} — Дебрянск Авто`;
       const h1 = isNew
         ? `Купить ${row.brand} ${row.model} ${row.year} в Брянске`
         : `${row.brand} ${row.model} ${row.year} с пробегом`;
       const priceLabel = isNew && maxDiscount > 0 ? `от ${priceStr}` : priceStr;
-      const stockLabel = stockNum ? ` Арт. №${stockNum}.` : "";
-      const description = `Купите ${row.brand} ${row.model} ${row.year}${modShort ? `, ${modShort}` : ""} в Брянске. Цена ${priceLabel}.${stockLabel} Официальный дилер «Дебрянск Авто» — +7 (4832) 77-77-70.`;
+      const variant = row.complectation || modShort || color;
+      const description = isNew
+        ? `Лот №${listingCode}: новый ${row.brand} ${row.model}, ${row.year} год${variant ? `, ${variant}` : ""}. Цена ${priceLabel}. Дебрянск Авто, Брянск.`
+        : `Лот №${listingCode}: ${row.brand} ${row.model}, ${row.year} год${runKm ? `, пробег ${runKm}` : ""}. Цена ${priceStr}. Дебрянск Авто, Брянск.`;
       const robots = "index, follow, max-snippet:-1, max-image-preview:large";
       const breadcrumbLd = buildBreadcrumbList(pathStr, title);
       const ogType = type === "new" ? "new" : "used";
@@ -1013,6 +1061,10 @@ export function seoMetaMiddleware(
         next();
         return;
       }
+      const queryString = req.originalUrl.includes("?") ? req.originalUrl.split("?").slice(1).join("?") : "";
+      const hasCatalogFilters = (route === "/cars" || route === "/new-cars")
+        && [...new URLSearchParams(queryString).keys()].some((key) => !/^(utm_.+|gclid|yclid|fbclid|_gl)$/i.test(key));
+      if (hasCatalogFilters) meta.robots = "noindex, follow";
       const html = getSsgHtml(route, bypassCache);
       if (!html) {
         next();
