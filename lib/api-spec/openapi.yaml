@@ -35,6 +35,8 @@ paths:
           description: Invalid or unsupported image URL
         "502":
           description: Source image could not be processed
+        "503":
+          description: Thumbnail service is temporarily busy
   /admin/ai-images/models:
     get:
       operationId: listAiImageModels
