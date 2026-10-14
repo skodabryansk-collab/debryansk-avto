@@ -271,6 +271,8 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
           <img
             src={img}
             alt={`${car.mark} ${car.model} ${car.year}${car.color ? `, ${car.color}` : ""}, ${formatRun(car.run)}`}
+            width={640}
+            height={384}
             loading="lazy"
             decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -445,7 +447,7 @@ function CarCard({ car, onLead, onCredit, onTradeIn }: { car: CarRecord; onLead:
   );
 }
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 9;
 
 const BODY_TYPES = ["Все типы кузова", ...BODY_TYPE_NAMES, "Купе"];
 
