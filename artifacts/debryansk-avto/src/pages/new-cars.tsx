@@ -269,6 +269,8 @@ function NewCarCard({ car, onTestDrive }: { car: NewCarRecord; onTestDrive: (car
           <img
             src={img}
             alt={`${car.mark} ${car.model} ${car.year}${car.complectation ? `, ${car.complectation}` : ""}`}
+            width={640}
+            height={384}
             loading="lazy"
             decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -434,7 +436,7 @@ function NewCarCard({ car, onTestDrive }: { car: NewCarRecord; onTestDrive: (car
   );
 }
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 9;
 
 const BODY_TYPES = ["Все типы", ...BODY_TYPE_NAMES];
 const DEALERS = ["Все дилеры", "Jaecoo", "Omoda", "Tenet", "Tenet Plus", "Haval City", "Haval Pro", "Jetour", "Soueast", "Jeland"];
