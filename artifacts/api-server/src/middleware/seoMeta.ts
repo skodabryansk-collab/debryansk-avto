@@ -404,7 +404,7 @@ function injectMeta(
   result = result.replace(
     /<div id="root"><\/div>/,
     `<div id="root"></div>
-    <main aria-label="Основной контент" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">
+    <div aria-hidden="true" data-seo-crawler-content="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">
       ${needsFallbackH1 ? `<h1 data-seo-h1-fallback="true">${esc(h1)}</h1>` : ""}
       <nav aria-label="Основная навигация">
         <a href="/new-cars">Новые автомобили в Брянске</a>
@@ -434,7 +434,7 @@ function injectMeta(
         <p>Режим работы: ежедневно 9:00–21:00</p>
         <p>Email: <a href="mailto:info@debryansk-auto.ru">info@debryansk-auto.ru</a></p>
       </address>
-    </main>`
+    </div>`
   );
 
   return result;
