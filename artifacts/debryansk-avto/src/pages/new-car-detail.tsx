@@ -415,6 +415,7 @@ export default function NewCarDetail() {
   const drive = parseDrive(car.modification);
   const engine = parseEngine(car.modification);
   const salePrice = car.maxDiscount > 0 ? car.price - car.maxDiscount : car.price;
+  const listingCode = car.id.replace(/\D/g, "").slice(-8) || car.id.slice(-8);
 
   const specs = [
     { label: "Год выпуска", value: String(car.year), icon: <Calendar className="w-4 h-4 text-[#0070b8]" /> },
@@ -597,8 +598,8 @@ export default function NewCarDetail() {
     <Layout showMobileStickyBar={false} navigatorMobileBottomOffset="bottom-[92px]">
       {car && (
         <SEO
-          title={`${car.mark} ${car.model} ${car.year} год от ${formatPrice(car.price)}`}
-          description={`Новый ${car.mark} ${car.model}, ${car.year} год, кузов ${car.bodyType}, цвет ${car.color}, комплектация ${car.complectation || car.modification}, дилер ${car.dealer}. Дебрянск Авто.`}
+          title={`${car.mark} ${car.model} ${car.year} новый · №${listingCode} — Дебрянск Авто`}
+          description={`Лот №${listingCode}: новый ${car.mark} ${car.model}, ${car.year} год${car.complectation || car.modification ? `, ${car.complectation || car.modification}` : ""}. Цена от ${formatPrice(salePrice)}. Дебрянск Авто, Брянск.`}
           canonical={`/new-cars/${encodeURIComponent(car.id)}`}
           image={car.images.filter(Boolean)[0] || "/opengraph.jpg"}
           type="product"
