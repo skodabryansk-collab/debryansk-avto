@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { ymGoal } from "@/lib/ym";
+import { ensureLeadSubmissionMetadata } from "../lib/leadSubmission";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { useLocation } from "wouter";
 import { CTPhone } from "@/components/CTPhone";
@@ -89,7 +90,7 @@ const advantages = [
   { icon: Shield,      title: "Гарантия производителя",  desc: "Все работы выполняются по стандартам производителя с сохранением гарантии" },
   { icon: Star,        title: "Сертифицированные мастера", desc: "Технические специалисты проходят регулярное обучение у производителей" },
   { icon: CheckCircle, title: "Оригинальные запчасти",    desc: "Только сертифицированные детали от официальных поставщиков" },
-  { icon: Clock,       title: "Быстрая запись",           desc: "Запись на сервис в тот же день или на удобное время" },
+  { icon: Clock,       title: "Запись на сервис",         desc: "Подберём ближайшее доступное время и согласуем его с вами" },
   { icon: Car,         title: "Запасной автомобиль",      desc: "Предоставляем подменный автомобиль на время длительного ремонта" },
   { icon: MapPin,      title: "4 сервисных центра",       desc: "Удобное расположение по всему городу Брянск и области" },
 ];
@@ -98,7 +99,7 @@ const advantages = [
 const serviceSchema = {
   "@type": "AutoRepair",
   name: "Дебрянск Авто — Официальный сервис",
-  description: "Официальный сервисный центр Haval, Omoda, Jaecoo, Jetour, Tenet, Soueast, Volkswagen, Skoda, Exeed, Mercedes-Benz в Брянске.",
+  description: "Техническое обслуживание, ремонт, диагностика, кузовные работы, шиномонтаж и запчасти в сервисных центрах Дебрянск Авто в Брянске и Супонево.",
   url: "https://debryansk-auto.ru/service",
   telephone: "+7 (4832) 77 77 70",
   areaServed: { "@type": "City", name: "Брянск" },
@@ -167,11 +168,11 @@ function BookingForm({ locations }: { locations: ApiLocation[] }) {
       if (form.date) fd.append("preferredDate", form.date);
       if (form.comment) fd.append("comment", form.comment.trim());
       fd.append("source", "Форма на странице сервиса");
-      const res = await fetch("/api/send-email", { method: "POST", body: fd });
+      const res = await fetch("/api/send-email", { method: "POST", body: ensureLeadSubmissionMetadata(fd) });
       if (!res.ok) throw new Error("server");
       ymGoal("lead_submit");
       setSubmitted(true);
-      toast({ title: "Заявка принята", description: "Перезвоним в течение 15 минут" });
+      toast({ title: "Заявка принята", description: "Менеджер свяжется с вами для уточнения деталей" });
     } catch {
       toast({ title: "Ошибка отправки", description: "Позвоните: +7 (4832) 77-77-70", variant: "destructive" });
     }
@@ -185,7 +186,7 @@ function BookingForm({ locations }: { locations: ApiLocation[] }) {
         </div>
         <h3 className="text-xl font-extrabold mb-2">Заявка принята!</h3>
         <p className="text-slate-500 mb-4">
-          Мы перезвоним вам в течение 15 минут для уточнения деталей.
+          Менеджер свяжется с вами, чтобы уточнить детали и подобрать подходящее время.
         </p>
         <button onClick={() => setSubmitted(false)} className="text-[#0070b8] font-bold hover:underline">
           Отправить ещё одну
@@ -374,7 +375,7 @@ function ServicePromoModal({
       fd.append("type", "promo");
       fd.append("phone", phone);
       fd.append("source", `Акция сервиса: ${promo.title}`);
-      const r = await fetch("/api/send-email", { method: "POST", body: fd });
+      const r = await fetch("/api/send-email", { method: "POST", body: ensureLeadSubmissionMetadata(fd) });
       if (!r.ok) { setError(true); setSending(false); return; }
       ymGoal("lead_submit");
       setSubmitted(true);
@@ -723,7 +724,7 @@ export default function ServicePage() {
       {!isLoading && <div data-prerender-ready="true" style={{ display: "none" }} />}
       <SEO
         title="Официальный сервис — Дебрянск Авто"
-        description="Официальный сервис Haval, Omoda, Jaecoo, Jetour, Tenet, Soueast, Volkswagen, Skoda, Exeed, Mercedes-Benz в Брянске. ТО, ремонт, кузовной, детейлинг, диагностика. Онлайн-запись."
+        description="Техническое обслуживание, ремонт, диагностика и кузовные работы в Брянске. Адреса сервисных центров и онлайн-запись на сайте Дебрянск Авто."
         canonical="/service"
         jsonLd={serviceSchema}
         breadcrumbs={[
