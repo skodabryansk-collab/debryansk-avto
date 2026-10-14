@@ -20,6 +20,7 @@ import Layout from "@/components/Layout";
 import CatalogFilterPanel, { BODY_TYPE_NAMES, TRANSMISSIONS, DRIVES, FUEL_TYPES, type FilterSection } from "@/components/CatalogFilterPanel";
 import { SortPopover } from "@/components/SortPopover";
 import { ActiveFilters, type ActiveFilterChip } from "@/components/ActiveFilters";
+import { getCatalogPageFromUrl, getCatalogPageHref } from "@/lib/catalogPagination";
 
 interface CarRecord {
   id: string;
@@ -474,7 +475,7 @@ export default function UsedCars() {
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
   const [sortBy, setSortBy] = useState<"popular" | "price_asc" | "price_desc" | "year_desc" | "run_asc">("popular");
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(getCatalogPageFromUrl);
   const [leadCar, setLeadCar] = useState<CarRecord | null>(null);
   const [creditCar, setCreditCar] = useState<CarRecord | null>(null);
   const [showTradeIn, setShowTradeIn] = useState(false);
@@ -515,6 +516,9 @@ export default function UsedCars() {
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useEffect(() => {
+    if (totalPages > 0 && page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   function go(fn: () => void) { fn(); setPage(1); }
 
@@ -803,11 +807,12 @@ export default function UsedCars() {
                       const p = i + 1;
                       if (p === 1 || p === totalPages || Math.abs(p - page) <= 1) {
                         return (
-                          <button key={p} onClick={() => setPage(p)}
+                          <a key={p} href={getCatalogPageHref(p)} onClick={e => { e.preventDefault(); setPage(p); }}
+                            aria-current={page === p ? "page" : undefined}
                             className={`w-9 h-9 rounded-full text-sm font-bold transition-all ${
                               page === p ? "bg-[#0070b8] text-white" : "border border-slate-200 text-slate-600 hover:border-[#0070b8]"
                             }`}
-                          >{p}</button>
+                          >{p}</a>
                         );
                       }
                       if (Math.abs(p - page) === 2) return <span key={p} className="text-slate-300">…</span>;
