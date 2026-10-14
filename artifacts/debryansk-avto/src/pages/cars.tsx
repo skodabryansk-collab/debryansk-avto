@@ -606,6 +606,8 @@ export default function UsedCars() {
       },
     })),
   } : undefined;
+  const hasFilterQuery = [...new URLSearchParams(window.location.search).keys()]
+    .some((key) => !/^(utm_.+|gclid|yclid|fbclid|_gl)$/i.test(key));
 
   return (
     <Layout>
@@ -613,6 +615,7 @@ export default function UsedCars() {
         title="Автомобили с пробегом в Брянске"
         description={`Купить авто с пробегом в Брянске. Выгодные цены, проверенные автомобили, кредит, трейд-ин. Дебрянск Авто — ${brandsCount} брендов.`}
         canonical="/cars"
+        robots={hasFilterQuery ? "noindex, follow" : undefined}
         jsonLd={itemListJsonLd}
         breadcrumbs={[
           { name: "Главная", url: "/" },
