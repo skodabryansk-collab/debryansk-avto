@@ -17,6 +17,7 @@
 - [GitHub auto-sync policy](github-auto-sync-policy.md) — ALWAYS sync to GitHub after completing any task that modifies files. User expects this to happen automatically without being asked.
 - [Auto.ru Dealer API](autoru-api.md) — catalog proxy: host apiauto.ru, auth header x-authorization (no Bearer/Vertis prefix), brands+models via /1.0/search/cars/breadcrumbs.
 - [Calltouch REST API](calltouch-api.md) — правильный endpoint: calls-service/RestAPI/{siteId}/calls-diary/calls (не call-service/v1 и не calls-service/v1).
+- [Yandex Metrika CSP endpoint](yandex-metrika-csp.md) — Metrika loads a secondary script from mc.yandex.com; allow it alongside mc.yandex.ru in script-src.
 - [Phone normalization](phone-normalization.md) — normalizePhone/phoneHref util at src/lib/normalizePhone.ts. Digit[1]='9' → mobile 3-digit code (+7 (9XX) XXX-XX-XX), else landline 4-digit (+7 (XXXX) XX-XX-XX).
 - [Навигатор AI chat](navigator-ai-chat.md) — JSON mode, gpt-5-mini, car catalog injected into prompt (50 used+60 new), returns {reply,car_ids[],action}. home.tsx is standalone (no Layout) — ChatWidget added directly. Empty reply fallback included.
 - [Navigator DB & sync](navigator-db-sync.md) — cars table populated via syncCars() on startup+every 30min; owners_number parsed from Russian text ("Один владелец"→1); modification field included in catalog lines for KPP/drive context. Discount columns (max_discount, credit_discount, tradein_discount) added; ChatCarItem has minPrice (min per brand+model for new) and discount fields.
