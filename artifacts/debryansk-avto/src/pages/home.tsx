@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription,
 } from "@/components/ui/form";
 
 import logoPng from "@/assets/logo-optimized.webp";
@@ -276,6 +276,7 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-title"
+          aria-describedby="modal-description"
           className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
           initial={{ y: 80, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -291,12 +292,12 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
           </div>
 
           <div className="p-6 sm:p-8">
-            <button onClick={onClose} aria-label="Закрыть"
-              className="absolute top-5 right-5 w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+            <button type="button" onClick={onClose} aria-label="Закрыть окно заявки"
+              className="absolute top-5 right-5 w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] transition-colors">
               <X className="w-4 h-4 text-slate-500" />
             </button>
             <h2 id="modal-title" className="text-2xl font-extrabold mb-1">{cfg.title}</h2>
-            <p className="text-slate-500 text-sm mb-6">{cfg.subtitle}</p>
+            <p id="modal-description" className="text-slate-500 text-sm mb-6">{cfg.subtitle}</p>
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -304,9 +305,10 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
                   <FormItem>
                     <FormLabel className="text-slate-600 font-semibold">Имя</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ваше имя" {...field}
-                        className="bg-slate-50 border-slate-200 rounded-xl h-12 focus-visible:ring-[#0070b8]" />
+                        <Input placeholder="Ваше имя" {...field} autoComplete="name"
+                          className="bg-slate-50 border-slate-200 rounded-xl h-12 focus-visible:ring-[#0070b8]" />
                     </FormControl>
+                      <FormDescription className="sr-only">Укажите имя для обращения</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -314,11 +316,12 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
                   <FormItem>
                     <FormLabel className="text-slate-600 font-semibold">Телефон</FormLabel>
                     <FormControl>
-                      <Input placeholder="+7 (___) ___-__-__" {...field}
+                        <Input placeholder="+7 (___) ___-__-__" {...field} autoComplete="tel"
                         type="tel" inputMode="tel" maxLength={18}
                         onChange={e => field.onChange(formatPhone(e.target.value))}
                         className="bg-slate-50 border-slate-200 rounded-xl h-12 focus-visible:ring-[#0070b8]" />
                     </FormControl>
+                    <FormDescription className="sr-only">Введите номер телефона для обратного звонка</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -330,6 +333,7 @@ function Modal({ type, onClose }: { type: ModalType; onClose: () => void }) {
                         <Textarea placeholder={cfg.placeholder} {...field}
                           className="bg-slate-50 border-slate-200 rounded-xl min-h-[80px] focus-visible:ring-[#0070b8] resize-none" />
                       </FormControl>
+                      <FormDescription className="sr-only">Необязательный комментарий к заявке</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -902,6 +906,9 @@ export default function Home() {
           { name: "Главная", url: "/" },
         ]}
       />
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:font-bold focus:text-[#0070b8] focus:shadow-lg">
+        Перейти к основному содержимому
+      </a>
 
       {/* ── Modal ──────────────────────────────────────────── */}
       {modal && modal !== "tradein" && <Modal type={modal} onClose={closeModal} />}
@@ -1016,7 +1023,7 @@ export default function Home() {
             </Link>
           </div>
 
-          <button className="lg:hidden p-1.5 text-white/60 hover:text-white" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+          <button type="button" aria-label={mobileMenuOpen ? "Закрыть меню" : "Открыть меню"} aria-expanded={mobileMenuOpen} className="lg:hidden p-1.5 text-white/60 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
@@ -1026,7 +1033,7 @@ export default function Home() {
           {mobileMenuOpen && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
-              className="overflow-hidden border-t border-white/[0.07] bg-[#111317]">
+              id="home-mobile-menu" className="overflow-hidden border-t border-white/[0.07] bg-[#111317]">
               <div className="px-4 py-3 flex flex-col gap-0.5">
                 <Link href="/new-cars" onClick={() => setMobileMenuOpen(false)}
                   className="text-left text-base font-semibold py-3 border-b border-white/[0.07] text-white/60 hover:text-white transition-colors flex items-center gap-2">
@@ -1082,6 +1089,7 @@ export default function Home() {
         </AnimatePresence>
       </header>
 
+      <main id="main-content" tabIndex={-1} className="focus:outline-none">
       {/* ── Hero — full screen ─────────────────────────────── */}
       <section className="relative flex items-center justify-center overflow-hidden" style={{ minHeight: "100dvh" }}>
         {/* Background */}
@@ -1674,8 +1682,10 @@ export default function Home() {
                         <FormLabel className="text-slate-300 text-sm font-semibold">Имя</FormLabel>
                         <FormControl>
                           <Input placeholder="Ваше имя" {...field}
+                        autoComplete="name"
                             className="bg-white/10 border-white/15 text-white placeholder:text-slate-500 rounded-xl h-11 sm:h-12 focus-visible:ring-[#0070b8] focus-visible:ring-offset-0" />
                         </FormControl>
+                    <FormDescription className="sr-only">Укажите имя для обращения</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -1684,10 +1694,12 @@ export default function Home() {
                         <FormLabel className="text-slate-300 text-sm font-semibold">Телефон</FormLabel>
                         <FormControl>
                           <Input placeholder="+7 (___) ___-__-__" {...field}
+                          autoComplete="tel"
                             type="tel" inputMode="tel" maxLength={18}
                             onChange={e => field.onChange(formatPhone(e.target.value))}
                             className="bg-white/10 border-white/15 text-white placeholder:text-slate-500 rounded-xl h-11 sm:h-12 focus-visible:ring-[#0070b8] focus-visible:ring-offset-0" />
                         </FormControl>
+                      <FormDescription className="sr-only">Введите номер телефона для обратного звонка</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -1698,10 +1710,11 @@ export default function Home() {
                           <Textarea placeholder="Ваш вопрос или пожелание" {...field}
                             className="bg-white/10 border-white/15 text-white placeholder:text-slate-500 rounded-xl min-h-[80px] sm:min-h-[90px] focus-visible:ring-[#0070b8] focus-visible:ring-offset-0 resize-none" />
                         </FormControl>
+                      <FormDescription className="sr-only">Необязательное сообщение для менеджера</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <Button type="submit" size="lg" data-testid="btn-submit-contact"
+                    <Button type="submit" size="lg" aria-label="Отправить заявку: жду звонка" data-testid="btn-submit-contact"
                       className="w-full brand-gradient border-0 text-white font-bold rounded-xl text-base hover:opacity-90 shadow-md">
                       Жду звонка
                     </Button>
@@ -1762,12 +1775,17 @@ export default function Home() {
               <h2 className="text-2xl sm:text-3xl font-extrabold mb-2">Подпишитесь на рассылку</h2>
               <p className="text-slate-500 mb-6 text-sm sm:text-base">Узнавайте первыми об акциях, новинках и специальных предложениях</p>
               <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+                <label htmlFor="newsletter-email" className="sr-only">Ваш email для рассылки</label>
                 <input
+                  id="newsletter-email"
+                  name="email"
+                  autoComplete="email"
+                  spellCheck={false}
                   type="email"
                   placeholder="Ваш email"
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#0070b8]/50 transition-colors"
                 />
-                <Button className="brand-gradient border-0 text-white font-bold rounded-xl px-6 hover:opacity-90 shrink-0">
+                <Button type="button" aria-label="Подписаться на email-рассылку" className="brand-gradient border-0 text-white font-bold rounded-xl px-6 hover:opacity-90 shrink-0">
                   Подписаться
                 </Button>
               </div>
@@ -1779,6 +1797,8 @@ export default function Home() {
         </div>
       </section>
 
+      <FaqBlock pageSlug="main" />
+      </main>
       {/* ── Footer ─────────────────────────────────────────── */}
       <footer className="bg-[#0d0f14] text-slate-400 pt-12 sm:pt-14 pb-8 border-t border-white/[0.07]">
         <div className="container mx-auto px-4 sm:px-6">
@@ -1845,7 +1865,6 @@ export default function Home() {
 
       <ChatWidget onOpenCallback={() => setModal("callback")} />
 
-      <FaqBlock pageSlug="main" />
     </div>
   );
 }
