@@ -1272,6 +1272,15 @@ export default function Home() {
               );
             })}
           </div>
+          <div className="mt-7 flex justify-center">
+            <Link
+              href="/brands"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-[#0070b8] transition-colors hover:border-[#0070b8] hover:bg-blue-50"
+            >
+              Все бренды и сервисные центры
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
         </div>
       </section>
 
