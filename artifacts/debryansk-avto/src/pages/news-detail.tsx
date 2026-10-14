@@ -34,6 +34,17 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
 }
 
+function getArticleDescription(article: NewsArticle): string {
+  const plainContent = (article.content ?? "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return (article.excerpt?.trim() || plainContent || `Новость «${article.title}» от Дебрянск Авто.`).slice(0, 155);
+}
+
 /** Returns the effective images array for an article — prefers images[], falls back to image */
 function getImages(article: NewsArticle): string[] {
   if (article.images && article.images.length > 0) return article.images;
@@ -448,7 +459,7 @@ export default function NewsDetailPage() {
     <Layout>
       <SEO
         title={article.title}
-        description={article.excerpt ?? ""}
+        description={getArticleDescription(article)}
         canonical={`/news/${article.slug}`}
         image={article.image ?? undefined}
         type="article"
