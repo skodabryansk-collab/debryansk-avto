@@ -1258,8 +1258,10 @@ export default function ChatWidget({
   const [showConsent, setShowConsent] = useState(false);
   const [promoVisible, setPromoVisible] = useState(false);
   const [mobileStickyVisible, setMobileStickyVisible] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [composerFocused, setComposerFocused] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const composerBlurTimerRef = useRef<number | null>(null);
   const base = useMemo(() => import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "", []);
   const { data: widgetBrands = [] } = useQuery<Array<{ id: number }>>({
     queryKey: ["public-brands"],
@@ -1271,9 +1273,11 @@ export default function ChatWidget({
   const pageCarContext = usePageCar();
   const proactiveSentRef = useRef(false);
   const [location] = useLocation();
-  const chatPanelBottom = mobileStickyVisible
-    ? "bottom-[104px]"
-    : (mobileBottomOffset ?? "bottom-[5.5rem]");
+  const chatPanelBottom = composerFocused
+    ? "bottom-2"
+    : mobileStickyVisible
+      ? "bottom-[104px]"
+      : (mobileBottomOffset ?? "bottom-[5.5rem]");
   const chatButtonBottom = mobileStickyVisible
     ? "bottom-[104px]"
     : (mobileBottomOffset ?? "bottom-4");
@@ -1324,14 +1328,17 @@ export default function ChatWidget({
   });
 
   const scrollToBottom = useCallback(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = messagesContainerRef.current;
+    if (container) container.scrollTop = container.scrollHeight;
   }, []);
 
   useEffect(() => {
     if (open) {
       setUnread(0);
       if (!consented) setShowConsent(true);
-      setTimeout(() => { if (consented) inputRef.current?.focus(); }, 300);
+      if (consented && !window.matchMedia("(pointer: coarse)").matches) {
+        setTimeout(() => inputRef.current?.focus(), 300);
+      }
       setTimeout(scrollToBottom, 100);
     }
   }, [open, consented, scrollToBottom]);
@@ -1487,7 +1494,47 @@ export default function ChatWidget({
     setConsented(true);
     setConsentedAt(ts);
     setShowConsent(false);
-    setTimeout(() => inputRef.current?.focus(), 200);
+    if (!window.matchMedia("(pointer: coarse)").matches) {
+      setTimeout(() => inputRef.current?.focus(), 200);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open || !window.matchMedia("(pointer: coarse)").matches) return;
+
+    const scrollY = window.scrollY;
+    const body = document.body;
+    const previous = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+
+    return () => {
+      body.style.position = previous.position;
+      body.style.top = previous.top;
+      body.style.left = previous.left;
+      body.style.right = previous.right;
+      body.style.width = previous.width;
+      body.style.overflow = previous.overflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+
+  useEffect(() => () => {
+    if (composerBlurTimerRef.current !== null) {
+      window.clearTimeout(composerBlurTimerRef.current);
+    }
   }, []);
 
   const handleDecline = useCallback(() => {
@@ -1717,6 +1764,7 @@ export default function ChatWidget({
                 </div>
                 <button
                   onClick={() => setOpen(false)}
+                  aria-label="Свернуть чат"
                   className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors shrink-0"
                 >
                   <ChevronDown className="w-4 h-4 text-slate-500" />
@@ -1735,7 +1783,7 @@ export default function ChatWidget({
             ) : (
               <>
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3 min-h-0"
+                <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3 min-h-0"
                   style={{ background: "#fafbfd" }}
                 >
                   {messages.map(msg => (
@@ -1861,7 +1909,6 @@ export default function ChatWidget({
                     </div>
                   )}
 
-                  <div ref={bottomRef} />
                 </div>
 
                 {/* Quick action chips */}
@@ -1889,6 +1936,19 @@ export default function ChatWidget({
                       placeholder="Написать сообщение..."
                       disabled={loading}
                       maxLength={500}
+                      onFocus={() => {
+                        if (composerBlurTimerRef.current !== null) {
+                          window.clearTimeout(composerBlurTimerRef.current);
+                          composerBlurTimerRef.current = null;
+                        }
+                        setComposerFocused(true);
+                      }}
+                      onBlur={() => {
+                        composerBlurTimerRef.current = window.setTimeout(() => {
+                          setComposerFocused(false);
+                          composerBlurTimerRef.current = null;
+                        }, 250);
+                      }}
                       className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 outline-none focus:border-[#0070b8]/50 focus:ring-2 focus:ring-[#0070b8]/10 placeholder:text-slate-400 disabled:opacity-60 transition-all"
                     />
                     <motion.button
@@ -1908,7 +1968,8 @@ export default function ChatWidget({
         )}
       </AnimatePresence>
 
-      {/* Floating button with pulse rings */}
+      {/* Floating button is only shown while the chat is closed */}
+      {!open && (
       <div className={`fixed ${chatButtonBottom} lg:bottom-4 right-4 z-[55] flex flex-col items-end gap-2`}>
         {/* Proactive context bubble */}
         <AnimatePresence>
@@ -1958,11 +2019,11 @@ export default function ChatWidget({
           )}
 
           <motion.button
-            onClick={() => setOpen(o => !o)}
+            onClick={() => setOpen(true)}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="relative flex items-center gap-2.5 text-white font-bold text-sm px-4 py-3 rounded-2xl shadow-xl transition-colors"
-            style={{ background: open ? "#005fa0" : "linear-gradient(135deg, #0070b8 0%, #005a96 100%)" }}
+            style={{ background: "linear-gradient(135deg, #0070b8 0%, #005a96 100%)" }}
             aria-label="Открыть чат Навигатор"
           >
             <Compass className="w-5 h-5 shrink-0" />
@@ -1978,6 +2039,7 @@ export default function ChatWidget({
           </motion.button>
         </div>
       </div>
+      )}
     </>
   );
 }
