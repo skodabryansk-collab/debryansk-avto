@@ -1089,7 +1089,7 @@ export default function Home() {
         </AnimatePresence>
       </header>
 
-      <main id="main-content" tabIndex={-1} className="focus:outline-none">
+      <main id="main-content" tabIndex={-1} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] focus-visible:ring-offset-2">
       {/* ── Hero — full screen ─────────────────────────────── */}
       <section className="relative flex items-center justify-center overflow-hidden" style={{ minHeight: "100dvh" }}>
         {/* Background */}
