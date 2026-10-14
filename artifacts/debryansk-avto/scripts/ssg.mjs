@@ -13,6 +13,177 @@ const distDir = process.env["FRONTEND_DIST_PATH"]
 
 const SITE = "https://debryansk-auto.ru";
 const DEFAULT_OG_IMAGE = `${SITE}/opengraph.jpg`;
+const AI_FALLBACK_FAQS = [
+  {
+    question: "Какие услуги предлагает Дебрянск Авто?",
+    answer:
+      "Дебрянск Авто продаёт новые автомобили, предлагает автомобили с пробегом, сервисное обслуживание, выкуп и комиссионную продажу автомобилей в Брянске.",
+    url: `${SITE}/`,
+  },
+  {
+    question: "Какие бренды автомобилей представлены в Дебрянск Авто?",
+    answer:
+      "В Дебрянск Авто представлены Haval City, Haval Pro, JAECOO, JETOUR, Jeland, OMODA, SOUEAST, Tenet и Tenet Plus. Сервисное обслуживание доступно для Exeed, Mercedes-Benz, SKODA и Volkswagen.",
+    url: `${SITE}/brands`,
+  },
+  {
+    question: "Где находятся дилерские центры Дебрянск Авто?",
+    answer:
+      "Дилерские центры находятся в Брянске на ул. Литейной, 3/2, ул. Советской, 77 и пр. Московскому, 2Г, а также в селе Супонево на ул. Шоссейной, 12Г.",
+    url: `${SITE}/contacts`,
+  },
+  {
+    question: "Как записаться на сервисное обслуживание?",
+    answer:
+      "Записаться на техническое обслуживание можно на странице сервиса Дебрянск Авто. Выберите сервисный центр, дату и удобное время, после чего мастер подтвердит запись по телефону.",
+    url: `${SITE}/service`,
+  },
+  {
+    question: "Можно ли купить автомобиль в кредит или обменять его по trade-in?",
+    answer:
+      "Да, Дебрянск Авто помогает оформить кредит на новый автомобиль и принимает автомобили по программе trade-in. Точные условия зависят от выбранной модели и действующих программ.",
+    url: `${SITE}/new-cars`,
+  },
+  {
+    question: "Как продать автомобиль через Дебрянск Авто?",
+    answer:
+      "На странице выкупа можно оставить данные автомобиля для предварительной оценки. Дебрянск Авто также принимает автомобили на комиссионную продажу; окончательная цена определяется после осмотра.",
+    url: `${SITE}/buyout`,
+  },
+  {
+    question: "Как связаться с Дебрянск Авто?",
+    answer:
+      "Главный телефон Дебрянск Авто: +7 (4832) 77-77-70. Адреса и телефоны дилерских центров опубликованы на странице контактов.",
+    url: `${SITE}/contacts`,
+  },
+];
+
+const AI_SUMMARY = {
+  name: "Дебрянск Авто",
+  description:
+    "Официальный сайт группы автомобильных дилерских центров «Дебрянск Авто» в Брянске и Брянской области. Продажа новых автомобилей и автомобилей с пробегом, сервисное обслуживание, выкуп и trade-in.",
+  url: `${SITE}/`,
+  type: "AutomotiveDealerGroup",
+  areaServed: "Брянск и Брянская область, Россия",
+  founded: "2011",
+  telephone: "+7 (4832) 77-77-70",
+  services: [
+    "Продажа новых автомобилей",
+    "Продажа автомобилей с пробегом",
+    "Сервисное обслуживание и ремонт",
+    "Выкуп и комиссионная продажа автомобилей",
+    "Кредитование и trade-in",
+  ],
+  brands: [
+    "Haval City",
+    "Haval Pro",
+    "JAECOO",
+    "JETOUR",
+    "Jeland",
+    "OMODA",
+    "SOUEAST",
+    "Tenet",
+    "Tenet Plus",
+    "Exeed",
+    "Mercedes-Benz",
+    "SKODA",
+    "Volkswagen",
+  ],
+  links: {
+    contacts: `${SITE}/contacts`,
+    newCars: `${SITE}/new-cars`,
+    usedCars: `${SITE}/cars`,
+    service: `${SITE}/service`,
+    buyout: `${SITE}/buyout`,
+    brands: `${SITE}/brands`,
+  },
+};
+
+const AI_SERVICE = {
+  name: "Дебрянск Авто — сервисы и возможности",
+  description:
+    "Структурированное описание услуг официального автомобильного дилера Дебрянск Авто в Брянске.",
+  url: `${SITE}/service`,
+  provider: "Дебрянск Авто",
+  areaServed: "Брянск и Брянская область, Россия",
+  services: [
+    {
+      name: "Новые автомобили",
+      description:
+        "Каталог новых автомобилей официальных брендов с актуальными комплектациями и ценами.",
+      url: `${SITE}/new-cars`,
+    },
+    {
+      name: "Автомобили с пробегом",
+      description:
+        "Каталог проверенных автомобилей с пробегом, доступных в дилерских центрах Дебрянск Авто.",
+      url: `${SITE}/cars`,
+    },
+    {
+      name: "Сервисное обслуживание",
+      description:
+        "Техническое обслуживание, ремонт, гарантийные работы и оригинальные запчасти.",
+      url: `${SITE}/service`,
+    },
+    {
+      name: "Выкуп и комиссионная продажа",
+      description:
+        "Предварительная оценка, выкуп и комиссионная продажа автомобилей.",
+      url: `${SITE}/buyout`,
+    },
+    {
+      name: "Кредитование и trade-in",
+      description:
+        "Помощь с подбором финансовой программы и зачётом автомобиля клиента при покупке.",
+      url: `${SITE}/new-cars`,
+    },
+  ],
+  contact: {
+    telephone: "+7 (4832) 77-77-70",
+    url: `${SITE}/contacts`,
+  },
+};
+
+function writeAiJsonFiles(faqs = AI_FALLBACK_FAQS) {
+  const aiDir = join(distDir, "ai");
+  const wellKnownDir = join(distDir, ".well-known");
+  mkdirSync(aiDir, { recursive: true });
+  mkdirSync(wellKnownDir, { recursive: true });
+  const freshness = new Date().toISOString();
+  const faqPayload = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    name: "Частые вопросы о Дебрянск Авто",
+    url: `${SITE}/ai/faq.json`,
+    description:
+      "Структурированные ответы на частые вопросы о покупке автомобилей, сервисе, выкупе и дилерских центрах Дебрянск Авто.",
+    lastUpdated: freshness,
+    faqs,
+    mainEntity: faqs.map((faq) => ({
+      "@type": "Question",
+      name: faq.question,
+      acceptedAnswer: { "@type": "Answer", text: faq.answer },
+    })),
+  };
+  writeFileSync(join(aiDir, "summary.json"), `${JSON.stringify({ ...AI_SUMMARY, lastUpdated: freshness }, null, 2)}\n`, "utf8");
+  writeFileSync(join(aiDir, "service.json"), `${JSON.stringify({ ...AI_SERVICE, lastUpdated: freshness }, null, 2)}\n`, "utf8");
+  writeFileSync(join(aiDir, "faq.json"), `${JSON.stringify(faqPayload, null, 2)}\n`, "utf8");
+  writeFileSync(
+    join(wellKnownDir, "ai.txt"),
+    [
+      "# AI resources for Дебрянск Авто",
+      "",
+      `Summary: ${SITE}/ai/summary.json`,
+      `FAQ: ${SITE}/ai/faq.json`,
+      `Services: ${SITE}/ai/service.json`,
+      `Entity profile: ${SITE}/llms.txt`,
+      `Sitemap: ${SITE}/sitemap.xml`,
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  console.log("SSG: AI discovery resources");
+}
 
 const STATIC_ROUTES = {
   "/service/bonus": {
@@ -272,7 +443,7 @@ function buildNewsGridHtml(articles) {
       <article class="bg-white rounded-2xl border border-slate-100 overflow-hidden">
         <a href="/news/${slug}">
           <div class="h-40 overflow-hidden">
-            <img src="${img}" alt="${title}" class="w-full h-full object-cover" loading="lazy" decoding="async" />
+            <img src="${img}" alt="${title}" width="800" height="416" class="w-full h-full object-cover" loading="lazy" decoding="async" />
           </div>
         </a>
         <div class="p-4">
@@ -507,6 +678,10 @@ function segmentName(seg) {
 }
 
 async function main() {
+  // Always publish a valid fallback first. If the database is temporarily
+  // unavailable, the static build still contains crawlable AI resources.
+  writeAiJsonFiles();
+
   if (!process.env.DATABASE_URL) {
     console.warn("SSG: DATABASE_URL not set — skipping dynamic routes");
     for (const [route, meta] of Object.entries(STATIC_ROUTES)) {
@@ -528,6 +703,14 @@ async function main() {
       if (!faqsByPage[slug]) faqsByPage[slug] = [];
       faqsByPage[slug].push(row);
     }
+    const aiFaqs = ["main", "service", "buyout"].flatMap((slug) =>
+      (faqsByPage[slug] || []).map((row) => ({
+        question: row.question,
+        answer: row.answer,
+        url: `${SITE}/${slug === "main" ? "" : slug}`,
+      })),
+    );
+    writeAiJsonFiles(aiFaqs.length > 0 ? aiFaqs : AI_FALLBACK_FAQS);
 
     // Map static route paths to faqs page_slug keys
     const staticRouteSlugMap = {
