@@ -17,6 +17,7 @@ import type {
 
 import type {
   AiImageModelCatalogue,
+  GetCarImageThumbnailParams,
   HealthStatus
 } from './api.schemas';
 
@@ -29,6 +30,90 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+export const getGetCarImageThumbnailUrl = (params: GetCarImageThumbnailParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/cars/image-thumbnail?${stringifiedParams}` : `/api/cars/image-thumbnail`
+}
+
+/**
+ * @summary Serve a resized WebP thumbnail for a stock car image
+ */
+export const getCarImageThumbnail = async (params: GetCarImageThumbnailParams, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetCarImageThumbnailUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCarImageThumbnailQueryKey = (params?: GetCarImageThumbnailParams,) => {
+    return [
+    `/api/cars/image-thumbnail`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetCarImageThumbnailQueryOptions = <TData = Awaited<ReturnType<typeof getCarImageThumbnail>>, TError = ErrorType<void>>(params: GetCarImageThumbnailParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCarImageThumbnail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCarImageThumbnailQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCarImageThumbnail>>> = ({ signal }) => getCarImageThumbnail(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCarImageThumbnail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCarImageThumbnailQueryResult = NonNullable<Awaited<ReturnType<typeof getCarImageThumbnail>>>
+export type GetCarImageThumbnailQueryError = ErrorType<void>
+
+
+/**
+ * @summary Serve a resized WebP thumbnail for a stock car image
+ */
+
+export function useGetCarImageThumbnail<TData = Awaited<ReturnType<typeof getCarImageThumbnail>>, TError = ErrorType<void>>(
+ params: GetCarImageThumbnailParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCarImageThumbnail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCarImageThumbnailQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 
 
