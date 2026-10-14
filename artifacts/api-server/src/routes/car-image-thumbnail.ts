@@ -9,6 +9,7 @@ const MAX_CACHE_BYTES = 24 * 1024 * 1024;
 const MAX_SOURCE_BYTES = 12 * 1024 * 1024;
 const MAX_SOURCE_PATH = /^\/get-cme-media\/\d+\/[a-f0-9-]{16,64}\/optimize$/i;
 const MAX_CONCURRENT_RESIZES = 2;
+const MAX_QUEUED_RESIZES = 16;
 let cachedBytes = 0;
 let activeResizes = 0;
 const resizeQueue: Array<() => void> = [];
@@ -114,6 +115,10 @@ router.get("/cars/image-thumbnail", async (req, res): Promise<void> => {
   } else {
     let pending = inFlight.get(key);
     if (!pending) {
+      if (activeResizes >= MAX_CONCURRENT_RESIZES && resizeQueue.length >= MAX_QUEUED_RESIZES) {
+        res.setHeader("Retry-After", "2").status(503).json({ error: "Thumbnail service is busy" });
+        return;
+      }
       pending = withResizeSlot(() => createThumbnail(key));
       inFlight.set(key, pending);
     }
