@@ -20,6 +20,7 @@ import Layout from "@/components/Layout";
 import CatalogFilterPanel, { BODY_TYPE_NAMES, TRANSMISSIONS, DRIVES, FUEL_TYPES, type FilterSection } from "@/components/CatalogFilterPanel";
 import { SortPopover } from "@/components/SortPopover";
 import { ActiveFilters, type ActiveFilterChip } from "@/components/ActiveFilters";
+import { getCatalogPageFromUrl, getCatalogPageHref } from "@/lib/catalogPagination";
 
 interface NewCarRecord {
   id: string;
@@ -475,7 +476,7 @@ export default function NewCars() {
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
   const [sortBy, setSortBy] = useState<"price_asc" | "price_desc" | "year_desc" | "popular">("popular");
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(getCatalogPageFromUrl);
   const [testDriveCar, setTestDriveCar] = useState<NewCarRecord | null>(null);
   const [creditCar, setCreditCar] = useState<NewCarRecord | null>(null);
   const [showTradeIn, setShowTradeIn] = useState(false);
@@ -531,6 +532,9 @@ export default function NewCars() {
 
   const totalPages = Math.ceil(displayList.length / PAGE_SIZE);
   const paginated = displayList.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useEffect(() => {
+    if (totalPages > 0 && page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   function go(fn: () => void) { fn(); setPage(1); }
 
@@ -882,11 +886,12 @@ export default function NewCars() {
                       const p = i + 1;
                       if (p === 1 || p === totalPages || Math.abs(p - page) <= 1) {
                         return (
-                          <button key={p} onClick={() => setPage(p)}
+                          <a key={p} href={getCatalogPageHref(p)} onClick={e => { e.preventDefault(); setPage(p); }}
+                            aria-current={page === p ? "page" : undefined}
                             className={`w-9 h-9 rounded-full text-sm font-bold transition-all ${
                               page === p ? "bg-[#0070b8] text-white" : "border border-slate-200 text-slate-600 hover:border-[#0070b8]"
                             }`}
-                          >{p}</button>
+                          >{p}</a>
                         );
                       }
                       if (p === 2 && page > 3) return <span key="el" className="text-slate-400 text-sm">…</span>;
