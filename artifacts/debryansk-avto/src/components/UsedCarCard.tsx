@@ -13,6 +13,18 @@ interface UsedCar {
 function fmtPrice(p: number) { return p.toLocaleString("ru-RU") + " ₽"; }
 function fmtRun(km: number) { return km < 1000 ? km + " км" : Math.round(km / 1000) + " тыс. км"; }
 
+export function getCarThumbnailUrl(source: string): string {
+  try {
+    const url = new URL(source);
+    if (url.hostname !== "avatars.avto.ru" || !/^\/get-cme-media\/\d+\/[a-f0-9-]{16,64}\/optimize$/i.test(url.pathname)) {
+      return source;
+    }
+    return `/api/cars/image-thumbnail?src=${encodeURIComponent(url.href)}`;
+  } catch {
+    return source;
+  }
+}
+
 const COLOR_MAP: Record<string, { bg: string; border?: string }> = {
   "Белый":      { bg: "#ffffff", border: "#d1d5db" },
   "Чёрный":     { bg: "#1a1a1a" },
@@ -72,7 +84,7 @@ export default function UsedCarCard({ car }: { car: UsedCar }) {
       <div className="relative h-40 bg-slate-100 overflow-hidden shrink-0">
         {car.images[0] ? (
           <img
-            src={car.images[0]}
+            src={getCarThumbnailUrl(car.images[0])}
             alt={`${car.mark} ${car.model}`}
             width={640}
             height={400}
