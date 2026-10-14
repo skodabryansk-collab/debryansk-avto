@@ -11,7 +11,6 @@
 - [Cross-domain reverse proxy](cross-domain-reverse-proxy.md) — при переносе домена на этот VPS upstream нужно задавать фиксированным origin IP с сохранением SNI/Host, иначе DNS создаст proxy-петлю.
 - [Vite proxy for API](vite-api-proxy.md) — Replit multi-artifact proxy chain: browser→port 8081 (Replit infra)→port 19052 (Vite)→proxy to port 8080 (API server). Port 8081 is NOT the main router.
 - [API route prefix pitfall](api-route-prefix.md) — app.use("/api", router) in app.ts: router paths must NOT include /api prefix (write "/send-email", not "/api/send-email"). Also: multer/busboy must be in esbuild externals list alongside nodemailer.
-- [Image optimization strategy](image-optimization.md) — WebP-first approach: all PNG/JPG converted to WebP (~95% size reduction), mobile variants created for hero, lazy loading + async decoding for all non-critical images, `<picture>` with srcset for responsive hero.
 - [SVG optimization](svg-optimization.md) — Manual SVG cleanup: remove unused namespaces, redundant attributes, use `<g>` with `fill` instead of per-path fills, short gradient IDs. Jetour/VW/Haval-official SVGs remain as-is since they have unique source-embedded features.
 - [GitHub API upload](github-api-upload.md) — sync changed files through GitHub proxy without raw tokens; trim CodeExecution shell filenames to remove trailing CRLF.
 - [GitHub auto-sync policy](github-auto-sync-policy.md) — ALWAYS sync to GitHub after completing any task that modifies files. User expects this to happen automatically without being asked.
