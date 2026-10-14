@@ -61,7 +61,7 @@
 - [SEO GAP Engine](seo-gap-engine.md) — полная архитектура SEO-центра: 8 шагов GAP, Karpathy Loop, формула приоритета, типы предложений, BRAND_KEYWORDS vs site-wide coverage, правила доработки.
 - [Prerender title sync from og:title](prerender-title-fix.md) — prerender.ts served cached HTML with wrong `<title>` (SPA default); fix: extract og:title from cached HTML and use it as `<title>` before res.send.
 - [News SEO & gallery](news-seo-and-gallery.md) — stale JS hash на VPS news pages, deploy fix (rm news/ before upload), og:image/type/NewsArticle fixes, mobile gallery HeroGallery on all screens.
-- [H1 injection for bots](seo-h1-injection.md) — SPA shell has no H1; inject via hidden <main> block in injectMeta(); regex /<h1 class="sr-only">/ never matched shell.
+- [H1 injection for bots](seo-h1-injection.md) — add fallback only when raw HTML lacks H1; remove stale injected blocks and let hydration discard fallback once a real heading renders.
 - [Workflow restart port ownership](workflow-restart-port-ownership.md) — a stale API process can survive restart and keep serving old code on port 8080; verify listener ownership before testing.
 - [VPS SSH transient refusal](vps-ssh-transient-refusal.md) — use a foreground ControlMaster; `ControlPersist` can detach it and leave a stale socket.
 - [Route health and safe prerender publication](route-health-integrity.md) — reconcile DB registry with every cache route; validate and atomically publish only crawl-safe snapshots.
