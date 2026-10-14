@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { motion, useReducedMotion } from "framer-motion";
 import { Calendar, ArrowRight, Clock, Newspaper } from "lucide-react";
 import SEO from "@/components/SEO";
+import { DEALER_ORGANIZATION_ID } from "@/lib/structured-data";
 import Layout from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
 
@@ -72,14 +73,18 @@ function ArticleCard({ article, index }: { article: NewsArticle; index: number }
 
           {/* Text content at bottom */}
           <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-7">
-            <div className="flex items-center gap-2 text-[11px] text-white/65 mb-2.5">
-              <Calendar className="w-3 h-3" />
-              <span>{article.publishedAt ? formatDate(article.publishedAt) : ""}</span>
-              <span className="w-0.5 h-0.5 rounded-full bg-white/40" />
-              <span>Редакция Дебрянск Авто</span>
-              <span className="w-0.5 h-0.5 rounded-full bg-white/40" />
-              <Clock className="w-3 h-3" />
-              <span>{article.readTime ?? 3} мин</span>
+            <div className="mb-2.5 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 text-[11px] text-white/65 sm:flex sm:flex-wrap sm:gap-2">
+              <span className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap">
+                <Calendar className="w-3 h-3 shrink-0" />
+                <span>{article.publishedAt ? formatDate(article.publishedAt) : ""}</span>
+              </span>
+              <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap sm:order-3">
+                <Clock className="w-3 h-3 shrink-0" />
+                <span>{article.readTime ?? 3} мин</span>
+              </span>
+              <span className="col-span-2 min-w-0 whitespace-nowrap sm:col-span-1 sm:order-2">
+                Редакция Дебрянск Авто
+              </span>
             </div>
             <h2 className="font-bold text-xl sm:text-2xl leading-snug text-white mb-2 group-hover:text-white/90 transition-colors">
               {article.title}
@@ -123,16 +128,22 @@ function ArticleCard({ article, index }: { article: NewsArticle; index: number }
         </div>
       </Link>
       <div className="p-4 sm:p-5">
-        <div className="flex items-center gap-2 text-[11px] text-slate-400 mb-2">
-          <span className="text-primary font-bold">{article.category ?? "Новости"}</span>
-          <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
-          <Calendar className="w-3 h-3" />
-          <span>{article.publishedAt ? formatDate(article.publishedAt) : ""}</span>
-          <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
-            <span>Редакция Дебрянск Авто</span>
-            <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
-          <Clock className="w-3 h-3" />
-          <span>{article.readTime ?? 3} мин</span>
+        <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 text-[11px] text-slate-400 sm:flex sm:flex-wrap sm:gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            <span className="text-primary font-bold">{article.category ?? "Новости"}</span>
+            <span aria-hidden="true" className="h-0.5 w-0.5 shrink-0 rounded-full bg-slate-300" />
+            <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+              <Calendar className="w-3 h-3" />
+              <span>{article.publishedAt ? formatDate(article.publishedAt) : ""}</span>
+            </span>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap sm:order-3">
+            <Clock className="w-3 h-3" />
+            <span>{article.readTime ?? 3} мин</span>
+          </span>
+          <span className="col-span-2 min-w-0 whitespace-nowrap sm:col-span-1 sm:order-2">
+            Редакция Дебрянск Авто
+          </span>
         </div>
         <Link href={`/news/${article.slug}`}>
           <h2 className="font-bold text-sm sm:text-base text-slate-900 leading-snug group-hover:text-primary transition-colors mb-2">
@@ -173,6 +184,7 @@ export default function NewsPage() {
       "description": "Актуальные новости автомобильного рынка Брянска",
       "publisher": {
         "@type": "Organization",
+        "@id": DEALER_ORGANIZATION_ID,
         "name": "Дебрянск Авто",
         "url": "https://debryansk-auto.ru",
       },
