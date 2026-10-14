@@ -649,6 +649,8 @@ export default function NewCars() {
       },
     })),
   } : undefined;
+  const hasFilterQuery = [...new URLSearchParams(window.location.search).keys()]
+    .some((key) => !/^(utm_.+|gclid|yclid|fbclid|_gl)$/i.test(key));
 
   return (
     <Layout>
@@ -656,6 +658,7 @@ export default function NewCars() {
         title="Новые автомобили в Брянске"
         description={`Новые автомобили ${brandsCount} брендов у официальных дилеров Брянска. Выгодное кредитование, специальные программы, гарантия производителя. Дебрянск Авто.`}
         canonical="/new-cars"
+        robots={hasFilterQuery ? "noindex, follow" : undefined}
         jsonLd={itemListJsonLd}
         breadcrumbs={[
           { name: "Главная", url: "/" },
