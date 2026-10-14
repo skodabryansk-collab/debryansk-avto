@@ -33,6 +33,8 @@ function FavoriteCard({ car, onRemove }: { car: ReturnType<typeof useCarStorage>
         </Link>
         <button
           onClick={onRemove}
+          type="button"
+          aria-label={`Убрать ${car.mark} ${car.model} из избранного`}
           className="absolute top-2 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-colors shadow-sm"
         >
           <Trash2 className="w-4 h-4" />
@@ -40,9 +42,9 @@ function FavoriteCard({ car, onRemove }: { car: ReturnType<typeof useCarStorage>
       </div>
       <div className="p-4">
         <Link href={car.type === "used" ? `/cars/${encodeURIComponent(car.id)}` : `/new-cars/${encodeURIComponent(car.id)}`}>
-          <h3 className="font-bold text-sm leading-tight mb-1 hover:text-[#0070b8] transition-colors cursor-pointer">
+          <h2 className="font-bold text-sm leading-tight mb-1 hover:text-[#0070b8] transition-colors cursor-pointer">
             {car.mark} {car.model}
-          </h3>
+          </h2>
         </Link>
         <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
           <span>{car.year}</span>
@@ -52,10 +54,8 @@ function FavoriteCard({ car, onRemove }: { car: ReturnType<typeof useCarStorage>
           <span>{car.color}</span>
         </div>
         <p className="text-xl font-extrabold text-slate-900 mb-3">{formatPrice(car.price)}</p>
-        <Link href={car.type === "used" ? `/cars/${encodeURIComponent(car.id)}` : `/new-cars/${encodeURIComponent(car.id)}`}>
-          <button className="w-full py-2.5 rounded-xl bg-[#0070b8] text-white font-bold text-sm hover:bg-[#005a9a] transition-colors">
-            Оставить заявку
-          </button>
+        <Link href={car.type === "used" ? `/cars/${encodeURIComponent(car.id)}` : `/new-cars/${encodeURIComponent(car.id)}`} className="block w-full py-2.5 rounded-xl bg-[#0070b8] text-center text-white font-bold text-sm hover:bg-[#005a9a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] transition-colors">
+          Оставить заявку
         </Link>
       </div>
     </motion.div>
@@ -79,6 +79,7 @@ export default function FavoritesPage() {
         ]}
       />
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-6">Избранные автомобили</h1>
         {favorites.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -88,7 +89,7 @@ export default function FavoritesPage() {
             <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
               <Heart className="w-8 h-8 text-slate-400" />
             </div>
-            <h1 className="text-xl font-extrabold text-slate-900 mb-2">Нет избранных автомобилей</h1>
+            <h2 className="text-xl font-extrabold text-slate-900 mb-2">Нет избранных автомобилей</h2>
             <p className="text-slate-500 text-sm mb-6">Добавляйте автомобили в избранное, чтобы вернуться к ним позже</p>
             <Link href="/cars">
               <span className="inline-flex items-center gap-2 bg-[#0070b8] text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-[#0058a0] transition-colors">
