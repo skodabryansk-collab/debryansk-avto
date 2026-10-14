@@ -36,7 +36,7 @@ import {
 import logoPng from "@/assets/logo-optimized.webp";
 import ChatWidget from "@/components/ChatWidget";
 import HomeCarousel from "@/components/HomeCarousel";
-import UsedCarCard from "@/components/UsedCarCard";
+import UsedCarCard, { getCarThumbnailUrl } from "@/components/UsedCarCard";
 import { ReviewsSection, fetchReviews } from "@/components/ReviewsSection";
 import FaqBlock from "@/components/FaqBlock";
 import logoWhiteSvg from "@/assets/logo-white.svg";
@@ -573,7 +573,7 @@ function SpecialOffersSection({ onOpenModal }: { onOpenModal: (type: ModalType) 
         onClick={() => window.location.href = `/new-cars/${encodeURIComponent(car.id)}`}>
         <div className="relative h-40 sm:h-44 overflow-hidden bg-slate-100 shrink-0">
           {img ? (
-            <img src={img} alt={`${car.mark} ${car.model}`} width={640} height={384} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
+            <img src={getCarThumbnailUrl(img)} alt={`${car.mark} ${car.model}`} width={640} height={384} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-slate-300">
               <Car className="w-12 h-12" />
