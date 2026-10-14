@@ -4,6 +4,7 @@ import { Link, useRoute } from "wouter";
 import { motion, useReducedMotion } from "framer-motion";
 import { ChevronRight, ChevronLeft, Calendar, Clock, Car, X, ZoomIn } from "lucide-react";
 import SEO from "@/components/SEO";
+import { DEALER_ORGANIZATION_ID } from "@/lib/structured-data";
 import Layout from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
 
@@ -27,6 +28,14 @@ async function fetchAllNews(): Promise<NewsArticle[]> {
   if (!r.ok) throw new Error("API error");
   const json = await r.json();
   return json.ok ? json.data : [];
+}
+
+async function fetchNewsArticle(slug: string): Promise<NewsArticle | null> {
+  const r = await fetch(`/api/news/${encodeURIComponent(slug)}`);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error("API error");
+  const json = await r.json();
+  return json.ok ? json.data : null;
 }
 
 function formatDate(dateStr: string) {
@@ -392,13 +401,19 @@ export default function NewsDetailPage() {
   const prefersReduced = useReducedMotion();
   const [lightboxIdx, setLightboxIdx] = React.useState<number | null>(null);
 
-  const { data: allNews = [], isLoading } = useQuery({
+  const { data: article, isLoading } = useQuery({
+    queryKey: ["public-news-detail", slug],
+    queryFn: () => fetchNewsArticle(slug),
+    enabled: Boolean(slug),
+    staleTime: 60 * 1000,
+  });
+
+  const { data: allNews = [] } = useQuery({
     queryKey: ["public-news"],
     queryFn: fetchAllNews,
     staleTime: 60 * 1000,
   });
 
-  const article = allNews.find(a => a.slug === slug);
   const related = article
     ? allNews.filter(a => a.id !== article.id && a.category === article.category).slice(0, 3)
     : [];
@@ -445,9 +460,10 @@ export default function NewsDetailPage() {
     "image": article.image,
     "datePublished": article.publishedAt,
     "dateModified": article.updatedAt || article.publishedAt,
-    "author": { "@type": "Organization", "name": "Дебрянск Авто" },
+    "author": { "@type": "Organization", "@id": DEALER_ORGANIZATION_ID },
     "publisher": {
       "@type": "Organization",
+      "@id": DEALER_ORGANIZATION_ID,
       "name": "Дебрянск Авто",
       "logo": { "@type": "ImageObject", "url": "https://debryansk-auto.ru/favicon.svg" }
     },
