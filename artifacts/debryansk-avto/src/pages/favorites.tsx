@@ -79,7 +79,7 @@ export default function FavoritesPage() {
         ]}
       />
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-6">Избранные автомобили</h1>
+        <h1 className="sr-only">Избранные автомобили</h1>
         {favorites.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
