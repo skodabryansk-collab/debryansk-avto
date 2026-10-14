@@ -53,6 +53,7 @@
 - [КП tool — manager quotes](kp-manager-quotes.md) — esbuild copies kp-template.html+logo-da.svg to dist/; manager JWT shares ADMIN_JWT_SECRET; admin also passes requireManager (isAdmin===true).
 - [Prerender car-sync stampede](prerender-car-sync-stampede.md) — car-sync updates=484 always true → spawn prerender every 30min → 484 Puppeteer×/api/cars/used → DB pool dead. Fix: spawn only on addedNewCarIds/addedUsedCarIds; deduplicate XML fetch in-flight.
 - [Admin panel VPS deploy](admin-panel-vps-deploy.md) — nginx serves /admin from /opt/debryansk/admin/ (static). Must build with BASE_PATH=/admin/ NODE_ENV=production, then scp dist/public/. to VPS. Dev server changes are NOT visible on production.
+- [VPS frontend hotfix deploy](vps-frontend-hotfix-deploy.md) — preserve VPS-only HTML, refresh entry JS/CSS references across pages, and restart PM2 to reload cached asset tags.
 - [OG image generator](og-image-generator.md) — Puppeteer 1200×630 PNG для /brands/:slug, /new-cars/:id, /cars/:id; 7-day disk cache /opt/debryansk/og-cache/; acquireChrome(1500) семафор; prerender middleware патчит og:image в кэшированном HTML через patchOgImage().
 - [GCS→local disk migration gap](gcs-to-local-migration.md) — фото без .webp в UUID = старый GCS файл, не на VPS диске. Скачивать через @replit/object-storage Client, SCP в /opt/debryansk/uploads/uploads/.
 - [Gemini image response format](gemini-image-response-format.md) — Gemini chat returns image in message.images, not content; do not generalize Gemini transport to GPT/FLUX/Runway.
