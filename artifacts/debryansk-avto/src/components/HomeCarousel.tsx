@@ -119,6 +119,8 @@ export default function HomeCarousel({
             <div className="flex gap-2">
               <button
                 onClick={prev}
+                type="button"
+                aria-label={`Предыдущие: ${title}`}
                 disabled={page === 0}
                 className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center hover:border-[#0070b8] hover:text-[#0070b8] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
@@ -126,6 +128,8 @@ export default function HomeCarousel({
               </button>
               <button
                 onClick={next}
+                type="button"
+                aria-label={`Следующие: ${title}`}
                 disabled={page >= pages - 1}
                 className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center hover:border-[#0070b8] hover:text-[#0070b8] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
