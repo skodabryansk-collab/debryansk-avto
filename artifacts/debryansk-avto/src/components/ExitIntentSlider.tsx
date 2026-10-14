@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { BadgePercent, X, Phone } from "lucide-react";
 import { formatPhone, isPhoneValid } from "@/hooks/usePhoneMask";
 import { ymGoal } from "@/lib/ym";
+import { ensureLeadSubmissionMetadata } from "../lib/leadSubmission";
 import { useLocation } from "wouter";
 import { useExitIntentContext } from "@/hooks/useExitIntentContext";
 
@@ -26,8 +27,13 @@ export function ExitIntentSlider({ open, onClose }: ExitIntentSliderProps) {
   useEffect(() => {
     if (!open) return;
     ymGoal("exit_intent_open");
-    const t = setTimeout(() => inputRef.current?.focus(), 350);
-    return () => clearTimeout(t);
+    const shouldAutoFocus = !window.matchMedia("(pointer: coarse)").matches;
+    const t = shouldAutoFocus
+      ? setTimeout(() => inputRef.current?.focus(), 350)
+      : undefined;
+    return () => {
+      if (t) clearTimeout(t);
+    };
   }, [open]);
 
   // Auto-close 3s after successful send
@@ -55,7 +61,7 @@ export function ExitIntentSlider({ open, onClose }: ExitIntentSliderProps) {
       fd.append("type", "exit_intent");
       fd.append("phone", phone);
       fd.append("page", location);
-      const res = await fetch(`${BASE}/api/send-email`, { method: "POST", body: fd });
+      const res = await fetch(`${BASE}/api/send-email`, { method: "POST", body: ensureLeadSubmissionMetadata(fd) });
       if (res.ok) {
         ymGoal("exit_intent_submit");
         setSent(true);
