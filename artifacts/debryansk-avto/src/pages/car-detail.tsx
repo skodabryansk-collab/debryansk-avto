@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { ymGoal } from "@/lib/ym";
 import { CTPhoneDesktop, CTPhoneMobile } from "@/components/CTPhone";
 import { sendWithRetry } from "@/lib/sendWithRetry";
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { useCarStorage } from "@/hooks/useCarStorage";
 import SEO from "@/components/SEO";
+import { DEALER_ORGANIZATION_ID } from "@/lib/structured-data";
 import CarOptionsBlock from "@/components/CarOptionsBlock";
 import { CreditModal } from "@/components/modals/CreditModal";
 import { TradeInModal } from "@/components/modals/TradeInModal";
@@ -576,10 +578,7 @@ export default function UsedCarDetail() {
       "availability": car.availability === "В наличии" ? "https://schema.org/InStock" : "https://schema.org/PreOrder",
       "itemCondition": "https://schema.org/UsedCondition",
       "seller": {
-        "@type": "AutoDealer",
-        "name": "Дебрянск Авто",
-        "url": "https://debryansk-auto.ru",
-        "address": { "@type": "PostalAddress", "addressLocality": "Брянск", "addressCountry": "RU" }
+        "@id": DEALER_ORGANIZATION_ID,
       }
     },
     ...(reviewStats && reviewStats.overallCount > 0 ? {
@@ -838,29 +837,32 @@ export default function UsedCarDetail() {
       </div>
 
       {/* Mobile sticky bottom bar */}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-40 flex items-center gap-2 border-t border-slate-200/80 bg-white/95 px-3 pt-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.10)] backdrop-blur-xl lg:hidden"
-        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0.75rem))" }}
-      >
-        <div className="flex-1 min-w-0">
-          <p className="truncate text-[10px] font-bold uppercase tracking-[0.06em] text-slate-400">{car.mark} {car.model}</p>
-          {car.maxDiscount > 0 ? (
-            <div className="flex min-w-0 items-baseline gap-1.5">
-              <p className="whitespace-nowrap text-[17px] font-extrabold leading-tight tracking-[-0.025em] text-[#0070b8]">от {formatPrice(car.price - car.maxDiscount)}</p>
-            </div>
-          ) : (
-            <p className="whitespace-nowrap text-[17px] font-extrabold leading-tight tracking-[-0.025em] text-slate-900">{formatPrice(car.price)}</p>
-          )}
-        </div>
-        <CTPhoneMobile className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:border-[#0070b8]/40 hover:text-[#0070b8]"
-          phone={locationPhone} />
-        <button
-          onClick={() => setShowLead(true)}
-          className="brand-gradient h-11 shrink-0 whitespace-nowrap rounded-xl px-3.5 text-[13px] font-extrabold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8]/40"
+      {typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed bottom-0 left-0 right-0 z-40 flex items-center gap-2 border-t border-slate-200/80 bg-white px-3 pt-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.10)] lg:hidden"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0.75rem))" }}
         >
-          Заявка
-        </button>
-      </div>
+          <div className="flex-1 min-w-0">
+            <p className="truncate text-[10px] font-bold uppercase tracking-[0.06em] text-slate-400">{car.mark} {car.model}</p>
+            {car.maxDiscount > 0 ? (
+              <div className="flex min-w-0 items-baseline gap-1.5">
+                <p className="whitespace-nowrap text-[17px] font-extrabold leading-tight tracking-[-0.025em] text-[#0070b8]">от {formatPrice(car.price - car.maxDiscount)}</p>
+              </div>
+            ) : (
+              <p className="whitespace-nowrap text-[17px] font-extrabold leading-tight tracking-[-0.025em] text-slate-900">{formatPrice(car.price)}</p>
+            )}
+          </div>
+          <CTPhoneMobile className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:border-[#0070b8]/40 hover:text-[#0070b8]"
+            phone={locationPhone} />
+          <button
+            onClick={() => setShowLead(true)}
+            className="brand-gradient h-11 shrink-0 whitespace-nowrap rounded-xl px-3.5 text-[13px] font-extrabold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8]/40"
+          >
+            Заявка
+          </button>
+        </div>,
+        document.body,
+      )}
 
       <AnimatePresence>
         {showLead && <LeadModal car={car} onClose={() => setShowLead(false)} />}
