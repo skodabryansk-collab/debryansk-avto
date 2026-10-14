@@ -72,6 +72,7 @@ export default function ComparePage() {
         ]}
       />
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-6">Сравнение автомобилей</h1>
         {compare.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -81,7 +82,7 @@ export default function ComparePage() {
             <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
               <Scale className="w-8 h-8 text-slate-400" />
             </div>
-            <h1 className="text-xl font-extrabold text-slate-900 mb-2">Нет автомобилей для сравнения</h1>
+            <h2 className="text-xl font-extrabold text-slate-900 mb-2">Нет автомобилей для сравнения</h2>
             <p className="text-slate-500 text-sm mb-6">Добавьте автомобили из каталога — до 3 штук</p>
             <Link href="/cars">
               <span className="inline-flex items-center gap-2 bg-[#0070b8] text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-[#0058a0] transition-colors">
@@ -126,7 +127,9 @@ export default function ComparePage() {
                         </div>
                       )}
                       <button
+                        type="button"
                         onClick={() => removeFromCompare(car.id)}
+                        aria-label={`Убрать ${car.mark} ${car.model} из сравнения`}
                         className="absolute top-2 right-2 w-8 h-8 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center transition-colors"
                       >
                         <X className="w-4 h-4 text-white" />
@@ -134,15 +137,13 @@ export default function ComparePage() {
                     </div>
                     <div className="p-4">
                       <Link href={car.type === "used" ? `/cars/${encodeURIComponent(car.id)}` : `/new-cars/${encodeURIComponent(car.id)}`}>
-                        <h3 className="font-bold text-base hover:text-[#0070b8] transition-colors">
+                        <h2 className="font-bold text-base hover:text-[#0070b8] transition-colors">
                           {car.mark} {car.model}
-                        </h3>
+                        </h2>
                       </Link>
                       <p className="text-xl font-extrabold text-[#0070b8] mt-1">{formatPrice(car.price)}</p>
-                      <Link href={car.type === "used" ? `/cars/${encodeURIComponent(car.id)}` : `/new-cars/${encodeURIComponent(car.id)}`}>
-                        <button className="w-full mt-3 py-2.5 rounded-xl bg-[#0070b8] text-white font-bold text-sm hover:bg-[#005a9a] transition-colors">
-                          Оставить заявку
-                        </button>
+                      <Link href={car.type === "used" ? `/cars/${encodeURIComponent(car.id)}` : `/new-cars/${encodeURIComponent(car.id)}`} className="block w-full mt-3 py-2.5 rounded-xl bg-[#0070b8] text-center text-white font-bold text-sm hover:bg-[#005a9a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] transition-colors">
+                        Оставить заявку
                       </Link>
 
                       {/* Params table */}
@@ -210,7 +211,9 @@ export default function ComparePage() {
                               </div>
                             )}
                             <button
+                              type="button"
                               onClick={() => removeFromCompare(car.id)}
+                              aria-label={`Убрать ${car.mark} ${car.model} из сравнения`}
                               className="absolute top-2 right-2 w-7 h-7 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center transition-colors"
                             >
                               <X className="w-3.5 h-3.5 text-white" />
@@ -218,15 +221,13 @@ export default function ComparePage() {
                           </div>
                           <div className="p-3">
                             <Link href={car.type === "used" ? `/cars/${encodeURIComponent(car.id)}` : `/new-cars/${encodeURIComponent(car.id)}`}>
-                              <h3 className="font-bold text-sm leading-tight hover:text-[#0070b8] transition-colors cursor-pointer">
+                              <h2 className="font-bold text-sm leading-tight hover:text-[#0070b8] transition-colors cursor-pointer">
                                 {car.mark} {car.model}
-                              </h3>
+                              </h2>
                             </Link>
                             <p className="text-lg font-extrabold text-[#0070b8] mt-1">{formatPrice(car.price)}</p>
-                            <Link href={car.type === "used" ? `/cars/${encodeURIComponent(car.id)}` : `/new-cars/${encodeURIComponent(car.id)}`}>
-                              <button className="w-full mt-2 py-2 rounded-xl bg-[#0070b8] text-white font-bold text-xs hover:bg-[#005a9a] transition-colors">
-                                Оставить заявку
-                              </button>
+                            <Link href={car.type === "used" ? `/cars/${encodeURIComponent(car.id)}` : `/new-cars/${encodeURIComponent(car.id)}`} className="block w-full mt-2 py-2 rounded-xl bg-[#0070b8] text-center text-white font-bold text-xs hover:bg-[#005a9a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0070b8] transition-colors">
+                              Оставить заявку
                             </Link>
                           </div>
                         </div>
