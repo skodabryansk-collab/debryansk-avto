@@ -10,8 +10,10 @@ import { registerSitemapRoute } from "./routes/sitemap";
 import { prerenderMiddleware } from "./middleware/prerender";
 import { seoMetaMiddleware } from "./middleware/seoMeta";
 import { LLMS_TEXT } from "./lib/llms";
+import { registerAiRoutes } from "./routes/ai";
 
 const app: Express = express();
+app.disable("x-powered-by");
 
 // Redirect www to canonical non-www domain, preserving path and query string.
 // Runs first so every subsequent middleware and the SPA fallback see the
@@ -52,7 +54,21 @@ app.use((_req, res, next) => {
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader(
     "Content-Security-Policy",
-    "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; connect-src 'self' https: wss://mc.yandex.ru wss://*.yandex.ru; img-src 'self' data: https: http:; frame-ancestors 'self';"
+    [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'self'",
+      "form-action 'self'",
+      "script-src 'self' 'sha256-nQKN0dGS1qJ7QPnoWgFic7YygByYTQYyyz8o7FwTooY=' 'sha256-uR3FizX7z6+vU2R8m98HnYu9uV/I41xtWaYxXgIPTIo=' https://api-maps.yandex.ru https://mc.yandex.ru https://mod.calltouch.ru https://*.yandex.ru https://*.yastatic.net https://*.calltouch.ru",
+      "style-src 'self' 'unsafe-inline' https://api-maps.yandex.ru https://*.yastatic.net",
+      "img-src 'self' data: blob: https: http:",
+      "font-src 'self' data: https:",
+      "connect-src 'self' https: wss:",
+      "frame-src 'self' https:",
+      "worker-src 'self' blob: https://*.yandex.ru https://*.yastatic.net",
+      "media-src 'self' blob: https:",
+    ].join("; ")
   );
   res.setHeader(
     "Permissions-Policy",
@@ -95,6 +111,7 @@ app.get("/sitemaps.xml", (_req, res) => {
 });
 
 registerSitemapRoute(app);
+registerAiRoutes(app);
 
 // AI search systems need a small, crawlable entity profile. Register it before
 // the frontend middleware so it can never fall through to the React SPA shell.
@@ -103,6 +120,20 @@ app.get("/llms.txt", (_req, res) => {
     .setHeader("Content-Type", "text/plain; charset=utf-8")
     .setHeader("Cache-Control", "public, max-age=3600")
     .send(LLMS_TEXT);
+});
+
+app.get("/.well-known/security.txt", (_req, res) => {
+  res
+    .status(200)
+    .type("text/plain")
+    .setHeader("Cache-Control", "public, max-age=3600")
+    .send([
+      "Contact: mailto:info@debryansk-auto.ru",
+      "Expires: 2027-10-14T00:00:00Z",
+      "Preferred-Languages: ru, en",
+      "Canonical: https://debryansk-auto.ru/.well-known/security.txt",
+      "",
+    ].join("\n"));
 });
 
 app.use("/api", router);
