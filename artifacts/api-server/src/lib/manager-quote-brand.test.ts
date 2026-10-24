@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { filterManagerQuoteCarsByBrand, managerQuoteBrandMatches } from "./manager-quote-brand";
+import {
+  filterManagerQuoteCarsByBrand,
+  getManagerQuoteLocationOverride,
+  managerQuoteBrandMatches,
+} from "./manager-quote-brand";
 
 const mixedCars = [
   { externalId: "gw-1", brand: "Great Wall", model: "Poer" },
@@ -27,4 +31,14 @@ test("brand matching is case-insensitive but never substring-based", () => {
   assert.equal(managerQuoteBrandMatches("great wall", "Great Wall"), true);
   assert.equal(managerQuoteBrandMatches("Haval City", "Haval"), false);
   assert.equal(managerQuoteBrandMatches("Great Wall", "Haval City"), false);
+});
+
+test("Tenet Plus quotes use the Sovietskaya dealership location", () => {
+  assert.equal(getManagerQuoteLocationOverride("new", "Tenet Plus"), "Советская");
+  assert.equal(getManagerQuoteLocationOverride("new", " tenet plus "), "Советская");
+  assert.equal(getManagerQuoteLocationOverride("new", "Tenet"), null);
+});
+
+test("used-car quotes keep using Супонево", () => {
+  assert.equal(getManagerQuoteLocationOverride("used", "Tenet Plus"), "Супонево");
 });
