@@ -6,6 +6,15 @@ export function managerQuoteBrandMatches(actualBrand: string | null | undefined,
   return normalizeManagerQuoteBrand(actualBrand ?? "") === normalizeManagerQuoteBrand(requestedBrand);
 }
 
+export function getManagerQuoteLocationOverride(
+  carType: string | null | undefined,
+  brand: string | null | undefined,
+): string | null {
+  if (carType === "used") return "Супонево";
+  if (managerQuoteBrandMatches(brand, "Tenet Plus")) return "Советская";
+  return null;
+}
+
 export function filterManagerQuoteCarsByBrand<T extends { brand: string | null | undefined }>(
   cars: readonly T[],
   requestedBrand: string,
