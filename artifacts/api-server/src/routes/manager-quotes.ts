@@ -16,7 +16,7 @@ import fs from "fs";
 import path from "path";
 import { acquireChrome, isPrerendererRunning } from "../lib/chrome-semaphore";
 import { cmBusinessGet } from "../lib/cm-expert-client";
-import { normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
+import { getManagerQuoteLocationOverride, normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
 import { verifiedQuoteExtras } from "../lib/quote-car-extras";
 import {
   getCmStockIntegrations, isCmOptionsOnlyDealer,
@@ -836,6 +836,43 @@ async function getOrCreateAdminManager(): Promise<number> {
   return inserted[0]!.id;
 }
 
+async function getQuoteDealerLocation(
+  carType: string | null | undefined,
+  brand: string | null | undefined,
+): Promise<{ title: string; address: string; phone: string | null; hours: string | null } | null> {
+  const selectedLocation = {
+    title: locationsTable.title,
+    address: locationsTable.address,
+    phone: locationsTable.phone,
+    hours: locationsTable.hours,
+  };
+  const locationOverride = getManagerQuoteLocationOverride(carType, brand);
+
+  if (locationOverride) {
+    const rows = await db.select(selectedLocation)
+      .from(locationsTable)
+      .where(eq(locationsTable.title, locationOverride))
+      .limit(1);
+    if (rows[0]) return rows[0];
+    // Never substitute another dealership for a brand with an explicit location.
+    if (normalizeManagerQuoteBrand(brand ?? "") === "tenet plus") return null;
+  } else if (brand) {
+    const rows = await db.select(selectedLocation)
+      .from(locationsTable)
+      .innerJoin(locationBrandsTable, eq(locationBrandsTable.locationId, locationsTable.id))
+      .innerJoin(brandsTable, eq(brandsTable.id, locationBrandsTable.brandId))
+      .where(ilike(brandsTable.carMark, brand))
+      .limit(1);
+    if (rows[0]) return rows[0];
+  }
+
+  const fallback = await db.select(selectedLocation)
+    .from(locationsTable)
+    .orderBy(locationsTable.sortOrder)
+    .limit(1);
+  return fallback[0] ?? null;
+}
+
 async function regenerateStoredQuotePdf(quote: typeof quotesTable.$inferSelect): Promise<string> {
   const carRows = await db.select().from(carsTable).where(eq(carsTable.externalId, quote.carId)).limit(1);
   const car = await enrichQuoteCar(carRows[0] ?? null);
@@ -849,32 +886,7 @@ async function regenerateStoredQuotePdf(quote: typeof quotesTable.$inferSelect):
 
   const carBrand = car?.brand ?? String(snap["brand"] ?? "");
   const carType = quote.carType;
-  let loc: { title: string; address: string; phone: string | null; hours: string | null } | null = null;
-  if (carType === "used") {
-    const rows = await db.select({
-      title: locationsTable.title, address: locationsTable.address,
-      phone: locationsTable.phone, hours: locationsTable.hours,
-    }).from(locationsTable).where(eq(locationsTable.title, "Супонево")).limit(1);
-    loc = rows[0] ?? null;
-  } else if (carBrand) {
-    const rows = await db.select({
-      title: locationsTable.title, address: locationsTable.address,
-      phone: locationsTable.phone, hours: locationsTable.hours,
-    })
-      .from(locationsTable)
-      .innerJoin(locationBrandsTable, eq(locationBrandsTable.locationId, locationsTable.id))
-      .innerJoin(brandsTable, eq(brandsTable.id, locationBrandsTable.brandId))
-      .where(ilike(brandsTable.carMark, carBrand))
-      .limit(1);
-    loc = rows[0] ?? null;
-  }
-  if (!loc) {
-    const rows = await db.select({
-      title: locationsTable.title, address: locationsTable.address,
-      phone: locationsTable.phone, hours: locationsTable.hours,
-    }).from(locationsTable).orderBy(locationsTable.sortOrder).limit(1);
-    loc = rows[0] ?? null;
-  }
+  const loc = await getQuoteDealerLocation(carType, carBrand);
 
   const brandDisplayName = carBrand ? await resolveBrandName(carBrand) : (carBrand || null);
   const quoteBrand = carBrand;
@@ -1130,39 +1142,7 @@ router.post("/quotes", async (req, res) => {
       .join("")
       .toUpperCase();
 
-    // Find location: used cars → Супонево; new cars → by brand, fallback to first
-    let loc: { title: string; address: string; phone: string | null; hours: string | null } | null = null;
-    if (car.type === "used") {
-      const usedLocRows = await db.select({
-        title: locationsTable.title,
-        address: locationsTable.address,
-        phone: locationsTable.phone,
-        hours: locationsTable.hours,
-      }).from(locationsTable).where(eq(locationsTable.title, "Супонево")).limit(1);
-      loc = usedLocRows[0] ?? null;
-    } else if (car.brand) {
-      const brandLocRows = await db.select({
-        title: locationsTable.title,
-        address: locationsTable.address,
-        phone: locationsTable.phone,
-        hours: locationsTable.hours,
-      })
-        .from(locationsTable)
-        .innerJoin(locationBrandsTable, eq(locationBrandsTable.locationId, locationsTable.id))
-        .innerJoin(brandsTable, eq(brandsTable.id, locationBrandsTable.brandId))
-        .where(ilike(brandsTable.carMark, car.brand))
-        .limit(1);
-      loc = brandLocRows[0] ?? null;
-    }
-    if (!loc) {
-      const fallback = await db.select({
-        title: locationsTable.title,
-        address: locationsTable.address,
-        phone: locationsTable.phone,
-        hours: locationsTable.hours,
-      }).from(locationsTable).orderBy(locationsTable.sortOrder).limit(1);
-      loc = fallback[0] ?? null;
-    }
+    const loc = await getQuoteDealerLocation(car.type, car.brand);
 
     const brandDisplayName = car.brand ? await resolveBrandName(car.brand) : (car.brand ?? null);
     const quoteBrand = car.brand ?? "";
@@ -1336,31 +1316,7 @@ router.put("/quotes/:id", async (req, res) => {
 
     const carBrand = car?.brand ?? String(snap["brand"] ?? "");
     const carType = quote.carType;
-    let loc: { title: string; address: string; phone: string | null; hours: string | null } | null = null;
-    if (carType === "used") {
-      const usedLocRows = await db.select({
-        title: locationsTable.title, address: locationsTable.address,
-        phone: locationsTable.phone, hours: locationsTable.hours,
-      }).from(locationsTable).where(eq(locationsTable.title, "Супонево")).limit(1);
-      loc = usedLocRows[0] ?? null;
-    } else if (carBrand) {
-      const brandLocRows = await db.select({
-        title: locationsTable.title, address: locationsTable.address,
-        phone: locationsTable.phone, hours: locationsTable.hours,
-      })
-        .from(locationsTable)
-        .innerJoin(locationBrandsTable, eq(locationBrandsTable.locationId, locationsTable.id))
-        .innerJoin(brandsTable, eq(brandsTable.id, locationBrandsTable.brandId))
-        .where(ilike(brandsTable.carMark, carBrand)).limit(1);
-      loc = brandLocRows[0] ?? null;
-    }
-    if (!loc) {
-      const fallback = await db.select({
-        title: locationsTable.title, address: locationsTable.address,
-        phone: locationsTable.phone, hours: locationsTable.hours,
-      }).from(locationsTable).orderBy(locationsTable.sortOrder).limit(1);
-      loc = fallback[0] ?? null;
-    }
+    const loc = await getQuoteDealerLocation(carType, carBrand);
 
     const brandDisplayName = carBrand ? await resolveBrandName(carBrand) : (carBrand || null);
     const quoteBrand = carBrand;
