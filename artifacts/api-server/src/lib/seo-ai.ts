@@ -511,6 +511,51 @@ export async function aiMetaDescription(
   return { desc, generatedBy: "ai" };
 }
 
+/**
+ * Create a materially new meta hypothesis after a previous one failed.
+ * The prompt deliberately excludes dynamic numbers so the retry cannot invent
+ * prices, discounts, rates, stock counts, or other unsupported claims.
+ */
+export async function aiMetaRetryHypothesis(input: {
+  brandName: string;
+  currentTitle: string;
+  currentDesc: string;
+  failedTitle: string;
+  failedDesc: string;
+  failureContext: string;
+  searchIntent: string;
+  attempt: number;
+  knownCandidates: string[];
+}): Promise<{ title: string; desc: string } | null> {
+  const prompt =
+    `Создай НОВУЮ SEO-гипотезу для страницы сайта официального дилера «Дебрянск Авто» в Брянске. ` +
+    `Продвигаемая тема: ${input.brandName}.\n` +
+    `Текущие опубликованные мета-теги:\nTITLE: ${input.currentTitle}\nDESCRIPTION: ${input.currentDesc || "(пусто)"}\n` +
+    `Неудачная гипотеза:\nTITLE: ${input.failedTitle}\nDESCRIPTION: ${input.failedDesc}\n` +
+    `Почему она не сработала: ${input.failureContext}\n` +
+    `Целевой интент: ${input.searchIntent || "покупка автомобиля / официальный дилер"}.\n` +
+    `Уже использованные варианты (не повторять):\n${input.knownCandidates.join("\n") || "(нет)"}\n` +
+    `Предложи другой содержательный подход, а не перефразирование: измени фокус title и/или description ` +
+    `на иной аспект интента, ценность официального дилера, гарантию/сервис или понятный следующий шаг.\n` +
+    `Не используй цены, скидки, проценты, количество автомобилей, названия моделей и другие неподтверждённые факты. ` +
+    `Не добавляй числовые данные. Не повторяй формулировки неудачной гипотезы.\n` +
+    `Попытка генерации №${input.attempt}: выбери новый аспект интента, отличный от предыдущей попытки. ` +
+    `TITLE — до 65 символов, DESCRIPTION — до 160 символов. Верни JSON: {"title":"...","desc":"..."}.`;
+
+  const { content, hallucinated } = await callSeoAiValidated(prompt, true, 500);
+  if (!content || hallucinated) return null;
+
+  try {
+    const parsed = JSON.parse(content) as { title?: unknown; desc?: unknown };
+    if (typeof parsed.title !== "string" || typeof parsed.desc !== "string") return null;
+    const result = { title: parsed.title.trim(), desc: parsed.desc.trim() };
+    if (!result.title || !result.desc || result.title.length > 65 || result.desc.length > 160) return null;
+    return result;
+  } catch {
+    return null;
+  }
+}
+
 /* ── Batch cluster → 2–3 diverse FAQ pairs ───────────────────────────── */
 /**
  * Takes a cluster of similar search queries and generates 2–3 DISTINCT FAQ
