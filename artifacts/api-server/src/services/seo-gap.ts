@@ -12,7 +12,14 @@ import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { loadPrerendered } from "../lib/prerenderStorage";
 import { inspectSnapshot, requiresPrerenderSnapshot } from "../lib/routeHealth";
-import { aiClusterToFaqs, AI_HALLUCINATION_SIGNAL } from "../lib/seo-ai";
+import { aiClusterToFaqs, aiMetaRetryHypothesis, AI_HALLUCINATION_SIGNAL } from "../lib/seo-ai";
+import {
+  isMeaningfullyDifferentMeta,
+  isMetaPairUnique,
+  isValidMetaPair,
+  parseMetaPair,
+  serializeMetaPair,
+} from "./seo-meta-retry";
 import { webmasterGet } from "./yandex-oauth";
 import { getSitemapLocs } from "../routes/sitemap";
 import {
@@ -376,8 +383,8 @@ async function buildMetaProposal(
     const ud = usedData.rows[0] as { cnt: number; min_price: number | null } | undefined;
     const cnt = ud?.cnt ?? 0;
     const pricePart = ud?.min_price && ud.min_price > 0 ? ` от ${formatPrice(ud.min_price)} ₽` : "";
-    const currentTitle = "Авто с пробегом в Брянске | Дебрянск Авто";
-    const currentDesc = "";
+    const currentTitle = "Автомобили с пробегом в Брянске — Дебрянск Авто";
+    const currentDesc = "Автомобили с пробегом в Брянске: актуальные предложения, характеристики и цены. Подберите автомобиль в каталоге Дебрянск Авто.";
     // Try to extract body type from topQuery for a more specific title
     const USED_BODY_TYPES: [string, string][] = [
       ["кроссовер", "Кроссоверы с пробегом"],
@@ -412,8 +419,8 @@ async function buildMetaProposal(
     const cnt = nd?.cnt ?? 0;
     const pricePart = nd?.min_price && nd.min_price > 0 ? ` от ${formatPrice(nd.min_price)} ₽` : "";
     const topBrands = ((nd?.brands ?? []) as string[]).slice(0, 4).join(", ");
-    const currentTitle = "Новые автомобили в Брянске | Дебрянск Авто";
-    const currentDesc = "";
+    const currentTitle = "Новые автомобили в Брянске — Дебрянск Авто";
+    const currentDesc = "Каталог новых автомобилей у официальных дилеров Брянска. Модели, комплектации, цены и условия покупки — на сайте Дебрянск Авто.";
     // Try to extract body type from topQuery for a more specific title
     const NEW_BODY_TYPES: [string, string][] = [
       ["кроссовер", "Новые кроссоверы"],
@@ -763,6 +770,25 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
       );
     }
 
+    // After negative feedback, only the retry generator may propose META for
+    // that page. The ordinary deterministic templates otherwise recreate the
+    // exact failed text before the retry logic gets a chance to run.
+    const failedMetaRows = await db.execute(sql`
+      SELECT page_url
+      FROM (
+        SELECT DISTINCT ON (page_url) page_url, evaluation_result
+        FROM seo_suggestions
+        WHERE type = 'meta'
+          AND status = 'applied'
+          AND evaluated_at IS NOT NULL
+        ORDER BY page_url, evaluated_at DESC
+      ) latest
+      WHERE evaluation_result IN ('fell', 'falsified')
+    `);
+    const negativeMetaRetryPages = new Set(
+      (failedMetaRows.rows as { page_url: string }[]).map(row => row.page_url),
+    );
+
     // 0. Load Петля Карпаты feedback
     //    • fell / falsified → 0.5× priority discount
     //    • improved         → 1.2× priority boost (positive reinforcement)
@@ -960,6 +986,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
       const pageUrl = `/brands/${brandSlug}`;
       const key = `meta:${pageUrl}`;
       if (seen.has(key)) continue;
+      if (negativeMetaRetryPages.has(pageUrl)) continue;
 
       // Find best matching Webmaster query for this brand
       let wmRow: WmRow | undefined;
@@ -1047,6 +1074,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
       for (const gp of genericMetaPages) {
         const key = `meta:${gp.url}`;
         if (seen.has(key)) continue;
+        if (negativeMetaRetryPages.has(gp.url)) continue;
 
         // Find best matching Webmaster query for this generic page
         let bestWmRow: WmRow | undefined;
@@ -1461,8 +1489,8 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
     // row for the same page/type to coexist with them.
     {
       const failedRows = await db.execute(sql`
-        SELECT failed.id, failed.type, failed.page_url, failed.proposed_value,
-               failed.reasoning, failed.priority_score, failed.evaluation_result
+        SELECT failed.id, failed.type, failed.page_url, failed.current_value, failed.proposed_value,
+               failed.reasoning, failed.evaluation_note, failed.priority_score, failed.evaluation_result
         FROM seo_suggestions failed
         WHERE failed.status = 'applied'
           AND failed.evaluation_result IN ('fell', 'falsified')
@@ -1473,6 +1501,14 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
               AND active.page_url = failed.page_url
               AND active.status = 'pending'
           )
+          AND NOT EXISTS (
+            SELECT 1 FROM seo_suggestions newer
+            WHERE newer.type = failed.type
+              AND newer.page_url = failed.page_url
+              AND newer.status = 'applied'
+              AND newer.evaluated_at IS NOT NULL
+              AND newer.evaluated_at > failed.evaluated_at
+          )
         ORDER BY failed.evaluated_at ASC
         LIMIT 50
       `);
@@ -1481,14 +1517,36 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
         id: number;
         type: string;
         page_url: string;
+        current_value: string;
         proposed_value: string;
         reasoning: string | null;
+        evaluation_note: string | null;
         priority_score: number;
         evaluation_result: "fell" | "falsified";
       }[]) {
-        let proposedValue = failed.proposed_value;
-        let retryReason = `Предыдущая гипотеза (КП №${failed.id}) получила результат «${failed.evaluation_result}». ` +
-          `Сформировать новую гипотезу и проверить её отдельно.`;
+        // Do not manufacture "new" retries by copying the rejected hypothesis.
+        // Only types with a real, validated regeneration path may create a retry.
+        if (failed.type !== "meta" && failed.type !== "content") {
+          logger.info(
+            { previousId: failed.id, type: failed.type, pageUrl: failed.page_url },
+            "[seo-gap] Retry skipped: no validated regeneration strategy for this type",
+          );
+          continue;
+        }
+
+        const historyRows = await db.execute(sql`
+          SELECT current_value, proposed_value
+          FROM seo_suggestions
+          WHERE type = ${failed.type} AND page_url = ${failed.page_url}
+          ORDER BY created_at DESC
+          LIMIT 30
+        `);
+        const knownValues = (historyRows.rows as { current_value: string | null; proposed_value: string | null }[])
+          .flatMap(row => [row.current_value ?? "", row.proposed_value ?? ""])
+          .filter(Boolean);
+        let proposedValue = "";
+        let currentValue = failed.proposed_value;
+        let retryReason = `Предыдущая гипотеза (КП №${failed.id}) получила результат «${failed.evaluation_result}». `;
 
         // Content suggestions are applied as FAQ JSON or model-query lines.
         // Ask the same validated AI path for a genuinely different FAQ set.
@@ -1508,15 +1566,99 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
             if (freshFaqs !== AI_HALLUCINATION_SIGNAL && freshFaqs !== "[]") {
               proposedValue = freshFaqs;
               retryReason += " AI подготовил новый набор FAQ с учётом неудачи предыдущей гипотезы.";
-            } else {
-              const modelText = models.length > 0 ? models.join(", ") : brandName;
-              proposedValue = JSON.stringify([{
-                question: `Как выбрать автомобиль ${brandName} для поездок по Брянску?`,
-                answer: `На странице ${brandName} представлены модели ${modelText}. Сравните их комплектации и запишитесь на консультацию у официального дилера в Брянске.`,
-              }]);
-              retryReason += " Создан резервный FAQ-вариант с новым пользовательским интентом.";
             }
           }
+        } else if (failed.type === "meta") {
+          const currentMetaFallback = parseMetaPair(failed.current_value);
+          const failedMeta = parseMetaPair(failed.proposed_value);
+          const intent = failed.reasoning?.match(/[«"]([^»"]+)[»"]/u)?.[1] ?? "";
+          const proposal = await buildMetaProposal(failed.page_url, intent, 20);
+          if (!proposal) {
+            logger.warn({ previousId: failed.id, pageUrl: failed.page_url }, "[seo-gap] Meta retry skipped: page facts unavailable");
+            continue;
+          }
+
+          const currentMeta = {
+            title: proposal.currentTitle || currentMetaFallback.title,
+            desc: proposal.currentDesc || currentMetaFallback.desc,
+          };
+          // Generic collection pages may have live overrides that differ from
+          // the static templates returned by buildMetaProposal().
+          if (failed.page_url === "/cars" || failed.page_url === "/new-cars") {
+            const overrideRows = await db.execute(sql`
+              SELECT meta_title, meta_description
+              FROM page_seo_overrides
+              WHERE route = ${failed.page_url}
+              LIMIT 1
+            `);
+            const override = overrideRows.rows[0] as { meta_title?: string | null; meta_description?: string | null } | undefined;
+            if (override?.meta_title) currentMeta.title = override.meta_title;
+            if (override?.meta_description) currentMeta.desc = override.meta_description;
+          }
+
+          const brandSlug = failed.page_url.startsWith("/brands/")
+            ? failed.page_url.slice("/brands/".length)
+            : "";
+          const brandRows = brandSlug
+            ? await db.execute(sql`SELECT name FROM brands WHERE slug = ${brandSlug} LIMIT 1`)
+            : null;
+          const brandName = (brandRows?.rows[0] as { name?: string } | undefined)?.name
+            ?? (failed.page_url === "/cars" ? "автомобили с пробегом" : "новые автомобили");
+          const failureContext = [failed.evaluation_note, failed.reasoning].filter(Boolean).join(" ");
+          const candidates = knownValues.slice(0, 12);
+          let candidateFound = false;
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            const candidate = await aiMetaRetryHypothesis({
+              brandName,
+              currentTitle: currentMeta.title,
+              currentDesc: currentMeta.desc,
+              failedTitle: failedMeta.title,
+              failedDesc: failedMeta.desc,
+              failureContext,
+              searchIntent: intent,
+              attempt,
+              knownCandidates: candidates,
+            });
+            if (
+              candidate
+              && isValidMetaPair(candidate)
+              && isMeaningfullyDifferentMeta(candidate, failedMeta)
+              && isMeaningfullyDifferentMeta(candidate, currentMeta)
+              && isMetaPairUnique(candidate, knownValues)
+            ) {
+              proposedValue = serializeMetaPair(candidate);
+              currentValue = serializeMetaPair(currentMeta);
+              candidateFound = true;
+              retryReason += " Подготовлен новый вариант с другим содержательным фокусом; он отличается от опубликованных и ранее предложенных мета-тегов.";
+              break;
+            }
+          }
+          if (!candidateFound) {
+            logger.warn(
+              { previousId: failed.id, pageUrl: failed.page_url },
+              "[seo-gap] Meta retry skipped: no valid, materially distinct candidate",
+            );
+            continue;
+          }
+        }
+
+        // A cache hit or template fallback must not turn into another duplicate
+        // content hypothesis under a new database id.
+        if (failed.type === "content") {
+          const normalizeContent = (value: string) => value.toLocaleLowerCase("ru-RU")
+            .replace(/ё/g, "е")
+            .replace(/[^\p{L}\p{N}]+/gu, " ")
+            .trim()
+            .replace(/\s+/g, " ");
+          const normalized = normalizeContent(proposedValue);
+          if (!normalized || knownValues.some(value => normalizeContent(value) === normalized)) {
+            logger.warn(
+              { previousId: failed.id, pageUrl: failed.page_url },
+              "[seo-gap] Content retry skipped: generated proposal duplicates existing history",
+            );
+            continue;
+          }
+          retryReason += " Проверена уникальность относительно предыдущих вариантов.";
         }
 
         const retryRes = await db.execute(sql`
@@ -1524,7 +1666,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
             (type, page_url, current_value, proposed_value, reasoning,
              priority_score, demand, position_factor, ease, status)
           VALUES
-            (${failed.type}, ${failed.page_url}, ${failed.proposed_value},
+            (${failed.type}, ${failed.page_url}, ${currentValue},
              ${proposedValue}, ${retryReason},
              ${Math.max(1, Number(failed.priority_score) || 1) * KARPATHY_NEGATIVE_DISCOUNT},
              0, 0, ${EASE[failed.type] ?? 0.5}, 'pending')
@@ -1931,6 +2073,7 @@ export async function runGapAnalysis(triggeredBy: "manual" | "auto" = "manual"):
     for (const [anchorUrl, queries] of anchorPageQueries) {
       const metaKey = `meta:${anchorUrl}`;
       if (seen.has(metaKey)) continue; // already covered by a standard step
+      if (negativeMetaRetryPages.has(anchorUrl)) continue;
 
       const primaryQuery = queries[0];
       const proposal = await buildMetaProposal(anchorUrl, primaryQuery, 20);
