@@ -1,7 +1,16 @@
 import { Router, type IRouter } from "express";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { db, brandsTable, brandPageContentTable } from "@workspace/db";
 import { asc, eq, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import {
+  brandIdsSignature,
+  parsePublicBrandsCache,
+  sanitizeCachedBrandData,
+  type BrandFeedState,
+  type PublicBrandsCacheSnapshot,
+} from "../lib/public-brands-cache";
 import {
   getCmBusinessFeedState,
   getCmBusinessPublicIdSet,
@@ -14,18 +23,17 @@ import { getUsedCars } from "./cars";
 const router: IRouter = Router();
 
 const BRANDS_CACHE_TTL_MS = 5 * 60 * 1000;
-let _brandsCache: {
-  data: unknown[];
-  ts: number;
-  tenetPlusComplete: boolean;
-  tenetPlusIds: string;
-  jelandComplete: boolean;
-  jelandIds: string;
-} | null = null;
-
-function tenetIdsSignature(ids: Set<string>): string {
-  return [...ids].sort().join("\u0000");
-}
+const BRANDS_CACHE_FILE = process.env["PUBLIC_BRANDS_CACHE_FILE"]
+  || path.join(
+    process.env["LOCAL_PRERENDER_CACHE_DIR"] || path.join(process.cwd(), "prerender-cache"),
+    "_internal",
+    "public-brands-cache.json",
+  );
+const DB_BOOTSTRAP_TIMEOUT_MS = 4_000;
+let _brandsCache: PublicBrandsCacheSnapshot | null = null;
+let brandsCacheLoadPromise: Promise<void> | null = null;
+let brandsBootstrapPromise: Promise<PublicBrandsCacheSnapshot> | null = null;
+let brandsRefreshPromise: Promise<void> | null = null;
 
 async function countPublicTenetPlusDbRows(publicIds: Set<string>): Promise<number> {
   if (publicIds.size === 0) return 0;
@@ -69,126 +77,231 @@ async function countPublicJelandDbRows(publicIds: Set<string>): Promise<number> 
     .filter(id => publicIds.has(id))).size;
 }
 
+function currentBrandFeedState(): BrandFeedState {
+  const tenetPlusComplete = getTenetPlusFeedState().complete;
+  const jelandComplete = getCmBusinessFeedState("Jeland").complete;
+  return {
+    tenetPlus: {
+      complete: tenetPlusComplete,
+      ids: tenetPlusComplete ? getTenetPlusPublicIdSet() : new Set<string>(),
+    },
+    jeland: {
+      complete: jelandComplete,
+      ids: jelandComplete ? getCmBusinessPublicIdSet("Jeland") : new Set<string>(),
+    },
+  };
+}
+
+async function loadPersistedBrandsCache(): Promise<void> {
+  if (!brandsCacheLoadPromise) {
+    brandsCacheLoadPromise = (async () => {
+      try {
+        const parsed = parsePublicBrandsCache(JSON.parse(await readFile(BRANDS_CACHE_FILE, "utf8")));
+        if (parsed) {
+          _brandsCache = parsed;
+          logger.info({ cacheAgeMs: Date.now() - parsed.ts }, "public-brands: loaded persistent cache");
+        } else {
+          logger.warn("public-brands: persistent cache has an invalid shape");
+        }
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+          logger.warn({ err }, "public-brands: failed to load persistent cache");
+        }
+      }
+    })();
+  }
+  await brandsCacheLoadPromise;
+}
+
+async function persistBrandsCache(snapshot: PublicBrandsCacheSnapshot): Promise<void> {
+  const tempPath = `${BRANDS_CACHE_FILE}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    await mkdir(path.dirname(BRANDS_CACHE_FILE), { recursive: true });
+    await writeFile(tempPath, `${JSON.stringify(snapshot)}\n`, "utf8");
+    await rename(tempPath, BRANDS_CACHE_FILE);
+  } catch (err) {
+    logger.warn({ err }, "public-brands: failed to persist cache");
+  }
+}
+
+function makeSnapshot(
+  data: unknown[],
+  feedState: BrandFeedState = currentBrandFeedState(),
+): PublicBrandsCacheSnapshot {
+  return {
+    data: data as PublicBrandsCacheSnapshot["data"],
+    ts: Date.now(),
+    tenetPlusComplete: feedState.tenetPlus.complete,
+    tenetPlusIds: brandIdsSignature(feedState.tenetPlus.ids),
+    jelandComplete: feedState.jeland.complete,
+    jelandIds: brandIdsSignature(feedState.jeland.ids),
+  };
+}
+
+function safeBrandsFromCache(snapshot: PublicBrandsCacheSnapshot): unknown[] {
+  return sanitizeCachedBrandData(snapshot, currentBrandFeedState());
+}
+
+async function loadDbCarCounts(): Promise<{ newCounts: Record<string, number>; usedCount: number }> {
+  const rows = await db.execute(sql`
+    SELECT LOWER(dealer) AS dealer_key, type, COUNT(*)::int AS cnt
+    FROM cars
+    WHERE type <> 'new'
+       OR LOWER(BTRIM(dealer)) IS DISTINCT FROM 'tenet plus'
+       AND LOWER(BTRIM(dealer)) IS DISTINCT FROM 'jeland'
+    GROUP BY LOWER(dealer), type
+  `);
+  const newCounts: Record<string, number> = {};
+  let usedCount = 0;
+  for (const row of rows.rows as { dealer_key: string; type: string; cnt: number }[]) {
+    if (row.type === "used") {
+      usedCount += Number(row.cnt);
+    } else {
+      newCounts[row.dealer_key] = (newCounts[row.dealer_key] ?? 0) + Number(row.cnt);
+    }
+  }
+  return { newCounts, usedCount };
+}
+
+function mapBrandCounts<T extends { name: string; isServiceOnly: boolean | null }>(
+  rows: T[],
+  newCounts: Record<string, number>,
+  usedCount: number,
+): Array<T & { carCount: number }> {
+  return rows.map(brand => {
+    if (brand.isServiceOnly) return { ...brand, carCount: 0 };
+    if (brand.name.toLowerCase().includes("пробег")) return { ...brand, carCount: usedCount };
+    return { ...brand, carCount: newCounts[brand.name.toLowerCase()] ?? 0 };
+  });
+}
+
+async function buildDbFallbackCache(): Promise<PublicBrandsCacheSnapshot> {
+  const [rows, counts] = await Promise.all([
+    db.select().from(brandsTable).orderBy(asc(brandsTable.isServiceOnly), asc(brandsTable.name)),
+    loadDbCarCounts(),
+  ]);
+  if (!rows.length) throw new Error("brands table is empty");
+
+  // TENET Plus and Jeland stay hidden until a complete live feed confirms their inventory.
+  counts.newCounts["tenet plus"] = 0;
+  counts.newCounts["jeland"] = 0;
+  const snapshot = makeSnapshot(mapBrandCounts(rows, counts.newCounts, counts.usedCount), {
+    tenetPlus: { complete: false, ids: new Set() },
+    jeland: { complete: false, ids: new Set() },
+  });
+  return snapshot;
+}
+
+async function buildFeedCache(): Promise<PublicBrandsCacheSnapshot> {
+  const [rows, newCars, usedCars] = await Promise.all([
+    db.select().from(brandsTable).orderBy(asc(brandsTable.isServiceOnly), asc(brandsTable.name)),
+    getPublicNewCars(),
+    getUsedCars(),
+  ]);
+  if (!rows.length) throw new Error("brands table is empty");
+
+  let dbCounts: { newCounts: Record<string, number>; usedCount: number } | null = null;
+  if (newCars.length === 0 || usedCars.length === 0) {
+    try {
+      dbCounts = await loadDbCarCounts();
+    } catch (err) {
+      logger.warn({ err }, "public-brands: database count fallback failed");
+    }
+  }
+
+  const newCounts: Record<string, number> = {};
+  for (const car of newCars) {
+    const dealer = car.dealer.trim().toLowerCase();
+    if (dealer === "tenet plus" || dealer === "jeland") continue;
+    newCounts[dealer] = (newCounts[dealer] ?? 0) + 1;
+  }
+  if (newCars.length === 0 && dbCounts) Object.assign(newCounts, dbCounts.newCounts);
+
+  const feedState = currentBrandFeedState();
+  newCounts["tenet plus"] = feedState.tenetPlus.complete
+    ? await countPublicTenetPlusDbRows(feedState.tenetPlus.ids)
+    : 0;
+  newCounts["jeland"] = feedState.jeland.complete
+    ? await countPublicJelandDbRows(feedState.jeland.ids)
+    : 0;
+
+  const snapshot = makeSnapshot(
+    mapBrandCounts(rows, newCounts, usedCars.length > 0 ? usedCars.length : dbCounts?.usedCount ?? 0),
+    feedState,
+  );
+  // If either feed's complete snapshot changed during the refresh, suppress its count.
+  snapshot.data = sanitizeCachedBrandData(snapshot, currentBrandFeedState());
+  return snapshot;
+}
+
+function startBackgroundBrandsRefresh(): void {
+  if (brandsRefreshPromise) return;
+  brandsRefreshPromise = buildFeedCache()
+    .then(async snapshot => {
+      _brandsCache = snapshot;
+      await persistBrandsCache(snapshot);
+      logger.info({ count: snapshot.data.length }, "public-brands: cache refreshed");
+    })
+    .catch(err => {
+      logger.warn({ err }, "public-brands: background refresh failed; keeping last good cache");
+    })
+    .finally(() => {
+      brandsRefreshPromise = null;
+    });
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`database fallback timed out after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+function getDbBootstrapSnapshot(): Promise<PublicBrandsCacheSnapshot> {
+  if (!brandsBootstrapPromise) {
+    brandsBootstrapPromise = buildDbFallbackCache()
+      .then(async snapshot => {
+        if (!_brandsCache) {
+          _brandsCache = snapshot;
+          await persistBrandsCache(snapshot);
+          startBackgroundBrandsRefresh();
+        }
+        return snapshot;
+      })
+      .finally(() => {
+        brandsBootstrapPromise = null;
+      });
+  }
+  return withTimeout(brandsBootstrapPromise, DB_BOOTSTRAP_TIMEOUT_MS);
+}
+
 /* ── GET /api/brands  — full brand list with car counts ────── */
 router.get("/", async (_req, res) => {
-  const tenetPlusComplete = getTenetPlusFeedState().complete;
-  const publicTenetIds = tenetPlusComplete ? getTenetPlusPublicIdSet() : new Set<string>();
-  const tenetPlusIds = tenetIdsSignature(publicTenetIds);
-  const jelandComplete = getCmBusinessFeedState("Jeland").complete;
-  const publicJelandIds = jelandComplete ? getCmBusinessPublicIdSet("Jeland") : new Set<string>();
-  const jelandIds = tenetIdsSignature(publicJelandIds);
   try {
-    const rows = await db
-      .select()
-      .from(brandsTable)
-      .orderBy(asc(brandsTable.isServiceOnly), asc(brandsTable.name));
-
-    // Compute counts from the SAME XML-feed caches that the catalog pages use,
-    // so the home page and /new-cars / /cars always show identical numbers.
-    let newCounts: Record<string, number> = {};
-    let usedCount = 0;
-    try {
-      const [newCars, usedCars] = await Promise.all([
-        getPublicNewCars().catch((err) => {
-          logger?.warn({ err }, "public-brands: getPublicNewCars failed, falling back to DB counts");
-          return [];
-        }),
-        getUsedCars().catch((err) => {
-          logger?.warn({ err }, "public-brands: getUsedCars failed, falling back to DB counts");
-          return [];
-        }),
-      ]);
-
-      if (newCars.length > 0 || usedCars.length > 0) {
-        for (const c of newCars) {
-          if (c.dealer.trim().toLowerCase() === "tenet plus") continue;
-          if (c.dealer.trim().toLowerCase() === "jeland") continue;
-          const key = c.dealer.toLowerCase();
-          newCounts[key] = (newCounts[key] ?? 0) + 1;
-        }
-        usedCount = usedCars.length;
-
-        newCounts["tenet plus"] = await countPublicTenetPlusDbRows(publicTenetIds);
-        newCounts["jeland"] = await countPublicJelandDbRows(publicJelandIds);
-      } else {
-        throw new Error("feed caches empty");
-      }
-    } catch {
-      // Fallback to DB counts if feeds are unavailable
-      const countRows = await db.execute(sql`
-        SELECT LOWER(dealer) AS dealer_key, type, COUNT(*)::int AS cnt
-        FROM cars
-        WHERE type <> 'new'
-           OR LOWER(BTRIM(dealer)) IS DISTINCT FROM 'tenet plus'
-           AND LOWER(BTRIM(dealer)) IS DISTINCT FROM 'jeland'
-        GROUP BY LOWER(dealer), type
-      `);
-      newCounts = {};
-      usedCount = 0;
-      for (const r of countRows.rows as { dealer_key: string; type: string; cnt: number }[]) {
-        if (r.type === "used") {
-          usedCount += Number(r.cnt);
-        } else {
-          newCounts[r.dealer_key] = (newCounts[r.dealer_key] ?? 0) + Number(r.cnt);
-        }
-      }
-      newCounts["tenet plus"] = await countPublicTenetPlusDbRows(publicTenetIds);
-      newCounts["jeland"] = await countPublicJelandDbRows(publicJelandIds);
+    await loadPersistedBrandsCache();
+    if (_brandsCache) {
+      const stale = Date.now() - _brandsCache.ts >= BRANDS_CACHE_TTL_MS;
+      if (stale) startBackgroundBrandsRefresh();
+      return res.json({ ok: true, data: safeBrandsFromCache(_brandsCache) });
     }
 
-    const data = rows.map(brand => {
-      if (brand.isServiceOnly) return { ...brand, carCount: 0 };
-
-      const nameLower = brand.name.toLowerCase();
-
-      if (nameLower.includes("пробег")) {
-        return { ...brand, carCount: usedCount };
-      }
-
-      const count = newCounts[nameLower] ?? 0;
-      return { ...brand, carCount: count };
-    });
-
-    const latestComplete = getTenetPlusFeedState().complete;
-    const latestIds = latestComplete ? getTenetPlusPublicIdSet() : new Set<string>();
-    const latestJelandComplete = getCmBusinessFeedState("Jeland").complete;
-    const latestJelandIds = latestJelandComplete ? getCmBusinessPublicIdSet("Jeland") : new Set<string>();
-    const tenetSnapshotUnchanged = tenetPlusComplete
-      && latestComplete
-      && tenetIdsSignature(latestIds) === tenetPlusIds;
-    const jelandSnapshotUnchanged = jelandComplete
-      && latestJelandComplete
-      && tenetIdsSignature(latestJelandIds) === jelandIds;
-    const publicData = data.map(brand => {
-      const name = (brand as { name?: string }).name?.toLowerCase() ?? "";
-      if (name === "tenet plus" && !tenetSnapshotUnchanged) return { ...brand, carCount: 0 };
-      if (name === "jeland" && !jelandSnapshotUnchanged) return { ...brand, carCount: 0 };
-      return brand;
-    });
-
-    _brandsCache = {
-      data: publicData,
-      ts: Date.now(),
-      tenetPlusComplete: latestComplete,
-      tenetPlusIds: tenetIdsSignature(latestIds),
-      jelandComplete: latestJelandComplete,
-      jelandIds: tenetIdsSignature(latestJelandIds),
-    };
-    return res.json({ ok: true, data: publicData });
+    const snapshot = await getDbBootstrapSnapshot();
+    if (_brandsCache) {
+      return res.json({ ok: true, data: safeBrandsFromCache(_brandsCache) });
+    }
+    return res.json({ ok: true, data: safeBrandsFromCache(snapshot) });
   } catch (err) {
-    const currentComplete = getTenetPlusFeedState().complete;
-    const currentIds = currentComplete ? getTenetPlusPublicIdSet() : new Set<string>();
-    const currentJelandComplete = getCmBusinessFeedState("Jeland").complete;
-    const currentJelandIds = currentJelandComplete ? getCmBusinessPublicIdSet("Jeland") : new Set<string>();
-    if (_brandsCache
-      && _brandsCache.tenetPlusComplete === currentComplete
-      && _brandsCache.tenetPlusIds === tenetIdsSignature(currentIds)
-      && _brandsCache.jelandComplete === currentJelandComplete
-      && _brandsCache.jelandIds === tenetIdsSignature(currentJelandIds)
-      && Date.now() - _brandsCache.ts < BRANDS_CACHE_TTL_MS) {
-      return res.json({ ok: true, data: _brandsCache.data });
+    if (_brandsCache) {
+      logger.warn({ err }, "public-brands: serving stale cache after bootstrap failure");
+      return res.json({ ok: true, data: safeBrandsFromCache(_brandsCache) });
     }
-    return res.status(500).json({ ok: false, error: String(err) });
+    logger.error({ err }, "public-brands: no cache available and database bootstrap failed");
+    return res.status(503).json({ ok: false, error: "Данные брендов временно недоступны" });
   }
 });
 
