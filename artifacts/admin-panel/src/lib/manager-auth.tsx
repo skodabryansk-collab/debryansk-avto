@@ -1,5 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { useLocation } from "wouter";
+import {
+  ADMIN_SESSION_EXPIRED_EVENT,
+  MANAGER_SESSION_EXPIRED_EVENT,
+  processSessionResponse,
+} from "./session-client";
 
 const MANAGER_TOKEN_KEY = "manager_token";
 const MANAGER_NAME_KEY = "manager_name";
@@ -11,6 +16,10 @@ export function isAdminUsingManagerPortal(): boolean {
 
 export function getManagerToken(): string | null {
   return localStorage.getItem(MANAGER_TOKEN_KEY) || localStorage.getItem(ADMIN_TOKEN_KEY);
+}
+
+export function getManagerTokenStorageKey(): "manager_token" | "admin_token" {
+  return localStorage.getItem(MANAGER_TOKEN_KEY) ? MANAGER_TOKEN_KEY : ADMIN_TOKEN_KEY;
 }
 
 export function isManagerLoggedIn(): boolean {
@@ -45,6 +54,7 @@ export function getManagerName(): string {
 
 async function managerApi<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = getManagerToken();
+  const tokenStorageKey = getManagerTokenStorageKey();
   const res = await fetch(`/api/manager${path}`, {
     method,
     headers: {
@@ -53,6 +63,7 @@ async function managerApi<T>(method: string, path: string, body?: unknown): Prom
     },
     body: body ? JSON.stringify(body) : undefined,
   });
+  processSessionResponse(res, token, tokenStorageKey);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Request failed" }));
     throw new Error(err.error || `HTTP ${res.status}`);
@@ -207,6 +218,15 @@ const ManagerAuthContext = createContext<ManagerAuthContextType>({
 export function ManagerAuthProvider({ children }: { children: ReactNode }) {
   const [authenticated, setAuthenticated] = useState(isManagerLoggedIn());
   const logout = () => { logoutManager(); setAuthenticated(false); };
+  useEffect(() => {
+    const handleSessionExpired = () => setAuthenticated(false);
+    window.addEventListener(MANAGER_SESSION_EXPIRED_EVENT, handleSessionExpired);
+    window.addEventListener(ADMIN_SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => {
+      window.removeEventListener(MANAGER_SESSION_EXPIRED_EVENT, handleSessionExpired);
+      window.removeEventListener(ADMIN_SESSION_EXPIRED_EVENT, handleSessionExpired);
+    };
+  }, []);
   return (
     <ManagerAuthContext.Provider value={{ authenticated, setAuthenticated, logout }}>
       {children}
