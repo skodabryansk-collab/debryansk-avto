@@ -142,7 +142,10 @@ export async function getUsedCars(): Promise<CarRecord[]> {
   // instances call /api/cars/used simultaneously after a batch prerender run.
   if (!_usedCarsFetchInFlight) {
     _usedCarsFetchInFlight = (async () => {
-      const r = await fetch(XML_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
+      const r = await fetch(XML_URL, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: AbortSignal.timeout(15_000),
+      });
       if (!r.ok) throw new Error(`XML fetch failed: ${r.status}`);
       const text = await r.text();
       const data = parseXml(text);
