@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { isLoggedIn, logoutAdmin } from "./api";
+import { ADMIN_SESSION_EXPIRED_EVENT } from "./session-client";
 
 interface AuthContextType {
   authenticated: boolean;
@@ -14,8 +15,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authenticated, setAuthenticated] = useState(isLoggedIn());
   const [loading, setLoading] = useState(true);
   useEffect(() => {
+    const handleSessionExpired = () => setAuthenticated(false);
+    window.addEventListener(ADMIN_SESSION_EXPIRED_EVENT, handleSessionExpired);
     setAuthenticated(isLoggedIn());
     setLoading(false);
+    return () => window.removeEventListener(ADMIN_SESSION_EXPIRED_EVENT, handleSessionExpired);
   }, []);
   const logout = () => {
     logoutAdmin();
