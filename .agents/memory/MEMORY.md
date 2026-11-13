@@ -51,6 +51,7 @@
 - [Soft 404 handling](soft-404-handling.md) — seoMeta returns HTTP 404 with `noindex, follow` for unknown routes when UA is a bot; browsers still get the SPA shell for client-side 404 rendering.
 - [www to non-www redirect](www-redirect.md) — Express middleware at the top of app.ts redirects `www.debryansk-auto.ru` → canonical domain with 301, preserving path and query string.
 - [КП tool — manager quotes](kp-manager-quotes.md) — esbuild copies kp-template.html+logo-da.svg to dist/; manager JWT shares ADMIN_JWT_SECRET; admin also passes requireManager (isAdmin===true).
+- [Admin and manager sessions](admin-session-lifecycle.md) — renew valid JWTs during activity; cap sessions at 90 days and redirect cleanly on 401.
 - [Prerender car-sync stampede](prerender-car-sync-stampede.md) — car-sync updates=484 always true → spawn prerender every 30min → 484 Puppeteer×/api/cars/used → DB pool dead. Fix: spawn only on addedNewCarIds/addedUsedCarIds; deduplicate XML fetch in-flight.
 - [Admin panel VPS deploy](admin-panel-vps-deploy.md) — nginx serves /admin from /opt/debryansk/admin/ (static). Must build with BASE_PATH=/admin/ NODE_ENV=production, then scp dist/public/. to VPS. Dev server changes are NOT visible on production.
 - [VPS frontend hotfix deploy](vps-frontend-hotfix-deploy.md) — preserve VPS-only HTML, refresh entry JS/CSS references across pages, and restart PM2 to reload cached asset tags.
