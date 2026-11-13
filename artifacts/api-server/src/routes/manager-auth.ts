@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, managersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import { createSessionToken } from "../lib/session-token";
 
 const router: IRouter = Router();
 
@@ -27,11 +27,16 @@ router.post("/", async (req, res) => {
       return res.status(401).json({ ok: false, error: "Invalid credentials" });
     }
 
+    // Record last login time (fire-and-forget — don't block the response)
+    void db.update(managersTable)
+      .set({ lastLoginAt: new Date() })
+      .where(eq(managersTable.id, manager.id))
+      .catch(() => {/* ignore — non-critical */});
+
     const secret = process.env["ADMIN_JWT_SECRET"] || process.env["JWT_SECRET"] || "dev-only-secret-key";
-    const token = jwt.sign(
+    const token = createSessionToken(
       { managerId: manager.id, name: manager.name, role: "manager" },
       secret,
-      { expiresIn: "30d" }
     );
 
     return res.json({ ok: true, token, name: manager.name });
