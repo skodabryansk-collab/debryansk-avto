@@ -1,4 +1,5 @@
 import type { AiImageModelCatalogue } from "@workspace/api-client-react";
+import { processSessionResponse } from "./session-client";
 const API_BASE = "/api";
 
 export function getAiImageModels() {
@@ -21,6 +22,7 @@ async function api<T>(method: string, path: string, body?: unknown): Promise<T> 
     headers,
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (path !== "/admin/login") processSessionResponse(res, token, "admin_token");
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Request failed" }));
     throw new Error(err.error || `HTTP ${res.status}`);
@@ -86,6 +88,7 @@ export async function exportLeads() {
   const res = await fetch(`${API_BASE}/admin/leads/export`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  processSessionResponse(res, token, "admin_token");
   if (!res.ok) throw new Error("Export failed");
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -337,6 +340,7 @@ export async function exportChatsJsonl() {
   const res = await fetch(`${API_BASE}/admin/navigator/chats/export-jsonl`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  processSessionResponse(res, token, "admin_token");
   if (!res.ok) throw new Error("Export failed");
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -738,6 +742,7 @@ export async function uploadFile(file: File): Promise<string> {
       headers: authHeader,
       body: fd,
     });
+    processSessionResponse(res, token, "admin_token");
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: "Upload failed" }));
       throw new Error(err.error || `HTTP ${res.status}`);
@@ -759,6 +764,7 @@ export async function uploadFile(file: File): Promise<string> {
       contentType: file.type || "application/octet-stream",
     }),
   });
+  processSessionResponse(metaRes, token, "admin_token");
   if (!metaRes.ok) throw new Error("Failed to get upload URL");
   const { uploadURL, objectPath } = await metaRes.json();
 
@@ -968,6 +974,7 @@ export async function exportCalltouchCalls(params: { status?: string; phone?: st
   const res = await fetch(`${API_BASE}/admin/calltouch-calls/export?${qs}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  processSessionResponse(res, token, "admin_token");
   if (!res.ok) throw new Error("Export failed");
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -1546,6 +1553,7 @@ export async function generateAiImage(sessionId: number, formData: FormData): Pr
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
   });
+  processSessionResponse(res, token, "admin_token");
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Generation failed" })) as { ok: boolean; error?: string; message?: AiMessage };
     // Return error message if server sent one (502 with message body)
@@ -1579,11 +1587,13 @@ export function getBrandLogo() {
 export async function uploadBrandLogo(file: File): Promise<{ ok: true; data: BrandLogo }> {
   const fd = new FormData();
   fd.append("file", file);
+  const token = getToken();
   const res = await fetch(`${API_BASE}/admin/ai-images/brand-assets/logo`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: { Authorization: `Bearer ${token}` },
     body: fd,
   });
+  processSessionResponse(res, token, "admin_token");
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Upload failed" })) as { error?: string };
     throw new Error(err.error ?? "Upload failed");
@@ -1612,11 +1622,13 @@ export async function uploadBrandFont(file: File, name: string): Promise<{ ok: t
   const fd = new FormData();
   fd.append("file", file);
   fd.append("name", name);
+  const token = getToken();
   const res = await fetch(`${API_BASE}/admin/ai-images/brand-assets/fonts`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: { Authorization: `Bearer ${token}` },
     body: fd,
   });
+  processSessionResponse(res, token, "admin_token");
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Upload failed" })) as { error?: string };
     throw new Error(err.error ?? "Upload failed");
@@ -1650,11 +1662,13 @@ export async function uploadLogoVariant(file: File, name: string): Promise<{ ok:
   const fd = new FormData();
   fd.append("file", file);
   fd.append("name", name);
+  const token = getToken();
   const res = await fetch(`${API_BASE}/admin/ai-images/logo-variants`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: { Authorization: `Bearer ${token}` },
     body: fd,
   });
+  processSessionResponse(res, token, "admin_token");
   if (!res.ok) { const e = await res.json().catch(() => ({}) ) as {error?:string}; throw new Error(e.error ?? "Upload failed"); }
   return res.json() as Promise<{ ok: true; data: LogoVariant }>;
 }
