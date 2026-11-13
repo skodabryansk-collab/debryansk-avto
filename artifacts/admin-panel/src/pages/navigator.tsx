@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { processSessionResponse } from "@/lib/session-client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -151,10 +152,15 @@ export default function NavigatorPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => fetch(`/api/admin/navigator/chats/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${localStorage.getItem("admin_token")}` },
-    }).then(r => r.json()),
+    mutationFn: async (id: number) => {
+      const token = localStorage.getItem("admin_token");
+      const response = await fetch(`/api/admin/navigator/chats/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      processSessionResponse(response, token, "admin_token");
+      return response.json();
+    },
     onSuccess: () => {
       toast({ title: "Диалог удалён" });
       qc.invalidateQueries({ queryKey: ["chats"] });
