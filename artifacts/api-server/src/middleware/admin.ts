@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { db, usersTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { createSessionToken, renewSessionToken, SESSION_TOKEN_HEADER } from "../lib/session-token";
 
 const isProd = process.env["NODE_ENV"] === "production";
 
@@ -30,6 +31,12 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
       res.status(403).json({ error: "Forbidden: admin access required" });
       return;
     }
+    const renewedToken = renewSessionToken(
+      decoded as Record<string, unknown>,
+      { login: decoded.login, ...(decoded.id !== undefined ? { id: decoded.id } : {}), isAdmin: true },
+      JWT_SECRET,
+    );
+    if (renewedToken) res.setHeader(SESSION_TOKEN_HEADER, renewedToken);
     (req as any).admin = decoded;
     next();
   } catch {
@@ -38,7 +45,7 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 export function generateToken(login: string, id?: number, isAdmin?: boolean): string {
-  return jwt.sign({ login, id, isAdmin: isAdmin ?? true }, JWT_SECRET, { expiresIn: "24h" });
+  return createSessionToken({ login, ...(id !== undefined ? { id } : {}), isAdmin: isAdmin ?? true }, JWT_SECRET);
 }
 
 export function verifyCredentials(login: string, password: string): boolean {
