@@ -203,15 +203,19 @@ export const YandexMap = forwardRef<YandexMapHandle, YandexMapProps>(
     const ymaps3Ref = useRef<any>(null);
     const initializedRef = useRef(false);
     const fittedRef = useRef(false); // tracks if we've done the initial bounding-box fit
+    const latestPropsRef = useRef({ locations, center, zoom, activeId, onMarkerClick });
+    latestPropsRef.current = { locations, center, zoom, activeId, onMarkerClick };
 
     function getCenter(): [number, number] {
-      if (center) return [center[1], center[0]];
-      return calcCenterFromLocations(locations);
+      const current = latestPropsRef.current;
+      if (current.center) return [current.center[1], current.center[0]];
+      return calcCenterFromLocations(current.locations);
     }
 
     function getZoom(): number {
-      if (zoom != null) return zoom;
-      return calcZoomFromLocations(locations);
+      const current = latestPropsRef.current;
+      if (current.zoom != null) return current.zoom;
+      return calcZoomFromLocations(current.locations);
     }
 
     function closeOtherPopups(exceptId: number) {
@@ -235,10 +239,11 @@ export const YandexMap = forwardRef<YandexMapHandle, YandexMapProps>(
 
     function drawMarkers(y3: any, map: any) {
       const { YMapMarker } = y3;
+      const current = latestPropsRef.current;
 
-      locations.forEach((loc, idx) => {
-        const isActive = activeId === loc.id;
-        const el = makeMarkerElement(loc, isActive, idx + 1, onMarkerClick, closeOtherPopups);
+      current.locations.forEach((loc, idx) => {
+        const isActive = current.activeId === loc.id;
+        const el = makeMarkerElement(loc, isActive, idx + 1, current.onMarkerClick, closeOtherPopups);
         elementsRef.current[loc.id] = el;
 
         const marker = new YMapMarker(
@@ -309,7 +314,7 @@ export const YandexMap = forwardRef<YandexMapHandle, YandexMapProps>(
         drawMarkers(y3, map);
 
         // Mark as fitted if we already have locations
-        if (locations.length > 0) fittedRef.current = true;
+        if (latestPropsRef.current.locations.length > 0) fittedRef.current = true;
       }
 
       init();
