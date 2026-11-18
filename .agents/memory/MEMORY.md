@@ -87,3 +87,4 @@
 - [Mobile detail sticky bars](mobile-sticky-bars.md) — render car detail CTAs through body portals and avoid backdrop blur so scrolling containers cannot displace them.
 - [New-car price tag requirements](vehicle-tag-requirements.md) — A4 monochrome for mall displays; Debryansk Auto, no photo or price, prioritize trims and powertrains.
 - [Vehicle trim source review](vehicle-trim-source-review.md) — verify every PDF page visually; text extraction can miss trim names in equipment matrices.
+- [Price-tag data enrichment](vehicle-tag-enrichment-source.md) — active car records are authoritative; specification data fills only fields missing from a printable tag.
