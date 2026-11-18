@@ -18,6 +18,8 @@ import { acquireChrome, isPrerendererRunning } from "../lib/chrome-semaphore";
 import { cmBusinessGet } from "../lib/cm-expert-client";
 import { getManagerQuoteLocationOverride, normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
 import { verifiedQuoteExtras } from "../lib/quote-car-extras";
+import { parseXmlEngineData } from "../services/car-engine-enrichment";
+import { renderVehicleTag, type VehicleTagSpec, type VehicleTagVariant } from "../templates/vehicle-tag/render";
 import {
   getCmStockIntegrations, isCmOptionsOnlyDealer,
   type CmStockIntegration,
@@ -873,6 +875,91 @@ async function getQuoteDealerLocation(
   return fallback[0] ?? null;
 }
 
+async function getVehicleTagDealerLocation(brand: string): Promise<{ address: string } | null> {
+  const locationOverride = getManagerQuoteLocationOverride("new", brand);
+  if (locationOverride) {
+    const rows = await db.select({ address: locationsTable.address })
+      .from(locationsTable)
+      .where(eq(locationsTable.title, locationOverride))
+      .limit(1);
+    return rows[0] ?? null;
+  }
+
+  const rows = await db.select({ address: locationsTable.address })
+    .from(locationsTable)
+    .innerJoin(locationBrandsTable, eq(locationBrandsTable.locationId, locationsTable.id))
+    .innerJoin(brandsTable, eq(brandsTable.id, locationBrandsTable.brandId))
+    .where(ilike(brandsTable.carMark, brand))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+function extractVehicleTagGearbox(modification: string | null, complectation: string | null): string {
+  const source = [modification, complectation].filter(Boolean).join(" ");
+  if (!source) return "";
+  const match = source.match(
+    /\b\d{1,2}\s*(?:DCT|DSG|CVT|AMT|AT|MT|АКПП|МКПП)\b|\b(?:DCT|DSG|CVT|AMT|АКПП|МКПП)\b|\bробот(?:изированная)?\b|\bвариатор\b|\bавтомат(?:ическая)?\b|\bмеханика\b/i,
+  );
+  return match?.[0]?.trim() ?? "";
+}
+
+function extractVehicleTagDrive(driveType: string | null, modification: string | null): string {
+  const drive = driveType?.trim();
+  if (drive) return drive;
+  const match = modification?.match(/\b(?:4WD|AWD|FWD|RWD|2WD)\b/i);
+  return match?.[0]?.toUpperCase() ?? "";
+}
+
+function uniqueVehicleTagValues(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values.map(value => value?.trim() ?? "").filter(Boolean)));
+}
+
+function makeVehicleTagVariant(row: {
+  complectation: string | null;
+  modification: string | null;
+  fuelType: string | null;
+  engineVolume: number | null;
+  enginePower: number | null;
+  driveType: string | null;
+}): VehicleTagVariant {
+  const xmlEngineData = parseXmlEngineData(row.modification ?? "");
+  const fuelType = row.fuelType?.trim() || xmlEngineData?.fuelType || "";
+  const engineVolume = row.engineVolume ?? xmlEngineData?.engineVolume ?? null;
+  const enginePower = row.enginePower ?? xmlEngineData?.enginePower ?? null;
+  const engineParts = [
+    fuelType,
+    engineVolume != null
+      ? `${engineVolume.toLocaleString("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} л`
+      : "",
+    enginePower != null ? `${enginePower} л.с.` : "",
+  ].filter(Boolean);
+  const modification = row.modification?.trim() ?? "";
+
+  return {
+    name: row.complectation?.trim() || modification || "Комплектация не указана",
+    engine: engineParts.join(" · ") || modification,
+    gearbox: extractVehicleTagGearbox(modification, row.complectation),
+    drive: extractVehicleTagDrive(row.driveType, modification),
+  };
+}
+
+function buildVehicleTagSpecs(
+  variants: VehicleTagVariant[],
+  bodyTypes: Array<string | null | undefined>,
+): VehicleTagSpec[] {
+  const specs: VehicleTagSpec[] = [];
+  const engines = uniqueVehicleTagValues(variants.map(variant => variant.engine));
+  const gearboxes = uniqueVehicleTagValues(variants.map(variant => variant.gearbox));
+  const drives = uniqueVehicleTagValues(variants.map(variant => variant.drive));
+  const bodies = uniqueVehicleTagValues(bodyTypes);
+
+  if (engines.length) specs.push({ label: "Двигатели", value: engines.join("; ") });
+  if (gearboxes.length) specs.push({ label: "Коробки передач", value: gearboxes.join(", ") });
+  if (drives.length) specs.push({ label: "Привод", value: drives.join(", ") });
+  if (bodies.length) specs.push({ label: "Тип кузова", value: bodies.join(", ") });
+  return specs;
+}
+
 async function regenerateStoredQuotePdf(quote: typeof quotesTable.$inferSelect): Promise<string> {
   const carRows = await db.select().from(carsTable).where(eq(carsTable.externalId, quote.carId)).limit(1);
   const car = await enrichQuoteCar(carRows[0] ?? null);
@@ -1031,6 +1118,109 @@ router.post("/quotes/:id/pdf", async (req, res) => {
   } catch (err) {
     logger.error({ err }, "[quotes] PDF recovery failed");
     return res.status(500).json({ ok: false, error: "Не удалось сформировать PDF. Попробуйте ещё раз." });
+  }
+});
+
+router.post("/vehicle-tags/pdf", async (req, res): Promise<void> => {
+  try {
+    const carId = Number(req.body?.carId);
+    if (!Number.isInteger(carId) || carId <= 0) {
+      res.status(400).json({ ok: false, error: "Выберите автомобиль для ценника." });
+      return;
+    }
+
+    const payload = getManagerPayload(req) as unknown as Record<string, unknown>;
+    const isAdmin = payload["isAdmin"] === true;
+    const carFilters = [eq(carsTable.id, carId), eq(carsTable.type, "new")];
+    if (!isAdmin) {
+      const managerId = Number(payload["managerId"]);
+      if (!Number.isInteger(managerId) || managerId <= 0) {
+        res.status(403).json({ ok: false, error: "Нет доступа к выбранному автомобилю." });
+        return;
+      }
+      carFilters.push(...buildManagerCarFilter(await getManagerBrands(managerId), "new"));
+    }
+
+    const carRows = await db.select().from(carsTable).where(and(...carFilters)).limit(1);
+    const car = carRows[0];
+    if (!car) {
+      res.status(404).json({ ok: false, error: "Автомобиль не найден или недоступен." });
+      return;
+    }
+    if (!car.brand?.trim() || !car.model?.trim()) {
+      res.status(409).json({ ok: false, error: "У автомобиля не указаны марка или модель." });
+      return;
+    }
+
+    const location = await getVehicleTagDealerLocation(car.brand);
+    if (!location?.address?.trim()) {
+      res.status(409).json({
+        ok: false,
+        error: `Для марки ${car.brand} не настроен адрес дилерского центра.`,
+      });
+      return;
+    }
+
+    const modelFilters = [
+      eq(carsTable.type, "new"),
+      sql`lower(trim(${carsTable.brand})) = lower(trim(${car.brand}))`,
+      sql`lower(trim(${carsTable.model})) = lower(trim(${car.model}))`,
+    ];
+    if (car.year) modelFilters.push(eq(carsTable.year, car.year));
+
+    const modelRows = await db.select({
+      complectation: carsTable.complectation,
+      modification: carsTable.modification,
+      fuelType: carsTable.fuelType,
+      engineVolume: carsTable.engineVolume,
+      enginePower: carsTable.enginePower,
+      driveType: carsTable.driveType,
+      bodyType: carsTable.bodyType,
+    }).from(carsTable)
+      .where(and(...modelFilters))
+      .orderBy(carsTable.complectation, carsTable.modification);
+
+    const variantMap = new Map<string, VehicleTagVariant>();
+    for (const row of modelRows) {
+      const variant = makeVehicleTagVariant(row);
+      const key = [variant.name, variant.engine, variant.gearbox, variant.drive].join("\u241f");
+      variantMap.set(key, variant);
+    }
+    const variants = Array.from(variantMap.values());
+    const specs = buildVehicleTagSpecs(variants, modelRows.map(row => row.bodyType));
+
+    const catalogUrl = new URL("/new-cars", "https://debryansk-auto.ru");
+    const dealer = car.dealer?.trim();
+    if (dealer) catalogUrl.searchParams.set("dealer", dealer);
+    catalogUrl.searchParams.set("model", car.model);
+    const qrDataUrl = await QRCode.toDataURL(catalogUrl.toString(), {
+      width: 420,
+      margin: 1,
+      errorCorrectionLevel: "M",
+      color: { dark: "#111111", light: "#ffffff" },
+    });
+
+    const address = /брянск/i.test(location.address)
+      ? location.address
+      : `Брянск, ${location.address}`;
+    const pdf = await generatePdf(renderVehicleTag({
+      brand: car.brand,
+      model: car.model,
+      year: car.year,
+      variants,
+      specs,
+      address,
+      qrDataUrl,
+      qrLabel: `Каталог ${car.brand} ${car.model}`,
+    }));
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'inline; filename="vehicle-tag.pdf"');
+    res.setHeader("Content-Length", String(pdf.length));
+    res.send(pdf);
+  } catch (err) {
+    req.log.error({ err }, "[vehicle-tags] PDF generation failed");
+    res.status(500).json({ ok: false, error: "Не удалось сформировать ценник. Попробуйте ещё раз." });
   }
 });
 
