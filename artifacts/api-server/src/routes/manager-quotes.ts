@@ -19,7 +19,11 @@ import { cmBusinessGet } from "../lib/cm-expert-client";
 import { getManagerQuoteLocationOverride, normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
 import { verifiedQuoteExtras } from "../lib/quote-car-extras";
 import { parseXmlEngineData } from "../services/car-engine-enrichment";
-import { enrichVehicleTagData, loadVehicleTagSpecRecords } from "../services/vehicle-tag-enrichment";
+import {
+  enrichVehicleTagData,
+  loadVehicleTagSpecRecords,
+  normalizeVehicleTagBodyType,
+} from "../services/vehicle-tag-enrichment";
 import { renderVehicleTag, type VehicleTagSpec, type VehicleTagVariant } from "../templates/vehicle-tag/render";
 import {
   getCmStockIntegrations, isCmOptionsOnlyDealer,
@@ -953,7 +957,7 @@ function buildVehicleTagSpecs(
   const engines = uniqueVehicleTagValues(variants.map(variant => variant.engine));
   const gearboxes = uniqueVehicleTagValues(variants.map(variant => variant.gearbox));
   const drives = uniqueVehicleTagValues(variants.map(variant => variant.drive));
-  const bodies = uniqueVehicleTagValues(bodyTypes);
+  const bodies = uniqueVehicleTagValues(bodyTypes.map(normalizeVehicleTagBodyType));
 
   if (engines.length) specs.push({ label: "Двигатели", value: engines.join("; ") });
   if (gearboxes.length) specs.push({ label: "Коробки передач", value: gearboxes.join(", ") });
