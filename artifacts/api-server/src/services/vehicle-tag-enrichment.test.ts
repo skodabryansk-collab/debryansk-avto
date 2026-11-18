@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   enrichVehicleTagData,
   loadVehicleTagSpecRecords,
+  normalizeVehicleTagBodyType,
   parseVehicleSpecCsv,
 } from "./vehicle-tag-enrichment";
 
@@ -19,6 +20,8 @@ const csv = [
 const records = parseVehicleSpecCsv(csv);
 assert.equal(records.length, 7);
 assert.equal(records.at(-1)?.value, "6MT");
+assert.equal(normalizeVehicleTagBodyType("off"), "");
+assert.equal(normalizeVehicleTagBodyType(" 5-дверный универсал "), "5-дверный универсал");
 
 const activeRows = [{
   complectation: "Премиум",
@@ -48,6 +51,33 @@ assert.deepEqual(enriched.variants[0], {
 });
 assert.ok(enriched.specs.some(spec => spec.label === "Длина × ширина × высота" && spec.value === "4700 × 1900 × 1700 мм"));
 assert.ok(!enriched.specs.some(spec => spec.value.includes("6MT")));
+
+const bodyTypeSupplement = enrichVehicleTagData({
+  records: [
+    ...records,
+    {
+      source_brand_label: "HAVAL",
+      model: "H7",
+      model_year: "2026",
+      production_year: "2026",
+      trim_name_ru: "",
+      scope: "model",
+      spec_key: "body_type",
+      label_ru: "Тип кузова",
+      value: "5-дверный внедорожник",
+      unit: "",
+    },
+  ],
+  brand: "Haval",
+  model: "H7",
+  year: 2026,
+  variants: [{ name: "Премиум", engine: "", gearbox: "", drive: "" }],
+  activeRows: [{ ...activeRows[0]!, bodyType: "off" }],
+  activeSpecs: [],
+});
+assert.ok(bodyTypeSupplement.specs.some(
+  spec => spec.label === "Тип кузова" && spec.value === "5-дверный внедорожник",
+));
 
 const authoritative = enrichVehicleTagData({
   records,
