@@ -142,6 +142,13 @@ async function copyTemplates() {
   }
 }
 
+async function copyVehicleTagData() {
+  const src = path.resolve(artifactDir, "src/data/vehicle-specs-import-normalized.csv");
+  const dstDir = path.resolve(artifactDir, "dist/data");
+  await mkdir(dstDir, { recursive: true });
+  await cp(src, path.join(dstDir, path.basename(src)));
+}
+
 async function copyGeoCitationScript() {
   const src = path.resolve(artifactDir, "../../scripts/geo-citation-check.mjs");
   const dst = path.resolve(artifactDir, "dist/geo-citation-check.mjs");
@@ -151,6 +158,7 @@ async function copyGeoCitationScript() {
 buildAll()
   .then(async () => {
     await copyTemplates();
+    await copyVehicleTagData();
     await copyGeoCitationScript();
   })
   .catch((err) => {
