@@ -889,7 +889,8 @@ async function getVehicleTagDealerLocation(brand: string): Promise<{ address: st
     .from(locationsTable)
     .innerJoin(locationBrandsTable, eq(locationBrandsTable.locationId, locationsTable.id))
     .innerJoin(brandsTable, eq(brandsTable.id, locationBrandsTable.brandId))
-    .where(ilike(brandsTable.carMark, brand))
+    .where(sql`lower(trim(${brandsTable.carMark})) = lower(trim(${brand}))`)
+    .orderBy(locationsTable.sortOrder)
     .limit(1);
   return rows[0] ?? null;
 }
