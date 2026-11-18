@@ -5,10 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Plus, FileDown, Share2, LogOut, ImageOff, Pencil, BookOpen, UserPlus, UserCheck, LogIn, FileText, Clock, User, UserRound, ExternalLink, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, Search, Plus, FileDown, Share2, LogOut, ImageOff, Pencil, BookOpen, UserPlus, UserCheck, LogIn, FileText, Clock, User, UserRound, ExternalLink, RefreshCw, CheckCircle2, AlertCircle, Printer } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  searchCars, fetchCarBrands, fetchCarModels, refreshManagerCarFromCm,
+  searchCars, fetchCarBrands, fetchCarModels, refreshManagerCarFromCm, generateVehicleTagPdf,
   createQuote, updateQuote, regenerateQuotePdf, createQuoteShareLink, getMyQuotes, getManagerName, logoutManager, pdfDownloadUrl,
   isAdminUsingManagerPortal,
   type CarSearchResult, type QuoteDiscount, type QuoteHistoryItem,
@@ -359,8 +359,10 @@ function QuoteForm({
     initialData?.tradeIn?.priceTo != null ? String(initialData.tradeIn.priceTo) : ""
   );
   const [generating, setGenerating] = React.useState(false);
+  const [generatingTag, setGeneratingTag] = React.useState(false);
   const [error, setError] = React.useState("");
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   const mutation = useMutation({
     mutationFn: (payload: Parameters<typeof createQuote>[0]) =>
@@ -421,8 +423,35 @@ function QuoteForm({
     }
   }
 
+  async function handleGenerateVehicleTag() {
+    if (!selectedCar || !selectedCar.id || selectedCar.type !== "new" || generating || generatingTag) return;
+
+    setGeneratingTag(true);
+    setError("");
+    try {
+      const pdf = await generateVehicleTagPdf(selectedCar.id);
+      const objectUrl = URL.createObjectURL(pdf);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `Ценник-${selectedCar.brand || "авто"}-${selectedCar.model || "модель"}.pdf`
+        .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
+      toast({ title: "Ценник сформирован", description: "PDF скачан и готов к печати." });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Не удалось сформировать ценник";
+      setError(message);
+      toast({ title: "Не удалось сформировать ценник", description: message, variant: "destructive" });
+    } finally {
+      setGeneratingTag(false);
+    }
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (generating || generatingTag) return;
     if (!selectedCar) { setError("Выберите автомобиль"); return; }
     if (!clientName.trim()) { setError("Укажите имя клиента"); return; }
     if (!clientPhone.trim()) { setError("Укажите телефон клиента"); return; }
@@ -816,7 +845,7 @@ function QuoteForm({
 
       <Button
         type="submit"
-        disabled={generating || !selectedCar}
+        disabled={generating || generatingTag || !selectedCar}
         className="w-full bg-[#0070b8] hover:bg-[#005a94] text-white h-11 text-base font-semibold"
       >
         {generating ? (
@@ -827,6 +856,23 @@ function QuoteForm({
           "Сформировать PDF"
         )}
       </Button>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={!selectedCar || !selectedCar.id || selectedCar.type !== "new" || generating || generatingTag}
+        onClick={handleGenerateVehicleTag}
+        className="w-full h-11 text-base font-semibold"
+        data-testid="button-generate-vehicle-tag"
+      >
+        {generatingTag ? (
+          <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Формируем ценник...</>
+        ) : (
+          <><Printer className="mr-2 h-4 w-4" />Сформировать ценник</>
+        )}
+      </Button>
+      {selectedCar?.type === "used" && (
+        <p className="text-xs text-slate-500">Ценник доступен только для новых автомобилей.</p>
+      )}
     </form>
   );
 }
