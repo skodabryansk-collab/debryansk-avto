@@ -318,7 +318,10 @@ function buildMissingSpecs(
     if (group.category === "power" && activeRows.some(row => row.enginePower != null)) continue;
     if (group.category === "body" && activeRows.some(row => Boolean(normalizeVehicleTagBodyType(row.bodyType)))) continue;
     if (group.category === "engine-displacement" && activeRows.some(row => row.engineVolume != null)) continue;
-    if (group.category === "transmission" && activeFieldIsPresent("transmission", activeRows)) continue;
+    if (group.category === "transmission" && (
+      activeFieldIsPresent("transmission", activeRows)
+      || activeSpecs.some(spec => ["коробкапередач", "коробкипередач"].includes(normalizeKey(spec.label)))
+    )) continue;
     if (group.category === "drive" && activeRows.some(row => Boolean(row.driveType?.trim()))) continue;
 
     const trimValues = selectedTrimRecords.filter(record => record.spec_key === specKey);
