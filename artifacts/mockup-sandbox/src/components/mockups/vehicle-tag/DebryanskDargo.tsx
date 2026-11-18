@@ -88,46 +88,55 @@ export function DebryanskDargo() {
           white-space: nowrap;
         }
         .tag-hero {
-          min-height: 48mm;
+          position: relative;
+          min-height: 54mm;
           display: flex;
           align-items: flex-end;
           justify-content: space-between;
           gap: 8mm;
-          padding: 7mm 0 6mm;
-          border-bottom: 1px solid #bbb;
+          padding: 7.5mm 0 6.5mm;
+          border-bottom: 1.8px solid #111;
         }
         .tag-make {
-          margin: 0;
-          font-size: 12pt;
+          display: inline-block;
+          margin: 0 0 2.2mm;
+          padding: 1.1mm 2.2mm .9mm;
+          background: #111;
+          color: #fff;
+          font-size: 11pt;
+          line-height: 1;
           font-weight: 800;
-          letter-spacing: .18em;
+          letter-spacing: .16em;
         }
         .tag-model {
           margin: 0;
-          font-size: clamp(48px, 8vw, 68px);
-          line-height: .94;
+          font-size: clamp(60px, 9vw, 82px);
+          line-height: .86;
           font-weight: 800;
-          letter-spacing: -.03em;
+          letter-spacing: -.04em;
+          text-wrap: balance;
         }
         .tag-year {
           min-width: 30mm;
-          margin-bottom: 1mm;
-          padding-left: 4mm;
-          border-left: 1px solid #888;
-          text-align: left;
+          margin-bottom: 1.2mm;
+          padding: 3mm 3.2mm 3.2mm;
+          background: #111;
+          color: #fff;
+          text-align: center;
         }
         .tag-year-label {
           display: block;
           margin-bottom: 1mm;
-          color: #555;
-          font-size: 8pt;
+          color: #e5e5e5;
+          font-size: 7.5pt;
           font-weight: 600;
           letter-spacing: .08em;
           text-transform: uppercase;
         }
         .tag-year-value {
           display: block;
-          font-size: 21pt;
+          color: #fff;
+          font-size: 24pt;
           line-height: 1;
           font-weight: 800;
           letter-spacing: -.04em;
@@ -264,9 +273,47 @@ export function DebryanskDargo() {
         @media (max-width: 680px) {
           .tag-preview { padding: 8px; }
           .tag-sheet { padding: 7mm 7mm 6mm; }
-          .tag-hero { min-height: 42mm; }
-          .tag-model { font-size: clamp(40px, 12vw, 58px); }
-          .tag-year { min-width: 24mm; }
+          .tag-hero { min-height: 46mm; gap: 4mm; }
+          .tag-model { font-size: clamp(48px, 13vw, 68px); }
+          .tag-year { min-width: 22mm; padding: 2.5mm 2mm; }
+          .tag-year-value { font-size: 20pt; }
+          .tag-config-table,
+          .tag-config-table tbody {
+            display: block;
+            width: 100%;
+          }
+          .tag-config-table thead { display: none; }
+          .tag-config-table tr {
+            display: grid;
+            grid-template-columns: 1.15fr 1fr .62fr;
+            column-gap: 2mm;
+            padding: 2.4mm 1.5mm;
+            border-bottom: 1px solid #ccc;
+          }
+          .tag-config-table td {
+            display: block;
+            min-width: 0;
+            padding: 0;
+            border: 0;
+            font-size: 8.25pt;
+            line-height: 1.25;
+          }
+          .tag-config-table td:first-child {
+            grid-column: 1 / -1;
+            margin-bottom: 1.6mm;
+            padding-bottom: 1.4mm;
+            border-bottom: 1px solid #ccc;
+            font-size: 10.5pt;
+          }
+          .tag-config-table td:not(:first-child)::before {
+            display: block;
+            margin-bottom: .6mm;
+            color: #606060;
+            content: attr(data-label);
+            font-size: 6.5pt;
+            font-weight: 600;
+            line-height: 1.2;
+          }
           .tag-spec-groups { grid-template-columns: 1fr; row-gap: 4mm; }
           .tag-bottom { grid-template-columns: minmax(0, 1fr) 30mm; gap: 4mm; }
           .tag-qr { width: 30mm; height: 30mm; }
@@ -284,6 +331,7 @@ export function DebryanskDargo() {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
           }
+          .tag-model { font-size: 64pt; }
         }
       `}</style>
 
@@ -295,7 +343,7 @@ export function DebryanskDargo() {
               src="/__mockup/images/vehicle-tag/debryansk-auto-logo.svg"
               alt="Дебрянск Авто"
             />
-            <span className="tag-logo-tagline">Пространство автомобилей</span>
+            <span className="tag-logo-tagline">ПРОСТРАНСТВО АВТОМОБИЛЕЙ</span>
           </div>
         </header>
 
@@ -323,22 +371,22 @@ export function DebryanskDargo() {
             </thead>
             <tbody>
               <tr>
-                <td>Оптимум</td>
-                <td>Бензин, 2,0 л, 200 л.с.</td>
-                <td>7DCT, робот</td>
-                <td>4WD</td>
+                <td data-label="Комплектация">Оптимум</td>
+                <td data-label="Двигатель">Бензин, 2,0 л, 200 л.с.</td>
+                <td data-label="Коробка передач">7DCT, робот</td>
+                <td data-label="Привод">4WD</td>
               </tr>
               <tr>
-                <td>Премиум</td>
-                <td>Бензин, 2,0 л, 200 л.с.</td>
-                <td>7DCT, робот</td>
-                <td>4WD</td>
+                <td data-label="Комплектация">Премиум</td>
+                <td data-label="Двигатель">Бензин, 2,0 л, 200 л.с.</td>
+                <td data-label="Коробка передач">7DCT, робот</td>
+                <td data-label="Привод">4WD</td>
               </tr>
               <tr>
-                <td>Техно+</td>
-                <td>Бензин, 2,0 л, 200 л.с.</td>
-                <td>7DCT, робот</td>
-                <td>4WD</td>
+                <td data-label="Комплектация">Техно+</td>
+                <td data-label="Двигатель">Бензин, 2,0 л, 200 л.с.</td>
+                <td data-label="Коробка передач">7DCT, робот</td>
+                <td data-label="Привод">4WD</td>
               </tr>
             </tbody>
           </table>
