@@ -23,6 +23,10 @@ assert.match(html, /ПРОСТРАНСТВО АВТОМОБИЛЕЙ/);
 assert.match(html, /Брянск, Литейная 3\/2/);
 assert.match(html, /data:image\/svg\+xml;base64,/);
 assert.match(html, /data:image\/png;base64,cW9y/);
+assert.match(html, /background: #E63312/);
+assert.match(html, /background: #F4F1EA/);
+assert.match(html, /font-size: 56pt/);
+assert.match(html, /Комплектации и доступные модели\./);
 assert.doesNotMatch(html, /₽|VIN|Клиент|Телефон клиента/i);
 
 const escapedHtml = renderVehicleTag({
