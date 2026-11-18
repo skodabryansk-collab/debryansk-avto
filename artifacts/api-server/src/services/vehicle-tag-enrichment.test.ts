@@ -155,9 +155,10 @@ const actualF7x = enrichVehicleTagData({
     { label: "Привод", value: "Полный" },
   ],
 });
-assert.ok(actualF7x.specs.length > 3);
+assert.equal(actualF7x.specs.length, 8);
 assert.ok(actualF7x.specs.some(spec => spec.label === "Длина × ширина × высота"));
 assert.ok(actualF7x.specs.some(spec => spec.label === "Максимальный крутящий момент"));
+assert.equal(actualF7x.specs.filter(spec => /коробк.*передач/i.test(spec.label)).length, 1);
 
 const actualM6 = enrichVehicleTagData({
   records: productionRecords,
@@ -180,7 +181,7 @@ const actualM6 = enrichVehicleTagData({
     { label: "Привод", value: "Передний" },
   ],
 });
-assert.ok(actualM6.specs.length > 3);
+assert.equal(actualM6.specs.length, 8);
 assert.ok(actualM6.specs.some(spec => spec.label === "Длина × ширина × высота"));
 
 assert.throws(() => parseVehicleSpecCsv("missing,headers\n1,2"), /missing required columns/i);
