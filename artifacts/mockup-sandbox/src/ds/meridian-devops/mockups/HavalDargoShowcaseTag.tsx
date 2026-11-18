@@ -94,7 +94,7 @@ export function HavalDargoShowcaseTag() {
           aria-labelledby="dargo-title"
         >
           <div>
-            <p className="mb-1 mt-0 font-mono text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+            <p className="mb-2 mt-0 font-mono text-xl font-bold uppercase tracking-[0.16em] text-primary">
               Haval
             </p>
             <h1
@@ -159,21 +159,23 @@ export function HavalDargoShowcaseTag() {
 
         <Separator />
 
-        <section className="ept-lower mt-[6mm] grid grid-cols-[minmax(0,1fr)_42mm] items-stretch gap-[7mm]" aria-label="Подборка модели">
-          <div className="flex flex-col justify-center">
-            <h2 className="m-0 text-lg font-bold">Подборка модели</h2>
-            <p className="mb-0 mt-2 max-w-[78mm] text-sm leading-relaxed text-muted-foreground">
-              Комплектации и доступные модели.
-            </p>
-          </div>
+        <section className="mt-[6mm]" aria-label="Подборка модели">
           <Card>
-            <CardContent className="flex flex-col items-center p-[3mm] text-center">
-              <img
-                className="block h-[29mm] w-[29mm] object-contain"
-                src="/__mockup/images/vehicle-tag/dargo-catalog-qr.svg"
-                alt="QR-код на подборку Haval Dargo на сайте Дебрянск Авто"
-              />
-              <p className="mb-0 mt-2 text-xs font-semibold">Каталог Haval Dargo</p>
+            <CardContent className="ept-lower grid grid-cols-[minmax(0,1fr)_42mm] items-center gap-[5mm] p-[4mm]">
+              <div className="flex flex-col justify-center">
+                <h2 className="m-0 text-lg font-bold">Подборка модели</h2>
+                <p className="mb-0 mt-2 max-w-[78mm] text-sm leading-relaxed text-muted-foreground">
+                  Комплектации и доступные модели.
+                </p>
+              </div>
+              <div className="flex flex-col items-center text-center">
+                <img
+                  className="block h-[29mm] w-[29mm] object-contain"
+                  src="/__mockup/images/vehicle-tag/dargo-catalog-qr.svg"
+                  alt="QR-код на подборку Haval Dargo на сайте Дебрянск Авто"
+                />
+                <p className="mb-0 mt-2 text-xs font-semibold">Каталог Haval Dargo</p>
+              </div>
             </CardContent>
           </Card>
         </section>
