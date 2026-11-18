@@ -135,6 +135,16 @@ function normalizeKey(value: string): string {
     .replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
+const INVALID_BODY_TYPE_VALUES = new Set([
+  "off", "on", "true", "false", "0", "1", "null", "undefined", "none", "na",
+]);
+
+export function normalizeVehicleTagBodyType(value: string | null | undefined): string {
+  const bodyType = value?.trim() ?? "";
+  if (!bodyType || INVALID_BODY_TYPE_VALUES.has(normalizeKey(bodyType))) return "";
+  return bodyType;
+}
+
 function chooseApplicableYearRows(rows: VehicleSpecRecord[], year: number | null): VehicleSpecRecord[] {
   const yearRows = rows.filter(row => row.model_year || row.production_year);
   const yearlessRows = rows.filter(row => !row.model_year && !row.production_year);
@@ -246,7 +256,7 @@ function getEnrichedVariant(
 function activeFieldIsPresent(key: string, rows: VehicleTagActiveRow[]): boolean {
   switch (key) {
     case "body_type":
-      return rows.some(row => Boolean(row.bodyType?.trim()));
+      return rows.some(row => Boolean(normalizeVehicleTagBodyType(row.bodyType)));
     case "drive_type":
     case "drivetrain":
       return rows.some(row => Boolean(row.driveType?.trim()));
@@ -298,7 +308,7 @@ function buildMissingSpecs(
     ));
     if (!specKey) continue;
     if (group.category === "power" && activeRows.some(row => row.enginePower != null)) continue;
-    if (group.category === "body" && activeRows.some(row => Boolean(row.bodyType?.trim()))) continue;
+    if (group.category === "body" && activeRows.some(row => Boolean(normalizeVehicleTagBodyType(row.bodyType)))) continue;
     if (group.category === "engine-displacement" && activeRows.some(row => row.engineVolume != null)) continue;
     if (group.category === "transmission" && activeFieldIsPresent("transmission", activeRows)) continue;
     if (group.category === "drive" && activeRows.some(row => Boolean(row.driveType?.trim()))) continue;
