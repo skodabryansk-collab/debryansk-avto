@@ -47,7 +47,6 @@ export const modules: ModuleMap = {
   "./components/mockups/vehicle-tag-copy-o2Uj-K0R/DebryanskDargo.tsx": () => import("../components/mockups/vehicle-tag-copy-o2Uj-K0R/DebryanskDargo.tsx"),
   "./components/mockups/vehicle-tag-copy-o2Uj-K0R/EditorialTag.tsx": () => import("../components/mockups/vehicle-tag-copy-o2Uj-K0R/EditorialTag.tsx"),
   "./components/mockups/vehicle-tag-copy-o2Uj-K0R/SpecificationIndexTag.tsx": () => import("../components/mockups/vehicle-tag-copy-o2Uj-K0R/SpecificationIndexTag.tsx"),
-  "./components/mockups/vehicle-tag-copy-o2Uj-K0R/VehicleTagCopyO2UjK0R.tsx": () => import("../components/mockups/vehicle-tag-copy-o2Uj-K0R/VehicleTagCopyO2UjK0R.tsx"),
   "./components/mockups/vehicle-tag-copy-u2Yw9VZp/DargoRail.tsx": () => import("../components/mockups/vehicle-tag-copy-u2Yw9VZp/DargoRail.tsx"),
   "./components/mockups/vehicle-tag-copy-u2Yw9VZp/DargoShowroom.tsx": () => import("../components/mockups/vehicle-tag-copy-u2Yw9VZp/DargoShowroom.tsx"),
   "./components/mockups/vehicle-tag-copy-u2Yw9VZp/DargoTypographic.tsx": () => import("../components/mockups/vehicle-tag-copy-u2Yw9VZp/DargoTypographic.tsx"),
