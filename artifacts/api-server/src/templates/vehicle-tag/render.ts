@@ -57,7 +57,7 @@ export function renderVehicleTag(data: VehicleTagData): string {
   const logoDataUrl = getCompanyLogoDataUrl();
   const dense = data.variants.length > 6;
   const ultraDense = data.variants.length > 12;
-  const modelSize = data.model.length > 17 ? 30 : data.model.length > 11 ? 36 : 42;
+  const modelSize = data.model.length > 17 ? 36 : data.model.length > 11 ? 48 : 56;
   const specColumns = Math.max(1, Math.min(4, data.specs.length));
   const variantsHtml = data.variants.length
     ? data.variants.map(variant => `
@@ -92,9 +92,9 @@ export function renderVehicleTag(data: VehicleTagData): string {
     * { box-sizing: border-box; }
     html, body { width: 210mm; height: 297mm; margin: 0; padding: 0; }
     body {
-      color: #17191c;
-      background: #fff;
-      font-family: Arial, "DejaVu Sans", sans-serif;
+      color: #0D0D0D;
+      background: #F4F1EA;
+      font-family: "Inter Tight", Helvetica, Arial, "DejaVu Sans", sans-serif;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -102,13 +102,14 @@ export function renderVehicleTag(data: VehicleTagData): string {
       position: relative;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: flex-start;
       width: 210mm;
       height: 297mm;
       overflow: hidden;
       padding: 11mm 13mm 9mm;
+      background: #F4F1EA;
     }
-    .rail { position: absolute; inset: 0 auto 0 0; width: 1.4mm; background: #4a4d52; }
+    .rail { position: absolute; inset: 0 auto 0 0; width: 2mm; background: #E63312; }
     .brand-lockup {
       position: relative;
       width: 54mm;
@@ -125,29 +126,30 @@ export function renderVehicleTag(data: VehicleTagData): string {
       height: 24%;
       overflow: hidden;
       margin: 0;
-      background: #fff;
-      color: #17191c;
+      background: #F4F1EA;
+      color: #0D0D0D;
+      font-family: "Inter Tight", Helvetica, Arial, "DejaVu Sans", sans-serif;
       font-size: 5.8pt;
       font-weight: 600;
       line-height: 1;
       letter-spacing: .08em;
       white-space: nowrap;
     }
-    .top-rule { height: 0; margin-top: 5mm; border: 0; border-top: .45pt solid #c9cdd1; }
+    .top-rule { height: 0; margin-top: 5mm; border: 0; border-top: .45pt solid #AFADA8; }
     .identity {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 32mm;
       align-items: end;
       gap: 7mm;
       padding: 8mm 0;
-      border-bottom: 1.2pt solid #17191c;
+      border-bottom: 1.2pt solid #0D0D0D;
     }
     .identity.no-year { grid-template-columns: 1fr; }
     .brand-name {
       margin: 0 0 2mm;
-      color: #45494f;
-      font-family: "DejaVu Sans Mono", monospace;
-      font-size: 17pt;
+      color: #E63312;
+      font-family: "IBM Plex Mono", "DejaVu Sans Mono", monospace;
+      font-size: 20pt;
       font-weight: 700;
       letter-spacing: .16em;
       text-transform: uppercase;
@@ -161,11 +163,11 @@ export function renderVehicleTag(data: VehicleTagData): string {
       text-transform: uppercase;
       overflow-wrap: anywhere;
     }
-    .year { padding: 0 0 1mm 4mm; border-left: .6pt solid #aeb4ba; }
+    .year { padding: 0 0 1mm 4mm; border-left: .6pt solid #AFADA8; }
     .year span {
       display: block;
-      color: #686d73;
-      font-family: "DejaVu Sans Mono", monospace;
+      color: #5A5751;
+      font-family: "IBM Plex Mono", "DejaVu Sans Mono", monospace;
       font-size: 7.5pt;
       letter-spacing: .1em;
       text-transform: uppercase;
@@ -176,27 +178,27 @@ export function renderVehicleTag(data: VehicleTagData): string {
       grid-template-columns: 35mm minmax(0, 1fr);
       gap: 6mm;
       padding: 6mm 0;
-      border-bottom: .5pt solid #c9cdd1;
+      border-bottom: .5pt solid #AFADA8;
     }
     .config-label { padding-top: 3.5mm; }
     .config-label h2, .specs-title, .qr-title { margin: 0; font-size: 12pt; font-weight: 700; line-height: 1.2; }
-    .variants { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5mm; align-content: start; }
-    .variant { min-width: 0; padding: 3mm; border: .5pt solid #c7ccd1; border-radius: 1.5mm; }
-    .variant h3 { margin: 0; font-size: 9.5pt; line-height: 1.2; overflow-wrap: anywhere; }
-    .variant p { margin: 2mm 0 0; color: #555b62; font-size: 8pt; line-height: 1.3; overflow-wrap: anywhere; }
-    .variant .drive { color: #17191c; font-family: "DejaVu Sans Mono", monospace; font-weight: 700; }
+    .variants { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3mm; align-content: start; }
+    .variant { min-width: 0; padding: 3.5mm; border: .5pt solid #AFADA8; border-radius: 0; }
+    .variant h3 { margin: 0; font-size: 10.5pt; line-height: 1.2; overflow-wrap: anywhere; }
+    .variant p { margin: 2mm 0 0; color: #5A5751; font-size: 8.5pt; line-height: 1.3; overflow-wrap: anywhere; }
+    .variant .drive { color: #0D0D0D; font-family: "IBM Plex Mono", "DejaVu Sans Mono", monospace; font-weight: 700; }
     .specs { padding: 6mm 0; }
     .specs-title { margin-bottom: 3mm; font-size: 14pt; }
-    .spec-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; border-top: .5pt solid #c9cdd1; border-left: .5pt solid #c9cdd1; }
-    .spec { min-height: 21mm; padding: 3mm; border-right: .5pt solid #c9cdd1; border-bottom: .5pt solid #c9cdd1; }
-    .spec dt { margin: 0 0 2mm; color: #646a70; font-size: 7.5pt; line-height: 1.25; }
-    .spec dd { margin: 0; font-size: 10pt; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
-    .empty { margin: 0; color: #646a70; font-size: 9pt; line-height: 1.4; }
-    .qr-section { margin-top: 2mm; padding: 3.5mm; border: .65pt solid #b9bec4; border-radius: 1.5mm; }
+    .spec-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; border-top: .5pt solid #AFADA8; border-left: .5pt solid #AFADA8; }
+    .spec { min-height: 22mm; padding: 3mm; border-right: .5pt solid #AFADA8; border-bottom: .5pt solid #AFADA8; }
+    .spec dt { margin: 0 0 2mm; color: #5A5751; font-size: 8pt; line-height: 1.25; }
+    .spec dd { margin: 0; font-size: 11pt; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+    .empty { margin: 0; color: #5A5751; font-size: 9pt; line-height: 1.4; }
+    .qr-section { margin-top: 6mm; padding: 4mm; border: .65pt solid #AFADA8; border-radius: 0; }
     .qr-layout { display: grid; grid-template-columns: minmax(0, 1fr) 36mm; align-items: center; gap: 5mm; }
     .qr-copy { display: flex; flex-direction: column; justify-content: center; }
     .qr-title { font-size: 14pt; }
-    .qr-copy p { max-width: 78mm; margin: 2mm 0 0; color: #565c62; font-size: 9pt; line-height: 1.4; }
+    .qr-copy p { max-width: 78mm; margin: 2mm 0 0; color: #5A5751; font-size: 9pt; line-height: 1.4; }
     .qr-box { display: flex; flex-direction: column; align-items: center; text-align: center; }
     .qr-image { display: block; width: 29mm; height: 29mm; object-fit: contain; }
     .qr-label { margin: 1.5mm 0 0; font-size: 7.5pt; font-weight: 700; line-height: 1.2; }
@@ -205,11 +207,11 @@ export function renderVehicleTag(data: VehicleTagData): string {
       align-items: center;
       justify-content: space-between;
       gap: 5mm;
-      margin-top: 0;
+      margin-top: auto;
       padding-top: 3mm;
-      border-top: .65pt solid #17191c;
-      color: #535960;
-      font-family: "DejaVu Sans Mono", monospace;
+      border-top: .65pt solid #0D0D0D;
+      color: #5A5751;
+      font-family: "IBM Plex Mono", "DejaVu Sans Mono", monospace;
       font-size: 7.5pt;
     }
     .dense .config { padding: 4mm 0; }
@@ -255,7 +257,7 @@ export function renderVehicleTag(data: VehicleTagData): string {
       <div class="qr-layout">
         <div class="qr-copy">
           <h2 class="qr-title">Подборка модели</h2>
-          <p>Комплектации и модификации</p>
+          <p>Комплектации и доступные модели.</p>
         </div>
         <div class="qr-box">
           <img class="qr-image" src="${requiredText(data.qrDataUrl)}" alt="${requiredText(data.qrLabel)}">
