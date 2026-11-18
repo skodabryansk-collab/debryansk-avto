@@ -35,57 +35,172 @@ id = "YNtFUw3ER9ginfoEBVk3l"
 uri = "file://artifacts/debryansk-avto/src/assets/dealer-omoda.png"
 type = "image"
 title = "modern car dealership showroom exterior futuristic architecture"
+logical_id = "1d94f4f5-c29e-4f47-a478-159a355936df"
 
 [[outputs]]
 id = "otl2AtWDJaIiD-WlpfaiI"
 uri = "file://artifacts/debryansk-avto/src/assets/dealer-haval.png"
 type = "image"
 title = "large modern suv dealership building exterior clean lines"
+logical_id = "cb0c238d-532b-4bee-9732-be6e63d58a15"
 
 [[outputs]]
 id = "sfZ1K2iZUJd6JUWlSJzpj"
 uri = "file://artifacts/debryansk-avto/src/assets/dealer-mb.png"
 type = "image"
 title = "ultra luxury german car dealership interior premium lighting"
+logical_id = "56170a91-3c83-4a45-8509-425d26ad4d85"
 
 [[outputs]]
 id = "UgWv2j3MejkEUtcEmyc_3"
 uri = "file://artifacts/mockup-sandbox/public/images/hero-dynamic.jpg"
 type = "image"
 title = "modern car showroom"
+logical_id = "d770e54d-078c-4b49-8804-3b23f8555bd9"
 
 [[outputs]]
 id = "aleb8MVtT0z_1Y9DF9qXG"
 uri = "file://artifacts/mockup-sandbox/public/images/hero-luxury.jpg"
 type = "image"
 title = "dark luxury car showroom interior night cinematic"
+logical_id = "46b99d80-730d-4d37-8702-767da92e5fd4"
 
 [[outputs]]
 id = "Gowsclks95bghWr3BScG8"
 uri = "file://attached_assets/image_search/hero_showroom_many.jpg"
 type = "image"
 title = "1 — Шоурум с множеством авто (цветное)"
+logical_id = "c2817ab4-ac4f-4aba-b61c-26766ca7d0d7"
 
 [[outputs]]
 id = "hLCp-bOI35W02z4psM5t1"
 uri = "file://attached_assets/image_search/hero_sports_row.jpg"
 type = "image"
 title = "2 — Ряд спортивных авто (яркое, цветное)"
+logical_id = "1831f514-2e6e-4d1d-9969-13f56fcdc009"
 
 [[outputs]]
 id = "Z5Ikd8R_jYEiD5yrX7sOz"
 uri = "file://attached_assets/image_search/hero_showroom_bw.jpg"
 type = "image"
 title = "3 — Шоурум ч/б (драматичный, премиум)"
+logical_id = "96509bfd-a826-4219-a11c-ee2adeee2953"
 
 [[outputs]]
 id = "UZw9H0MPkfYwudYtp-Uzd"
 uri = "file://attached_assets/image_search/hero_garage_bw.jpg"
 type = "image"
 title = "4 — Ряд авто в гараже ч/б"
+logical_id = "a04c680a-1c1d-4cd3-9355-87a355488e19"
 
 [[outputs]]
 id = "0rRw8kMOACZKxZLCf11lf"
 uri = "file://icons-debryansk-avto.zip"
 type = "unspecified"
 title = "Иконки Дебрянск Авто — 34 SVG файла"
+logical_id = "b4d1f4d0-9786-484f-a5d7-1bfc3174e3d4"
+
+[[outputs]]
+id = "5qWnOPRZJrPcYyImXtyBA"
+uri = "file://tmp/frame_001.jpg"
+type = "image"
+title = "Video frame 1"
+logical_id = "a4b93e1f-66c7-4027-9423-f624ee66e292"
+
+[[outputs]]
+id = "J6dLMptLZ7bif3pu0CsT1"
+uri = "file://tmp/frame_002.jpg"
+type = "image"
+title = "Video frame 2"
+logical_id = "a525cc33-96f4-4fae-a0c9-ddf4418d2482"
+
+[[outputs]]
+id = "o-PNQXMwCP-9jHONNXHTD"
+uri = "file://tmp/frame_003.jpg"
+type = "image"
+title = "Video frame 3"
+logical_id = "0cebbba4-4f5b-43a5-9a7c-0666337fa83e"
+
+[[outputs]]
+id = "GaNQHS6f24wmW4cIcLIbW"
+uri = "file://tmp/frame_004.jpg"
+type = "image"
+title = "Video frame 4"
+logical_id = "3bd8e567-5b01-4632-8f83-e47a47db2e62"
+
+[[outputs]]
+id = "ZzpLjsOedJcmWoYgPOeov"
+uri = "file://tmp/frame_005.jpg"
+type = "image"
+title = "Video frame 5"
+logical_id = "1d632e49-17dc-46b2-84f0-1be7efcc1285"
+
+[[outputs]]
+id = "GApo_tdjdukmDLauElh4W"
+uri = "file://artifacts/debryansk-avto/CALLTOUCH_PHONE_HISTORY.md"
+type = "text"
+title = "История изменений Calltouch и телефонов"
+logical_id = "009a5795-2014-43a1-9177-15fdb068831b"
+
+[[outputs]]
+id = "S-YgBK5dZiiNyLmnEiDlZ"
+uri = "file://attached_assets/og-car-preview.png"
+type = "image"
+title = "OG-изображение авто (новый макет)"
+logical_id = "14655a7d-be1e-449c-bf16-95cca927ba6d"
+
+[[outputs]]
+id = "ldnhD7FXTQ3bPPdp9RG4t"
+uri = "file://attached_assets/og-car-preview2.png"
+type = "image"
+title = "OG авто — лого в потоке (центрировано)"
+logical_id = "dabdda91-ab00-473f-b557-29df0408274c"
+
+[[outputs]]
+id = "NHYZrYOXsgSYXFyIXV5BH"
+uri = "file://attached_assets/og-new.png"
+type = "image"
+title = "Новый авто"
+logical_id = "f874fcd9-afc0-4a54-a7e9-799cee42ea88"
+
+[[outputs]]
+id = "3bxSHHC0TrE8sts7wamzM"
+uri = "file://attached_assets/og-used.png"
+type = "image"
+title = "Авто с пробегом"
+logical_id = "d579c508-22d4-4313-a3cc-ed18f7631e73"
+
+[[outputs]]
+id = "aOvpJIZ_S3M9w08o_ZyZx"
+uri = "file://attached_assets/og-cat.png"
+type = "image"
+title = "Каталог"
+logical_id = "08d46b65-5254-421e-bb8f-31036525959c"
+
+[[outputs]]
+id = "Yo_dBZYLiLl-Fe-pYtJi2"
+uri = "file://attached_assets/og-stat.png"
+type = "image"
+title = "Статическая страница (вакансии)"
+logical_id = "6a2b3c3d-0714-48d9-9ae3-fa058c349b14"
+
+[[outputs]]
+id = "oe28KM1nrUnUD-qwYvyx7"
+uri = "file://attached_assets/og-svc.png"
+type = "image"
+title = "Сервис"
+logical_id = "f6f3daac-89f8-4f6c-ad4e-a7f0b58be400"
+
+[[outputs]]
+id = "h6zXJWnRY2w0OuUFP_23H"
+uri = "file://attached_assets/og-brand.png"
+type = "image"
+title = "Бренд (Jetour)"
+logical_id = "5aaaeb8a-e109-4de3-b470-cc7e00f9f701"
+
+[[outputs]]
+id = "S2V8IechGmmzkh1ayfWLo"
+uri = "file://kp-changes-summary.txt"
+type = "text"
+title = "Сводка изменений КП для сотрудников"
+logical_id = "a5082019-3816-423d-a907-082234826681"
