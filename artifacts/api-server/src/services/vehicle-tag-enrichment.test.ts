@@ -134,5 +134,54 @@ assert.ok(actualH9.variants[0]?.gearbox);
 assert.ok(actualH9.variants[0]?.drive);
 assert.ok(actualH9.specs.some(spec => spec.label === "Длина × ширина × высота"));
 
+const actualF7x = enrichVehicleTagData({
+  records: productionRecords,
+  brand: "Haval City",
+  model: "F7X",
+  year: 2026,
+  variants: [{ name: "Техно +", engine: "2,0 л · 231 л.с.", gearbox: "0 AMT", drive: "Полный" }],
+  activeRows: [{
+    complectation: "Техно +",
+    modification: null,
+    fuelType: "Бензин",
+    engineVolume: 2,
+    enginePower: 231,
+    driveType: "Полный",
+    bodyType: null,
+  }],
+  activeSpecs: [
+    { label: "Двигатели", value: "2,0 л · 231 л.с." },
+    { label: "Коробки передач", value: "0 AMT" },
+    { label: "Привод", value: "Полный" },
+  ],
+});
+assert.ok(actualF7x.specs.length > 3);
+assert.ok(actualF7x.specs.some(spec => spec.label === "Длина × ширина × высота"));
+assert.ok(actualF7x.specs.some(spec => spec.label === "Максимальный крутящий момент"));
+
+const actualM6 = enrichVehicleTagData({
+  records: productionRecords,
+  brand: "Haval City",
+  model: "M6",
+  year: 2026,
+  variants: [{ name: "Оптимум (2026)", engine: "1,5 л · 143 л.с.", gearbox: "5 AMT", drive: "Передний" }],
+  activeRows: [{
+    complectation: "Оптимум (2026)",
+    modification: null,
+    fuelType: null,
+    engineVolume: 1.5,
+    enginePower: 143,
+    driveType: "Передний",
+    bodyType: null,
+  }],
+  activeSpecs: [
+    { label: "Двигатели", value: "1,5 л · 143 л.с." },
+    { label: "Коробки передач", value: "5 AMT" },
+    { label: "Привод", value: "Передний" },
+  ],
+});
+assert.ok(actualM6.specs.length > 3);
+assert.ok(actualM6.specs.some(spec => spec.label === "Длина × ширина × высота"));
+
 assert.throws(() => parseVehicleSpecCsv("missing,headers\n1,2"), /missing required columns/i);
 process.stdout.write("Vehicle tag enrichment tests passed\n");
