@@ -19,6 +19,7 @@ import { cmBusinessGet } from "../lib/cm-expert-client";
 import { getManagerQuoteLocationOverride, normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
 import { verifiedQuoteExtras } from "../lib/quote-car-extras";
 import { parseXmlEngineData } from "../services/car-engine-enrichment";
+import { enrichVehicleTagData, loadVehicleTagSpecRecords } from "../services/vehicle-tag-enrichment";
 import { renderVehicleTag, type VehicleTagSpec, type VehicleTagVariant } from "../templates/vehicle-tag/render";
 import {
   getCmStockIntegrations, isCmOptionsOnlyDealer,
@@ -1181,14 +1182,34 @@ router.post("/vehicle-tags/pdf", async (req, res): Promise<void> => {
       .where(and(...modelFilters))
       .orderBy(carsTable.complectation, carsTable.modification);
 
+    const activeRows = modelRows.map(row => ({
+      complectation: row.complectation,
+      modification: row.modification,
+      fuelType: row.fuelType,
+      engineVolume: row.engineVolume,
+      enginePower: row.enginePower,
+      driveType: row.driveType,
+      bodyType: row.bodyType,
+    }));
+    const baseVariants = modelRows.map(row => makeVehicleTagVariant(row));
+    const baseSpecs = buildVehicleTagSpecs(baseVariants, modelRows.map(row => row.bodyType));
+    const enriched = enrichVehicleTagData({
+      records: loadVehicleTagSpecRecords(),
+      brand: car.brand,
+      model: car.model,
+      year: car.year,
+      variants: baseVariants,
+      activeRows,
+      activeSpecs: baseSpecs,
+    });
+
     const variantMap = new Map<string, VehicleTagVariant>();
-    for (const row of modelRows) {
-      const variant = makeVehicleTagVariant(row);
+    for (const variant of enriched.variants) {
       const key = [variant.name, variant.engine, variant.gearbox, variant.drive].join("\u241f");
       variantMap.set(key, variant);
     }
     const variants = Array.from(variantMap.values());
-    const specs = buildVehicleTagSpecs(variants, modelRows.map(row => row.bodyType));
+    const specs = enriched.specs;
 
     const catalogUrl = new URL("/new-cars", "https://debryansk-auto.ru");
     const dealer = car.dealer?.trim();
