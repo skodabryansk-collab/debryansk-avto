@@ -1,0 +1,19 @@
+kind = "design-system"
+previewPath = "/meridian-devops/"
+title = "Meridian DevOps Design System"
+description = "A visual system extracted from the MERIDIAN SHIPFEST '25 poster, for technical event communications and platform-engineering materials."
+version = "1.0.0"
+id = "artifacts/meridian-devops"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/meridian-devops/" ]
+localPort = 25647
+
+[services.development]
+run = "pnpm --filter @workspace/meridian-devops run dev"
+
+[services.env]
+PORT = "25647"
+BASE_PATH = "/meridian-devops/"
