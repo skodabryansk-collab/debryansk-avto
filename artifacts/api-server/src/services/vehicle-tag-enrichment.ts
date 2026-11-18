@@ -135,6 +135,14 @@ function normalizeKey(value: string): string {
     .replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
+function normalizeBrandForSpecLookup(value: string): string {
+  const brandKey = normalizeKey(value);
+  // The live inventory labels Haval as "Haval City", while the source
+  // specification files and normalized dataset use the manufacturer name.
+  if (brandKey === "havalcity") return "haval";
+  return brandKey;
+}
+
 const INVALID_BODY_TYPE_VALUES = new Set([
   "off", "on", "true", "false", "0", "1", "null", "undefined", "none", "na",
 ]);
@@ -165,10 +173,10 @@ function getApplicableRecords(
   model: string,
   year: number | null,
 ): VehicleSpecRecord[] {
-  const brandKey = normalizeKey(brand);
+  const brandKey = normalizeBrandForSpecLookup(brand);
   const modelKey = normalizeKey(model);
   const matches = records.filter(record =>
-    normalizeKey(record.source_brand_label) === brandKey
+    normalizeBrandForSpecLookup(record.source_brand_label) === brandKey
     && normalizeKey(record.model) === modelKey,
   );
   return chooseApplicableYearRows(matches, year);
