@@ -204,3 +204,31 @@ uri = "file://kp-changes-summary.txt"
 type = "text"
 title = "Сводка изменений КП для сотрудников"
 logical_id = "a5082019-3816-423d-a907-082234826681"
+
+[[outputs]]
+id = "HbGZvy1ZqUg23XWUKFoA7"
+uri = "file://.local/outputs/vehicle-specs-import.csv"
+type = "table"
+title = "Характеристики автомобилей для импорта"
+description = "Обновлённая таблица: 913 записей по 28 моделям. Добавлены TENET A8/T7/T8/T9 и JETOUR X70 Plus, Dashing, T1, T1 i-DM и T2; цены исключены, годы с неясностью отмечены."
+logical_id = "dce880b5-6dc4-4778-9faa-498e05a8bec1"
+content_hash = "sha256:38a01359405771e271db1da38663d8177137d358028502068a2f1ef698b86ab0"
+size = 275252
+mtime_ms = 1795014151442
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:7d24f84d-d7d0-410f-bd17-f35938619fa4/dce880b5-6dc4-4778-9faa-498e05a8bec1/0b7aac01-abb2-46bf-af52-e508b85bd078"
+storage_version_token = "1795014170225636"
+content_type = "text/csv"
+
+[[outputs]]
+id = "_yb-DUI8Nt4bmLCsdLUZG"
+uri = "file://.local/outputs/vehicle-specs-import-normalized.csv"
+type = "table"
+title = "Финально нормализованная таблица характеристик"
+description = "Проверены все 1 319 строк: точных дублей нет, порядок строк стабилизирован, пробелы и кодировка приведены к единому виду. Все 28 моделей имеют комплектации."
+logical_id = "ffbc9d15-27c8-477e-b270-d6a064af1f40"
+content_hash = "sha256:11a4f231578a4e5d4aebea9422c758995eb349e473c8df1a00008f957cc9d0a3"
+size = 389635
+mtime_ms = 1795015217575
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:7d24f84d-d7d0-410f-bd17-f35938619fa4/ffbc9d15-27c8-477e-b270-d6a064af1f40/e5037961-e899-4132-96db-c33d125e51cd"
+storage_version_token = "1795015273840782"
+content_type = "text/csv"
