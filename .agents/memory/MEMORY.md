@@ -86,3 +86,4 @@
 - [CM Expert stock API](cm-expert-dealer-stock-api.md) — list filters are ignored; refresh one car with GET by dealerId + DMS ID; PATCH on that path writes to CM.
 - [Mobile detail sticky bars](mobile-sticky-bars.md) — render car detail CTAs through body portals and avoid backdrop blur so scrolling containers cannot displace them.
 - [New-car price tag requirements](vehicle-tag-requirements.md) — A4 monochrome for mall displays; Debryansk Auto, no photo or price, prioritize trims and powertrains.
+- [Vehicle trim source review](vehicle-trim-source-review.md) — verify every PDF page visually; text extraction can miss trim names in equipment matrices.
