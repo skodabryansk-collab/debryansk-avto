@@ -9,10 +9,12 @@ New-car information tags are displayed in shopping centers, not inside dealershi
 - Do not include a vehicle photo or selling price. VIN is optional and must not take priority over model options.
 - Prioritize the model, available trim levels, engines, transmissions, drive types, and technical specifications.
 - Include a QR code linking to the matching model collection on the website.
+- In the manager quote module, generate a tag as soon as a new car is selected; do not require customer details or create a quote.
+- Resolve the printed address from the selected brand's assigned dealership; do not substitute another center if the mapping is missing.
 - Remove generic sales slogans and avoid the old «Автомобили в наличии / официальный дилер Брянск» header.
 - Give the brand and model typography a confident presence, with a restrained monochrome visual accent so the tag feels more distinctive than a plain paper label.
 - Avoid solid black backgrounds behind the brand and model year; use typography and fine outlines for emphasis.
 
-**Why:** the user explicitly clarified the display context, print constraints, brand, information priority, desired visual character, and rejected solid black name/year panels.
+**Why:** the user explicitly clarified the display context, print constraints, brand, information priority, desired visual character, rejected solid black name/year panels, and said printing should require only a selected new car.
 
-**How to apply:** use these constraints for future new-car tag designs and implementation unless the user changes them.
+**How to apply:** use these constraints for future new-car tag designs and implementation unless the user changes them; derive the tag from current model inventory and the mapped dealership.
