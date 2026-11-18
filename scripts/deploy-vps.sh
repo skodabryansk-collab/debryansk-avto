@@ -90,9 +90,11 @@ fi
 if [[ "$SKIP_API" -eq 0 ]]; then
   log "Uploading API dist..."
   cd artifacts/api-server
+  ssh_vps "mkdir -p /opt/debryansk/api/data"
   tar czf - \
     dist/index.mjs \
     dist/geo-citation-check.mjs \
+    dist/data/vehicle-specs-import-normalized.csv \
     dist/pino-worker.mjs \
     dist/pino-file.mjs \
     dist/pino-pretty.mjs \
@@ -186,6 +188,7 @@ log "Verifying deployed files..."
 ssh_vps "
   ERRORS=0
   [ -f /opt/debryansk/api/index.mjs ]      || { echo 'MISSING: api/index.mjs'; ERRORS=1; }
+  [ -f /opt/debryansk/api/data/vehicle-specs-import-normalized.csv ] || { echo 'MISSING: api/data/vehicle-specs-import-normalized.csv'; ERRORS=1; }
   [ -f /opt/debryansk/api/geo-citation-check.mjs ] || { echo 'MISSING: api/geo-citation-check.mjs'; ERRORS=1; }
   [ -f /opt/debryansk/frontend/index.html ] || { echo 'MISSING: frontend/index.html'; ERRORS=1; }
   [ -f /opt/debryansk/admin/index.html ]    || { echo 'MISSING: admin/index.html'; ERRORS=1; }
