@@ -100,13 +100,12 @@ export function DebryanskDargo() {
         .tag-make {
           display: inline-block;
           margin: 0 0 2.2mm;
-          padding: 1.1mm 2.2mm .9mm;
-          background: #111;
-          color: #fff;
+          padding: 0;
+          color: #111;
           font-size: 11pt;
           line-height: 1;
           font-weight: 800;
-          letter-spacing: .16em;
+          letter-spacing: .2em;
         }
         .tag-model {
           margin: 0;
@@ -119,15 +118,15 @@ export function DebryanskDargo() {
         .tag-year {
           min-width: 30mm;
           margin-bottom: 1.2mm;
-          padding: 3mm 3.2mm 3.2mm;
-          background: #111;
-          color: #fff;
+          padding: 2.8mm 3.2mm 3mm;
+          border: 1.2px solid #111;
+          color: #111;
           text-align: center;
         }
         .tag-year-label {
           display: block;
           margin-bottom: 1mm;
-          color: #e5e5e5;
+          color: #555;
           font-size: 7.5pt;
           font-weight: 600;
           letter-spacing: .08em;
@@ -135,7 +134,7 @@ export function DebryanskDargo() {
         }
         .tag-year-value {
           display: block;
-          color: #fff;
+          color: #111;
           font-size: 24pt;
           line-height: 1;
           font-weight: 800;
