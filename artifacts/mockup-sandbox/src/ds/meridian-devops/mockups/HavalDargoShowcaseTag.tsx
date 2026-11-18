@@ -1,4 +1,3 @@
-import { Badge } from '@workspace/meridian-devops/components/ui/badge';
 import {
   Card,
   CardContent,
@@ -95,8 +94,7 @@ export function HavalDargoShowcaseTag() {
           aria-labelledby="dargo-title"
         >
           <div>
-            <Badge variant="outline">Новый автомобиль</Badge>
-            <p className="mb-1 mt-4 font-mono text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+            <p className="mb-1 mt-0 font-mono text-xs font-semibold uppercase tracking-[0.2em] text-primary">
               Haval
             </p>
             <h1
@@ -115,8 +113,7 @@ export function HavalDargoShowcaseTag() {
         </section>
 
         <section className="grid grid-cols-[35mm_minmax(0,1fr)] gap-[6mm] border-b border-border py-[6mm]" aria-labelledby="trims-title">
-          <div className="ept-section-index">
-            <p className="mb-1 font-mono text-[17pt] leading-none text-primary">01</p>
+          <div className="pt-[3.5mm]">
             <h2 id="trims-title" className="m-0 text-sm font-bold leading-snug">
               Комплектации<br />и агрегаты
             </h2>
@@ -140,13 +137,10 @@ export function HavalDargoShowcaseTag() {
         </section>
 
         <section className="py-[6mm]" aria-labelledby="specs-title">
-          <div className="mb-[3mm] flex items-end justify-between gap-4">
+          <div className="mb-[3mm]">
             <h2 id="specs-title" className="m-0 text-lg font-bold">
               Технические характеристики
             </h2>
-            <span className="font-mono text-[8px] uppercase tracking-[0.1em] text-muted-foreground">
-              Ключевые данные
-            </span>
           </div>
           <dl className="ept-spec-grid m-0 grid grid-cols-4 border-l border-t border-border">
             {specs.map(([label, value], index) => (
@@ -169,7 +163,7 @@ export function HavalDargoShowcaseTag() {
           <div className="flex flex-col justify-center">
             <h2 className="m-0 text-lg font-bold">Подборка модели</h2>
             <p className="mb-0 mt-2 max-w-[78mm] text-sm leading-relaxed text-muted-foreground">
-              Комплектации и доступные автомобили модели.
+              Комплектации и доступные модели.
             </p>
           </div>
           <Card>
@@ -180,18 +174,12 @@ export function HavalDargoShowcaseTag() {
                 alt="QR-код на подборку Haval Dargo на сайте Дебрянск Авто"
               />
               <p className="mb-0 mt-2 text-xs font-semibold">Каталог Haval Dargo</p>
-              <p className="mb-0 mt-1 text-[9px] leading-tight text-muted-foreground">
-                Комплектации и доступные автомобили модели.
-              </p>
             </CardContent>
           </Card>
         </section>
 
         <footer className="mt-auto flex items-center justify-between gap-5 border-t border-foreground pt-[3mm] text-xs text-muted-foreground">
-          <span className="flex items-center gap-2 font-mono">
-            <span aria-hidden="true" className="h-px w-[6mm] bg-foreground" />
-            Дебрянск Авто
-          </span>
+          <span className="font-mono">Брянск, Литейная 3/2</span>
           <span className="font-mono">debryansk-auto.ru</span>
         </footer>
       </main>
