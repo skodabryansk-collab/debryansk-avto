@@ -86,7 +86,6 @@ export function HavalDargoShowcaseTag() {
             />
             <p className="ept-tagline">ПРОСТРАНСТВО АВТОМОБИЛЕЙ</p>
           </div>
-          <Badge variant="outline">01 · МОДЕЛЬ / 2026</Badge>
         </header>
 
         <Separator className="mt-[5mm]" />
