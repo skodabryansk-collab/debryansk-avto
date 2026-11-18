@@ -85,3 +85,4 @@
 - [Quote car snapshot freshness](quote-car-snapshot.md) — КП snapshot can predate car sync; refresh photo/color from the live catalog when creating or rebuilding PDFs.
 - [CM Expert stock API](cm-expert-dealer-stock-api.md) — list filters are ignored; refresh one car with GET by dealerId + DMS ID; PATCH on that path writes to CM.
 - [Mobile detail sticky bars](mobile-sticky-bars.md) — render car detail CTAs through body portals and avoid backdrop blur so scrolling containers cannot displace them.
+- [New-car price tag requirements](vehicle-tag-requirements.md) — A4 monochrome for mall displays; Debryansk Auto, no photo or price, prioritize trims and powertrains.
