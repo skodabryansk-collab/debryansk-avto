@@ -3,9 +3,30 @@ export function DebryanskDargo() {
     <div className="tag-preview">
       <style>{`
         @font-face {
-          font-family: TaglineManrope;
+          font-family: Manrope;
           src: url("/__mockup/images/vehicle-tag/manrope-400.woff2") format("woff2");
           font-weight: 400;
+          font-style: normal;
+          font-display: swap;
+        }
+        @font-face {
+          font-family: Manrope;
+          src: url("/__mockup/images/vehicle-tag/manrope-600.woff2") format("woff2");
+          font-weight: 600;
+          font-style: normal;
+          font-display: swap;
+        }
+        @font-face {
+          font-family: Manrope;
+          src: url("/__mockup/images/vehicle-tag/manrope-700.woff2") format("woff2");
+          font-weight: 700;
+          font-style: normal;
+          font-display: swap;
+        }
+        @font-face {
+          font-family: Manrope;
+          src: url("/__mockup/images/vehicle-tag/manrope-800.woff2") format("woff2");
+          font-weight: 800;
           font-style: normal;
           font-display: swap;
         }
@@ -18,7 +39,7 @@ export function DebryanskDargo() {
           align-items: flex-start;
           background: #e8e9eb;
           color: #111;
-          font-family: Arial, Helvetica, sans-serif;
+          font-family: Manrope, Arial, sans-serif;
           -webkit-font-smoothing: antialiased;
         }
         .tag-sheet {
@@ -52,49 +73,41 @@ export function DebryanskDargo() {
         }
         .tag-logo-tagline {
           position: absolute;
-          top: 76%;
+          top: 72%;
           right: 0;
           left: 22.1%;
-          height: 22%;
+          height: 28%;
           overflow: hidden;
           background: #fff;
           color: #111;
-          font-family: TaglineManrope, Arial, Helvetica, sans-serif;
-          font-size: 1.43mm;
+          font-family: Manrope, Arial, sans-serif;
+          font-size: 2.35mm;
           font-weight: 400;
-          line-height: 1.15;
+          line-height: 1;
           letter-spacing: .025em;
           white-space: nowrap;
         }
         .tag-hero {
-          min-height: 49mm;
+          min-height: 48mm;
           display: flex;
           align-items: flex-end;
           justify-content: space-between;
           gap: 8mm;
-          padding: 8mm 0 6mm;
+          padding: 7mm 0 6mm;
           border-bottom: 1px solid #bbb;
-        }
-        .tag-kicker {
-          margin: 0 0 2.5mm;
-          color: #555;
-          font-size: 8pt;
-          font-weight: 700;
-          letter-spacing: .17em;
-          text-transform: uppercase;
         }
         .tag-make {
           margin: 0;
           font-size: 12pt;
           font-weight: 800;
-          letter-spacing: .24em;
+          letter-spacing: .18em;
         }
         .tag-model {
           margin: 0;
           font-size: clamp(48px, 8vw, 68px);
           line-height: .94;
-          font-weight: 900;
-          letter-spacing: -.055em;
+          font-weight: 800;
+          letter-spacing: -.03em;
         }
         .tag-year {
           min-width: 30mm;
@@ -107,9 +120,9 @@ export function DebryanskDargo() {
           display: block;
           margin-bottom: 1mm;
           color: #555;
-          font-size: 7.5pt;
-          font-weight: 700;
-          letter-spacing: .13em;
+          font-size: 8pt;
+          font-weight: 600;
+          letter-spacing: .08em;
           text-transform: uppercase;
         }
         .tag-year-value {
@@ -120,7 +133,7 @@ export function DebryanskDargo() {
           letter-spacing: -.04em;
         }
         .tag-configs {
-          margin-top: 7mm;
+          margin-top: 8mm;
         }
         .tag-config-table {
           width: 100%;
@@ -128,24 +141,24 @@ export function DebryanskDargo() {
           table-layout: fixed;
         }
         .tag-config-table th {
-          padding: 1.8mm 1.5mm;
+          padding: 2mm 1.5mm;
           border-bottom: 1.2px solid #111;
           color: #555;
-          font-size: 7.5pt;
-          font-weight: 700;
-          letter-spacing: .1em;
+          font-size: 8pt;
+          font-weight: 600;
+          letter-spacing: .045em;
           text-align: left;
           text-transform: uppercase;
         }
         .tag-config-table td {
-          padding: 3mm 1.5mm;
+          padding: 3.4mm 1.5mm;
           border-bottom: 1px solid #ccc;
-          font-size: 9pt;
+          font-size: 9.5pt;
           line-height: 1.3;
           vertical-align: middle;
         }
         .tag-config-table td:first-child {
-          font-size: 10pt;
+          font-size: 10.5pt;
           font-weight: 800;
         }
         .tag-config-table td:not(:first-child) {
@@ -155,56 +168,68 @@ export function DebryanskDargo() {
         .tag-config-table th:nth-child(2) { width: 35%; }
         .tag-config-table th:nth-child(3) { width: 25%; }
         .tag-config-table th:nth-child(4) { width: 17%; }
-        }
         .tag-specs {
-          margin-top: 3mm;
+          margin-top: 8mm;
         }
         .tag-section-title {
-          margin: 0 0 2mm;
-          padding-bottom: 1.6mm;
+          margin: 0 0 3mm;
+          padding-bottom: 1.8mm;
           border-bottom: 1.3px solid #111;
-          font-size: 11pt;
+          font-size: 11.5pt;
           font-weight: 800;
-          letter-spacing: .09em;
+          letter-spacing: .045em;
           text-transform: uppercase;
         }
-        .tag-spec-grid {
+        .tag-spec-groups {
           display: grid;
           grid-template-columns: 1fr 1fr;
           column-gap: 8mm;
         }
-        .tag-spec {
-          min-height: 14mm;
+        .tag-spec-group-title {
+          margin: 0 0 1mm;
+          padding-bottom: 1.8mm;
+          border-bottom: 1px solid #aaa;
+          color: #444;
+          font-size: 9pt;
+          font-weight: 700;
+          letter-spacing: .025em;
+        }
+        .tag-spec-list {
           display: grid;
-          grid-template-columns: 39% 1fr;
+          grid-template-rows: repeat(4, minmax(12mm, auto));
+          margin: 0;
+        }
+        .tag-spec {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
           align-items: center;
-          gap: 2mm;
-          border-bottom: 1px solid #d0d0d0;
+          gap: 3mm;
+          padding: 1.5mm 0;
         }
         .tag-spec-label {
           color: #606060;
-          font-size: 8pt;
+          font-size: 8.25pt;
           line-height: 1.25;
         }
         .tag-spec-value {
+          margin: 0;
+          max-width: 45mm;
           font-size: 9.5pt;
           line-height: 1.25;
           font-weight: 700;
+          text-align: right;
         }
         .tag-bottom {
           display: grid;
-          grid-template-columns: 1fr auto;
+          grid-template-columns: minmax(0, 1fr) 34mm;
           align-items: center;
           gap: 8mm;
-          margin-top: auto;
+          margin-top: 8mm;
           padding-top: 5mm;
           border-top: 1.2px solid #111;
         }
-        .tag-bottom-copy {
-          max-width: 95mm;
-        }
         .tag-qr-title {
-          margin: 0 0 1.8mm;
+          margin: 0 0 1.5mm;
           font-size: 11pt;
           line-height: 1.2;
           font-weight: 800;
@@ -213,13 +238,13 @@ export function DebryanskDargo() {
           margin: 0;
           color: #4c4c4c;
           font-size: 8.5pt;
-          line-height: 1.45;
+          line-height: 1.4;
         }
         .tag-qr {
           width: 32mm;
           height: 32mm;
           display: block;
-          padding: 1mm;
+          padding: 1.2mm;
           border: 1px solid #111;
           background: #fff;
         }
@@ -228,13 +253,13 @@ export function DebryanskDargo() {
           align-items: center;
           justify-content: space-between;
           gap: 6mm;
-          margin-top: 4mm;
-          padding-top: 2.5mm;
+          margin-top: auto;
+          padding-top: 3mm;
           border-top: 1px solid #bbb;
           color: #555;
-          font-size: 7pt;
-          letter-spacing: .1em;
-          text-transform: uppercase;
+          font-size: 8pt;
+          font-weight: 600;
+          letter-spacing: .02em;
         }
         @media (max-width: 680px) {
           .tag-preview { padding: 8px; }
@@ -242,8 +267,9 @@ export function DebryanskDargo() {
           .tag-hero { min-height: 42mm; }
           .tag-model { font-size: clamp(40px, 12vw, 58px); }
           .tag-year { min-width: 24mm; }
-          .tag-spec-grid { column-gap: 5mm; }
-          .tag-spec { grid-template-columns: 42% 1fr; }
+          .tag-spec-groups { grid-template-columns: 1fr; row-gap: 4mm; }
+          .tag-bottom { grid-template-columns: minmax(0, 1fr) 30mm; gap: 4mm; }
+          .tag-qr { width: 30mm; height: 30mm; }
         }
         @media print {
           @page { size: A4 portrait; margin: 0; }
@@ -275,7 +301,6 @@ export function DebryanskDargo() {
 
         <section className="tag-hero" aria-labelledby="vehicle-name">
           <div>
-            <p className="tag-kicker">Новый автомобиль</p>
             <p className="tag-make">HAVAL</p>
             <h1 className="tag-model" id="vehicle-name">DARGO</h1>
           </div>
@@ -299,20 +324,20 @@ export function DebryanskDargo() {
             <tbody>
               <tr>
                 <td>Оптимум</td>
-                <td>Бензин · 2,0 л · 200 л.с.</td>
-                <td>7DCT · робот</td>
+                <td>Бензин, 2,0 л, 200 л.с.</td>
+                <td>7DCT, робот</td>
                 <td>4WD</td>
               </tr>
               <tr>
                 <td>Премиум</td>
-                <td>Бензин · 2,0 л · 200 л.с.</td>
-                <td>7DCT · робот</td>
+                <td>Бензин, 2,0 л, 200 л.с.</td>
+                <td>7DCT, робот</td>
                 <td>4WD</td>
               </tr>
               <tr>
                 <td>Техно+</td>
-                <td>Бензин · 2,0 л · 200 л.с.</td>
-                <td>7DCT · робот</td>
+                <td>Бензин, 2,0 л, 200 л.с.</td>
+                <td>7DCT, робот</td>
                 <td>4WD</td>
               </tr>
             </tbody>
@@ -321,38 +346,48 @@ export function DebryanskDargo() {
 
         <section className="tag-specs" aria-labelledby="specs-title">
           <h2 className="tag-section-title" id="specs-title">Технические характеристики</h2>
-          <div className="tag-spec-grid">
-            <div className="tag-spec">
-              <span className="tag-spec-label">Крутящий момент</span>
-              <span className="tag-spec-value">380 Н·м</span>
+          <div className="tag-spec-groups">
+            <div className="tag-spec-group">
+              <h3 className="tag-spec-group-title">Динамика и расход</h3>
+              <dl className="tag-spec-list">
+                <div className="tag-spec">
+                  <dt className="tag-spec-label">Крутящий момент</dt>
+                  <dd className="tag-spec-value">380 Н·м</dd>
+                </div>
+                <div className="tag-spec">
+                  <dt className="tag-spec-label">Максимальная скорость</dt>
+                  <dd className="tag-spec-value">180 км/ч</dd>
+                </div>
+                <div className="tag-spec">
+                  <dt className="tag-spec-label">Разгон до 100 км/ч</dt>
+                  <dd className="tag-spec-value">10,5 с</dd>
+                </div>
+                <div className="tag-spec">
+                  <dt className="tag-spec-label">Расход топлива</dt>
+                  <dd className="tag-spec-value">8,8 л/100 км</dd>
+                </div>
+              </dl>
             </div>
-            <div className="tag-spec">
-              <span className="tag-spec-label">Дорожный просвет</span>
-              <span className="tag-spec-value">200 мм</span>
-            </div>
-            <div className="tag-spec">
-              <span className="tag-spec-label">Колёсная база</span>
-              <span className="tag-spec-value">2 738 мм</span>
-            </div>
-            <div className="tag-spec">
-              <span className="tag-spec-label">Габариты</span>
-              <span className="tag-spec-value">4 620 × 1 890 × 1 780 мм</span>
-            </div>
-            <div className="tag-spec">
-              <span className="tag-spec-label">Максимальная скорость</span>
-              <span className="tag-spec-value">180 км/ч</span>
-            </div>
-            <div className="tag-spec">
-              <span className="tag-spec-label">Разгон до 100 км/ч</span>
-              <span className="tag-spec-value">10,5 с</span>
-            </div>
-            <div className="tag-spec">
-              <span className="tag-spec-label">Расход топлива, смешанный</span>
-              <span className="tag-spec-value">8,8 л/100 км</span>
-            </div>
-            <div className="tag-spec">
-              <span className="tag-spec-label">Объём топливного бака</span>
-              <span className="tag-spec-value">60 л</span>
+            <div className="tag-spec-group">
+              <h3 className="tag-spec-group-title">Габариты и топливный бак</h3>
+              <dl className="tag-spec-list">
+                <div className="tag-spec">
+                  <dt className="tag-spec-label">Дорожный просвет</dt>
+                  <dd className="tag-spec-value">200 мм</dd>
+                </div>
+                <div className="tag-spec">
+                  <dt className="tag-spec-label">Колёсная база</dt>
+                  <dd className="tag-spec-value">2 738 мм</dd>
+                </div>
+                <div className="tag-spec">
+                  <dt className="tag-spec-label">Габариты</dt>
+                  <dd className="tag-spec-value">4 620 × 1 890 × 1 780 мм</dd>
+                </div>
+                <div className="tag-spec">
+                  <dt className="tag-spec-label">Объём топливного бака</dt>
+                  <dd className="tag-spec-value">60 л</dd>
+                </div>
+              </dl>
             </div>
           </div>
         </section>
@@ -360,9 +395,7 @@ export function DebryanskDargo() {
         <section className="tag-bottom" aria-label="Подборка модели на сайте">
           <div className="tag-bottom-copy">
             <h2 className="tag-qr-title">Каталог Haval Dargo</h2>
-            <p className="tag-qr-copy">
-              Комплектации и доступные автомобили модели.
-            </p>
+            <p className="tag-qr-copy">Комплектации и доступные автомобили модели.</p>
           </div>
           <img
             className="tag-qr"
