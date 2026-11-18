@@ -170,6 +170,30 @@ export function createQuote(data: {
   return managerApi("POST", "/quotes", data);
 }
 
+export async function generateVehicleTagPdf(carId: number): Promise<Blob> {
+  const token = getManagerToken();
+  const tokenStorageKey = getManagerTokenStorageKey();
+  const res = await fetch("/api/manager/vehicle-tags/pdf", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ carId }),
+  });
+  processSessionResponse(res, token, tokenStorageKey);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: "Не удалось сформировать ценник" }));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
+
+  const pdf = await res.blob();
+  if (!pdf.size || pdf.type !== "application/pdf") {
+    throw new Error("Сервер вернул некорректный PDF");
+  }
+  return pdf;
+}
+
 export function getMyQuotes(): Promise<{ ok: boolean; data: QuoteHistoryItem[] }> {
   return managerApi("GET", "/quotes");
 }
