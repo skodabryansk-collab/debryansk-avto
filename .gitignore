@@ -5,6 +5,7 @@ dist
 tmp
 out-tsc
 *.tsbuildinfo
+/generated-artifacts/
 .expo
 .expo-shared
 
@@ -47,3 +48,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Prerender runtime cache
+artifacts/api-server/prerender-cache/
