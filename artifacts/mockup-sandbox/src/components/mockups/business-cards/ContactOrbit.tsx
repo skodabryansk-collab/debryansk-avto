@@ -25,9 +25,9 @@ export function ContactOrbit() {
               <h2 className="bc-person-name co-name">Коновалов Артем</h2>
               <p className="bc-person-role co-role">Эксперт по автомобилям</p>
             </div>
-            <a className="co-call" href="tel:+79206072857" aria-label="Позвонить Артему: 8 920 607 28 57">
+            <div className="co-call">
               <span className="co-phone">8 920 607 28 57</span>
-            </a>
+            </div>
           </article>
         </div>
 
@@ -39,32 +39,30 @@ export function ContactOrbit() {
                 <p className="co-eyebrow">Дебрянск Авто</p>
                 <h2>Выберите удобный способ</h2>
               </div>
-              <span className="co-back-mark" aria-hidden="true">↗</span>
             </header>
 
             <div className="co-contact-list">
-              <a href="https://debryansk-auto.ru" className="co-contact-link">
+              <div className="co-contact-link">
                 <span className="co-contact-number">01</span>
                 <span className="co-contact-copy">
                   <span className="co-contact-label">ОНЛАЙН</span>
                   <span className="co-contact-value">debryansk-auto.ru</span>
                 </span>
-                <span className="co-link-arrow" aria-hidden="true">↗</span>
-              </a>
-              <a href="mailto:artem.konovalov@debryansk-auto.ru" className="co-contact-link">
+              </div>
+              <div className="co-contact-link">
                 <span className="co-contact-number">02</span>
                 <span className="co-contact-copy">
                   <span className="co-contact-label">ПОЧТА</span>
                   <span className="co-contact-value co-email">artem.konovalov@debryansk-auto.ru</span>
                 </span>
-              </a>
+              </div>
             </div>
 
             <footer className="co-address">
               <span className="co-address-pin" aria-hidden="true">●</span>
-              <span>
-                <span className="co-contact-label">ЖДЁМ В ГОСТИ</span>
-                <span className="co-address-value">с. Супонево, ул. Шоссейная, 12Г</span>
+              <span className="co-contact-center">
+                <span className="co-contact-label">КОНТАКТНЫЙ ЦЕНТР</span>
+                <span className="co-address-value">+7 4832 77 77 70</span>
               </span>
             </footer>
           </article>
@@ -134,27 +132,10 @@ export function ContactOrbit() {
         .co-name { font-size: 23px; }
         .co-role { color: rgba(255,255,255,.65); }
         .co-call {
-          position: relative;
           display: flex;
           align-items: center;
-          gap: 10px;
           width: fit-content;
           color: #fff;
-          text-decoration: none;
-        }
-        .co-call::before {
-          position: absolute;
-          inset: -8px -12px;
-          z-index: -1;
-          border: 1px solid rgba(255,255,255,.18);
-          border-radius: 5px;
-          background: rgba(255,255,255,.06);
-          content: "";
-          transition: background .18s ease, border-color .18s ease;
-        }
-        .co-call:hover::before {
-          border-color: rgba(135,182,60,.8);
-          background: rgba(135,182,60,.12);
         }
         .co-phone { font-size: 13px; font-weight: 800; letter-spacing: -.02em; }
         .co-back {
@@ -180,18 +161,6 @@ export function ContactOrbit() {
           letter-spacing: -.04em;
           line-height: 1.1;
         }
-        .co-back-mark {
-          display: grid;
-          width: 24px;
-          height: 24px;
-          flex: 0 0 auto;
-          place-items: center;
-          border-radius: 50%;
-          background: var(--debryansk-soft);
-          color: var(--debryansk-blue);
-          font-size: 12px;
-          font-weight: 800;
-        }
         .co-contact-list { display: grid; gap: 8px; }
         .co-contact-link {
           display: flex;
@@ -201,9 +170,7 @@ export function ContactOrbit() {
           padding: 7px 0;
           border-bottom: 1px solid var(--debryansk-border);
           color: inherit;
-          text-decoration: none;
         }
-        .co-contact-link:hover .co-link-arrow { color: var(--debryansk-green); transform: translate(2px,-2px); }
         .co-contact-number {
           color: #94a3b8;
           font-size: 8px;
@@ -227,12 +194,6 @@ export function ContactOrbit() {
           white-space: nowrap;
         }
         .co-email { font-size: 8px; }
-        .co-link-arrow {
-          margin-left: auto;
-          color: var(--debryansk-blue);
-          font-size: 12px;
-          transition: color .18s ease, transform .18s ease;
-        }
         .co-address {
           display: flex;
           align-items: center;
