@@ -286,7 +286,6 @@ export default function ShowroomSurveyPage() {
         {step === "intro" && (
           <section className="rs-welcome rs-enter">
             <div className="rs-welcome-copy">
-              <p className="rs-kicker"><span />Опрос в шоуруме</p>
               <h1>Что вы думаете<br className="rs-desktop-break" /> об автомобиле?</h1>
               <p className="rs-welcome-description">Выберите марку и модель, оцените пять пунктов и укажите имя с телефоном. После отправки появится рейтинг — покажите его сотруднику, чтобы получить подарок.</p>
               <Button onClick={beginSurvey} disabled={modelsQuery.isLoading} className="rs-primary rs-welcome-cta" data-testid="button-start-survey">
@@ -295,7 +294,6 @@ export default function ShowroomSurveyPage() {
               <p className="rs-quiet-note">Около 2–3 минут на одну модель</p>
             </div>
             <aside className="rs-welcome-side" aria-label="Как проходит опрос">
-              <div className="rs-side-topline"><span>Дебрянск Авто</span><span>01—03</span></div>
               <h2>Коротко<br />о процессе</h2>
               <ol>
                 <li><span>01</span><p>Выберите марку и модель, которые посмотрели</p></li>
@@ -439,7 +437,7 @@ export default function ShowroomSurveyPage() {
               {models.some((model) => !evaluations.some((evaluation) => evaluation.modelId === model.id)) && (
                 <Button onClick={() => setStep("choose-brand")} variant="outline" className="rs-secondary" data-testid="button-rate-another">Оценить ещё автомобиль</Button>
               )}
-              <Button onClick={() => setStep("contact")} className="rs-primary" data-testid="button-continue-contact">К контактам <ArrowRight aria-hidden="true" /></Button>
+              <Button onClick={() => setStep("contact")} className="rs-primary" data-testid="button-continue-contact">Получить подарок <ArrowRight aria-hidden="true" /></Button>
             </div>
             <button type="button" className="rs-back rs-next-back" onClick={() => setStep("choose-brand")}><ArrowLeft aria-hidden="true" /> Вернуться к маркам</button>
           </section>
