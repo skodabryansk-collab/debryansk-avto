@@ -36,7 +36,6 @@ export function ContactOrbit() {
           <article className="bc-card co-back" aria-label="Оборотная сторона визитки">
             <header className="co-back-head">
               <div>
-                <p className="co-eyebrow">Дебрянск Авто</p>
                 <h2>Выберите удобный способ</h2>
               </div>
             </header>
@@ -120,15 +119,6 @@ export function ContactOrbit() {
           filter: brightness(0) invert(1);
         }
         .co-person { position: relative; z-index: 1; }
-        .co-eyebrow {
-          margin: 0 0 6px;
-          color: #a8c2d2;
-          font-size: 8px;
-          font-weight: 800;
-          letter-spacing: .14em;
-          line-height: 1;
-          text-transform: uppercase;
-        }
         .co-name { font-size: 23px; }
         .co-role { color: rgba(255,255,255,.65); }
         .co-call {
@@ -152,7 +142,6 @@ export function ContactOrbit() {
           justify-content: space-between;
           gap: 10px;
         }
-        .co-back-head .co-eyebrow { margin-bottom: 5px; color: var(--debryansk-blue); }
         .co-back-head h2 {
           margin: 0;
           color: var(--debryansk-ink);
