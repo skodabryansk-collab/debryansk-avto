@@ -1,6 +1,7 @@
 import "./_group.css";
 
 const logo = "/__mockup/images/business-cards/debryansk-auto-space-logo.png";
+const websiteQr = "/__mockup/images/business-cards/debryansk-auto-site-qr.svg";
 
 export function ContactOrbit() {
   return (
@@ -35,35 +36,36 @@ export function ContactOrbit() {
           <p className="bc-side-label">Оборотная сторона · остальные маршруты</p>
           <article className="bc-card co-back" aria-label="Оборотная сторона визитки">
             <header className="co-back-head">
-              <div>
-                <h2>Выберите удобный способ</h2>
-              </div>
+              <h2>Выберите удобный способ</h2>
             </header>
 
-            <div className="co-contact-list">
-              <div className="co-contact-link">
-                <span className="co-contact-number">01</span>
-                <span className="co-contact-copy">
-                  <span className="co-contact-label">ОНЛАЙН</span>
-                  <span className="co-contact-value">debryansk-auto.ru</span>
-                </span>
+            <div className="co-back-body">
+              <div className="co-contact-list">
+                <div className="co-contact-link">
+                  <span className="co-contact-copy">
+                    <span className="co-contact-label">САЙТ</span>
+                    <span className="co-contact-value">debryansk-auto.ru</span>
+                  </span>
+                </div>
+                <div className="co-contact-link">
+                  <span className="co-contact-copy">
+                    <span className="co-contact-label">ПОЧТА</span>
+                    <span className="co-contact-value">info@debryansk-auto.ru</span>
+                  </span>
+                </div>
+                <div className="co-contact-link">
+                  <span className="co-contact-copy">
+                    <span className="co-contact-label">КОНТАКТНЫЙ ЦЕНТР</span>
+                    <span className="co-contact-value">+7 4832 77 77 70</span>
+                  </span>
+                </div>
               </div>
-              <div className="co-contact-link">
-                <span className="co-contact-number">02</span>
-                <span className="co-contact-copy">
-                  <span className="co-contact-label">ПОЧТА</span>
-                  <span className="co-contact-value co-email">artem.konovalov@debryansk-auto.ru</span>
-                </span>
-              </div>
-            </div>
 
-            <footer className="co-address">
-              <span className="co-address-pin" aria-hidden="true">●</span>
-              <span className="co-contact-center">
-                <span className="co-contact-label">КОНТАКТНЫЙ ЦЕНТР</span>
-                <span className="co-address-value">+7 4832 77 77 70</span>
-              </span>
-            </footer>
+              <figure className="co-qr">
+                <img className="co-qr-image" src={websiteQr} alt="QR-код сайта debryansk-auto.ru" />
+                <figcaption className="co-qr-caption">Сайт</figcaption>
+              </figure>
+            </div>
           </article>
         </div>
       </section>
@@ -150,20 +152,20 @@ export function ContactOrbit() {
           letter-spacing: -.04em;
           line-height: 1.1;
         }
-        .co-contact-list { display: grid; gap: 8px; }
-        .co-contact-link {
-          display: flex;
+        .co-back-body {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 28%;
           align-items: center;
+          gap: 4%;
+          min-height: 0;
+        }
+        .co-contact-list { display: grid; gap: 3px; min-width: 0; }
+        .co-contact-link {
+          display: block;
           min-width: 0;
-          gap: 9px;
-          padding: 7px 0;
+          padding: 5px 0;
           border-bottom: 1px solid var(--debryansk-border);
           color: inherit;
-        }
-        .co-contact-number {
-          color: #94a3b8;
-          font-size: 8px;
-          font-weight: 700;
         }
         .co-contact-copy { display: grid; min-width: 0; gap: 3px; }
         .co-contact-label {
@@ -177,34 +179,36 @@ export function ContactOrbit() {
         .co-contact-value {
           display: block;
           color: var(--debryansk-ink);
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 800;
           line-height: 1.15;
           white-space: nowrap;
         }
-        .co-email { font-size: 8px; }
-        .co-address {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding-top: 7px;
+        .co-qr {
+          display: grid;
+          justify-items: center;
+          gap: 4px;
+          width: 100%;
+          margin: 0;
         }
-        .co-address-pin { color: var(--debryansk-green); font-size: 9px; }
-        .co-address-value {
+        .co-qr-image {
           display: block;
-          margin-top: 3px;
-          color: var(--debryansk-ink);
-          font-size: 8px;
+          width: 100%;
+          aspect-ratio: 1;
+          background: #fff;
+          object-fit: contain;
+        }
+        .co-qr-caption {
+          color: var(--debryansk-muted);
+          font-size: 7px;
           font-weight: 700;
-          line-height: 1.1;
-          white-space: nowrap;
+          line-height: 1;
         }
         @media (max-width: 390px) {
           .co-name { font-size: 20px; }
           .co-phone { font-size: 11px; }
-          .co-contact-value { font-size: 9px; }
-          .co-email { font-size: 7px; }
-          .co-address-value { font-size: 7px; }
+          .co-contact-value { font-size: 8px; }
+          .co-back-body { grid-template-columns: minmax(0, 1fr) 25%; }
         }
       `}</style>
     </main>
