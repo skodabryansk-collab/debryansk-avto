@@ -63,7 +63,6 @@ export function ContactOrbit() {
 
               <figure className="co-qr">
                 <img className="co-qr-image" src={websiteQr} alt="QR-код сайта debryansk-auto.ru" />
-                <figcaption className="co-qr-caption">Сайт</figcaption>
               </figure>
             </div>
           </article>
@@ -155,15 +154,23 @@ export function ContactOrbit() {
         .co-back-body {
           display: grid;
           grid-template-columns: minmax(0, 1fr) 28%;
-          align-items: center;
+          align-items: stretch;
           gap: 4%;
           min-height: 0;
         }
-        .co-contact-list { display: grid; gap: 3px; min-width: 0; }
-        .co-contact-link {
-          display: block;
+        .co-contact-list {
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
           min-width: 0;
-          padding: 5px 0;
+        }
+        .co-contact-link {
+          display: flex;
+          flex: 1;
+          flex-direction: column;
+          justify-content: center;
+          min-width: 0;
+          padding: 4px 0;
           border-bottom: 1px solid var(--debryansk-border);
           color: inherit;
         }
@@ -185,24 +192,20 @@ export function ContactOrbit() {
           white-space: nowrap;
         }
         .co-qr {
-          display: grid;
-          justify-items: center;
-          gap: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           width: 100%;
+          aspect-ratio: 1;
           margin: 0;
         }
         .co-qr-image {
           display: block;
           width: 100%;
+          height: 100%;
           aspect-ratio: 1;
           background: #fff;
           object-fit: contain;
-        }
-        .co-qr-caption {
-          color: var(--debryansk-muted);
-          font-size: 7px;
-          font-weight: 700;
-          line-height: 1;
         }
         @media (max-width: 390px) {
           .co-name { font-size: 20px; }
