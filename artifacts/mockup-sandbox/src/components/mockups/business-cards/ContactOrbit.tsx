@@ -27,7 +27,6 @@ export function ContactOrbit() {
             </div>
             <a className="co-call" href="tel:+79206072857" aria-label="Позвонить Артему: 8 920 607 28 57">
               <span className="co-phone">8 920 607 28 57</span>
-              <span className="co-arrow" aria-hidden="true">↗</span>
             </a>
           </article>
         </div>
@@ -158,7 +157,6 @@ export function ContactOrbit() {
           background: rgba(135,182,60,.12);
         }
         .co-phone { font-size: 13px; font-weight: 800; letter-spacing: -.02em; }
-        .co-arrow { color: #a9cc7b; font-size: 14px; }
         .co-back {
           display: flex;
           flex-direction: column;
