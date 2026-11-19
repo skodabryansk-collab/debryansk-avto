@@ -1,0 +1,259 @@
+@font-face {
+  font-family: "Debryansk Manrope";
+  src: url("/__mockup/images/business-cards/fonts/manrope-400.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Debryansk Manrope";
+  src: url("/__mockup/images/business-cards/fonts/manrope-500.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Debryansk Manrope";
+  src: url("/__mockup/images/business-cards/fonts/manrope-600.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Debryansk Manrope";
+  src: url("/__mockup/images/business-cards/fonts/manrope-700.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Debryansk Manrope";
+  src: url("/__mockup/images/business-cards/fonts/manrope-800.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+}
+
+:root {
+  --debryansk-ink: #111317;
+  --debryansk-blue: #0070b8;
+  --debryansk-green: #87b63c;
+  --debryansk-gradient: linear-gradient(135deg, #0070b8 0%, #87b63c 100%);
+  --debryansk-text: #262a31;
+  --debryansk-muted: #64748b;
+  --debryansk-border: #e2e8f0;
+  --debryansk-soft: #f8fafc;
+}
+
+.bc-showcase,
+.bc-showcase * {
+  box-sizing: border-box;
+}
+
+.bc-showcase {
+  min-height: 100vh;
+  padding: 38px 28px;
+  background: #f1f5f9;
+  color: var(--debryansk-text);
+  font-family: "Debryansk Manrope", Manrope, sans-serif;
+}
+
+.bc-showcase-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 1060px;
+  margin: 0 auto 18px;
+}
+
+.bc-showcase-kicker {
+  margin: 0 0 5px;
+  color: var(--debryansk-blue);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.bc-showcase-title {
+  margin: 0;
+  color: var(--debryansk-ink);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.bc-showcase-size {
+  margin: 0;
+  color: var(--debryansk-muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bc-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 440px));
+  justify-content: center;
+  align-items: start;
+  gap: 24px;
+}
+
+.bc-side-wrap {
+  min-width: 0;
+}
+
+.bc-side-label {
+  margin: 0 0 7px 2px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.bc-card {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9 / 5;
+  overflow: hidden;
+  border: 1px solid rgba(17, 19, 23, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 14px 34px rgba(17, 19, 23, 0.13), 0 2px 6px rgba(17, 19, 23, 0.06);
+}
+
+.bc-logo-art {
+  display: block;
+  width: 55%;
+  height: auto;
+  max-height: 42px;
+  object-fit: contain;
+  object-position: left center;
+  flex: 0 0 auto;
+}
+
+.bc-person-name {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.bc-person-role {
+  margin: 7px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.bc-contact-label {
+  display: block;
+  margin: 0 0 3px;
+  color: var(--debryansk-blue);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.bc-contact-value {
+  display: block;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.bc-contact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 22px;
+  row-gap: 12px;
+  margin: 0;
+}
+
+.bc-contact-item {
+  min-width: 0;
+}
+
+.bc-contact-item dt,
+.bc-contact-item dd {
+  margin: 0;
+}
+
+.bc-contact-item--wide {
+  grid-column: 1 / -1;
+}
+
+.bc-gradient-rule {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--debryansk-gradient);
+}
+
+@media (max-width: 760px) {
+  .bc-showcase {
+    padding: 24px 12px;
+  }
+
+  .bc-showcase-head {
+    max-width: 440px;
+  }
+
+  .bc-pair {
+    grid-template-columns: minmax(0, 440px);
+    gap: 18px;
+  }
+}
+
+@media (max-width: 380px) {
+  .bc-showcase-title {
+    font-size: 17px;
+  }
+
+  .bc-person-name {
+    font-size: 21px;
+  }
+}
+
+@media print {
+  .bc-showcase {
+    min-height: auto;
+    padding: 0;
+    background: #fff;
+  }
+
+  .bc-showcase-head,
+  .bc-side-label {
+    display: none;
+  }
+
+  .bc-pair {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6mm;
+  }
+
+  .bc-side-wrap {
+    width: 90mm;
+  }
+
+  .bc-card {
+    width: 90mm;
+    height: 50mm;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
