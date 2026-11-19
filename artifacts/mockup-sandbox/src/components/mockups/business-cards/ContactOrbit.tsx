@@ -35,10 +35,6 @@ export function ContactOrbit() {
         <div className="bc-side-wrap">
           <p className="bc-side-label">Оборотная сторона · остальные маршруты</p>
           <article className="bc-card co-back" aria-label="Оборотная сторона визитки">
-            <header className="co-back-head">
-              <h2>Выберите удобный способ</h2>
-            </header>
-
             <div className="co-back-body">
               <div className="co-contact-list">
                 <div className="co-contact-link">
@@ -132,24 +128,10 @@ export function ContactOrbit() {
         .co-back {
           display: flex;
           flex-direction: column;
-          justify-content: space-between;
+          justify-content: center;
           padding: 7% 7.5%;
           background: #fff;
           color: var(--debryansk-text);
-        }
-        .co-back-head {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 10px;
-        }
-        .co-back-head h2 {
-          margin: 0;
-          color: var(--debryansk-ink);
-          font-size: 14px;
-          font-weight: 800;
-          letter-spacing: -.04em;
-          line-height: 1.1;
         }
         .co-back-body {
           display: grid;
