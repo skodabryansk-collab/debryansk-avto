@@ -233,7 +233,7 @@ export default function ShowroomSurveyPage() {
     <main className="refined-survey">
       <SEO
         title="Оцените автомобили в шоуруме — Дебрянск Авто"
-        description="Оцените автомобили в шоуруме Дебрянск Авто и отправьте заявку, чтобы получить подарок у сотрудника."
+        description="Оцените автомобиль в шоуруме Дебрянск Авто. Покажите свой рейтинг сотруднику и получите подарок на месте."
         canonical="/showroom-survey"
         robots="noindex, nofollow"
       />
@@ -286,9 +286,9 @@ export default function ShowroomSurveyPage() {
         {step === "intro" && (
           <section className="rs-welcome rs-enter">
             <div className="rs-welcome-copy">
-              <p className="rs-kicker"><span />Ваше мнение важно</p>
-              <h1>Вы уже познакомились<br className="rs-desktop-break" /> с автомобилем. Расскажите,<br className="rs-desktop-break" /> каким он вам показался.</h1>
-              <p className="rs-welcome-description">Выберите марку и модель, затем оцените пять впечатлений. Результат останется у вас на экране — покажите его сотруднику шоурума.</p>
+              <p className="rs-kicker"><span />Опрос в шоуруме</p>
+              <h1>Что вы думаете<br className="rs-desktop-break" /> об автомобиле?</h1>
+              <p className="rs-welcome-description">Выберите марку и модель, оцените пять пунктов и укажите имя с телефоном. После отправки появится рейтинг — покажите его сотруднику, чтобы получить подарок.</p>
               <Button onClick={beginSurvey} disabled={modelsQuery.isLoading} className="rs-primary rs-welcome-cta" data-testid="button-start-survey">
                 {modelsQuery.isLoading ? <><LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />Загружаем автомобили</> : <>Начать оценку <ArrowRight aria-hidden="true" /></>}
               </Button>
@@ -360,8 +360,8 @@ export default function ShowroomSurveyPage() {
           <section className="rs-content rs-enter">
             <button type="button" className="rs-back" onClick={() => setStep("choose-brand")} data-testid="button-back-brands"><ArrowLeft aria-hidden="true" /> Все марки</button>
             <p className="rs-kicker"><span />Шаг 1 · {selectedBrand}</p>
-            <h1>Какая модель?</h1>
-            <p className="rs-lede">Выберите автомобиль {selectedBrand}, который вы посмотрели.</p>
+            <h1>Какую модель вы смотрели?</h1>
+            <p className="rs-lede">Выберите модель марки {selectedBrand}.</p>
             {initialDraft && (
               <p className="rs-draft-note" role="status">
                 Ваши оценки сохранены в этой вкладке.
@@ -386,7 +386,7 @@ export default function ShowroomSurveyPage() {
             <button type="button" className="rs-back" onClick={() => setStep("choose-model")} data-testid="button-back-models"><ArrowLeft aria-hidden="true" /> Все модели</button>
             <p className="rs-kicker"><span />Шаг 2 · {activeModel.brand}</p>
             <div className="rs-rating-heading">
-              <div><h1>{activeModel.model}</h1><p className="rs-lede">Оцените каждое впечатление от 1 — «не понравилось» до 5 — «очень понравилось».</p></div>
+            <div><h1>{activeModel.model}</h1><p className="rs-lede">Поставьте оценку каждому пункту от 1 («не понравилось») до 5 («очень понравилось»).</p></div>
               <span className="rs-rating-count">{Object.values(ratings).filter(Boolean).length}<i> / 5</i></span>
             </div>
             <div className="rs-question-list">
@@ -430,14 +430,14 @@ export default function ShowroomSurveyPage() {
           <section className="rs-next rs-enter">
             <p className="rs-kicker"><span />Шаг 3 · Продолжение</p>
             <h1>Оценка сохранена</h1>
-            <p className="rs-lede">Добавьте впечатления ещё об одной модели или перейдите к итогам.</p>
+            <p className="rs-lede">Оцените ещё одну модель или укажите имя и телефон, чтобы увидеть рейтинг.</p>
             <div className="rs-evaluated-strip">
               <span>Уже оценено</span>
               <strong>{evaluations.map((entry) => models.find((model) => model.id === entry.modelId)?.model).filter(Boolean).join(" · ")}</strong>
             </div>
             <div className="rs-next-actions">
               {models.some((model) => !evaluations.some((evaluation) => evaluation.modelId === model.id)) && (
-                <Button onClick={() => setStep("choose-brand")} variant="outline" className="rs-secondary" data-testid="button-rate-another">Оценить ещё модель</Button>
+                <Button onClick={() => setStep("choose-brand")} variant="outline" className="rs-secondary" data-testid="button-rate-another">Оценить ещё автомобиль</Button>
               )}
               <Button onClick={() => setStep("contact")} className="rs-primary" data-testid="button-continue-contact">К контактам <ArrowRight aria-hidden="true" /></Button>
             </div>
@@ -451,8 +451,8 @@ export default function ShowroomSurveyPage() {
             <div className="rs-contact-layout">
               <div className="rs-contact-intro">
                 <p className="rs-kicker"><span />Шаг 4 · Завершение</p>
-                <h1>Оставьте контакт для завершения</h1>
-                <p className="rs-lede">После отправки появится ваш рейтинг. Покажите его сотруднику «Пространства автомобилей» — подарок выдадут на месте.</p>
+                <h1>Укажите имя и телефон</h1>
+                <p className="rs-lede">После отправки откроется ваш рейтинг. Покажите его сотруднику «Пространства автомобилей», чтобы получить подарок на месте.</p>
                 <div className="rs-contact-summary">
                   <span>Оценённые модели</span>
                   <strong>{evaluations.map((entry) => {
@@ -470,7 +470,7 @@ export default function ShowroomSurveyPage() {
                 <div className="rs-field">
                   <label htmlFor="visitor-phone">Номер телефона <span>обязательно</span></label>
                   <Input id="visitor-phone" type="tel" inputMode="tel" autoComplete="tel" value={phone.value} onChange={(event) => { phone.onChange(event); if (validationField === "phone") { setValidationError(""); setValidationField(""); } }} placeholder="+7 (___) ___-__-__" className={`rs-input${validationField === "phone" ? " has-error" : ""}`} aria-invalid={validationField === "phone"} aria-describedby={validationField === "phone" ? "phone-error" : "phone-help"} data-testid="input-visitor-phone" />
-                  {validationField === "phone" ? <p className="rs-error" id="phone-error" role="alert">{validationError}</p> : <p className="rs-help" id="phone-help">Номер нужен, чтобы оформить заявку. Для рекламной связи действует отдельное согласие.</p>}
+                  {validationField === "phone" ? <p className="rs-error" id="phone-error" role="alert">{validationError}</p> : <p className="rs-help" id="phone-help">Номер нужен, чтобы оформить заявку на подарок.</p>}
                 </div>
                 <div className={`rs-consent-row${validationField === "consent" ? " has-error" : ""}`}>
                   <Checkbox id="personal-consent" checked={consent} onCheckedChange={(checked) => { setConsent(checked === true); if (validationField === "consent") { setValidationError(""); setValidationField(""); } }} className="rs-checkbox" data-testid="checkbox-personal-consent" />
@@ -484,7 +484,7 @@ export default function ShowroomSurveyPage() {
                 {validationField === "submit" && validationError && <p className="rs-error" role="alert">{validationError}</p>}
                 {submitError && <div className="rs-submit-error" role="alert">{submitError}</div>}
                 <Button onClick={submit} disabled={submitSurvey.isPending} className="rs-primary rs-wide-cta" data-testid="button-submit-survey">
-                  {submitSurvey.isPending ? <><LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />Отправляем…</> : <>Отправить и показать итог <ArrowRight aria-hidden="true" /></>}
+                  {submitSurvey.isPending ? <><LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />Отправляем…</> : <>Отправить и показать рейтинг <ArrowRight aria-hidden="true" /></>}
                 </Button>
                 <p className="rs-consent-caption">Согласие на обработку данных обязательно. Согласие на связь — по желанию.</p>
               </div>
@@ -494,10 +494,10 @@ export default function ShowroomSurveyPage() {
 
         {step === "success" && (
           <section className="rs-success rs-enter" aria-live="polite">
-            <div className="rs-success-status"><span aria-hidden="true" />Опрос завершён</div>
+            <div className="rs-success-status"><span aria-hidden="true" />Рейтинг готов</div>
             <div className="rs-success-heading">
-              <h1>Спасибо за участие</h1>
-              <p className="rs-lede">{name.trim()}, ваши оценки сохранены. Ниже — ваш рейтинг впечатлений.</p>
+              <h1>Спасибо за ответы</h1>
+              <p className="rs-lede">{name.trim()}, оценки сохранены. Ниже — рейтинг автомобилей.</p>
             </div>
             {ranking.length > 0 && (
               <div className="rs-ranking" aria-label="Ваш рейтинг моделей">
