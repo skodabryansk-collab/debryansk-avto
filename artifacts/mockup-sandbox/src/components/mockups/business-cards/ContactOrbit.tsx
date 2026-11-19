@@ -21,7 +21,6 @@ export function ContactOrbit() {
             <div className="co-orb co-orb-two" aria-hidden="true" />
             <div className="co-front-top">
               <img className="bc-logo-art co-logo" src={logo} alt="Дебрянск Авто — Пространство автомобилей" />
-              <span className="co-pill">НА СВЯЗИ</span>
             </div>
             <div className="co-person">
               <p className="co-eyebrow">Ваш менеджер</p>
