@@ -287,7 +287,6 @@ export default function ShowroomSurveyPage() {
           <section className="rs-welcome rs-enter">
             <div className="rs-welcome-copy">
               <h1>Что вы думаете<br className="rs-desktop-break" /> об автомобиле?</h1>
-              <p className="rs-welcome-description">Выберите марку и модель, оцените пять пунктов и укажите имя с телефоном. После отправки появится рейтинг — покажите его сотруднику, чтобы получить подарок.</p>
               <Button onClick={beginSurvey} disabled={modelsQuery.isLoading} className="rs-primary rs-welcome-cta" data-testid="button-start-survey">
                 {modelsQuery.isLoading ? <><LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />Загружаем автомобили</> : <>Начать оценку <ArrowRight aria-hidden="true" /></>}
               </Button>
