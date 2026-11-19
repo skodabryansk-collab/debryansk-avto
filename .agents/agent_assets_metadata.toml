@@ -237,12 +237,40 @@ content_type = "text/csv"
 id = "y_xdCueYFop5ALvhK95ac"
 uri = "file://generated-artifacts/debryansk-auto-business-card-contactorbit-print.pdf"
 type = "pdf"
-title = "Визитка Дебрянск Авто — PDF для печати"
-description = "Два листа: лицевая и оборотная стороны. Обрезной размер 90×50 мм, вылет 3 мм, метки реза."
+title = "Визитка — PDF для просмотра"
+description = "Обновлённый двухстраничный макет; векторный логотип, вылеты 3 мм и метки реза."
 logical_id = "5a2e29e5-cc1c-47f5-b59e-8a1cb0b41b3d"
-content_hash = "sha256:e00a2cc52f2cc20b8428df34e5b4a9062653faf72edb6dc389abda8e309fc4f2"
-size = 174466
-mtime_ms = 1795080735419
-storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:7d24f84d-d7d0-410f-bd17-f35938619fa4/5a2e29e5-cc1c-47f5-b59e-8a1cb0b41b3d/0b409d1a-6ff3-4a56-b60b-7b200b01dd03"
-storage_version_token = "1795080780000878"
+content_hash = "sha256:5d582ee0fa628cfbec50e937714f7cf78c4ebc19836cacf92cdc6d640b94095f"
+size = 200466
+mtime_ms = 1795081217661
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:7d24f84d-d7d0-410f-bd17-f35938619fa4/5a2e29e5-cc1c-47f5-b59e-8a1cb0b41b3d/5edf7724-ed77-4ac2-8718-82cc9193d707"
+storage_version_token = "1795081262923354"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "MFNzJ_VSxxb2W9WVvDOQw"
+uri = "file://generated-artifacts/debryansk-auto-business-card-front.eps"
+type = "unspecified"
+title = "Визитка — лицевая сторона EPS"
+description = "EPS Level 2, одна сторона, страница 110×70 мм; обрезка 90×50 мм, вылет 3 мм, метки реза."
+logical_id = "a76e3ae4-45ed-4ee0-9cad-6f2d2ac0b28d"
+content_hash = "sha256:3c31fd8ecb4ee411543b0c416c43ce5afbafc178c7a55521d81b23cc6b8ba196"
+size = 827272
+mtime_ms = 1795081217499
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:7d24f84d-d7d0-410f-bd17-f35938619fa4/a76e3ae4-45ed-4ee0-9cad-6f2d2ac0b28d/6612b7d3-d67b-4e8a-a68e-8b02a0c90b2d"
+storage_version_token = "1795081260644600"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "buv8qNTGgHGWAmg_uzTdS"
+uri = "file://generated-artifacts/debryansk-auto-business-card-back.eps"
+type = "unspecified"
+title = "Визитка — оборотная сторона EPS"
+description = "EPS Level 2, одна сторона, страница 110×70 мм; обрезка 90×50 мм, вылет 3 мм, метки реза."
+logical_id = "8dedf7b6-6d2f-44ca-9ea3-983e00b59f74"
+content_hash = "sha256:93a5e9bf7b97220aaf52be5902f2e153930992cf7dc261ecf7d70474b430fe1b"
+size = 341849
+mtime_ms = 1795081217643
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:7d24f84d-d7d0-410f-bd17-f35938619fa4/8dedf7b6-6d2f-44ca-9ea3-983e00b59f74/0cae58f7-a109-4ada-aa4a-9814937a8b46"
+storage_version_token = "1795081261841434"
+content_type = "application/octet-stream"
