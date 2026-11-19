@@ -22,7 +22,6 @@ export function ContactOrbit() {
               <img className="bc-logo-art co-logo" src={logo} alt="Дебрянск Авто — Пространство автомобилей" />
             </div>
             <div className="co-person">
-              <p className="co-eyebrow">Ваш менеджер</p>
               <h2 className="bc-person-name co-name">Коновалов Артем</h2>
               <p className="bc-person-role co-role">Эксперт по автомобилям</p>
             </div>
