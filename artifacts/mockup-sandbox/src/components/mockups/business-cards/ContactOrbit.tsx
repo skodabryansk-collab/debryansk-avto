@@ -30,7 +30,6 @@ export function ContactOrbit() {
               <span className="co-phone">8 920 607 28 57</span>
               <span className="co-arrow" aria-hidden="true">↗</span>
             </a>
-            <span className="co-side-index" aria-hidden="true">01 / 02</span>
           </article>
         </div>
 
@@ -169,12 +168,6 @@ export function ContactOrbit() {
           font-weight: 700;
           letter-spacing: .1em;
           white-space: nowrap;
-        }
-        .co-front > .co-side-index {
-          position: absolute;
-          right: 7%;
-          bottom: 8%;
-          color: rgba(255,255,255,.5);
         }
         .co-back {
           display: flex;
