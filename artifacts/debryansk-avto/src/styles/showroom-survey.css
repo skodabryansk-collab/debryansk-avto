@@ -129,9 +129,12 @@
 }
 
 .rs-header {
+  position: sticky;
+  z-index: 50;
+  top: 0;
   min-height: 74px;
-  border-bottom: 1px solid rgba(23, 34, 44, .09);
-  background: rgba(255, 255, 255, .94);
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  background: #111317;
 }
 
 .rs-header-inner {
@@ -147,10 +150,11 @@
   display: block;
   width: 164px;
   height: auto;
+  filter: brightness(0) invert(1);
 }
 
 .rs-header-note {
-  color: #758087;
+  color: rgba(255, 255, 255, .58);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: .03em;
@@ -1216,12 +1220,17 @@
     width: min(100% - 32px, 560px);
   }
 
+  .rs-header-inner {
+    position: relative;
+    justify-content: center;
+  }
+
   .rs-logo {
     width: 142px;
   }
 
   .rs-header-note {
-    font-size: 10px;
+    display: none;
   }
 
   .rs-shell {
