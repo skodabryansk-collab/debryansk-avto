@@ -68,7 +68,6 @@ export function ContactOrbit() {
                 <span className="co-contact-label">ЖДЁМ В ГОСТИ</span>
                 <span className="co-address-value">с. Супонево, ул. Шоссейная, 12Г</span>
               </span>
-              <span className="co-side-index" aria-hidden="true">02 / 02</span>
             </footer>
           </article>
         </div>
@@ -161,13 +160,6 @@ export function ContactOrbit() {
         }
         .co-phone { font-size: 13px; font-weight: 800; letter-spacing: -.02em; }
         .co-arrow { color: #a9cc7b; font-size: 14px; }
-        .co-side-index {
-          color: #87919d;
-          font-size: 7px;
-          font-weight: 700;
-          letter-spacing: .1em;
-          white-space: nowrap;
-        }
         .co-back {
           display: flex;
           flex-direction: column;
@@ -260,7 +252,6 @@ export function ContactOrbit() {
           line-height: 1.1;
           white-space: nowrap;
         }
-        .co-address .co-side-index { margin-left: auto; align-self: flex-end; }
         @media (max-width: 390px) {
           .co-name { font-size: 20px; }
           .co-phone { font-size: 11px; }
