@@ -232,3 +232,17 @@ mtime_ms = 1795015217575
 storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:7d24f84d-d7d0-410f-bd17-f35938619fa4/ffbc9d15-27c8-477e-b270-d6a064af1f40/e5037961-e899-4132-96db-c33d125e51cd"
 storage_version_token = "1795015273840782"
 content_type = "text/csv"
+
+[[outputs]]
+id = "y_xdCueYFop5ALvhK95ac"
+uri = "file://generated-artifacts/debryansk-auto-business-card-contactorbit-print.pdf"
+type = "pdf"
+title = "Визитка Дебрянск Авто — PDF для печати"
+description = "Два листа: лицевая и оборотная стороны. Обрезной размер 90×50 мм, вылет 3 мм, метки реза."
+logical_id = "5a2e29e5-cc1c-47f5-b59e-8a1cb0b41b3d"
+content_hash = "sha256:e00a2cc52f2cc20b8428df34e5b4a9062653faf72edb6dc389abda8e309fc4f2"
+size = 174466
+mtime_ms = 1795080735419
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:7d24f84d-d7d0-410f-bd17-f35938619fa4/5a2e29e5-cc1c-47f5-b59e-8a1cb0b41b3d/0b409d1a-6ff3-4a56-b60b-7b200b01dd03"
+storage_version_token = "1795080780000878"
+content_type = "application/pdf"
