@@ -274,3 +274,45 @@ mtime_ms = 1795081217643
 storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:7d24f84d-d7d0-410f-bd17-f35938619fa4/8dedf7b6-6d2f-44ca-9ea3-983e00b59f74/0cae58f7-a109-4ada-aa4a-9814937a8b46"
 storage_version_token = "1795081261841434"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "uI_L4TX_L9sRFkdLxV41s"
+uri = "file://generated-artifacts/debryansk-auto-business-card-print-94x54.pdf"
+type = "pdf"
+title = "Визитка — обновлённый PDF для печати"
+description = "Две стороны в одном PDF. Дообрезной формат 94×54 мм, готовая обрезка 90×50 мм, вылет фона 2 мм, метки реза."
+logical_id = "eefac57a-1b59-404b-be7f-5b9a1c0be9ea"
+content_hash = "sha256:4a3383c8ed31cdfef058c61bdd3dfb5523674d99e92ae2bb5d0b656938cd3ab1"
+size = 219379
+mtime_ms = 1795096553781
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:7d24f84d-d7d0-410f-bd17-f35938619fa4/eefac57a-1b59-404b-be7f-5b9a1c0be9ea/55a6aa2f-abfa-4748-a2fb-47ad1f04f781"
+storage_version_token = "1795096629976093"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "Tjmqm0aNd5kSOSLMrJfvN"
+uri = "file://generated-artifacts/debryansk-auto-business-card-front-94x54.eps"
+type = "unspecified"
+title = "Визитка — лицевая сторона EPS 94×54"
+description = "EPS Level 2. Дообрезной формат 94×54 мм, готовая обрезка 90×50 мм, вылет фона 2 мм, метки реза; полоска 5,5 мм."
+logical_id = "f2b4f377-2b70-41fd-892b-a14af78a5aa4"
+content_hash = "sha256:c5283a2acad8213a0281a73329fd4428a5895928f8493be5b44f6c4e5bdae59a"
+size = 945124
+mtime_ms = 1795096553595
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:7d24f84d-d7d0-410f-bd17-f35938619fa4/f2b4f377-2b70-41fd-892b-a14af78a5aa4/129cb2bd-f9f5-4750-b928-f4d2fd24b144"
+storage_version_token = "1795096631432151"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "c8yuP8g8aaulVzslXs6Tg"
+uri = "file://generated-artifacts/debryansk-auto-business-card-back-94x54.eps"
+type = "unspecified"
+title = "Визитка — оборотная сторона EPS 94×54"
+description = "EPS Level 2. Дообрезной формат 94×54 мм, готовая обрезка 90×50 мм, вылет фона 2 мм, метки реза."
+logical_id = "3d915d53-fade-4bc0-b449-0db0d6944a9b"
+content_hash = "sha256:181b57c5504fa90645b3ce0deb472edd9bf37a41ffb9e736a4ecbec1410a41a4"
+size = 341251
+mtime_ms = 1795096553747
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:7d24f84d-d7d0-410f-bd17-f35938619fa4/3d915d53-fade-4bc0-b449-0db0d6944a9b/8da2fe75-2ef9-4029-8414-4ddbc947210e"
+storage_version_token = "1795096633376402"
+content_type = "application/octet-stream"
