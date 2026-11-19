@@ -27,7 +27,6 @@ export function ContactOrbit() {
               <p className="bc-person-role co-role">Эксперт по автомобилям</p>
             </div>
             <a className="co-call" href="tel:+79206072857" aria-label="Позвонить Артему: 8 920 607 28 57">
-              <span className="co-call-label">ПОЗВОНИТЬ</span>
               <span className="co-phone">8 920 607 28 57</span>
               <span className="co-arrow" aria-hidden="true">↗</span>
             </a>
@@ -161,12 +160,6 @@ export function ContactOrbit() {
         .co-call:hover::before {
           border-color: rgba(135,182,60,.8);
           background: rgba(135,182,60,.12);
-        }
-        .co-call-label {
-          color: #a9cc7b;
-          font-size: 7px;
-          font-weight: 800;
-          letter-spacing: .12em;
         }
         .co-phone { font-size: 13px; font-weight: 800; letter-spacing: -.02em; }
         .co-arrow { color: #a9cc7b; font-size: 14px; }
