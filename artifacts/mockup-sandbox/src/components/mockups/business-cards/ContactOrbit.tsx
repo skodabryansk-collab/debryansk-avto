@@ -58,7 +58,6 @@ export function ContactOrbit() {
                   <span className="co-contact-label">ПОЧТА</span>
                   <span className="co-contact-value co-email">artem.konovalov@debryansk-auto.ru</span>
                 </span>
-                <span className="co-link-arrow" aria-hidden="true">↗</span>
               </a>
             </div>
 
