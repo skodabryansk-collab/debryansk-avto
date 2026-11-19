@@ -12,7 +12,6 @@ export function ContactOrbit() {
         </div>
         <p className="bc-showcase-size">90 × 50 мм</p>
       </header>
-
       <section className="bc-pair" aria-label="Визитка: лицевая и оборотная стороны">
         <div className="bc-side-wrap">
           <p className="bc-side-label">Лицевая сторона · главный контакт</p>
@@ -25,7 +24,7 @@ export function ContactOrbit() {
             <div className="co-person">
               <p className="co-eyebrow">Ваш менеджер</p>
               <h2 className="bc-person-name co-name">Коновалов Артем</h2>
-              <p className="bc-person-role co-role">Менеджер по продажам автомобилей</p>
+              <p className="bc-person-role co-role">Эксперт по автомобилям</p>
             </div>
             <a className="co-call" href="tel:+79206072857" aria-label="Позвонить Артему: 8 920 607 28 57">
               <span className="co-call-label">ПОЗВОНИТЬ</span>
@@ -77,7 +76,6 @@ export function ContactOrbit() {
           </article>
         </div>
       </section>
-
       <style>{`
         .co-showcase .bc-showcase-head { margin-bottom: 18px; }
         .co-front {
@@ -128,15 +126,6 @@ export function ContactOrbit() {
           width: 42%;
           max-height: 28px;
           filter: brightness(0) invert(1);
-        }
-        .co-pill {
-          padding: 5px 8px;
-          border: 1px solid rgba(255,255,255,.25);
-          border-radius: 999px;
-          color: rgba(255,255,255,.82);
-          font-size: 7px;
-          font-weight: 800;
-          letter-spacing: .14em;
         }
         .co-person { position: relative; z-index: 1; }
         .co-eyebrow {
