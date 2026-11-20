@@ -67,6 +67,7 @@ type FormState = {
     model: string;
     undecided: boolean;
     budgetRange: "" | typeof budgetOptions[number];
+    plannedPurchaseDate: string;
   }>;
   currentCars: Array<{
     localId: string;
@@ -95,7 +96,7 @@ const emptyForm: FormState = {
   clientName: "",
   clientPhone: "+7",
   clientGender: "",
-  needs: [{ localId: "need-initial", brand: "", model: "", undecided: false, budgetRange: "" }],
+  needs: [{ localId: "need-initial", brand: "", model: "", undecided: false, budgetRange: "", plannedPurchaseDate: "" }],
   currentCars: [],
   commercialBrand: "",
   commercialModel: "",
@@ -151,6 +152,12 @@ const textAreaClass =
 function rub(value: number | null | undefined): string {
   if (value == null || value <= 0) return "Цена не указана";
   return `${value.toLocaleString("ru-RU")} ₽`;
+}
+
+function formatDateOnly(value: string | null | undefined): string {
+  if (!value) return "Не указана";
+  const [year, month, day] = value.split("-").map(Number);
+  return new Intl.DateTimeFormat("ru-RU", { dateStyle: "long" }).format(new Date(year!, month! - 1, day!));
 }
 
 function formatDate(value: string): string {
@@ -532,6 +539,16 @@ function NeedEditor({
           ))}
         </div>
         {invalid && !need.budgetRange && <p className="text-sm text-red-600">Укажите бюджет.</p>}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={`need-purchase-date-${need.localId}`}>Планируемая дата покупки · необязательно</Label>
+        <Input
+          id={`need-purchase-date-${need.localId}`}
+          type="date"
+          value={need.plannedPurchaseDate}
+          onChange={event => onChange({ plannedPurchaseDate: event.target.value })}
+          className="h-11"
+        />
       </div>
       <label className="flex min-h-10 items-center gap-2 text-sm text-slate-700">
         <input
@@ -934,6 +951,7 @@ export default function ManagerClientCardsPage() {
     model: detailCard.desiredModel,
     undecided: detailCard.desiredVehicleUndecided,
     budgetRange: detailCard.budgetRange,
+    plannedPurchaseDate: null,
   }] : [];
   const detailCurrentCars = detailCard?.currentCars?.length ? detailCard.currentCars : detailCard && (
     detailCard.currentCarBrand || detailCard.currentCarModel || detailCard.currentCarYear != null ||
@@ -946,7 +964,6 @@ export default function ManagerClientCardsPage() {
     generation: detailCard.currentCarGeneration,
     bodyType: detailCard.currentCarBodyType,
     ownersCount: detailCard.currentCarOwnersCount,
-    inventoryId: detailCard.currentCarInventoryId,
     snapshot: detailCard.currentCarSnapshot,
     tradeInPlan: detailCard.tradeInPlan,
   }] : [];
@@ -1047,6 +1064,7 @@ export default function ManagerClientCardsPage() {
       model: need.model || null,
       undecided: need.undecided,
       budgetRange: need.budgetRange || null,
+      plannedPurchaseDate: need.plannedPurchaseDate || null,
     }));
     const currentCars = form.currentCars
       .filter(car => Boolean(
@@ -1061,7 +1079,6 @@ export default function ManagerClientCardsPage() {
         generation: car.generation || null,
         bodyType: car.bodyType || null,
         ownersCount: car.ownersCount || null,
-        inventoryId: null,
         snapshot: null,
         tradeInPlan: car.tradeInPlan || null,
       }));
@@ -1085,7 +1102,6 @@ export default function ManagerClientCardsPage() {
       currentCarGeneration: firstCar?.generation ?? null,
       currentCarBodyType: firstCar?.bodyType ?? null,
       currentCarOwnersCount: firstCar?.ownersCount ?? null,
-      currentCarInventoryId: firstCar?.inventoryId ?? null,
       tradeInPlan: firstCar?.tradeInPlan ?? null,
       commercialBrand: form.commercialBrand || null,
       commercialModel: form.commercialModel || null,
@@ -1549,7 +1565,14 @@ export default function ManagerClientCardsPage() {
                     onClick={() => {
                       setForm(previous => ({
                         ...previous,
-                        needs: [...previous.needs, { localId: newLocalId("need"), brand: "", model: "", undecided: false, budgetRange: "" }],
+                        needs: [...previous.needs, {
+                          localId: newLocalId("need"),
+                          brand: "",
+                          model: "",
+                          undecided: false,
+                          budgetRange: "",
+                          plannedPurchaseDate: "",
+                        }],
                       }));
                       setFormError("");
                     }}
@@ -1778,6 +1801,7 @@ export default function ManagerClientCardsPage() {
                             {[need.brand, need.model].filter(Boolean).join(" ") || (need.undecided ? "Пока не определился" : "Не указана")}
                           </dd>
                           <dd className="mt-1 text-xs text-slate-500">Бюджет: {need.budgetRange || "Не указан"}</dd>
+                          <dd className="mt-1 text-xs text-slate-500">Покупка: {formatDateOnly(need.plannedPurchaseDate || null)}</dd>
                         </div>
                       ))}
                       {form.currentCars.filter(car => car.brand || car.model || car.year).map((car, index) => (
@@ -1886,6 +1910,7 @@ export default function ManagerClientCardsPage() {
                             (need.undecided ? "Пока не определился" : "Не указана")}
                         </dd>
                         <dd className="mt-1 text-xs text-slate-500">Бюджет: {need.budgetRange || "Не указан"}</dd>
+                        <dd className="mt-1 text-xs text-slate-500">Планируемая покупка: {formatDateOnly(need.plannedPurchaseDate)}</dd>
                       </div>
                     ))}
                   </dl>
