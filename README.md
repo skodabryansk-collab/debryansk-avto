@@ -494,6 +494,13 @@ URL: `/manager/login`, `/manager/quotes`, `/manager/profile`
 - Оценка авто: `GET /api/cm-expert/*`
 - Predict API: оценочная стоимость по параметрам
 
+### 1С — рабочие листы менеджеров
+
+- 1С опрашивает `GET /api/integrations/1c/v1/client-cards` по курсору
+- Авторизация отдельным Bearer-токеном `ONEC_CLIENT_CARDS_TOKEN`
+- Локация марки используется как организация, марка — как подразделение
+- Порядок настройки, поля и обработка ошибок: [`docs/onec-client-cards.md`](docs/onec-client-cards.md)
+
 ### Auto.ru
 
 - **API**: `apiauto.ru` (auth: `x-authorization`)
@@ -727,9 +734,13 @@ Vite code splitting по чанкам (manualChunks):
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | Email-транспорт |
 | `AUTORU_API_KEY` / `AUTORU_LOGIN` / `AUTORU_PASSWORD` | Auto.ru API |
 | `CMEXPERT_CLIENT_ID` / `CMEXPERT_CLIENT_SECRET` | CM Expert API |
+| `ONEC_CLIENT_CARDS_TOKEN` | Bearer-токен polling API рабочих листов 1С |
 | `GETLOYALTY_API_KEY` | GetLoyalty (отзывы) |
 | `HH_CLIENT_ID` / `HH_CLIENT_SECRET` | HeadHunter API |
 | `CALLTOUCH_WEBHOOK_SECRET` | Подпись вебхуков Calltouch |
+| `CALLTOUCH_CALLBACK_ACCESS_TOKEN` | API-ключ Calltouch для серверного автопрозвона (секрет; fallback — `CALLTOUCH_TOKEN`) |
+| `CALLTOUCH_CALLBACK_ROUTE_KEY` | Ключ виджета «Автопрозвон заявок с сайта» |
+| `CALLTOUCH_CALLBACK_SITE_ID` | ID кабинета Calltouch для автопрозвона (fallback — `CALLTOUCH_SITE_ID`) |
 | `YANDEX_METRIKA_TOKEN` | Яндекс Метрика |
 | `YANDEX_WEBMASTER_TOKEN` | Яндекс Вебмастер |
 | `YANDEX_WORDSTAT_API_KEY` | Яндекс Wordstat |
