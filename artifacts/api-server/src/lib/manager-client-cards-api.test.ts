@@ -92,6 +92,41 @@ test("manager client cards are saved and isolated by manager", async () => {
     const unauthorized = await fetch(`${started.baseUrl}/api/manager/client-cards`);
     assert.equal(unauthorized.status, 401);
 
+    const incompleteCurrentCar = await fetch(`${started.baseUrl}/api/manager/client-cards`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${managerToken(managerIds[0]!)}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        clientName: "Тестовый клиент",
+        clientPhone: "+7 (920) 607-28-57",
+        clientGender: null,
+        desiredBrand: "Haval City",
+        desiredModel: "Jolion",
+        desiredVehicleUndecided: false,
+        budgetRange: "2–3 млн",
+        currentCar: "Haval City",
+        currentCarBrand: "Haval City",
+        currentCarModel: null,
+        currentCarYear: null,
+        currentCarMileage: null,
+        currentCarGeneration: null,
+        currentCarBodyType: null,
+        currentCarOwnersCount: null,
+        currentCarInventoryId: null,
+        tradeInPlan: null,
+        commercialBrand: null,
+        commercialModel: null,
+        commercialCarId: null,
+        paymentMethod: null,
+        comment: "",
+      }),
+    });
+    const incompleteCurrentCarData = await incompleteCurrentCar.json() as ApiEnvelope<unknown>;
+    assert.equal(incompleteCurrentCar.status, 400);
+    assert.match(incompleteCurrentCarData.error ?? "", /марку, модель, год и пробег/);
+
     const createResponse = await fetch(`${started.baseUrl}/api/manager/client-cards`, {
       method: "POST",
       headers: {
@@ -106,8 +141,14 @@ test("manager client cards are saved and isolated by manager", async () => {
         desiredModel: "Jolion",
         desiredVehicleUndecided: false,
         budgetRange: "2–3 млн",
-        currentCar: null,
-        currentCarYear: null,
+        currentCar: "Haval City Jolion",
+        currentCarBrand: "Haval City",
+        currentCarModel: "Jolion",
+        currentCarYear: 2022,
+        currentCarMileage: 68500,
+        currentCarGeneration: "I",
+        currentCarBodyType: "Кроссовер",
+        currentCarOwnersCount: "2",
         currentCarInventoryId: currentCar.id,
         tradeInPlan: null,
         commercialBrand: null,
@@ -130,7 +171,13 @@ test("manager client cards are saved and isolated by manager", async () => {
         id: number;
         clientGender: string;
         currentCar: string;
+        currentCarBrand: string;
+        currentCarModel: string;
         currentCarYear: number;
+        currentCarMileage: number;
+        currentCarGeneration: string;
+        currentCarBodyType: string;
+        currentCarOwnersCount: string;
         currentCarSnapshot: { vin: string };
         commercialCarSnapshot: { model: string };
       }>;
@@ -142,7 +189,13 @@ test("manager client cards are saved and isolated by manager", async () => {
     assert.equal(own.data?.items[0]?.commercialCarSnapshot.model, "Jolion");
     assert.equal(own.data?.items[0]?.clientGender, "female");
     assert.equal(own.data?.items[0]?.currentCar, "Haval City Jolion");
+    assert.equal(own.data?.items[0]?.currentCarBrand, "Haval City");
+    assert.equal(own.data?.items[0]?.currentCarModel, "Jolion");
     assert.equal(own.data?.items[0]?.currentCarYear, 2022);
+    assert.equal(own.data?.items[0]?.currentCarMileage, 68500);
+    assert.equal(own.data?.items[0]?.currentCarGeneration, "I");
+    assert.equal(own.data?.items[0]?.currentCarBodyType, "Кроссовер");
+    assert.equal(own.data?.items[0]?.currentCarOwnersCount, "2");
     assert.equal(own.data?.items[0]?.currentCarSnapshot.vin, "XW8ZZZ61ZHG000456");
 
     const ownDetail = await fetch(`${started.baseUrl}/api/manager/client-cards/${created.data!.id}`, {
@@ -234,6 +287,7 @@ test("manager client cards are saved and isolated by manager", async () => {
     assert.equal(csvResponse.status, 200);
     assert.match(csvResponse.headers.get("content-type") ?? "", /text\/csv/);
     assert.match(csv, /Тестовый клиент/);
+    assert.match(csv, /68500/);
 
     const otherResponse = await fetch(`${started.baseUrl}/api/manager/client-cards`, {
       headers: { authorization: `Bearer ${managerToken(managerIds[1]!)}` },
@@ -258,7 +312,13 @@ test("manager client cards are saved and isolated by manager", async () => {
         desiredVehicleUndecided: false,
         budgetRange: "Не указан",
         currentCar: null,
+        currentCarBrand: null,
+        currentCarModel: null,
         currentCarYear: null,
+        currentCarMileage: null,
+        currentCarGeneration: null,
+        currentCarBodyType: null,
+        currentCarOwnersCount: null,
         currentCarInventoryId: null,
         tradeInPlan: null,
         commercialBrand: null,
