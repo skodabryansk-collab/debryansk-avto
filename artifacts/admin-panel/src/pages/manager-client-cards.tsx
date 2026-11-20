@@ -430,7 +430,7 @@ function SearchSuggestionField({
         <div
           id={listId}
           role="listbox"
-          className="absolute left-0 right-0 top-full z-40 mt-1 max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+          className="relative z-40 mt-1 max-h-40 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg sm:absolute sm:left-0 sm:right-0 sm:top-full sm:mt-1 sm:max-h-60 sm:w-auto"
         >
           {loading ? (
             <p className="px-3 py-2 text-sm text-slate-500">Загружаем варианты…</p>
