@@ -765,6 +765,113 @@ export interface ManagerClientCardInventoryResponse {
   data: ManagerClientCardInventoryItem[];
 }
 
+export interface OneCAdminStatus {
+  token_configured: boolean;
+  token_active: boolean;
+  secret_name: string;
+  authentication: string;
+  feed_path: string;
+  initial_cursor_path: string;
+  /** @nullable */
+  last_request_at: string | null;
+  /** @nullable */
+  last_success_at: string | null;
+  requests_24h: number;
+  failures_24h: number;
+}
+
+export type OneCAdminExchangeLogEntryEventType = typeof OneCAdminExchangeLogEntryEventType[keyof typeof OneCAdminExchangeLogEntryEventType];
+
+
+export const OneCAdminExchangeLogEntryEventType = {
+  api_request: 'api_request',
+  settings_change: 'settings_change',
+} as const;
+
+export interface OneCAdminExchangeLogEntry {
+  id: number;
+  event_type: OneCAdminExchangeLogEntryEventType;
+  /** @nullable */
+  endpoint: string | null;
+  method: string;
+  /** @nullable */
+  http_status: number | null;
+  outcome: string;
+  /** @nullable */
+  after_id: number | null;
+  /** @nullable */
+  next_cursor: number | null;
+  item_count: number;
+  /** @nullable */
+  has_more: boolean | null;
+  /** @nullable */
+  duration_ms: number | null;
+  /** @nullable */
+  error_code: string | null;
+  /** @nullable */
+  request_id: string | null;
+  /** @nullable */
+  entity_type: string | null;
+  /** @nullable */
+  entity_id: number | null;
+  /** @nullable */
+  entity_name: string | null;
+  /** @nullable */
+  previous_code: string | null;
+  /** @nullable */
+  new_code: string | null;
+  /** @nullable */
+  actor_login: string | null;
+  created_at: string;
+}
+
+export interface OneCAdminLogsPage {
+  items: OneCAdminExchangeLogEntry[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface OneCAdminLocationMapping {
+  id: number;
+  title: string;
+  /** @nullable */
+  organization_code: string | null;
+  confirmed: boolean;
+}
+
+export interface OneCAdminDepartmentMapping {
+  id: number;
+  brand_name: string;
+  /** @nullable */
+  department_code: string | null;
+  confirmed: boolean;
+  location_names: string[];
+  location_count: number;
+}
+
+export interface OneCAdminMappings {
+  organizations: OneCAdminLocationMapping[];
+  departments: OneCAdminDepartmentMapping[];
+}
+
+export interface OneCMappingUpdateInput {
+  /**
+     * @maxLength 128
+     * @nullable
+     */
+  code: string | null;
+  confirmed: boolean;
+}
+
+export interface OneCMappingUpdateResponse {
+  ok: boolean;
+  /** @nullable */
+  code: string | null;
+  confirmed: boolean;
+}
+
 export interface OneCClientCarSummary {
   /** @nullable */
   vin: string | null;
@@ -1044,6 +1151,37 @@ after_id: number;
  */
 limit?: number;
 };
+
+export type GetOneCAdminLogsParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 10
+ * @maximum 100
+ */
+page_size?: number;
+event_type?: GetOneCAdminLogsEventType;
+outcome?: GetOneCAdminLogsOutcome;
+};
+
+export type GetOneCAdminLogsEventType = typeof GetOneCAdminLogsEventType[keyof typeof GetOneCAdminLogsEventType];
+
+
+export const GetOneCAdminLogsEventType = {
+  api_request: 'api_request',
+  settings_change: 'settings_change',
+} as const;
+
+export type GetOneCAdminLogsOutcome = typeof GetOneCAdminLogsOutcome[keyof typeof GetOneCAdminLogsOutcome];
+
+
+export const GetOneCAdminLogsOutcome = {
+  success: 'success',
+  error: 'error',
+  settings_updated: 'settings_updated',
+} as const;
 
 export type ListManagerClientNeedsModelsParams = {
 /**
