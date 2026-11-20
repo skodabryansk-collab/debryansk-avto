@@ -468,6 +468,96 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+  /integrations/1c/v1/client-cards/changes:
+    get:
+      operationId: getOneCClientCardChanges
+      summary: Poll edits to manager client worksheets for 1C
+      description: >
+        Returns edits with IDs greater than after_change_id in ascending order.
+        The caller must persist next_cursor only after applying every event.
+        Each event contains the latest full worksheet, stable brand source keys,
+        and source keys for brand records that must be removed.
+      security:
+        - oneCClientCardsToken: []
+      parameters:
+        - name: after_change_id
+          in: query
+          required: true
+          description: Last edit event successfully applied by 1C
+          schema: { type: integer, minimum: 0 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 100 }
+      responses:
+        "200":
+          description: Next page of worksheet edits
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardChangesResponse"
+        "400":
+          description: Invalid cursor or page size
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "401":
+          description: Missing or invalid dedicated 1C token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "409":
+          description: An edited worksheet has an unresolved brand/location or unconfirmed 1C code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "503":
+          description: The 1C token is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "500":
+          description: Internal error while reading worksheet edits
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+  /integrations/1c/v1/client-cards/changes/initial-cursor:
+    get:
+      operationId: getOneCClientCardChangesInitialCursor
+      summary: Get the starting edit cursor without exporting historical edits
+      description: Call once during 1C change-feed setup, then poll the changes endpoint.
+      security:
+        - oneCClientCardsToken: []
+      responses:
+        "200":
+          description: Initial cursor at the current end of the worksheet edit history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardChangesInitialCursorResponse"
+        "401":
+          description: Missing or invalid dedicated 1C token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "503":
+          description: The 1C token is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "500":
+          description: Internal error while reading the edit cursor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
   /admin/onec/status:
     get:
       operationId: getOneCAdminStatus
@@ -725,6 +815,35 @@ paths:
                 $ref: "#/components/schemas/ManagerClientCardResponse"
         "401":
           description: Manager authentication required
+        "404":
+          description: Worksheet not found
+    put:
+      operationId: updateManagerClientCard
+      summary: Update a manager client worksheet
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManagerClientCardInput"
+      responses:
+        "200":
+          description: Worksheet updated and an audit/change event created if values changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagerClientCardUpdatedResponse"
+        "400":
+          description: Invalid worksheet data
+        "401":
+          description: Manager authentication required
+        "403":
+          description: Worksheet belongs to another manager or a selected vehicle is not allowed
         "404":
           description: Worksheet not found
   /car-catalog/brands:
@@ -1263,7 +1382,7 @@ components:
         tradeInPlan: { type: ["string", "null"], enum: ["Да", "Нет", "Пока не решил", null] }
     ManagerClientCard:
       type: object
-      required: [id, managerId, managerName, clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarBrand, currentCarModel, currentCarYear, currentCarMileage, currentCarGeneration, currentCarBodyType, currentCarOwnersCount, currentCarSnapshot, tradeInPlan, needs, currentCars, commercialBrand, commercialModel, commercialCarId, commercialCarSnapshot, paymentMethod, comment, createdAt]
+      required: [id, managerId, managerName, clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarBrand, currentCarModel, currentCarYear, currentCarMileage, currentCarGeneration, currentCarBodyType, currentCarOwnersCount, currentCarSnapshot, tradeInPlan, needs, currentCars, commercialBrand, commercialModel, commercialCarId, commercialCarSnapshot, paymentMethod, comment, createdAt, updatedAt]
       properties:
         id: { type: integer }
         managerId: { type: integer }
@@ -1304,6 +1423,28 @@ components:
         paymentMethod: { type: ["string", "null"] }
         comment: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        editHistory:
+          type: array
+          items: { $ref: "#/components/schemas/ManagerClientCardEditHistoryEntry" }
+    ManagerClientCardFieldChange:
+      type: object
+      required: [field, oldValue, newValue]
+      properties:
+        field: { type: string }
+        oldValue: {}
+        newValue: {}
+    ManagerClientCardEditHistoryEntry:
+      type: object
+      required: [id, editorName, editorRole, createdAt, changes]
+      properties:
+        id: { type: integer }
+        editorName: { type: string }
+        editorRole: { type: string, enum: [manager, admin] }
+        createdAt: { type: string, format: date-time }
+        changes:
+          type: array
+          items: { $ref: "#/components/schemas/ManagerClientCardFieldChange" }
     ManagerClientCardInput:
       type: object
       required: [clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarBrand, currentCarModel, currentCarYear, currentCarMileage, currentCarGeneration, currentCarBodyType, currentCarOwnersCount, tradeInPlan, commercialBrand, commercialModel, commercialCarId, paymentMethod, comment]
@@ -1369,6 +1510,18 @@ components:
           properties:
             id: { type: integer }
             createdAt: { type: string, format: date-time }
+    ManagerClientCardUpdatedResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data:
+          type: object
+          required: [id, changed, updatedAt]
+          properties:
+            id: { type: integer }
+            changed: { type: boolean }
+            updatedAt: { type: string, format: date-time }
     ManagerClientCardManager:
       type: object
       required: [id, name]
@@ -1644,6 +1797,43 @@ components:
           required: [after_id, as_of]
           properties:
             after_id: { type: integer }
+            as_of: { type: string, format: date-time }
+    OneCClientCardChangeEvent:
+      type: object
+      required: [change_id, worksheet_id, changed_at, deleted_source_keys, item]
+      properties:
+        change_id: { type: integer }
+        worksheet_id: { type: integer }
+        changed_at: { type: string, format: date-time }
+        deleted_source_keys:
+          type: array
+          items: { type: string }
+        item: { $ref: "#/components/schemas/OneCClientCardFeedItem" }
+    OneCClientCardChangesPage:
+      type: object
+      required: [events, next_cursor, has_more]
+      properties:
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/OneCClientCardChangeEvent" }
+        next_cursor: { type: integer }
+        has_more: { type: boolean }
+    OneCClientCardChangesResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data: { $ref: "#/components/schemas/OneCClientCardChangesPage" }
+    OneCClientCardChangesInitialCursorResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data:
+          type: object
+          required: [after_change_id, as_of]
+          properties:
+            after_change_id: { type: integer }
             as_of: { type: string, format: date-time }
     OneCClientCardsErrorResponse:
       type: object
