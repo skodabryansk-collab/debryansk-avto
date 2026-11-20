@@ -249,6 +249,133 @@ test("manager client cards are saved and isolated by manager", async () => {
     });
     assert.equal(hiddenDetail.status, 404);
 
+    const updatePayload = {
+      clientName: "Тестовый клиент обновлён",
+      clientPhone: "+7 (920) 607-28-57",
+      clientGender: "female",
+      desiredBrand: "Haval City",
+      desiredModel: "Jolion",
+      desiredVehicleUndecided: false,
+      budgetRange: "2–3 млн",
+      currentCar: "Haval City Jolion",
+      currentCarBrand: "Haval City",
+      currentCarModel: "Jolion",
+      currentCarYear: 2022,
+      currentCarMileage: 69000,
+      currentCarGeneration: "I",
+      currentCarBodyType: "Кроссовер",
+      currentCarOwnersCount: "2",
+      tradeInPlan: "Да",
+      needs: [
+        { brand: "Haval City", model: "Jolion", undecided: false, budgetRange: "2–3 млн", plannedPurchaseDate: "2027-05-21" },
+        { brand: "Haval City", model: "Jolion", undecided: false, budgetRange: "3–5 млн", plannedPurchaseDate: null },
+      ],
+      currentCars: [
+        {
+          brand: "Haval City",
+          model: "Jolion",
+          year: 2022,
+          mileage: 69000,
+          generation: "I",
+          bodyType: "Кроссовер",
+          ownersCount: "2",
+          snapshot: null,
+          tradeInPlan: "Да",
+        },
+        {
+          brand: "Toyota",
+          model: "Camry",
+          year: 2019,
+          mileage: 75000,
+          generation: null,
+          bodyType: "Седан",
+          ownersCount: null,
+          snapshot: null,
+          tradeInPlan: null,
+        },
+      ],
+      commercialBrand: "Haval City",
+      commercialModel: "Jolion",
+      commercialCarId: car.id,
+      paymentMethod: "Кредит",
+      comment: "Изменённый комментарий",
+    };
+    const foreignUpdate = await fetch(`${started.baseUrl}/api/manager/client-cards/${created.data!.id}`, {
+      method: "PUT",
+      headers: {
+        authorization: `Bearer ${managerToken(managerIds[1]!)}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(updatePayload),
+    });
+    const foreignUpdateData = await foreignUpdate.json() as ApiEnvelope<unknown>;
+    assert.equal(foreignUpdate.status, 404, foreignUpdateData.error);
+
+    const updateResponse = await fetch(`${started.baseUrl}/api/manager/client-cards/${created.data!.id}`, {
+      method: "PUT",
+      headers: {
+        authorization: `Bearer ${managerToken(managerIds[0]!)}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(updatePayload),
+    });
+    const updateResult = await updateResponse.json() as ApiEnvelope<{ id: number; changed: boolean; updatedAt: string }>;
+    assert.equal(updateResponse.status, 200, updateResult.error);
+    assert.equal(updateResult.data?.changed, true);
+
+    const updatedDetailResponse = await fetch(`${started.baseUrl}/api/manager/client-cards/${created.data!.id}`, {
+      headers: { authorization: `Bearer ${managerToken(managerIds[0]!)}` },
+    });
+    const updatedDetail = await updatedDetailResponse.json() as ApiEnvelope<{
+      clientName: string;
+      currentCars: Array<{ mileage: number }>;
+      editHistory: Array<{
+        editorName: string;
+        editorRole: string;
+        changes: Array<{ field: string; oldValue: unknown; newValue: unknown }>;
+      }>;
+    }>;
+    assert.equal(updatedDetailResponse.status, 200);
+    assert.equal(updatedDetail.data?.clientName, "Тестовый клиент обновлён");
+    assert.equal(updatedDetail.data?.currentCars[0]?.mileage, 69000);
+    assert.equal(updatedDetail.data?.editHistory.length, 1);
+    assert.equal(updatedDetail.data?.editHistory[0]?.editorName, "Client card manager A");
+    assert.equal(updatedDetail.data?.editHistory[0]?.editorRole, "manager");
+    assert.equal(updatedDetail.data?.editHistory[0]?.changes.some(change => change.field === "clientName"), true);
+    assert.equal(updatedDetail.data?.editHistory[0]?.changes.some(change => change.field === "currentCars"), true);
+
+    const noOpUpdate = await fetch(`${started.baseUrl}/api/manager/client-cards/${created.data!.id}`, {
+      method: "PUT",
+      headers: {
+        authorization: `Bearer ${managerToken(managerIds[0]!)}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(updatePayload),
+    });
+    const noOpResult = await noOpUpdate.json() as ApiEnvelope<{ changed: boolean }>;
+    assert.equal(noOpUpdate.status, 200);
+    assert.equal(noOpResult.data?.changed, false);
+
+    const adminUpdate = await fetch(`${started.baseUrl}/api/manager/client-cards/${created.data!.id}`, {
+      method: "PUT",
+      headers: {
+        authorization: `Bearer ${adminToken()}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ ...updatePayload, comment: "Комментарий обновлён администратором" }),
+    });
+    assert.equal(adminUpdate.status, 200);
+    const adminUpdatedDetailResponse = await fetch(`${started.baseUrl}/api/manager/client-cards/${created.data!.id}`, {
+      headers: { authorization: `Bearer ${adminToken()}` },
+    });
+    const adminUpdatedDetail = await adminUpdatedDetailResponse.json() as ApiEnvelope<{
+      editHistory: Array<{ editorName: string; editorRole: string }>;
+    }>;
+    assert.equal(adminUpdatedDetailResponse.status, 200);
+    assert.equal(adminUpdatedDetail.data?.editHistory.length, 2);
+    assert.equal(adminUpdatedDetail.data?.editHistory[0]?.editorRole, "admin");
+    assert.match(adminUpdatedDetail.data?.editHistory[0]?.editorName ?? "", /client-card-test-admin/);
+
     const moscowToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Moscow" }).format(new Date());
     const adminFiltered = await fetch(
       `${started.baseUrl}/api/manager/client-cards?managerId=${managerIds[0]}&client=${encodeURIComponent("Тестовый")}&dateFrom=${moscowToday}&dateTo=${moscowToday}`,
@@ -397,7 +524,7 @@ test("manager client cards are saved and isolated by manager", async () => {
     assert.equal(csvResponse.status, 200);
     assert.match(csvResponse.headers.get("content-type") ?? "", /text\/csv/);
     assert.match(csv, /Тестовый клиент/);
-    assert.match(csv, /68500/);
+    assert.match(csv, /69000/);
     assert.match(csv, /Toyota Camry/);
 
     const otherResponse = await fetch(`${started.baseUrl}/api/manager/client-cards`, {
