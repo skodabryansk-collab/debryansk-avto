@@ -15,7 +15,7 @@ export interface OneCClientCommercialOffer {
   /** @nullable */
   model: string | null;
   /** @nullable */
-  car_id: number | null;
+  car_vin: string | null;
   car: OneCClientCarSummary | null;
   /** @nullable */
   organization_code: string | null;
