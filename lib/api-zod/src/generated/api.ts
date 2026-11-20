@@ -1041,6 +1041,144 @@ export const GetOneCClientCardsInitialCursorResponse = zod.object({
 
 
 /**
+ * @summary Get safe 1C integration configuration status
+ */
+export const GetOneCAdminStatusResponse = zod.object({
+  "token_configured": zod.boolean(),
+  "token_active": zod.boolean(),
+  "secret_name": zod.string(),
+  "authentication": zod.string(),
+  "feed_path": zod.string(),
+  "initial_cursor_path": zod.string(),
+  "last_request_at": zod.coerce.date().nullable(),
+  "last_success_at": zod.coerce.date().nullable(),
+  "requests_24h": zod.number(),
+  "failures_24h": zod.number()
+})
+
+
+/**
+ * @summary List 1C exchange and settings events
+ */
+export const getOneCAdminLogsQueryPageDefault = 1;
+
+export const getOneCAdminLogsQueryPageSizeDefault = 25;
+export const getOneCAdminLogsQueryPageSizeMin = 10;
+export const getOneCAdminLogsQueryPageSizeMax = 100;
+
+
+
+export const GetOneCAdminLogsQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).default(getOneCAdminLogsQueryPageDefault),
+  "page_size": zod.coerce.number().min(getOneCAdminLogsQueryPageSizeMin).max(getOneCAdminLogsQueryPageSizeMax).default(getOneCAdminLogsQueryPageSizeDefault),
+  "event_type": zod.enum(['api_request', 'settings_change']).optional(),
+  "outcome": zod.enum(['success', 'error', 'settings_updated']).optional()
+})
+
+export const GetOneCAdminLogsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "event_type": zod.enum(['api_request', 'settings_change']),
+  "endpoint": zod.string().nullable(),
+  "method": zod.string(),
+  "http_status": zod.number().nullable(),
+  "outcome": zod.string(),
+  "after_id": zod.number().nullable(),
+  "next_cursor": zod.number().nullable(),
+  "item_count": zod.number(),
+  "has_more": zod.boolean().nullable(),
+  "duration_ms": zod.number().nullable(),
+  "error_code": zod.string().nullable(),
+  "request_id": zod.string().nullable(),
+  "entity_type": zod.string().nullable(),
+  "entity_id": zod.number().nullable(),
+  "entity_name": zod.string().nullable(),
+  "previous_code": zod.string().nullable(),
+  "new_code": zod.string().nullable(),
+  "actor_login": zod.string().nullable(),
+  "created_at": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "page_size": zod.number(),
+  "pages": zod.number()
+})
+
+
+/**
+ * @summary List organization and department code mappings
+ */
+export const GetOneCAdminMappingsResponse = zod.object({
+  "organizations": zod.array(zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "organization_code": zod.string().nullable(),
+  "confirmed": zod.boolean()
+})),
+  "departments": zod.array(zod.object({
+  "id": zod.number(),
+  "brand_name": zod.string(),
+  "department_code": zod.string().nullable(),
+  "confirmed": zod.boolean(),
+  "location_names": zod.array(zod.string()),
+  "location_count": zod.number()
+}))
+})
+
+
+/**
+ * @summary Update the 1C organization code for a location
+ */
+
+
+
+export const UpdateOneCOrganizationMappingParams = zod.object({
+  "locationId": zod.coerce.number().min(1)
+})
+
+export const updateOneCOrganizationMappingBodyCodeMax = 128;
+
+
+
+export const UpdateOneCOrganizationMappingBody = zod.object({
+  "code": zod.string().max(updateOneCOrganizationMappingBodyCodeMax).nullable(),
+  "confirmed": zod.boolean()
+})
+
+export const UpdateOneCOrganizationMappingResponse = zod.object({
+  "ok": zod.boolean(),
+  "code": zod.string().nullable(),
+  "confirmed": zod.boolean()
+})
+
+
+/**
+ * @summary Update the 1C department code for a brand
+ */
+
+
+
+export const UpdateOneCDepartmentMappingParams = zod.object({
+  "brandId": zod.coerce.number().min(1)
+})
+
+export const updateOneCDepartmentMappingBodyCodeMax = 128;
+
+
+
+export const UpdateOneCDepartmentMappingBody = zod.object({
+  "code": zod.string().max(updateOneCDepartmentMappingBodyCodeMax).nullable(),
+  "confirmed": zod.boolean()
+})
+
+export const UpdateOneCDepartmentMappingResponse = zod.object({
+  "ok": zod.boolean(),
+  "code": zod.string().nullable(),
+  "confirmed": zod.boolean()
+})
+
+
+/**
  * @summary List managers available in the worksheet filter
  */
 export const ListManagerClientCardManagersResponse = zod.object({
