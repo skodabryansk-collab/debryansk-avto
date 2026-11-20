@@ -41,6 +41,26 @@ export const quotesTable = pgTable("quotes", {
   updatedAt: timestamp("updated_at", { withTimezone: true }),
 });
 
+export type ManagerClientNeed = {
+  brand: string | null;
+  model: string | null;
+  undecided: boolean;
+  budgetRange: string | null;
+};
+
+export type ManagerClientCurrentCar = {
+  brand: string;
+  model: string;
+  year: number;
+  mileage: number;
+  generation: string | null;
+  bodyType: string | null;
+  ownersCount: string | null;
+  inventoryId: number | null;
+  snapshot: Record<string, unknown> | null;
+  tradeInPlan: string | null;
+};
+
 export const managerClientCardsTable = pgTable("manager_client_cards", {
   id: serial("id").primaryKey(),
   managerId: integer("manager_id").notNull().references(() => managersTable.id, { onDelete: "restrict" }),
@@ -62,6 +82,8 @@ export const managerClientCardsTable = pgTable("manager_client_cards", {
   currentCarInventoryId: integer("current_car_inventory_id").references(() => carsTable.id, { onDelete: "set null" }),
   currentCarSnapshot: jsonb("current_car_snapshot"),
   tradeInPlan: text("trade_in_plan"),
+  needs: jsonb("needs").$type<ManagerClientNeed[]>().notNull().default([]),
+  currentCars: jsonb("current_cars").$type<ManagerClientCurrentCar[]>().notNull().default([]),
   commercialBrand: text("commercial_brand"),
   commercialModel: text("commercial_model"),
   commercialCarId: integer("commercial_car_id").references(() => carsTable.id, { onDelete: "set null" }),
