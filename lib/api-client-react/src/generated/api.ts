@@ -34,6 +34,7 @@ import type {
   ExportManagerClientCardsParams,
   GetCarImageThumbnailParams,
   GetCustomerSurveyStatsParams,
+  GetOneCClientCardsParams,
   HealthStatus,
   ListAutoRuCarModelsParams,
   ListCustomerSurveyResponsesParams,
@@ -46,6 +47,9 @@ import type {
   ManagerClientCardResponse,
   ManagerClientCardStringListResponse,
   ManagerClientCardsPageResponse,
+  OneCClientCardsErrorResponse,
+  OneCClientCardsInitialCursorResponse,
+  OneCClientCardsResponse,
   SearchManagerClientCardInventoryParams,
   ShowroomSurveyModelsResponse,
   ShowroomSurveySubmissionInput,
@@ -1141,6 +1145,170 @@ export const useCreateManagerClientCard = <TError = ErrorType<void>,
       > => {
       return useMutation(getCreateManagerClientCardMutationOptions(options));
     }
+
+export const getGetOneCClientCardsUrl = (params: GetOneCClientCardsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/integrations/1c/v1/client-cards?${stringifiedParams}` : `/api/integrations/1c/v1/client-cards`
+}
+
+/**
+ * Returns client worksheets with IDs greater than after_id in ascending order. The caller must persist next_cursor only after successfully importing every returned item. Records are not returned while organization or department codes are provisional.
+
+ * @summary Poll new manager client worksheets for 1C
+ */
+export const getOneCClientCards = async (params: GetOneCClientCardsParams, options?: RequestInit): Promise<OneCClientCardsResponse> => {
+
+  return customFetch<OneCClientCardsResponse>(getGetOneCClientCardsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOneCClientCardsQueryKey = (params?: GetOneCClientCardsParams,) => {
+    return [
+    `/api/integrations/1c/v1/client-cards`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetOneCClientCardsQueryOptions = <TData = Awaited<ReturnType<typeof getOneCClientCards>>, TError = ErrorType<OneCClientCardsErrorResponse>>(params: GetOneCClientCardsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCClientCards>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOneCClientCardsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOneCClientCards>>> = ({ signal }) => getOneCClientCards(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOneCClientCards>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOneCClientCardsQueryResult = NonNullable<Awaited<ReturnType<typeof getOneCClientCards>>>
+export type GetOneCClientCardsQueryError = ErrorType<OneCClientCardsErrorResponse>
+
+
+/**
+ * @summary Poll new manager client worksheets for 1C
+ */
+
+export function useGetOneCClientCards<TData = Awaited<ReturnType<typeof getOneCClientCards>>, TError = ErrorType<OneCClientCardsErrorResponse>>(
+ params: GetOneCClientCardsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCClientCards>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOneCClientCardsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetOneCClientCardsInitialCursorUrl = () => {
+
+
+
+
+  return `/api/integrations/1c/v1/client-cards/initial-cursor`
+}
+
+/**
+ * Call once during initial setup, store after_id in 1C, then poll the feed endpoint.
+ * @summary Get the starting cursor without exporting historical client data
+ */
+export const getOneCClientCardsInitialCursor = async ( options?: RequestInit): Promise<OneCClientCardsInitialCursorResponse> => {
+
+  return customFetch<OneCClientCardsInitialCursorResponse>(getGetOneCClientCardsInitialCursorUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOneCClientCardsInitialCursorQueryKey = () => {
+    return [
+    `/api/integrations/1c/v1/client-cards/initial-cursor`
+    ] as const;
+    }
+
+
+export const getGetOneCClientCardsInitialCursorQueryOptions = <TData = Awaited<ReturnType<typeof getOneCClientCardsInitialCursor>>, TError = ErrorType<OneCClientCardsErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCClientCardsInitialCursor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOneCClientCardsInitialCursorQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOneCClientCardsInitialCursor>>> = ({ signal }) => getOneCClientCardsInitialCursor({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOneCClientCardsInitialCursor>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOneCClientCardsInitialCursorQueryResult = NonNullable<Awaited<ReturnType<typeof getOneCClientCardsInitialCursor>>>
+export type GetOneCClientCardsInitialCursorQueryError = ErrorType<OneCClientCardsErrorResponse>
+
+
+/**
+ * @summary Get the starting cursor without exporting historical client data
+ */
+
+export function useGetOneCClientCardsInitialCursor<TData = Awaited<ReturnType<typeof getOneCClientCardsInitialCursor>>, TError = ErrorType<OneCClientCardsErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCClientCardsInitialCursor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOneCClientCardsInitialCursorQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListManagerClientCardManagersUrl = () => {
 
