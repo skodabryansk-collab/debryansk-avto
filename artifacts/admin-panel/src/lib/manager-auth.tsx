@@ -5,6 +5,22 @@ import {
   MANAGER_SESSION_EXPIRED_EVENT,
   processSessionResponse,
 } from "./session-client";
+import type {
+  AutoRuCatalogBrand,
+  AutoRuCatalogBrandsResponse,
+  AutoRuCatalogModel,
+  AutoRuCatalogModelsResponse,
+  ListManagerClientCardsParams,
+  ManagerClientCard,
+  ManagerClientCardInput,
+  ManagerClientCardCreatedResponse,
+  ManagerClientCardInventoryResponse,
+  ManagerClientCardManagersResponse,
+  ManagerClientCardResponse,
+  ManagerClientCardsPageResponse,
+  ManagerClientCardStringListResponse,
+  SearchManagerClientCardInventoryParams,
+} from "@workspace/api-client-react";
 
 const MANAGER_TOKEN_KEY = "manager_token";
 const MANAGER_NAME_KEY = "manager_name";
@@ -116,51 +132,18 @@ export interface QuoteHistoryItem {
   updatedAt: string | null;
 }
 
-export interface ManagerClientCarSnapshot {
-  id: number;
-  externalId: string;
-  type: string;
-  brand: string | null;
-  model: string | null;
-  year: number | null;
-  modification: string | null;
-  complectation: string | null;
-  color: string | null;
-  price: number | null;
-  imageUrl: string | null;
-}
+export type ManagerClientCardFilters = Omit<ListManagerClientCardsParams, "managerId"> & { managerId?: number | "" };
 
-export interface ManagerClientCard {
-  id: number;
-  managerId: number;
-  managerName: string | null;
-  clientName: string;
-  clientPhone: string;
-  desiredBrand: string | null;
-  desiredModel: string | null;
-  budgetRange: string | null;
-  currentCar: string | null;
-  currentCarYear: number | null;
-  tradeInPlan: string | null;
-  commercialCarId: number | null;
-  commercialCarSnapshot: ManagerClientCarSnapshot | null;
-  paymentMethod: string | null;
-  comment: string | null;
-  createdAt: string;
-}
-
-export interface NewManagerClientCard {
-  clientName: string;
-  clientPhone: string;
-  desiredBrand: string | null;
-  desiredModel: string | null;
-  budgetRange: string | null;
-  currentCar: string | null;
-  currentCarYear: number | null;
-  tradeInPlan: string | null;
-  commercialCarId: number | null;
-  paymentMethod: string | null;
-  comment: string;
+function cardFilterParams(filters: ManagerClientCardFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.client?.trim()) params.set("client", filters.client.trim());
+  if (filters.phone?.trim()) params.set("phone", filters.phone.trim());
+  if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
+  if (filters.dateTo) params.set("dateTo", filters.dateTo);
+  if (filters.managerId) params.set("managerId", String(filters.managerId));
+  if (filters.page) params.set("page", String(filters.page));
+  if (filters.pageSize) params.set("pageSize", String(filters.pageSize));
+  return params;
 }
 
 export function searchCars(opts: {
@@ -174,17 +157,66 @@ export function searchCars(opts: {
   return managerApi("GET", `/cars/search?${params}`);
 }
 
-export function getManagerClientCards(q?: string): Promise<{ ok: boolean; data: ManagerClientCard[] }> {
-  const params = new URLSearchParams();
-  if (q?.trim()) params.set("q", q.trim());
+export function getManagerClientCards(filters: ManagerClientCardFilters = {}): Promise<ManagerClientCardsPageResponse> {
+  const params = cardFilterParams(filters);
   return managerApi("GET", `/client-cards${params.size ? `?${params}` : ""}`);
 }
 
-export function createManagerClientCard(data: NewManagerClientCard): Promise<{
-  ok: boolean;
-  data: { id: number; createdAt: string };
-}> {
+export function getManagerClientCard(id: number): Promise<ManagerClientCardResponse> {
+  return managerApi("GET", `/client-cards/${id}`);
+}
+
+export function getManagerClientCardManagers(): Promise<ManagerClientCardManagersResponse> {
+  return managerApi("GET", "/client-cards/managers");
+}
+
+export function getManagerClientNeedsBrands(): Promise<ManagerClientCardStringListResponse> {
+  return managerApi("GET", "/client-cards/needs/brands");
+}
+
+export function getManagerClientNeedsModels(brand: string): Promise<ManagerClientCardStringListResponse> {
+  return managerApi("GET", `/client-cards/needs/models?${new URLSearchParams({ brand })}`);
+}
+
+export function searchManagerClientCardInventory(options: SearchManagerClientCardInventoryParams): Promise<ManagerClientCardInventoryResponse> {
+  const params = new URLSearchParams();
+  if (options.brand) params.set("brand", options.brand);
+  if (options.model) params.set("model", options.model);
+  if (options.q) params.set("q", options.q);
+  if (options.vin) params.set("vin", options.vin);
+  if (options.type) params.set("type", options.type);
+  return managerApi("GET", `/client-cards/inventory?${params}`);
+}
+
+export async function getAutoRuCatalogBrands(): Promise<AutoRuCatalogBrandsResponse> {
+  const response = await fetch("/api/car-catalog/brands");
+  if (!response.ok) throw new Error("Не удалось загрузить марки Auto.ru");
+  return response.json();
+}
+
+export async function getAutoRuCatalogModels(brandId: string): Promise<AutoRuCatalogModelsResponse> {
+  const response = await fetch(`/api/car-catalog/models?${new URLSearchParams({ brandId })}`);
+  if (!response.ok) throw new Error("Не удалось загрузить модели Auto.ru");
+  return response.json();
+}
+
+export function createManagerClientCard(data: ManagerClientCardInput): Promise<ManagerClientCardCreatedResponse> {
   return managerApi("POST", "/client-cards", data);
+}
+
+export async function exportManagerClientCards(filters: ManagerClientCardFilters = {}): Promise<Blob> {
+  const token = getManagerToken();
+  const tokenStorageKey = getManagerTokenStorageKey();
+  const params = cardFilterParams(filters);
+  const response = await fetch(`/api/manager/client-cards/export.csv?${params}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  processSessionResponse(response, token, tokenStorageKey);
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: "Не удалось выгрузить CSV" }));
+    throw new Error(error.error || "Не удалось выгрузить CSV");
+  }
+  return response.blob();
 }
 
 export function refreshManagerCarFromCm(id: number): Promise<{
