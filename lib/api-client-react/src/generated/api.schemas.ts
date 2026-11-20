@@ -21,6 +21,607 @@ export interface AiImageModelCatalogue {
   data: AiImageModel[];
 }
 
+export interface ShowroomSurveyModel {
+  id: string;
+  brand: string;
+  model: string;
+}
+
+export interface ShowroomSurveyModelsResponse {
+  ok: boolean;
+  data: ShowroomSurveyModel[];
+}
+
+export interface ShowroomSurveyRatings {
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  design: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  interior: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  driverComfort: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  rearSeat: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  trunk: number;
+}
+
+export interface ShowroomSurveyEvaluationInput {
+  /**
+     * @minLength 1
+     * @maxLength 180
+     */
+  modelId: string;
+  ratings: ShowroomSurveyRatings;
+}
+
+export interface ShowroomSurveySubmissionInput {
+  /**
+     * @minLength 16
+     * @maxLength 80
+     */
+  submissionId: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  /**
+     * @minLength 10
+     * @maxLength 32
+     */
+  phone: string;
+  consent: true;
+  /** Optional permission to contact the visitor about the vehicles they selected */
+  communicationsConsent?: boolean;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  source?: string | null;
+  /**
+     * @minItems 1
+     * @maxItems 30
+     */
+  evaluations: ShowroomSurveyEvaluationInput[];
+}
+
+export interface ShowroomSurveySubmissionResponse {
+  ok: boolean;
+  submissionId: string;
+  leadId: number;
+  duplicate: boolean;
+}
+
+export type CustomerSurveyQuestionType = typeof CustomerSurveyQuestionType[keyof typeof CustomerSurveyQuestionType];
+
+
+export const CustomerSurveyQuestionType = {
+  rating: 'rating',
+  single_choice: 'single_choice',
+  multiple_choice: 'multiple_choice',
+  text: 'text',
+  brand_picker: 'brand_picker',
+  model_picker: 'model_picker',
+} as const;
+
+export interface CustomerSurveyQuestion {
+  /**
+     * @minLength 1
+     * @maxLength 48
+     */
+  id: string;
+  type: CustomerSurveyQuestionType;
+  /**
+     * @minLength 2
+     * @maxLength 180
+     */
+  label: string;
+  /**
+     * @maxLength 300
+     * @nullable
+     */
+  description?: string | null;
+  required: boolean;
+  options?: string[];
+  /**
+     * @minimum 0
+     * @maximum 10
+     */
+  min?: number;
+  /**
+     * @minimum 1
+     * @maximum 10
+     */
+  max?: number;
+  /** @maxLength 50 */
+  minLabel?: string;
+  /** @maxLength 50 */
+  maxLabel?: string;
+  /** @maxLength 48 */
+  dependsOn?: string;
+}
+
+export type CustomerSurveyDefinitionMode = typeof CustomerSurveyDefinitionMode[keyof typeof CustomerSurveyDefinitionMode];
+
+
+export const CustomerSurveyDefinitionMode = {
+  standard: 'standard',
+  showroom: 'showroom',
+} as const;
+
+export interface CustomerSurveyDefinition {
+  mode: CustomerSurveyDefinitionMode;
+  /**
+     * @minItems 1
+     * @maxItems 40
+     */
+  questions: CustomerSurveyQuestion[];
+  collectContact: boolean;
+  processingConsent: boolean;
+  communicationsConsent: boolean;
+}
+
+export type CustomerSurveyInputStatus = typeof CustomerSurveyInputStatus[keyof typeof CustomerSurveyInputStatus];
+
+
+export const CustomerSurveyInputStatus = {
+  draft: 'draft',
+  published: 'published',
+  archived: 'archived',
+} as const;
+
+export interface CustomerSurveyInput {
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  title: string;
+  /**
+     * @minLength 2
+     * @maxLength 100
+     * @pattern ^[a-z0-9]+(?:-[a-z0-9]+)*$
+     */
+  slug: string;
+  status: CustomerSurveyInputStatus;
+  definition: CustomerSurveyDefinition;
+}
+
+export type CustomerSurveyRecordStatus = typeof CustomerSurveyRecordStatus[keyof typeof CustomerSurveyRecordStatus];
+
+
+export const CustomerSurveyRecordStatus = {
+  draft: 'draft',
+  published: 'published',
+  archived: 'archived',
+} as const;
+
+export interface CustomerSurveyRecord {
+  id: number;
+  title: string;
+  slug: string;
+  status: CustomerSurveyRecordStatus;
+  definition: CustomerSurveyDefinition;
+  version: number;
+  responseCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomerSurveyListResponse {
+  ok: boolean;
+  data: CustomerSurveyRecord[];
+}
+
+export interface CustomerSurveyRecordResponse {
+  ok: boolean;
+  data: CustomerSurveyRecord;
+}
+
+export type CustomerSurveyPublicResponseData = {
+  title: string;
+  slug: string;
+  version: number;
+  definition: CustomerSurveyDefinition;
+};
+
+export interface CustomerSurveyPublicResponse {
+  ok: boolean;
+  data: CustomerSurveyPublicResponseData;
+}
+
+export type CustomerSurveyResponseInputAnswers = { [key: string]: unknown };
+
+export interface CustomerSurveyResponseInput {
+  /**
+     * @minLength 16
+     * @maxLength 80
+     */
+  submissionId: string;
+  answers: CustomerSurveyResponseInputAnswers;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  name?: string | null;
+  /**
+     * @maxLength 32
+     * @nullable
+     */
+  phone?: string | null;
+  consent?: boolean;
+  communicationsConsent?: boolean;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  source?: string | null;
+}
+
+export interface CustomerSurveySubmissionResult {
+  ok: boolean;
+  duplicate: boolean;
+  responseId: number;
+  /** @nullable */
+  leadId: number | null;
+}
+
+export interface CustomerSurveyBucket {
+  value: string;
+  count: number;
+}
+
+export interface CustomerSurveyQuestionStats {
+  questionId: string;
+  label: string;
+  type: CustomerSurveyQuestionType;
+  answered: number;
+  /** @nullable */
+  average: number | null;
+  buckets: CustomerSurveyBucket[];
+}
+
+export interface CustomerSurveyDayCount {
+  date: string;
+  count: number;
+}
+
+export interface CustomerSurveyStats {
+  totalResponses: number;
+  byDate: CustomerSurveyDayCount[];
+  questions: CustomerSurveyQuestionStats[];
+}
+
+export interface CustomerSurveyStatsResponse {
+  ok: boolean;
+  data: CustomerSurveyStats;
+}
+
+export type CustomerSurveyResponseItemAnswers = { [key: string]: unknown };
+
+export interface CustomerSurveyResponseItem {
+  id: number;
+  submittedAt: string;
+  surveyVersion: number;
+  answers: CustomerSurveyResponseItemAnswers;
+  definitionSnapshot: CustomerSurveyDefinition;
+  /** @nullable */
+  name: string | null;
+  /** @nullable */
+  phone: string | null;
+  /** @nullable */
+  source: string | null;
+  /** @nullable */
+  processingConsent: boolean | null;
+  /** @nullable */
+  communicationsConsent: boolean | null;
+}
+
+export interface CustomerSurveyResponsesResponse {
+  ok: boolean;
+  data: CustomerSurveyResponseItem[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
+export interface AutoRuCatalogBrand {
+  id: string;
+  name: string;
+  cyrillicName: string;
+  isPopular: boolean;
+}
+
+export interface AutoRuCatalogModel {
+  id: string;
+  name: string;
+}
+
+export interface AutoRuCatalogBrandsResponse {
+  ok: boolean;
+  data: AutoRuCatalogBrand[];
+}
+
+export interface AutoRuCatalogModelsResponse {
+  ok: boolean;
+  data: AutoRuCatalogModel[];
+}
+
+export interface ManagerClientCarSnapshot {
+  id: number;
+  externalId: string;
+  type: string;
+  /** @nullable */
+  brand: string | null;
+  /** @nullable */
+  model: string | null;
+  /** @nullable */
+  year: number | null;
+  /** @nullable */
+  modification: string | null;
+  /** @nullable */
+  complectation: string | null;
+  /** @nullable */
+  color: string | null;
+  /** @nullable */
+  price: number | null;
+  /** @nullable */
+  imageUrl: string | null;
+  /** @nullable */
+  vin: string | null;
+}
+
+/**
+ * @nullable
+ */
+export type ManagerClientCardClientGender = typeof ManagerClientCardClientGender[keyof typeof ManagerClientCardClientGender] | null;
+
+
+export const ManagerClientCardClientGender = {
+  male: 'male',
+  female: 'female',
+} as const;
+
+export interface ManagerClientCard {
+  id: number;
+  managerId: number;
+  /** @nullable */
+  managerName: string | null;
+  clientName: string;
+  clientPhone: string;
+  /** @nullable */
+  clientGender: ManagerClientCardClientGender;
+  /** @nullable */
+  desiredBrand: string | null;
+  /** @nullable */
+  desiredModel: string | null;
+  desiredVehicleUndecided: boolean;
+  /** @nullable */
+  budgetRange: string | null;
+  /** @nullable */
+  currentCar: string | null;
+  /** @nullable */
+  currentCarYear: number | null;
+  /** @nullable */
+  currentCarInventoryId: number | null;
+  currentCarSnapshot: ManagerClientCarSnapshot | null;
+  /** @nullable */
+  tradeInPlan: string | null;
+  /** @nullable */
+  commercialBrand: string | null;
+  /** @nullable */
+  commercialModel: string | null;
+  /** @nullable */
+  commercialCarId: number | null;
+  commercialCarSnapshot: ManagerClientCarSnapshot | null;
+  /** @nullable */
+  paymentMethod: string | null;
+  /** @nullable */
+  comment: string | null;
+  createdAt: string;
+}
+
+/**
+ * @nullable
+ */
+export type ManagerClientCardInputClientGender = typeof ManagerClientCardInputClientGender[keyof typeof ManagerClientCardInputClientGender] | null;
+
+
+export const ManagerClientCardInputClientGender = {
+  male: 'male',
+  female: 'female',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ManagerClientCardInputBudgetRange = typeof ManagerClientCardInputBudgetRange[keyof typeof ManagerClientCardInputBudgetRange] | null;
+
+
+export const ManagerClientCardInputBudgetRange = {
+  Не_указан: 'Не указан',
+  до_2_млн: 'до 2 млн',
+  '2–3_млн': '2–3 млн',
+  '3–5_млн': '3–5 млн',
+  '5+_млн': '5+ млн',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ManagerClientCardInputTradeInPlan = typeof ManagerClientCardInputTradeInPlan[keyof typeof ManagerClientCardInputTradeInPlan] | null;
+
+
+export const ManagerClientCardInputTradeInPlan = {
+  Да: 'Да',
+  Нет: 'Нет',
+  Пока_не_решил: 'Пока не решил',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ManagerClientCardInputPaymentMethod = typeof ManagerClientCardInputPaymentMethod[keyof typeof ManagerClientCardInputPaymentMethod] | null;
+
+
+export const ManagerClientCardInputPaymentMethod = {
+  Кредит: 'Кредит',
+  Лизинг: 'Лизинг',
+  'Наличные_/_Безнал': 'Наличные / Безнал',
+} as const;
+
+export interface ManagerClientCardInput {
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  clientName: string;
+  /**
+     * @minLength 10
+     * @maxLength 40
+     */
+  clientPhone: string;
+  /** @nullable */
+  clientGender: ManagerClientCardInputClientGender;
+  /**
+     * @maxLength 180
+     * @nullable
+     */
+  desiredBrand: string | null;
+  /**
+     * @maxLength 180
+     * @nullable
+     */
+  desiredModel: string | null;
+  desiredVehicleUndecided: boolean;
+  /** @nullable */
+  budgetRange: ManagerClientCardInputBudgetRange;
+  /**
+     * @maxLength 180
+     * @nullable
+     */
+  currentCar: string | null;
+  /**
+     * @minimum 1950
+     * @maximum 2100
+     * @nullable
+     */
+  currentCarYear: number | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  currentCarInventoryId: number | null;
+  /** @nullable */
+  tradeInPlan: ManagerClientCardInputTradeInPlan;
+  /**
+     * @maxLength 180
+     * @nullable
+     */
+  commercialBrand: string | null;
+  /**
+     * @maxLength 180
+     * @nullable
+     */
+  commercialModel: string | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  commercialCarId: number | null;
+  /** @nullable */
+  paymentMethod: ManagerClientCardInputPaymentMethod;
+  /** @maxLength 4000 */
+  comment: string;
+}
+
+export interface ManagerClientCardsPage {
+  items: ManagerClientCard[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface ManagerClientCardsPageResponse {
+  ok: boolean;
+  data: ManagerClientCardsPage;
+}
+
+export interface ManagerClientCardResponse {
+  ok: boolean;
+  data: ManagerClientCard;
+}
+
+export type ManagerClientCardCreatedResponseData = {
+  id: number;
+  createdAt: string;
+};
+
+export interface ManagerClientCardCreatedResponse {
+  ok: boolean;
+  data: ManagerClientCardCreatedResponseData;
+}
+
+export interface ManagerClientCardManager {
+  id: number;
+  name: string;
+}
+
+export interface ManagerClientCardManagersResponse {
+  ok: boolean;
+  data: ManagerClientCardManager[];
+}
+
+export interface ManagerClientCardStringListResponse {
+  ok: boolean;
+  data: string[];
+}
+
+export interface ManagerClientCardInventoryItem {
+  id: number;
+  externalId: string;
+  type: string;
+  /** @nullable */
+  brand: string | null;
+  /** @nullable */
+  model: string | null;
+  /** @nullable */
+  year: number | null;
+  /** @nullable */
+  modification: string | null;
+  /** @nullable */
+  complectation: string | null;
+  /** @nullable */
+  color: string | null;
+  /** @nullable */
+  price: number | null;
+  /** @nullable */
+  imageUrl: string | null;
+  /** @nullable */
+  vin: string | null;
+  /** @nullable */
+  dealer: string | null;
+}
+
+export interface ManagerClientCardInventoryResponse {
+  ok: boolean;
+  data: ManagerClientCardInventoryItem[];
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -30,5 +631,115 @@ export type GetCarImageThumbnailParams = {
  * Auto.ru stock image URL from avatars.avto.ru
  */
 src: string;
+};
+
+export type GetCustomerSurveyStatsParams = {
+/**
+ * @minimum 1
+ */
+id: number;
+from?: string;
+to?: string;
+};
+
+export type ListCustomerSurveyResponsesParams = {
+/**
+ * @minimum 1
+ */
+id: number;
+from?: string;
+to?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+};
+
+export type ListManagerClientCardsParams = {
+/**
+ * @maxLength 100
+ */
+client?: string;
+/**
+ * @maxLength 40
+ */
+phone?: string;
+dateFrom?: string;
+dateTo?: string;
+/**
+ * @minimum 1
+ */
+managerId?: number;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+pageSize?: number;
+};
+
+export type ListManagerClientNeedsModelsParams = {
+/**
+ * @minLength 1
+ * @maxLength 180
+ */
+brand: string;
+};
+
+export type SearchManagerClientCardInventoryParams = {
+/**
+ * @maxLength 180
+ */
+brand?: string;
+/**
+ * @maxLength 180
+ */
+model?: string;
+/**
+ * @minLength 2
+ * @maxLength 180
+ */
+q?: string;
+/**
+ * @minLength 4
+ * @maxLength 32
+ */
+vin?: string;
+type?: SearchManagerClientCardInventoryType;
+};
+
+export type SearchManagerClientCardInventoryType = typeof SearchManagerClientCardInventoryType[keyof typeof SearchManagerClientCardInventoryType];
+
+
+export const SearchManagerClientCardInventoryType = {
+  new: 'new',
+  used: 'used',
+} as const;
+
+export type ExportManagerClientCardsParams = {
+/**
+ * @maxLength 100
+ */
+client?: string;
+/**
+ * @maxLength 40
+ */
+phone?: string;
+dateFrom?: string;
+dateTo?: string;
+/**
+ * @minimum 1
+ */
+managerId?: number;
+};
+
+export type ListAutoRuCarModelsParams = {
+/**
+ * @minLength 1
+ */
+brandId: string;
 };
 
