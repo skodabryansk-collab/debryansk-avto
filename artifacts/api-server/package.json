@@ -13,6 +13,7 @@
     "test:manager-client-cards": "pnpm --dir ../../scripts exec tsx ../artifacts/api-server/src/lib/manager-client-cards-api.test.ts",
     "test:manager-client-cards-validation": "pnpm --dir ../../scripts exec tsx ../artifacts/api-server/src/lib/manager-client-cards-validation.test.ts",
     "test:onec-client-cards": "pnpm --dir ../../scripts exec tsx ../artifacts/api-server/src/lib/onec-integration-api.test.ts",
+    "test:onec-admin": "pnpm --dir ../../scripts exec tsx ../artifacts/api-server/src/lib/admin-onec-integration-api.test.ts",
     "test:vehicle-tag": "pnpm --dir ../../scripts exec tsx ../artifacts/api-server/src/templates/vehicle-tag/render.test.ts",
     "test:vehicle-tag-enrichment": "pnpm --dir ../../scripts exec tsx ../artifacts/api-server/src/services/vehicle-tag-enrichment.test.ts",
     "test:calltouch": "tsc -p tsconfig.tests.json --noEmit && pnpm --dir ../../scripts exec tsx ../artifacts/api-server/scripts/test-calltouch-callback.ts",
