@@ -1235,6 +1235,12 @@ export default function ManagerQuotesPage() {
           </Button>
           <Button
             variant="outline"
+            onClick={() => setLocation("/manager/client-cards")}
+          >
+            Карточки клиентов
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => setShowInstructions(true)}
             className="text-slate-600 ml-auto"
           >
