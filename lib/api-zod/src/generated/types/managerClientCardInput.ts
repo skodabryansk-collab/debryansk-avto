@@ -78,11 +78,6 @@ export interface ManagerClientCardInput {
   currentCarBodyType: string | null;
   /** @nullable */
   currentCarOwnersCount: ManagerClientCardInputCurrentCarOwnersCount;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  currentCarInventoryId: number | null;
   /** @nullable */
   tradeInPlan: ManagerClientCardInputTradeInPlan;
   /** @minItems 1 */
