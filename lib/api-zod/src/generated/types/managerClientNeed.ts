@@ -21,4 +21,9 @@ export interface ManagerClientNeed {
   undecided: boolean;
   /** @nullable */
   budgetRange: ManagerClientNeedBudgetRange;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  plannedPurchaseDate?: string | null;
 }
