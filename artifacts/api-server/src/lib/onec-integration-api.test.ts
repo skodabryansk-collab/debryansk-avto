@@ -9,6 +9,7 @@ import {
   db,
   locationsTable,
   locationBrandsTable,
+  managerClientCardHistoryTable,
   managerClientCardsTable,
   managersTable,
 } from "@workspace/db";
@@ -72,6 +73,18 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
     assert.equal(cursorBody.ok, true);
     const initialCursor = cursorBody.data.after_id;
     assert.ok(Number.isInteger(initialCursor));
+
+    const changesCursorResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v1/client-cards/changes/initial-cursor`,
+      { headers: { Authorization: "Bearer test-only-onec-token" } },
+    );
+    assert.equal(changesCursorResponse.status, 200);
+    const changesCursorBody = await changesCursorResponse.json() as {
+      ok: boolean;
+      data: { after_change_id: number };
+    };
+    const initialChangeCursor = changesCursorBody.data.after_change_id;
+    assert.ok(Number.isInteger(initialChangeCursor));
 
     const missingCursor = await fetch(`${started.baseUrl}/api/integrations/1c/v1/client-cards`, {
       headers: { Authorization: "Bearer test-only-onec-token" },
@@ -280,6 +293,50 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
     assert.equal("brand_id" in (exportedItem.brand_records[0] as object), false);
     assert.equal("organization_name" in (exportedItem.brand_records[0] as object), false);
     assert.equal("department_name" in (exportedItem.brand_records[0] as object), false);
+
+    await db.update(managerClientCardsTable).set({
+      desiredBrand: "Haval City",
+      desiredModel: "Jolion",
+      needs: [
+        { brand: "Haval City", model: "Jolion", undecided: false, budgetRange: "2–3 млн", plannedPurchaseDate: "2027-05-21" },
+      ],
+      updatedAt: new Date(),
+    }).where(eq(managerClientCardsTable.id, cardId));
+    await db.insert(managerClientCardHistoryTable).values({
+      cardId,
+      editorName: "Менеджер 1С",
+      editorRole: "manager",
+      changes: [{ field: "needs", oldValue: ["Haval City", "Jetour"], newValue: ["Haval City"] }],
+      previousBrands: ["Haval City", "Jetour"],
+      currentBrands: ["Haval City"],
+    });
+
+    const changesResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v1/client-cards/changes?after_change_id=${initialChangeCursor}&limit=10`,
+      { headers: { Authorization: "Bearer test-only-onec-token" } },
+    );
+    assert.equal(changesResponse.status, 200);
+    const changesBody = await changesResponse.json() as {
+      ok: boolean;
+      data: {
+        events: Array<{
+          change_id: number;
+          worksheet_id: number;
+          deleted_source_keys: string[];
+          item: { needs: Array<{ brand: string | null }>; brand_records: Array<{ source_key: string }> };
+        }>;
+        next_cursor: number;
+        has_more: boolean;
+      };
+    };
+    assert.equal(changesBody.ok, true);
+    assert.equal(changesBody.data.events.length, 1);
+    assert.equal(changesBody.data.events[0]?.worksheet_id, cardId);
+    assert.equal(changesBody.data.events[0]?.item.needs.length, 1);
+    assert.equal(changesBody.data.events[0]?.item.brand_records.length, 1);
+    assert.deepEqual(changesBody.data.events[0]?.deleted_source_keys, [`${cardId}:jetour`]);
+    assert.equal(changesBody.data.next_cursor, changesBody.data.events[0]?.change_id);
+    assert.equal(changesBody.data.has_more, false);
   } finally {
     if (server) {
       await new Promise<void>(resolve => server!.close(() => resolve()));
