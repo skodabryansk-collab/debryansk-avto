@@ -9,8 +9,6 @@ import type { OneCClientNeedBudgetRange } from './oneCClientNeedBudgetRange';
 
 export interface OneCClientNeed {
   /** @nullable */
-  brand_id: number | null;
-  /** @nullable */
   brand: string | null;
   /** @nullable */
   model: string | null;
@@ -25,9 +23,5 @@ export interface OneCClientNeed {
   /** @nullable */
   organization_code: string | null;
   /** @nullable */
-  organization_name: string | null;
-  /** @nullable */
   department_code: string | null;
-  /** @nullable */
-  department_name: string | null;
 }
