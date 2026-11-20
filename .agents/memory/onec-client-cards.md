@@ -9,8 +9,12 @@ Generated `TMP1C-` values are placeholders only. Do not send them to 1C, even if
 
 Do not expose `current_car_inventory_id` or `current_cars[].inventory_id` in manager/1C API contracts. The selected commercial car may use an internal numeric database ID inside the admin app, but the 1C contract identifies it by `commercial_car_vin` (nullable when the VIN is unavailable). Each need may also carry an optional planned purchase date as a date-only `YYYY-MM-DD` string.
 
+The 1C payload should send organization and department codes, not their display names, and should not expose an internal `brand_id`. Keep `source_key` as an opaque idempotency key built from the worksheet ID and normalized brand name.
+
 **Why:** the user specified that location represents organization, brand represents department, and official 1C codes will be supplied later. Placeholder values must not create incorrectly routed leads.
 
 **Why:** the user confirmed there is no current-car inventory identifier in their workflow and wants the VIN—not an internal car row ID—sent for a selected commercial offer.
 
-**How to apply:** keep one-time cursor initialization separate from polling, use the dedicated bearer token in the Authorization header, stop the feed on an unresolved brand, location, or official code, and keep internal car IDs out of the external payload.
+**Why:** the user clarified that 1C needs the organization/department codes and brand name, but not display names or the source database's brand ID.
+
+**How to apply:** keep one-time cursor initialization separate from polling, use the dedicated bearer token in the Authorization header, stop the feed on an unresolved brand, location, or official code, keep internal IDs out of external fields, and send codes rather than display names.
