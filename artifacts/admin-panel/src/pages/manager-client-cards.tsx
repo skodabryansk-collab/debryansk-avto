@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
@@ -10,8 +10,10 @@ import {
   ChevronRight,
   Download,
   FileText,
+  History,
   Loader2,
   LogOut,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -26,8 +28,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToast } from "@/hooks/use-toast";
 import type {
   ManagerClientCard,
+  ManagerClientCardCreatedResponse,
   ManagerClientCardInput,
   ManagerClientCardInventoryItem,
+  ManagerClientCardUpdatedResponse,
+  ManagerClientCarSnapshot,
 } from "@workspace/api-client-react";
 import {
   createManagerClientCard,
@@ -40,6 +45,7 @@ import {
   getManagerName,
   isAdminUsingManagerPortal,
   searchManagerClientCardInventory,
+  updateManagerClientCard,
   useManagerAuth,
   type ManagerClientCardFilters,
 } from "@/lib/manager-auth";
@@ -85,6 +91,7 @@ type FormState = {
     bodyType: string;
     ownersCount: "" | "1" | "2" | "3" | "4+";
     tradeInPlan: "" | typeof tradeInOptions[number];
+    snapshot: ManagerClientCarSnapshot | null;
   }>;
   commercialBrand: string;
   commercialModel: string;
@@ -125,6 +132,7 @@ function emptyCurrentCar(localId = newLocalId("car")): FormState["currentCars"][
     bodyType: "",
     ownersCount: "",
     tradeInPlan: "",
+    snapshot: null,
   };
 }
 
@@ -199,6 +207,147 @@ function formatOwnersCount(value: string | null | undefined): string {
   if (value === "2" || value === "3") return `${value} владельца`;
   if (value === "4+") return "4 и более";
   return "";
+}
+
+function makeFormFromCard(card: ManagerClientCard): FormState {
+  const savedNeeds = card.needs?.length ? card.needs : [{
+    brand: card.desiredBrand,
+    model: card.desiredModel,
+    undecided: card.desiredVehicleUndecided,
+    budgetRange: card.budgetRange,
+    plannedPurchaseDate: null,
+  }];
+  const legacyCar = {
+    brand: card.currentCarBrand ?? card.currentCar ?? "",
+    model: card.currentCarModel ?? "",
+    year: card.currentCarYear,
+    mileage: card.currentCarMileage,
+    generation: card.currentCarGeneration,
+    bodyType: card.currentCarBodyType,
+    ownersCount: card.currentCarOwnersCount,
+    snapshot: card.currentCarSnapshot,
+    tradeInPlan: card.tradeInPlan,
+  };
+  const savedCars = card.currentCars?.length
+    ? card.currentCars
+    : Object.values(legacyCar).some(value => value != null && value !== "")
+      ? [legacyCar]
+      : [];
+
+  return {
+    clientName: card.clientName,
+    clientPhone: card.clientPhone,
+    clientGender: card.clientGender ?? "",
+    needs: savedNeeds.map(need => ({
+      localId: newLocalId("need"),
+      brand: need.brand ?? "",
+      model: need.model ?? "",
+      undecided: need.undecided,
+      budgetRange: (need.budgetRange ?? "") as FormState["needs"][number]["budgetRange"],
+      plannedPurchaseDate: need.plannedPurchaseDate ?? "",
+    })),
+    currentCars: savedCars.map(car => ({
+      localId: newLocalId("car"),
+      brandId: "",
+      modelId: "",
+      brandSearch: car.brand,
+      modelSearch: car.model,
+      brand: car.brand,
+      model: car.model,
+      year: car.year == null ? "" : String(car.year),
+      mileage: car.mileage == null ? "" : String(car.mileage),
+      generationId: car.generation ?? "",
+      bodyTypeId: car.bodyType ?? "",
+      generation: car.generation ?? "",
+      bodyType: car.bodyType ?? "",
+      ownersCount: (car.ownersCount ?? "") as FormState["currentCars"][number]["ownersCount"],
+      tradeInPlan: (car.tradeInPlan ?? "") as FormState["currentCars"][number]["tradeInPlan"],
+      snapshot: car.snapshot as ManagerClientCarSnapshot | null,
+    })),
+    commercialBrand: card.commercialBrand ?? "",
+    commercialModel: card.commercialModel ?? "",
+    paymentMethod: (card.paymentMethod ?? "") as FormState["paymentMethod"],
+    comment: card.comment ?? "",
+  };
+}
+
+function makeSelectedOfferCar(card: ManagerClientCard): ManagerClientCardInventoryItem | null {
+  const snapshot = card.commercialCarSnapshot as Record<string, unknown> | null;
+  if (card.commercialCarId == null && !snapshot) return null;
+  const value = snapshot ?? {};
+  const asNullableString = (key: string) => typeof value[key] === "string" ? value[key] as string : null;
+  const asNullableNumber = (key: string) => typeof value[key] === "number" ? value[key] as number : null;
+  return {
+    id: card.commercialCarId ?? (typeof value["id"] === "number" ? value["id"] : 0),
+    externalId: typeof value["externalId"] === "string" ? value["externalId"] : "",
+    type: typeof value["type"] === "string" ? value["type"] : "new",
+    brand: asNullableString("brand") ?? card.commercialBrand,
+    model: asNullableString("model") ?? card.commercialModel,
+    year: asNullableNumber("year"),
+    modification: asNullableString("modification"),
+    complectation: asNullableString("complectation"),
+    color: asNullableString("color"),
+    price: asNullableNumber("price"),
+    imageUrl: asNullableString("imageUrl"),
+    vin: asNullableString("vin"),
+    dealer: null,
+  };
+}
+
+function auditFieldLabel(field: string): string {
+  const labels: Record<string, string> = {
+    clientName: "ФИО клиента",
+    clientPhone: "Телефон",
+    clientGender: "Пол",
+    needs: "Потребности",
+    currentCars: "Текущие автомобили",
+    commercialBrand: "Марка предложения",
+    commercialModel: "Модель предложения",
+    commercialCarId: "Выбранный автомобиль из склада",
+    commercialCarSnapshot: "Автомобиль из склада",
+    paymentMethod: "Способ оплаты",
+    comment: "Комментарий",
+  };
+  return labels[field] ?? field;
+}
+
+function formatAuditValue(field: string, value: unknown): string {
+  if (value == null || value === "") return "Не указано";
+  if (field === "commercialCarId") return `Внутренний ID автомобиля: ${String(value)}`;
+  if (field === "clientGender") return value === "male" ? "Мужской" : value === "female" ? "Женский" : String(value);
+  if (field === "needs" && Array.isArray(value)) {
+    return value.map((raw, index) => {
+      const need = raw as Record<string, unknown>;
+      const title = [need["brand"], need["model"]].filter(Boolean).join(" ") ||
+        (need["undecided"] ? "Пока не определился" : "Без выбранной модели");
+      const details = [
+        need["budgetRange"] ? `бюджет ${String(need["budgetRange"])}` : "",
+        need["plannedPurchaseDate"] ? `покупка ${formatDateOnly(String(need["plannedPurchaseDate"]))}` : "",
+      ].filter(Boolean);
+      return `${index + 1}. ${title}${details.length ? ` (${details.join(", ")})` : ""}`;
+    }).join("\n") || "Не указано";
+  }
+  if (field === "currentCars" && Array.isArray(value)) {
+    return value.map((raw, index) => {
+      const car = raw as Record<string, unknown>;
+      const title = [car["brand"], car["model"], car["year"]].filter(Boolean).join(" ") || "Автомобиль";
+      const details = [
+        car["mileage"] != null ? `${Number(car["mileage"]).toLocaleString("ru-RU")} км` : "",
+        car["tradeInPlan"] ? `Трейд-ин: ${String(car["tradeInPlan"])}` : "",
+      ].filter(Boolean);
+      return `${index + 1}. ${title}${details.length ? ` (${details.join(", ")})` : ""}`;
+    }).join("\n") || "Не указано";
+  }
+  if (field === "commercialCarSnapshot" && typeof value === "object") {
+    const car = value as Record<string, unknown>;
+    return [
+      [car["brand"], car["model"], car["year"]].filter(Boolean).join(" "),
+      car["vin"] ? `VIN ${String(car["vin"])}` : "",
+      car["price"] ? rub(Number(car["price"])) : "",
+    ].filter(Boolean).join(" · ") || "Не указано";
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(value);
 }
 
 type CmCatalogItem = { id: string; name: string };
@@ -486,6 +635,12 @@ function NeedEditor({
     enabled: Boolean(need.brand && !need.undecided),
   });
   const models = modelsQuery.data?.data ?? [];
+  const visibleBrands = need.brand && !brands.includes(need.brand)
+    ? [...brands, need.brand]
+    : brands;
+  const visibleModels = need.model && !models.includes(need.model)
+    ? [...models, need.model]
+    : models;
   return (
     <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between gap-3">
@@ -505,7 +660,7 @@ function NeedEditor({
           onChange={brand => onChange({ brand, model: "" })}
         >
           <option value="">Выберите марку</option>
-          {brands.map(brand => <option key={brand} value={brand}>{brand}</option>)}
+          {visibleBrands.map(brand => <option key={brand} value={brand}>{brand}</option>)}
         </SelectField>
         <SelectField
           id={`need-model-${need.localId}`}
@@ -516,7 +671,7 @@ function NeedEditor({
           onChange={model => onChange({ model })}
         >
           <option value="">{need.brand ? "Выберите модель" : "Сначала выберите марку"}</option>
-          {models.map(model => <option key={model} value={model}>{model}</option>)}
+          {visibleModels.map(model => <option key={model} value={model}>{model}</option>)}
         </SelectField>
       </div>
       {modelsQuery.isLoading && <p className="text-xs text-slate-500">Загружаем модели…</p>}
@@ -620,6 +775,16 @@ function CurrentCarEditor({
   const modelOptions = (modelsQuery.data ?? []).map(item => ({ value: item.id, label: item.name }));
   const generations = generationsQuery.data ?? [];
   const bodies = bodiesQuery.data ?? [];
+  useEffect(() => {
+    if (car.brandId || !car.brand || brandsQuery.isLoading) return;
+    const match = brandOptions.find(item => item.label.toLocaleLowerCase("ru") === car.brand.toLocaleLowerCase("ru"));
+    if (match) onChange({ brandId: match.value, brandSearch: match.label, brand: match.label });
+  }, [car.brand, car.brandId, brandsQuery.isLoading, brandOptions, onChange]);
+  useEffect(() => {
+    if (car.modelId || !car.model || !car.brandId || modelsQuery.isLoading) return;
+    const match = modelOptions.find(item => item.label.toLocaleLowerCase("ru") === car.model.toLocaleLowerCase("ru"));
+    if (match) onChange({ modelId: match.value, modelSearch: match.label, model: match.label });
+  }, [car.brandId, car.model, car.modelId, modelOptions, modelsQuery.isLoading, onChange]);
   const fieldError = (part: string) => invalid && (
     part === "brand" ? !car.brandId :
     part === "model" ? !car.modelId :
@@ -718,6 +883,9 @@ function CurrentCarEditor({
                 disabled={yearsQuery.isLoading}
               >
                 <option value="">{yearsQuery.isLoading ? "Загружаем годы…" : "Выберите год"}</option>
+                {car.year && !(yearsQuery.data ?? []).includes(Number(car.year)) && (
+                  <option value={car.year}>{car.year}</option>
+                )}
                 {(yearsQuery.data ?? []).map(year => <option key={year} value={year}>{year}</option>)}
               </SelectField>
             </CascadeField>
@@ -754,6 +922,9 @@ function CurrentCarEditor({
                   disabled={generationsQuery.isLoading}
                 >
                   <option value="">{generationsQuery.isLoading ? "Загружаем поколения…" : "Не указано"}</option>
+                  {car.generationId && !generations.some(item => item.id === car.generationId) && (
+                    <option value={car.generationId}>{car.generation}</option>
+                  )}
                   {generations.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </SelectField>
               </CascadeField>
@@ -770,6 +941,9 @@ function CurrentCarEditor({
                 disabled={bodiesQuery.isLoading}
               >
                 <option value="">{bodiesQuery.isLoading ? "Загружаем типы кузова…" : "Не указано"}</option>
+                {car.bodyTypeId && !bodies.some(item => item.id === car.bodyTypeId) && (
+                  <option value={car.bodyTypeId}>{car.bodyType}</option>
+                )}
                 {bodies.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
               </SelectField>
             </CascadeField>
@@ -865,6 +1039,7 @@ export default function ManagerClientCardsPage() {
   const adminPortal = isAdminUsingManagerPortal();
 
   const [mode, setMode] = useState<"list" | "form">("list");
+  const [editingCardId, setEditingCardId] = useState<number | null>(null);
   const [step, setStep] = useState(0);
   const [filters, setFilters] = useState<ListFilters>(emptyFilters);
   const [page, setPage] = useState(1);
@@ -915,11 +1090,22 @@ export default function ManagerClientCardsPage() {
     staleTime: 30_000,
   });
 
-  const saveMutation = useMutation({
-    mutationFn: (payload: ManagerClientCardInput) => createManagerClientCard(payload),
-    onSuccess: () => {
-      toast({ title: "Рабочий лист сохранён" });
+  const saveMutation = useMutation<
+    ManagerClientCardCreatedResponse | ManagerClientCardUpdatedResponse,
+    Error,
+    { cardId: number | null; payload: ManagerClientCardInput }
+  >({
+    mutationFn: ({ cardId, payload }: { cardId: number | null; payload: ManagerClientCardInput }) =>
+      cardId ? updateManagerClientCard(cardId, payload) : createManagerClientCard(payload),
+    onSuccess: (result, variables) => {
+      const changed = "changed" in result.data ? result.data.changed : true;
+      toast({
+        title: variables.cardId
+          ? changed ? "Изменения сохранены" : "Изменений нет"
+          : "Рабочий лист сохранён",
+      });
       setForm(emptyForm);
+      setEditingCardId(null);
       setSelectedOfferCar(null);
       setStep(0);
       resetCurrentVehicle();
@@ -929,7 +1115,9 @@ export default function ManagerClientCardsPage() {
       setFormError("");
       setSaveAttempted(false);
       setMode("list");
+      setSelectedCard(null);
       void queryClient.invalidateQueries({ queryKey: ["manager-client-cards"] });
+      void queryClient.invalidateQueries({ queryKey: ["manager-client-card-detail"] });
     },
     onError: error => {
       setFormError(error instanceof Error ? error.message : "Не удалось сохранить рабочий лист");
@@ -1009,6 +1197,7 @@ export default function ManagerClientCardsPage() {
   }
 
   function startNewCard() {
+    setEditingCardId(null);
     setForm(emptyForm);
     setSelectedOfferCar(null);
     resetCurrentVehicle();
@@ -1018,6 +1207,21 @@ export default function ManagerClientCardsPage() {
     setStep(0);
     setFormError("");
     setSaveAttempted(false);
+    setMode("form");
+  }
+
+  function startEditCard(card: ManagerClientCard) {
+    const selectedCar = makeSelectedOfferCar(card);
+    setForm(makeFormFromCard(card));
+    setEditingCardId(card.id);
+    setSelectedOfferCar(selectedCar);
+    setOfferBrandSearch(selectedCar?.brand ?? card.commercialBrand ?? "");
+    setOfferModelSearch(selectedCar?.model ?? card.commercialModel ?? "");
+    setOfferVinSearch("");
+    setStep(0);
+    setFormError("");
+    setSaveAttempted(false);
+    setSelectedCard(null);
     setMode("form");
   }
 
@@ -1079,12 +1283,12 @@ export default function ManagerClientCardsPage() {
         generation: car.generation || null,
         bodyType: car.bodyType || null,
         ownersCount: car.ownersCount || null,
-        snapshot: null,
+        snapshot: car.snapshot,
         tradeInPlan: car.tradeInPlan || null,
       }));
     const firstNeed = needs[0]!;
     const firstCar = currentCars[0] ?? null;
-    saveMutation.mutate({
+    saveMutation.mutate({ cardId: editingCardId, payload: {
       clientName: form.clientName.trim(),
       clientPhone: form.clientPhone.trim(),
       clientGender: form.clientGender || null,
@@ -1108,7 +1312,7 @@ export default function ManagerClientCardsPage() {
       commercialCarId: selectedOfferCar?.id ?? null,
       paymentMethod: form.paymentMethod || null,
       comment: form.comment.trim(),
-    });
+    } });
   }
 
   function selectOfferCar(car: ManagerClientCardInventoryItem) {
@@ -1387,14 +1591,21 @@ export default function ManagerClientCardsPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setMode("list")}
+                    onClick={() => {
+                      setEditingCardId(null);
+                      setMode("list");
+                    }}
                     className="-ml-2 mb-2 text-slate-600"
                   >
                     <ArrowLeft className="mr-1.5 h-4 w-4" />
                     К списку
                   </Button>
-                  <CardTitle className="text-xl">Новая карточка клиента</CardTitle>
-                  <p className="mt-1 text-sm text-slate-500">Сохраните основные данные разговора с клиентом.</p>
+                  <CardTitle className="text-xl">
+                    {editingCardId ? `Редактирование рабочего листа №${editingCardId}` : "Новая карточка клиента"}
+                  </CardTitle>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {editingCardId ? "Измените данные и сохраните обновлённую карточку." : "Сохраните основные данные разговора с клиентом."}
+                  </p>
                 </div>
                 <span className="shrink-0 rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-[#0070b8]">{progress}</span>
               </div>
@@ -1868,7 +2079,7 @@ export default function ManagerClientCardsPage() {
                   ) : (
                     <Button onClick={saveCard} disabled={saveMutation.isPending} className="bg-[#0070b8] hover:bg-[#005a94]">
                       {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                      Сохранить рабочий лист
+                      {editingCardId ? "Сохранить изменения" : "Сохранить рабочий лист"}
                     </Button>
                   )}
                 </div>
@@ -1881,13 +2092,28 @@ export default function ManagerClientCardsPage() {
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           {selectedCard && detailCard && (
             <>
-              <DialogHeader>
-                <DialogTitle className="break-words">Рабочий лист №{detailCard.id}</DialogTitle>
-                <DialogDescription>
-                  Создан {formatDate(detailCard.createdAt)}
-                  {detailCard.managerName ? ` · ${detailCard.managerName}` : ""}
-                </DialogDescription>
-              </DialogHeader>
+              <div className="flex flex-col gap-3 pr-7 sm:flex-row sm:items-start sm:justify-between sm:pr-8">
+                <DialogHeader className="min-w-0">
+                  <DialogTitle className="break-words">Рабочий лист №{detailCard.id}</DialogTitle>
+                  <DialogDescription>
+                    Создан {formatDate(detailCard.createdAt)}
+                    {detailCard.managerName ? ` · ${detailCard.managerName}` : ""}
+                    {new Date(detailCard.updatedAt).getTime() > new Date(detailCard.createdAt).getTime()
+                      ? ` · Обновлён ${formatDate(detailCard.updatedAt)}`
+                      : ""}
+                  </DialogDescription>
+                </DialogHeader>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0"
+                  data-testid={`button-edit-client-card-${detailCard.id}`}
+                  onClick={() => startEditCard(detailCard)}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Редактировать
+                </Button>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <section className="rounded-xl border border-slate-200 p-4">
                   <h3 className="font-semibold text-slate-900">Клиент</h3>
@@ -1966,6 +2192,47 @@ export default function ManagerClientCardsPage() {
                     <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-700">{detailCard.comment}</p>
                   </section>
                 )}
+                <section className="rounded-xl border border-slate-200 p-4 sm:col-span-2" data-testid={`section-client-card-history-${detailCard.id}`}>
+                  <h3 className="flex items-center gap-2 font-semibold text-slate-900">
+                    <History className="h-4 w-4 text-slate-500" />
+                    История изменений
+                  </h3>
+                  {detailCard.editHistory?.length ? (
+                    <ol className="mt-3 space-y-3">
+                      {detailCard.editHistory.map(entry => (
+                        <li
+                          key={entry.id}
+                          className="rounded-lg bg-slate-50 p-3"
+                          data-testid={`history-entry-${entry.id}`}
+                        >
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                            <span className="text-sm font-medium text-slate-800">
+                              {entry.editorName}{entry.editorRole === "admin" ? " · администратор" : " · менеджер"}
+                            </span>
+                            <time className="text-xs text-slate-500">{formatDate(entry.createdAt)}</time>
+                          </div>
+                          <ul className="mt-2 space-y-2">
+                            {entry.changes.map((change, index) => (
+                              <li key={`${entry.id}-${change.field}-${index}`} className="text-sm">
+                                <span className="font-medium text-slate-700">{auditFieldLabel(change.field)}</span>
+                                <div className="mt-0.5 grid gap-1 text-xs text-slate-600 sm:grid-cols-2">
+                                  <span className="whitespace-pre-wrap break-words rounded bg-white px-2 py-1">
+                                    Было: {formatAuditValue(change.field, change.oldValue)}
+                                  </span>
+                                  <span className="whitespace-pre-wrap break-words rounded bg-white px-2 py-1">
+                                    Стало: {formatAuditValue(change.field, change.newValue)}
+                                  </span>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-500">Правок пока нет.</p>
+                  )}
+                </section>
               </div>
             </>
           )}
