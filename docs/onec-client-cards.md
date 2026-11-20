@@ -98,26 +98,98 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
         "client_name": "<ФИО клиента>",
         "client_phone": "<телефон клиента>",
         "client_gender": null,
-        "desired_brand": "Haval City",
-        "desired_model": "DARGO",
-        "desired_vehicle_undecided": false,
-        "budget_range": "от 3 до 4 млн",
-        "current_car": null,
-        "current_car_brand": null,
-        "current_car_model": null,
-        "current_car_year": null,
-        "current_car_mileage": null,
-        "current_car_generation": null,
-        "current_car_body_type": null,
-        "current_car_owners_count": null,
-        "current_car_inventory_id": null,
-        "trade_in_plan": null,
-        "commercial_brand": "Haval City",
-        "commercial_model": "DARGO",
+        "needs": [
+          {
+            "brand_id": 9,
+            "brand": "Haval City",
+            "model": "DARGO",
+            "undecided": false,
+            "budget_range": "3–5 млн",
+            "organization_code": "<код организации>",
+            "organization_name": "Литейная",
+            "department_code": "<код подразделения>",
+            "department_name": "Haval City"
+          },
+          {
+            "brand_id": 14,
+            "brand": "JETOUR",
+            "model": "DASHING",
+            "undecided": false,
+            "budget_range": "3–5 млн",
+            "organization_code": "<код организации>",
+            "organization_name": "Московский",
+            "department_code": "<код подразделения>",
+            "department_name": "JETOUR"
+          }
+        ],
+        "current_cars": [
+          {
+            "brand": "Toyota",
+            "model": "Camry",
+            "year": 2019,
+            "mileage": 75000,
+            "generation": null,
+            "body_type": "Седан",
+            "owners_count": "2",
+            "inventory_id": null,
+            "trade_in_plan": "Да"
+          }
+        ],
+        "commercial_brand": null,
+        "commercial_model": null,
         "commercial_car_id": null,
         "commercial_car": null,
-        "payment_method": null,
-        "comment": null
+        "commercial_offer": null,
+        "brand_records": [
+          {
+            "source_key": "121:9",
+            "brand_id": 9,
+            "brand_name": "Haval City",
+            "organization_code": "<код организации>",
+            "organization_name": "Литейная",
+            "department_code": "<код подразделения>",
+            "department_name": "Haval City",
+            "needs": [
+              {
+                "brand_id": 9,
+                "brand": "Haval City",
+                "model": "DARGO",
+                "undecided": false,
+                "budget_range": "3–5 млн",
+                "organization_code": "<код организации>",
+                "organization_name": "Литейная",
+                "department_code": "<код подразделения>",
+                "department_name": "Haval City"
+              }
+            ],
+            "commercial_offer": null
+          },
+          {
+            "source_key": "121:14",
+            "brand_id": 14,
+            "brand_name": "JETOUR",
+            "organization_code": "<код организации>",
+            "organization_name": "Московский",
+            "department_code": "<код подразделения>",
+            "department_name": "JETOUR",
+            "needs": [
+              {
+                "brand_id": 14,
+                "brand": "JETOUR",
+                "model": "DASHING",
+                "undecided": false,
+                "budget_range": "3–5 млн",
+                "organization_code": "<код организации>",
+                "organization_name": "Московский",
+                "department_code": "<код подразделения>",
+                "department_name": "JETOUR"
+              }
+            ],
+            "commercial_offer": null
+          }
+        ],
+        "payment_method": "Кредит",
+        "comment": "<комментарий менеджера>"
       }
     ],
     "next_cursor": 121,
@@ -128,6 +200,8 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
 
 Пример условный. `created_at` — дата и время в ISO 8601 UTC. Необязательные значения в ответе передаются как `null`.
 
+`payment_method` содержит ровно одно из значений `Кредит`, `Лизинг`, `Наличные / Безнал` либо `null`, если способ оплаты не выбран. В API передаётся точная подпись из формы.
+
 ### Поля РЛ
 
 | Поле | Тип | Значение |
@@ -135,30 +209,28 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
 | `id` | integer | ID РЛ в исходной системе; используйте как уникальный ключ импорта |
 | `created_at` | datetime | Дата создания РЛ |
 | `manager_id`, `manager_name` | integer, string/null | Менеджер, создавший РЛ |
-| `organization_code`, `organization_name` | string | Организация и её код из локации марки |
-| `department_code`, `department_name` | string | Подразделение и его код из марки |
 | `client_name`, `client_phone` | string | ФИО и телефон клиента |
 | `client_gender` | `male`, `female` или `null` | Пол, если указан |
-| `desired_brand`, `desired_model` | string/null | Желаемые марка и модель |
-| `desired_vehicle_undecided` | boolean | Клиент ещё не определился с автомобилем |
-| `budget_range` | string/null | Выбранный диапазон бюджета |
-| `current_car` | string/null | Текстовое описание текущего автомобиля |
-| `current_car_brand`, `current_car_model` | string/null | Марка и модель текущего автомобиля |
-| `current_car_year`, `current_car_mileage` | integer/null | Год выпуска и пробег |
-| `current_car_generation`, `current_car_body_type` | string/null | Поколение и тип кузова |
-| `current_car_owners_count` | string/null | Количество владельцев, если указано |
-| `current_car_inventory_id` | integer/null | ID связанного автомобиля с пробегом в базе |
-| `trade_in_plan` | string/null | Намерение клиента сдать автомобиль в трейд-ин |
+| `needs[]` | array | Потребности: марка, модель, признак неопределённости, бюджет и коды организации/подразделения для конкретной марки |
+| `current_cars[]` | array | Все автомобили клиента: марка, модель, год, пробег, поколение, кузов, владельцы, связь с базой и трейд-ин |
 | `commercial_brand`, `commercial_model` | string/null | Марка и модель предложения |
 | `commercial_car_id` | integer/null | ID конкретного автомобиля из предложения |
 | `commercial_car` | object/null | Снимок автомобиля: `id`, `external_id`, `brand`, `model`, `year`, `modification`, `complectation`, `color`, `price`; поля могут быть `null` |
-| `payment_method` | string/null | Предпочтительный способ оплаты |
+| `commercial_offer` | object/null | Данные предложения вместе с кодами его марки и локации |
+| `brand_records[]` | array | Подготовленные записи для 1С — по одной на каждую уникальную марку интереса или предложения |
+| `payment_method` | enum/null | Только `Кредит`, `Лизинг`, `Наличные / Безнал` или `null` |
 | `comment` | string/null | Комментарий менеджера |
+
+В `brand_records[]` каждую запись импортируйте в 1С отдельно. `source_key` — стабильный внешний ключ вида `<id РЛ>:<id марки>`; используйте его для идемпотентного создания/обновления и безопасного повтора после ошибки. Внутри записи `needs[]` уже отфильтрован по этой марке. Список `current_cars[]`, данные клиента, менеджера, оплата и комментарий относятся к карточке целиком и могут копироваться в каждую запись 1С.
+
+Поля `organization_*` и `department_*` верхнего уровня содержат коды первой записи `brand_records[]`; старые одиночные `desired_*` и `current_car_*` отражают первый элемент соответствующего массива. Они оставлены только для совместимости. Для новых интеграций используйте `needs[]`, `current_cars[]` и `brand_records[]`.
+
+Потребность с `brand_id: null` означает, что клиент ещё не выбрал марку. Она остаётся в общем `needs[]`, но не образует отдельную запись 1С без кода подразделения. Если в РЛ нет ни одной марки потребности и нет марки предложения, API возвращает `409 mapping_not_ready`.
 
 ## Алгоритм импорта и курсор
 
 1. 1С запрашивает страницу с сохранённым `after_id`.
-2. Импортируйте `items` в 1С идемпотентно, используя `id` как ключ источника.
+2. Для каждого элемента `items` импортируйте все `brand_records[]` идемпотентно по `source_key`. Не считайте карточку обработанной, пока не сохранены все её записи по маркам.
 3. Сохраните `next_cursor` только после успешного импорта всех элементов страницы.
 4. Если `has_more: true`, сразу запросите следующую страницу, передав сохранённый `next_cursor` как `after_id`.
 5. Если `items` пуст, `next_cursor` останется прежним; повторите запрос позже.
@@ -169,7 +241,8 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
 
 - Организация — локация, к которой привязана марка в базе.
 - Подразделение — марка.
-- Для РЛ сначала используется марка коммерческого предложения (`commercial_brand`), если она заполнена; иначе — желаемая марка (`desired_brand`).
+- Каждая марка из `needs[]` и марка предложения формируют отдельную запись в `brand_records[]`; совпадающие марки объединяются в одну запись.
+- Для каждой записи организация — локация марки в базе, подразделение — сама марка.
 - Марка должна соответствовать ровно одной локации.
 
 В production сейчас заведены **временные коды `TMP1C-*`**, не предназначенные для 1С. API блокирует страницу с РЛ, если код не подтверждён, остаётся временным или марка не сопоставлена однозначно. После получения официальных кодов их нужно внести в базу до начала обмена.
