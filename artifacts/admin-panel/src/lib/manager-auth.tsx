@@ -14,6 +14,7 @@ import type {
   ManagerClientCard,
   ManagerClientCardInput,
   ManagerClientCardCreatedResponse,
+  ManagerClientCardUpdatedResponse,
   ManagerClientCardInventoryResponse,
   ManagerClientCardManagersResponse,
   ManagerClientCardResponse,
@@ -202,6 +203,10 @@ export async function getAutoRuCatalogModels(brandId: string): Promise<AutoRuCat
 
 export function createManagerClientCard(data: ManagerClientCardInput): Promise<ManagerClientCardCreatedResponse> {
   return managerApi("POST", "/client-cards", data);
+}
+
+export function updateManagerClientCard(id: number, data: ManagerClientCardInput): Promise<ManagerClientCardUpdatedResponse> {
+  return managerApi("PUT", `/client-cards/${id}`, data);
 }
 
 export async function exportManagerClientCards(filters: ManagerClientCardFilters = {}): Promise<Blob> {
