@@ -1,4 +1,9 @@
 import { Router } from "express";
+import {
+  ListAutoRuCarBrandsResponse,
+  ListAutoRuCarModelsQueryParams,
+  ListAutoRuCarModelsResponse,
+} from "@workspace/api-zod";
 
 const router = Router();
 
@@ -41,18 +46,19 @@ router.get("/brands", async (_req, res) => {
       cyrillicName: (e.mark?.cyrillic_name as string | undefined) ?? (e.name as string),
       isPopular: (e.is_popular as boolean | undefined) ?? false,
     }));
-    res.json({ ok: true, data: brands });
+    res.json(ListAutoRuCarBrandsResponse.parse({ ok: true, data: brands }));
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
 
 router.get("/models", async (req, res) => {
-  const brandId = (req.query.brandId as string | undefined) ?? "";
-  if (!brandId) {
+  const parsedQuery = ListAutoRuCarModelsQueryParams.safeParse(req.query);
+  if (!parsedQuery.success) {
     res.status(400).json({ ok: false, error: "brandId required" });
     return;
   }
+  const { brandId } = parsedQuery.data;
   try {
     const data = await fetchAutoru(
       `/search/cars/breadcrumbs?bc_lookup=${encodeURIComponent(brandId)}`,
@@ -63,7 +69,7 @@ router.get("/models", async (req, res) => {
       id: e.id as string,
       name: e.name as string,
     }));
-    res.json({ ok: true, data: models });
+    res.json(ListAutoRuCarModelsResponse.parse({ ok: true, data: models }));
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
   }
