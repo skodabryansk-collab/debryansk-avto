@@ -659,6 +659,27 @@ export const ListManagerClientCardsQueryParams = zod.object({
   "pageSize": zod.coerce.number().min(1).max(listManagerClientCardsQueryPageSizeMax).default(listManagerClientCardsQueryPageSizeDefault)
 })
 
+export const listManagerClientCardsResponseDataItemsItemNeedsItemBrandMax = 180;
+
+export const listManagerClientCardsResponseDataItemsItemNeedsItemModelMax = 180;
+
+export const listManagerClientCardsResponseDataItemsItemCurrentCarsItemBrandMax = 120;
+
+export const listManagerClientCardsResponseDataItemsItemCurrentCarsItemModelMax = 120;
+
+export const listManagerClientCardsResponseDataItemsItemCurrentCarsItemYearMin = 1950;
+export const listManagerClientCardsResponseDataItemsItemCurrentCarsItemYearMax = 2100;
+
+export const listManagerClientCardsResponseDataItemsItemCurrentCarsItemMileageMin = 0;
+export const listManagerClientCardsResponseDataItemsItemCurrentCarsItemMileageMax = 2000000;
+
+export const listManagerClientCardsResponseDataItemsItemCurrentCarsItemGenerationMax = 120;
+
+export const listManagerClientCardsResponseDataItemsItemCurrentCarsItemBodyTypeMax = 120;
+
+
+
+
 export const ListManagerClientCardsResponse = zod.object({
   "ok": zod.boolean(),
   "data": zod.object({
@@ -697,6 +718,37 @@ export const ListManagerClientCardsResponse = zod.object({
   "vin": zod.string().nullable()
 }),zod.null()]),
   "tradeInPlan": zod.string().nullable(),
+  "needs": zod.array(zod.object({
+  "brand": zod.string().max(listManagerClientCardsResponseDataItemsItemNeedsItemBrandMax).nullable(),
+  "model": zod.string().max(listManagerClientCardsResponseDataItemsItemNeedsItemModelMax).nullable(),
+  "undecided": zod.boolean(),
+  "budgetRange": zod.union([zod.literal('Не указан'),zod.literal('до 2 млн'),zod.literal('2–3 млн'),zod.literal('3–5 млн'),zod.literal('5+ млн'),zod.literal(null)]).nullable()
+})),
+  "currentCars": zod.array(zod.object({
+  "brand": zod.string().max(listManagerClientCardsResponseDataItemsItemCurrentCarsItemBrandMax),
+  "model": zod.string().max(listManagerClientCardsResponseDataItemsItemCurrentCarsItemModelMax),
+  "year": zod.number().min(listManagerClientCardsResponseDataItemsItemCurrentCarsItemYearMin).max(listManagerClientCardsResponseDataItemsItemCurrentCarsItemYearMax),
+  "mileage": zod.number().min(listManagerClientCardsResponseDataItemsItemCurrentCarsItemMileageMin).max(listManagerClientCardsResponseDataItemsItemCurrentCarsItemMileageMax),
+  "generation": zod.string().max(listManagerClientCardsResponseDataItemsItemCurrentCarsItemGenerationMax).nullable(),
+  "bodyType": zod.string().max(listManagerClientCardsResponseDataItemsItemCurrentCarsItemBodyTypeMax).nullable(),
+  "ownersCount": zod.union([zod.literal('1'),zod.literal('2'),zod.literal('3'),zod.literal('4+'),zod.literal(null)]).nullable(),
+  "inventoryId": zod.number().min(1).nullable(),
+  "snapshot": zod.union([zod.object({
+  "id": zod.number(),
+  "externalId": zod.string(),
+  "type": zod.string(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "year": zod.number().nullable(),
+  "modification": zod.string().nullable(),
+  "complectation": zod.string().nullable(),
+  "color": zod.string().nullable(),
+  "price": zod.number().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "vin": zod.string().nullable()
+}),zod.null()]),
+  "tradeInPlan": zod.union([zod.literal('Да'),zod.literal('Нет'),zod.literal('Пока не решил'),zod.literal(null)]).nullable()
+})),
   "commercialBrand": zod.string().nullable(),
   "commercialModel": zod.string().nullable(),
   "commercialCarId": zod.number().nullable(),
@@ -755,6 +807,26 @@ export const createManagerClientCardBodyCurrentCarGenerationMax = 120;
 export const createManagerClientCardBodyCurrentCarBodyTypeMax = 120;
 
 
+export const createManagerClientCardBodyNeedsItemBrandMax = 180;
+
+export const createManagerClientCardBodyNeedsItemModelMax = 180;
+
+
+export const createManagerClientCardBodyCurrentCarsItemBrandMax = 120;
+
+export const createManagerClientCardBodyCurrentCarsItemModelMax = 120;
+
+export const createManagerClientCardBodyCurrentCarsItemYearMin = 1950;
+export const createManagerClientCardBodyCurrentCarsItemYearMax = 2100;
+
+export const createManagerClientCardBodyCurrentCarsItemMileageMin = 0;
+export const createManagerClientCardBodyCurrentCarsItemMileageMax = 2000000;
+
+export const createManagerClientCardBodyCurrentCarsItemGenerationMax = 120;
+
+export const createManagerClientCardBodyCurrentCarsItemBodyTypeMax = 120;
+
+
 export const createManagerClientCardBodyCommercialBrandMax = 180;
 
 export const createManagerClientCardBodyCommercialModelMax = 180;
@@ -782,6 +854,37 @@ export const CreateManagerClientCardBody = zod.object({
   "currentCarOwnersCount": zod.union([zod.literal('1'),zod.literal('2'),zod.literal('3'),zod.literal('4+'),zod.literal(null)]).nullable(),
   "currentCarInventoryId": zod.number().min(1).nullable(),
   "tradeInPlan": zod.union([zod.literal('Да'),zod.literal('Нет'),zod.literal('Пока не решил'),zod.literal(null)]).nullable(),
+  "needs": zod.array(zod.object({
+  "brand": zod.string().max(createManagerClientCardBodyNeedsItemBrandMax).nullable(),
+  "model": zod.string().max(createManagerClientCardBodyNeedsItemModelMax).nullable(),
+  "undecided": zod.boolean(),
+  "budgetRange": zod.union([zod.literal('Не указан'),zod.literal('до 2 млн'),zod.literal('2–3 млн'),zod.literal('3–5 млн'),zod.literal('5+ млн'),zod.literal(null)]).nullable()
+})).min(1).optional(),
+  "currentCars": zod.array(zod.object({
+  "brand": zod.string().max(createManagerClientCardBodyCurrentCarsItemBrandMax),
+  "model": zod.string().max(createManagerClientCardBodyCurrentCarsItemModelMax),
+  "year": zod.number().min(createManagerClientCardBodyCurrentCarsItemYearMin).max(createManagerClientCardBodyCurrentCarsItemYearMax),
+  "mileage": zod.number().min(createManagerClientCardBodyCurrentCarsItemMileageMin).max(createManagerClientCardBodyCurrentCarsItemMileageMax),
+  "generation": zod.string().max(createManagerClientCardBodyCurrentCarsItemGenerationMax).nullable(),
+  "bodyType": zod.string().max(createManagerClientCardBodyCurrentCarsItemBodyTypeMax).nullable(),
+  "ownersCount": zod.union([zod.literal('1'),zod.literal('2'),zod.literal('3'),zod.literal('4+'),zod.literal(null)]).nullable(),
+  "inventoryId": zod.number().min(1).nullable(),
+  "snapshot": zod.union([zod.object({
+  "id": zod.number(),
+  "externalId": zod.string(),
+  "type": zod.string(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "year": zod.number().nullable(),
+  "modification": zod.string().nullable(),
+  "complectation": zod.string().nullable(),
+  "color": zod.string().nullable(),
+  "price": zod.number().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "vin": zod.string().nullable()
+}),zod.null()]),
+  "tradeInPlan": zod.union([zod.literal('Да'),zod.literal('Нет'),zod.literal('Пока не решил'),zod.literal(null)]).nullable()
+})).optional(),
   "commercialBrand": zod.string().max(createManagerClientCardBodyCommercialBrandMax).nullable(),
   "commercialModel": zod.string().max(createManagerClientCardBodyCommercialModelMax).nullable(),
   "commercialCarId": zod.number().min(1).nullable(),
@@ -850,8 +953,92 @@ export const GetOneCClientCardsResponse = zod.object({
   "color": zod.string().nullable(),
   "price": zod.number().nullable()
 }),zod.null()]),
-  "payment_method": zod.string().nullable(),
-  "comment": zod.string().nullable()
+  "payment_method": zod.union([zod.literal('Кредит'),zod.literal('Лизинг'),zod.literal('Наличные / Безнал'),zod.literal(null)]).nullable(),
+  "comment": zod.string().nullable(),
+  "needs": zod.array(zod.object({
+  "brand_id": zod.number().nullable(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "undecided": zod.boolean(),
+  "budget_range": zod.union([zod.literal('Не указан'),zod.literal('до 2 млн'),zod.literal('2–3 млн'),zod.literal('3–5 млн'),zod.literal('5+ млн'),zod.literal(null)]).nullable(),
+  "organization_code": zod.string().nullable(),
+  "organization_name": zod.string().nullable(),
+  "department_code": zod.string().nullable(),
+  "department_name": zod.string().nullable()
+})),
+  "current_cars": zod.array(zod.object({
+  "brand": zod.string(),
+  "model": zod.string(),
+  "year": zod.number(),
+  "mileage": zod.number(),
+  "generation": zod.string().nullable(),
+  "body_type": zod.string().nullable(),
+  "owners_count": zod.string().nullable(),
+  "inventory_id": zod.number().nullable(),
+  "trade_in_plan": zod.union([zod.literal('Да'),zod.literal('Нет'),zod.literal('Пока не решил'),zod.literal(null)]).nullable()
+})),
+  "commercial_offer": zod.union([zod.object({
+  "brand_id": zod.number().nullable(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "car_id": zod.number().nullable(),
+  "car": zod.union([zod.object({
+  "id": zod.number().nullable(),
+  "external_id": zod.string().nullable(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "year": zod.number().nullable(),
+  "modification": zod.string().nullable(),
+  "complectation": zod.string().nullable(),
+  "color": zod.string().nullable(),
+  "price": zod.number().nullable()
+}),zod.null()]),
+  "organization_code": zod.string().nullable(),
+  "organization_name": zod.string().nullable(),
+  "department_code": zod.string().nullable(),
+  "department_name": zod.string().nullable()
+}),zod.null()]),
+  "brand_records": zod.array(zod.object({
+  "source_key": zod.string(),
+  "brand_id": zod.number(),
+  "brand_name": zod.string(),
+  "organization_code": zod.string(),
+  "organization_name": zod.string(),
+  "department_code": zod.string(),
+  "department_name": zod.string(),
+  "needs": zod.array(zod.object({
+  "brand_id": zod.number().nullable(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "undecided": zod.boolean(),
+  "budget_range": zod.union([zod.literal('Не указан'),zod.literal('до 2 млн'),zod.literal('2–3 млн'),zod.literal('3–5 млн'),zod.literal('5+ млн'),zod.literal(null)]).nullable(),
+  "organization_code": zod.string().nullable(),
+  "organization_name": zod.string().nullable(),
+  "department_code": zod.string().nullable(),
+  "department_name": zod.string().nullable()
+})),
+  "commercial_offer": zod.union([zod.object({
+  "brand_id": zod.number().nullable(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "car_id": zod.number().nullable(),
+  "car": zod.union([zod.object({
+  "id": zod.number().nullable(),
+  "external_id": zod.string().nullable(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "year": zod.number().nullable(),
+  "modification": zod.string().nullable(),
+  "complectation": zod.string().nullable(),
+  "color": zod.string().nullable(),
+  "price": zod.number().nullable()
+}),zod.null()]),
+  "organization_code": zod.string().nullable(),
+  "organization_name": zod.string().nullable(),
+  "department_code": zod.string().nullable(),
+  "department_name": zod.string().nullable()
+}),zod.null()])
+}))
 })),
   "next_cursor": zod.number(),
   "has_more": zod.boolean()
@@ -982,6 +1169,27 @@ export const GetManagerClientCardParams = zod.object({
   "id": zod.coerce.number().min(1)
 })
 
+export const getManagerClientCardResponseDataNeedsItemBrandMax = 180;
+
+export const getManagerClientCardResponseDataNeedsItemModelMax = 180;
+
+export const getManagerClientCardResponseDataCurrentCarsItemBrandMax = 120;
+
+export const getManagerClientCardResponseDataCurrentCarsItemModelMax = 120;
+
+export const getManagerClientCardResponseDataCurrentCarsItemYearMin = 1950;
+export const getManagerClientCardResponseDataCurrentCarsItemYearMax = 2100;
+
+export const getManagerClientCardResponseDataCurrentCarsItemMileageMin = 0;
+export const getManagerClientCardResponseDataCurrentCarsItemMileageMax = 2000000;
+
+export const getManagerClientCardResponseDataCurrentCarsItemGenerationMax = 120;
+
+export const getManagerClientCardResponseDataCurrentCarsItemBodyTypeMax = 120;
+
+
+
+
 export const GetManagerClientCardResponse = zod.object({
   "ok": zod.boolean(),
   "data": zod.object({
@@ -1019,6 +1227,37 @@ export const GetManagerClientCardResponse = zod.object({
   "vin": zod.string().nullable()
 }),zod.null()]),
   "tradeInPlan": zod.string().nullable(),
+  "needs": zod.array(zod.object({
+  "brand": zod.string().max(getManagerClientCardResponseDataNeedsItemBrandMax).nullable(),
+  "model": zod.string().max(getManagerClientCardResponseDataNeedsItemModelMax).nullable(),
+  "undecided": zod.boolean(),
+  "budgetRange": zod.union([zod.literal('Не указан'),zod.literal('до 2 млн'),zod.literal('2–3 млн'),zod.literal('3–5 млн'),zod.literal('5+ млн'),zod.literal(null)]).nullable()
+})),
+  "currentCars": zod.array(zod.object({
+  "brand": zod.string().max(getManagerClientCardResponseDataCurrentCarsItemBrandMax),
+  "model": zod.string().max(getManagerClientCardResponseDataCurrentCarsItemModelMax),
+  "year": zod.number().min(getManagerClientCardResponseDataCurrentCarsItemYearMin).max(getManagerClientCardResponseDataCurrentCarsItemYearMax),
+  "mileage": zod.number().min(getManagerClientCardResponseDataCurrentCarsItemMileageMin).max(getManagerClientCardResponseDataCurrentCarsItemMileageMax),
+  "generation": zod.string().max(getManagerClientCardResponseDataCurrentCarsItemGenerationMax).nullable(),
+  "bodyType": zod.string().max(getManagerClientCardResponseDataCurrentCarsItemBodyTypeMax).nullable(),
+  "ownersCount": zod.union([zod.literal('1'),zod.literal('2'),zod.literal('3'),zod.literal('4+'),zod.literal(null)]).nullable(),
+  "inventoryId": zod.number().min(1).nullable(),
+  "snapshot": zod.union([zod.object({
+  "id": zod.number(),
+  "externalId": zod.string(),
+  "type": zod.string(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "year": zod.number().nullable(),
+  "modification": zod.string().nullable(),
+  "complectation": zod.string().nullable(),
+  "color": zod.string().nullable(),
+  "price": zod.number().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "vin": zod.string().nullable()
+}),zod.null()]),
+  "tradeInPlan": zod.union([zod.literal('Да'),zod.literal('Нет'),zod.literal('Пока не решил'),zod.literal(null)]).nullable()
+})),
   "commercialBrand": zod.string().nullable(),
   "commercialModel": zod.string().nullable(),
   "commercialCarId": zod.number().nullable(),
