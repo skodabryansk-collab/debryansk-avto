@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ManagerClientCardClientGender } from './managerClientCardClientGender';
+import type { ManagerClientCardEditHistoryEntry } from './managerClientCardEditHistoryEntry';
 import type { ManagerClientCarSnapshot } from './managerClientCarSnapshot';
 import type { ManagerClientCurrentCar } from './managerClientCurrentCar';
 import type { ManagerClientNeed } from './managerClientNeed';
@@ -59,4 +60,6 @@ export interface ManagerClientCard {
   /** @nullable */
   comment: string | null;
   createdAt: Date;
+  updatedAt: Date;
+  editHistory?: ManagerClientCardEditHistoryEntry[];
 }
