@@ -1,4 +1,5 @@
 import { pgTable, serial, text, boolean, timestamp, integer, jsonb } from "drizzle-orm/pg-core";
+import { carsTable } from "./cars";
 
 export const managersTable = pgTable("managers", {
   id: serial("id").primaryKey(),
@@ -40,6 +41,24 @@ export const quotesTable = pgTable("quotes", {
   updatedAt: timestamp("updated_at", { withTimezone: true }),
 });
 
+export const managerClientCardsTable = pgTable("manager_client_cards", {
+  id: serial("id").primaryKey(),
+  managerId: integer("manager_id").notNull().references(() => managersTable.id, { onDelete: "restrict" }),
+  clientName: text("client_name").notNull(),
+  clientPhone: text("client_phone").notNull(),
+  desiredBrand: text("desired_brand"),
+  desiredModel: text("desired_model"),
+  budgetRange: text("budget_range"),
+  currentCar: text("current_car"),
+  currentCarYear: integer("current_car_year"),
+  tradeInPlan: text("trade_in_plan"),
+  commercialCarId: integer("commercial_car_id").references(() => carsTable.id, { onDelete: "set null" }),
+  commercialCarSnapshot: jsonb("commercial_car_snapshot"),
+  paymentMethod: text("payment_method"),
+  comment: text("comment"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const salesHeadManagersTable = pgTable("sales_head_managers", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -54,4 +73,5 @@ export const salesHeadManagersTable = pgTable("sales_head_managers", {
 
 export type Manager = typeof managersTable.$inferSelect;
 export type Quote = typeof quotesTable.$inferSelect;
+export type ManagerClientCard = typeof managerClientCardsTable.$inferSelect;
 export type SalesHeadManager = typeof salesHeadManagersTable.$inferSelect;
