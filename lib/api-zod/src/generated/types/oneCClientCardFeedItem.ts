@@ -5,8 +5,13 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { OneCClientBrandRecord } from './oneCClientBrandRecord';
 import type { OneCClientCardFeedItemClientGender } from './oneCClientCardFeedItemClientGender';
+import type { OneCClientCardFeedItemPaymentMethod } from './oneCClientCardFeedItemPaymentMethod';
 import type { OneCClientCarSummary } from './oneCClientCarSummary';
+import type { OneCClientCommercialOffer } from './oneCClientCommercialOffer';
+import type { OneCClientCurrentCar } from './oneCClientCurrentCar';
+import type { OneCClientNeed } from './oneCClientNeed';
 
 export interface OneCClientCardFeedItem {
   id: number;
@@ -57,7 +62,11 @@ export interface OneCClientCardFeedItem {
   commercial_car_id: number | null;
   commercial_car: OneCClientCarSummary | null;
   /** @nullable */
-  payment_method: string | null;
+  payment_method: OneCClientCardFeedItemPaymentMethod;
   /** @nullable */
   comment: string | null;
+  needs: OneCClientNeed[];
+  current_cars: OneCClientCurrentCar[];
+  commercial_offer: OneCClientCommercialOffer | null;
+  brand_records: OneCClientBrandRecord[];
 }
