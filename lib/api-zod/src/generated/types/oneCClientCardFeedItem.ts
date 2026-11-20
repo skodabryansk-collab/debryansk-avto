@@ -20,9 +20,7 @@ export interface OneCClientCardFeedItem {
   /** @nullable */
   manager_name: string | null;
   organization_code: string;
-  organization_name: string;
   department_code: string;
-  department_name: string;
   client_name: string;
   client_phone: string;
   /** @nullable */
