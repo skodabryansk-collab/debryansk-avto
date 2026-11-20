@@ -800,8 +800,6 @@ export const OneCClientNeedBudgetRange = {
 
 export interface OneCClientNeed {
   /** @nullable */
-  brand_id: number | null;
-  /** @nullable */
   brand: string | null;
   /** @nullable */
   model: string | null;
@@ -816,11 +814,7 @@ export interface OneCClientNeed {
   /** @nullable */
   organization_code: string | null;
   /** @nullable */
-  organization_name: string | null;
-  /** @nullable */
   department_code: string | null;
-  /** @nullable */
-  department_name: string | null;
 }
 
 /**
@@ -852,8 +846,6 @@ export interface OneCClientCurrentCar {
 
 export interface OneCClientCommercialOffer {
   /** @nullable */
-  brand_id: number | null;
-  /** @nullable */
   brand: string | null;
   /** @nullable */
   model: string | null;
@@ -863,21 +855,14 @@ export interface OneCClientCommercialOffer {
   /** @nullable */
   organization_code: string | null;
   /** @nullable */
-  organization_name: string | null;
-  /** @nullable */
   department_code: string | null;
-  /** @nullable */
-  department_name: string | null;
 }
 
 export interface OneCClientBrandRecord {
   source_key: string;
-  brand_id: number;
   brand_name: string;
   organization_code: string;
-  organization_name: string;
   department_code: string;
-  department_name: string;
   needs: OneCClientNeed[];
   commercial_offer: OneCClientCommercialOffer | null;
 }
@@ -912,9 +897,7 @@ export interface OneCClientCardFeedItem {
   /** @nullable */
   manager_name: string | null;
   organization_code: string;
-  organization_name: string;
   department_code: string;
-  department_name: string;
   client_name: string;
   client_phone: string;
   /** @nullable */
