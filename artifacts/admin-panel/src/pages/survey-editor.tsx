@@ -25,7 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ExternalLink, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type SurveyMeta = Pick<CustomerSurveyInput, "title" | "slug" | "status">;
@@ -313,22 +313,22 @@ export default function SurveyEditorPage() {
       {saveError && <Alert variant="destructive" data-testid="status-survey-validation-error"><AlertTitle>Проверьте данные</AlertTitle><AlertDescription>{saveError}</AlertDescription></Alert>}
       {updateSurvey.isError && !saveError && <Alert variant="destructive"><AlertTitle>Ошибка сохранения</AlertTitle><AlertDescription>Изменения не подтверждены сервером. Повторите попытку.</AlertDescription></Alert>}
 
-      <div className="min-w-0 grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(350px,0.85fr)]">
+      <div className="min-w-0 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(350px,0.85fr)]">
         <form onSubmit={save} className="min-w-0 space-y-5">
           <Card className="min-w-0">
             <CardHeader><CardTitle className="text-base">Основные настройки</CardTitle><CardDescription>Название, публичная ссылка и состояние анкеты.</CardDescription></CardHeader>
-            <CardContent className="min-w-0 grid gap-4 md:grid-cols-2">
-              <div className="space-y-2 md:col-span-2">
+            <CardContent className="min-w-0 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="min-w-0 space-y-2 md:col-span-2">
                 <Label htmlFor="meta-title">Название</Label>
                 <Input id="meta-title" maxLength={120} {...metaForm.register("title", { required: "Укажите название.", minLength: { value: 2, message: "Минимум 2 символа." } })} data-testid="input-survey-title" />
                 {metaForm.formState.errors.title && <p className="text-xs text-destructive">{metaForm.formState.errors.title.message}</p>}
               </div>
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <Label htmlFor="meta-slug">Slug</Label>
                 <Input id="meta-slug" maxLength={100} {...metaForm.register("slug", { required: "Укажите публичный адрес.", minLength: { value: 2, message: "Минимум 2 символа." } })} data-testid="input-survey-slug" />
                 {metaForm.formState.errors.slug && <p className="text-xs text-destructive">{metaForm.formState.errors.slug.message}</p>}
               </div>
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <Label htmlFor="meta-status">Состояние</Label>
                 <Controller control={metaForm.control} name="status" render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
@@ -337,10 +337,10 @@ export default function SurveyEditorPage() {
                   </Select>
                 )} />
               </div>
-              <div className="rounded-md bg-slate-50 p-3 md:col-span-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="min-w-0"><p className="text-xs font-medium text-slate-500">Публичный адрес</p><p className="truncate text-sm text-slate-800" data-testid="text-public-survey-url">{publicUrl}</p></div>
-                  <Button asChild variant="outline" size="sm" className="gap-1.5" data-testid="link-preview-survey">
+              <div className="min-w-0 w-full max-w-full rounded-md bg-slate-50 p-3 md:col-span-2">
+                <div className="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 w-full sm:flex-1"><p className="text-xs font-medium text-slate-500">Публичный адрес</p><p className="block max-w-full truncate text-sm text-slate-800" data-testid="text-public-survey-url">{publicUrl}</p></div>
+                  <Button asChild variant="outline" size="sm" className="shrink-0 gap-1.5" data-testid="link-preview-survey">
                     <a href={publicUrl} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" />Предпросмотр</a>
                   </Button>
                 </div>
@@ -434,12 +434,26 @@ export default function SurveyEditorPage() {
                         })}
                       </div> : <p className="text-sm text-slate-500">За выбранный период ответов нет.</p>}
                     </div>
-                    {stats.questions.length > 0 && <div className="space-y-3 border-t pt-4">
+                    {stats.questions.length > 0 && <div className="min-w-0 space-y-3 border-t pt-4">
                       <h3 className="text-sm font-semibold text-slate-800">Разбивка по вопросам</h3>
-                      {stats.questions.map((item) => <div key={item.questionId} className="space-y-1.5" data-testid={`stat-question-${item.questionId}`}>
-                        <div className="flex items-start justify-between gap-2 text-sm"><span className="font-medium text-slate-700">{item.label}</span><span className="shrink-0 text-xs text-slate-500">{item.answered} ответов{item.average !== null ? ` · среднее ${item.average.toFixed(1)}` : ""}</span></div>
-                        {item.buckets.map((bucket) => <div key={bucket.value} className="flex items-center justify-between text-xs text-slate-500"><span className="truncate">{bucket.value}</span><span className="tabular-nums">{bucket.count}</span></div>)}
-                      </div>)}
+                      <div className="min-w-0 divide-y divide-slate-100">
+                        {stats.questions.map((item) => <details key={item.questionId} className="group min-w-0 py-2.5 first:pt-0 last:pb-0" data-testid={`stat-question-${item.questionId}`}>
+                          <summary className="flex min-w-0 cursor-pointer list-none flex-wrap items-start justify-between gap-x-2 gap-y-1 [&::-webkit-details-marker]:hidden">
+                            <span className="min-w-0 flex-1 break-words text-sm font-medium leading-5 text-slate-700">{item.label}</span>
+                            <span className="flex shrink-0 items-center gap-2">
+                              <span className="whitespace-nowrap text-xs text-slate-500">{item.answered} ответов</span>
+                              {item.average !== null && <span aria-label={`Средняя оценка ${item.average.toFixed(1)}`} className="whitespace-nowrap rounded-md bg-primary/10 px-2 py-1 text-center text-xs font-semibold tabular-nums text-primary">ср. {item.average.toFixed(1)}</span>}
+                              <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true" />
+                            </span>
+                          </summary>
+                          <div className="mt-2 flex min-w-0 flex-wrap gap-2 pb-1">
+                            {item.buckets.map((bucket) => <span key={bucket.value} className="inline-flex min-w-0 max-w-full items-center gap-2 rounded-md bg-slate-100/70 px-2.5 py-1.5 text-xs text-slate-600">
+                              <span className="break-words">{bucket.value}</span>
+                              <span className="shrink-0 font-semibold tabular-nums text-slate-900">{bucket.count}</span>
+                            </span>)}
+                          </div>
+                        </details>)}
+                      </div>
                     </div>}
                   </>
                 )}
