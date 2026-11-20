@@ -1,7 +1,10 @@
 import { timingSafeEqual } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
-import { asc, eq, gt, max } from "drizzle-orm";
+import { asc, eq, gt, inArray, max } from "drizzle-orm";
 import {
+  GetOneCClientCardChangesInitialCursorResponse,
+  GetOneCClientCardChangesQueryParams,
+  GetOneCClientCardChangesResponse,
   GetOneCClientCardsInitialCursorResponse,
   GetOneCClientCardsQueryParams,
   GetOneCClientCardsResponse,
@@ -10,6 +13,7 @@ import {
   brandsTable,
   carsTable,
   db,
+  managerClientCardHistoryTable,
   locationsTable,
   locationBrandsTable,
   managerClientCardsTable,
@@ -44,6 +48,38 @@ type OneCRequestAudit = {
   itemCount?: number;
   hasMore?: boolean | null;
   errorCode?: string | null;
+};
+
+type OneCCardFeedRow = {
+  id: number;
+  managerId: number;
+  managerName: string | null;
+  clientName: string;
+  clientPhone: string;
+  clientGender: string | null;
+  desiredBrand: string | null;
+  desiredModel: string | null;
+  desiredVehicleUndecided: boolean;
+  budgetRange: string | null;
+  currentCar: string | null;
+  currentCarBrand: string | null;
+  currentCarModel: string | null;
+  currentCarYear: number | null;
+  currentCarMileage: number | null;
+  currentCarGeneration: string | null;
+  currentCarBodyType: string | null;
+  currentCarOwnersCount: string | null;
+  tradeInPlan: string | null;
+  needs: unknown;
+  currentCars: unknown;
+  commercialBrand: string | null;
+  commercialModel: string | null;
+  commercialCarId: number | null;
+  commercialCarSnapshot: unknown;
+  paymentMethod: string | null;
+  comment: string | null;
+  createdAt: Date;
+  commercialCarVin: string | null;
 };
 
 function setOneCRequestAudit(res: Response, audit: OneCRequestAudit): void {
@@ -217,6 +253,159 @@ function getMappingProblem(cardId: number, brandName: string | null, mappings: M
   return missingFields.length ? { cardId, missingFields } : null;
 }
 
+function needsForCard(card: OneCCardFeedRow): Record<string, unknown>[] {
+  if (Array.isArray(card.needs) && card.needs.length > 0) return card.needs.map(asRecord);
+  return [{
+    brand: card.desiredBrand,
+    model: card.desiredModel,
+    undecided: card.desiredVehicleUndecided,
+    budgetRange: card.budgetRange,
+    plannedPurchaseDate: null,
+  }];
+}
+
+function currentCarsForCard(card: OneCCardFeedRow): Record<string, unknown>[] {
+  if (Array.isArray(card.currentCars) && card.currentCars.length > 0) return card.currentCars.map(asRecord);
+  if (!card.currentCarBrand && !card.currentCarModel && card.currentCarYear == null && card.currentCarMileage == null) return [];
+  return [{
+    brand: card.currentCarBrand,
+    model: card.currentCarModel,
+    year: card.currentCarYear,
+    mileage: card.currentCarMileage,
+    generation: card.currentCarGeneration,
+    bodyType: card.currentCarBodyType,
+    ownersCount: card.currentCarOwnersCount,
+    tradeInPlan: card.tradeInPlan,
+  }];
+}
+
+function brandNamesForCard(card: OneCCardFeedRow): string[] {
+  const names = needsForCard(card)
+    .map(need => asString(need["brand"]))
+    .filter((brand): brand is string => Boolean(brand));
+  if (card.commercialBrand?.trim()) names.push(card.commercialBrand.trim());
+  return [...new Set(names)];
+}
+
+function findMapping(brandName: string | null, mappings: MappingRow[]): MappingRow | null {
+  if (!brandName) return null;
+  const matching = mappings.filter(
+    mapping => normalizeManagerQuoteBrand(mapping.brandName) === normalizeManagerQuoteBrand(brandName),
+  );
+  const locationIds = new Set(matching.flatMap(mapping => mapping.locationId === null ? [] : [mapping.locationId]));
+  return matching.find(item => item.locationId !== null && locationIds.size === 1) ?? null;
+}
+
+function buildOneCClientCardFeedItem(card: OneCCardFeedRow, mappings: MappingRow[]) {
+  const needs = needsForCard(card);
+  const currentCars = currentCarsForCard(card);
+  const mappedNeeds = needs.map(need => {
+    const brand = asString(need["brand"]);
+    const mapping = findMapping(brand, mappings);
+    return {
+      brand,
+      model: asString(need["model"]),
+      undecided: need["undecided"] === true,
+      budget_range: asString(need["budgetRange"]),
+      planned_purchase_date: asString(need["plannedPurchaseDate"]),
+      organization_code: mapping?.organizationCode ?? null,
+      department_code: mapping?.departmentCode ?? null,
+    };
+  });
+  const offerMapping = findMapping(card.commercialBrand, mappings);
+  const commercialCarSnapshot = asRecord(card.commercialCarSnapshot);
+  const commercialCarVin = asString(card.commercialCarVin) ?? asString(commercialCarSnapshot["vin"]);
+  const commercialOffer = card.commercialBrand || card.commercialModel || card.commercialCarId
+    ? {
+        brand: card.commercialBrand,
+        model: card.commercialModel,
+        car_vin: commercialCarVin,
+        car: getCommercialCarSummary(card.commercialCarSnapshot),
+        organization_code: offerMapping?.organizationCode ?? null,
+        department_code: offerMapping?.departmentCode ?? null,
+      }
+    : null;
+  const recordsByBrand = new Map<number, {
+    source_key: string;
+    brand_name: string;
+    organization_code: string;
+    department_code: string;
+    needs: typeof mappedNeeds;
+    commercial_offer: typeof commercialOffer;
+  }>();
+  const addBrandRecord = (mapping: MappingRow | null) => {
+    if (!mapping?.locationId || !mapping.organizationCode || !mapping.locationTitle || !mapping.departmentCode) return;
+    if (!recordsByBrand.has(mapping.brandId)) {
+      recordsByBrand.set(mapping.brandId, {
+        source_key: `${card.id}:${brandKeyForSource(mapping.brandName)}`,
+        brand_name: mapping.brandName,
+        organization_code: mapping.organizationCode,
+        department_code: mapping.departmentCode,
+        needs: [],
+        commercial_offer: null,
+      });
+    }
+    return recordsByBrand.get(mapping.brandId)!;
+  };
+  for (const need of mappedNeeds) {
+    const group = addBrandRecord(findMapping(need.brand, mappings));
+    if (group) group.needs.push(need);
+  }
+  if (commercialOffer && offerMapping) {
+    const group = addBrandRecord(offerMapping);
+    if (group) group.commercial_offer = commercialOffer;
+  }
+  const brandRecords = [...recordsByBrand.values()];
+  const primaryRecord = brandRecords[0];
+  const firstNeed = mappedNeeds[0];
+  const firstCar = currentCars[0] ?? {};
+  const currentCarName = [asString(firstCar["brand"]), asString(firstCar["model"])].filter(Boolean).join(" ") || null;
+
+  return {
+    id: card.id,
+    created_at: card.createdAt.toISOString(),
+    manager_id: card.managerId,
+    manager_name: card.managerName,
+    organization_code: primaryRecord?.organization_code ?? "",
+    department_code: primaryRecord?.department_code ?? "",
+    client_name: card.clientName,
+    client_phone: card.clientPhone,
+    client_gender: card.clientGender,
+    desired_brand: firstNeed?.brand ?? null,
+    desired_model: firstNeed?.model ?? null,
+    desired_vehicle_undecided: firstNeed?.undecided ?? false,
+    budget_range: firstNeed?.budget_range ?? null,
+    current_car: currentCarName,
+    current_car_brand: asString(firstCar["brand"]),
+    current_car_model: asString(firstCar["model"]),
+    current_car_year: asNumber(firstCar["year"]),
+    current_car_mileage: asNumber(firstCar["mileage"]),
+    current_car_generation: asString(firstCar["generation"]),
+    current_car_body_type: asString(firstCar["bodyType"]),
+    current_car_owners_count: asString(firstCar["ownersCount"]),
+    trade_in_plan: asString(firstCar["tradeInPlan"]),
+    commercial_brand: card.commercialBrand,
+    commercial_model: card.commercialModel,
+    commercial_car_vin: commercialCarVin,
+    commercial_car: getCommercialCarSummary(card.commercialCarSnapshot),
+    needs: mappedNeeds,
+    current_cars: currentCars.map(car => ({
+      brand: asString(car["brand"]) ?? "",
+      model: asString(car["model"]) ?? "",
+      year: asNumber(car["year"]) ?? 0,
+      mileage: asNumber(car["mileage"]) ?? 0,
+      generation: asString(car["generation"]),
+      body_type: asString(car["bodyType"]),
+      owners_count: asString(car["ownersCount"]),
+      trade_in_plan: asString(car["tradeInPlan"]),
+    })),
+    commercial_offer: commercialOffer,
+    brand_records: brandRecords,
+    payment_method: card.paymentMethod,
+    comment: card.comment,
+  };
+}
+
 router.get("/client-cards/initial-cursor", async (req, res): Promise<void> => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Vary", "Authorization");
@@ -318,51 +507,9 @@ router.get("/client-cards", async (req, res): Promise<void> => {
     const cards = pageRows.slice(0, limit);
     const mappings = cards.length ? await getBrandLocationMappings() : [];
 
-    const needsForCard = (card: (typeof cards)[number]) => {
-      if (Array.isArray(card.needs) && card.needs.length > 0) return card.needs.map(asRecord);
-      return [{
-        brand: card.desiredBrand,
-        model: card.desiredModel,
-        undecided: card.desiredVehicleUndecided,
-        budgetRange: card.budgetRange,
-        plannedPurchaseDate: null,
-      }];
-    };
-    const currentCarsForCard = (card: (typeof cards)[number]) => {
-      if (Array.isArray(card.currentCars) && card.currentCars.length > 0) return card.currentCars.map(asRecord);
-      if (!card.currentCarBrand && !card.currentCarModel && card.currentCarYear == null && card.currentCarMileage == null) return [];
-      return [{
-        brand: card.currentCarBrand,
-        model: card.currentCarModel,
-        year: card.currentCarYear,
-        mileage: card.currentCarMileage,
-        generation: card.currentCarGeneration,
-        bodyType: card.currentCarBodyType,
-        ownersCount: card.currentCarOwnersCount,
-        tradeInPlan: card.tradeInPlan,
-      }];
-    };
-    const findMapping = (brandName: string | null) => {
-      if (!brandName) return null;
-      const matching = mappings.filter(
-        mapping => normalizeManagerQuoteBrand(mapping.brandName) === normalizeManagerQuoteBrand(brandName),
-      );
-      const locationIds = new Set(matching.flatMap(mapping => mapping.locationId === null ? [] : [mapping.locationId]));
-      return matching.find(item => item.locationId !== null && locationIds.size === 1) ?? null;
-    };
-
     for (const card of cards) {
-      const needs = needsForCard(card);
-      const targetBrands = new Map<string, string>();
-      for (const need of needs) {
-        const brand = asString(need["brand"]);
-        if (brand) targetBrands.set(normalizeManagerQuoteBrand(brand), brand);
-      }
-      if (card.commercialBrand?.trim()) {
-        const brand = card.commercialBrand.trim();
-        targetBrands.set(normalizeManagerQuoteBrand(brand), brand);
-      }
-      if (targetBrands.size === 0) {
+      const targetBrands = brandNamesForCard(card);
+      if (targetBrands.length === 0) {
         setOneCRequestAudit(res, { afterId, errorCode: "mapping_not_ready" });
         res.status(409).json({
           ok: false,
@@ -372,7 +519,7 @@ router.get("/client-cards", async (req, res): Promise<void> => {
         } satisfies FeedError);
         return;
       }
-      for (const brand of targetBrands.values()) {
+      for (const brand of targetBrands) {
         const problem = getMappingProblem(card.id, brand, mappings);
         if (problem) {
           setOneCRequestAudit(res, { afterId, errorCode: "mapping_not_ready" });
@@ -387,115 +534,7 @@ router.get("/client-cards", async (req, res): Promise<void> => {
       }
     }
 
-    const items = cards.map(card => {
-      const needs = needsForCard(card);
-      const currentCars = currentCarsForCard(card);
-      const mappedNeeds = needs.map(need => {
-        const brand = asString(need["brand"]);
-        const mapping = findMapping(brand);
-        return {
-          brand,
-          model: asString(need["model"]),
-          undecided: need["undecided"] === true,
-          budget_range: asString(need["budgetRange"]),
-          planned_purchase_date: asString(need["plannedPurchaseDate"]),
-          organization_code: mapping?.organizationCode ?? null,
-          department_code: mapping?.departmentCode ?? null,
-        };
-      });
-      const offerMapping = findMapping(card.commercialBrand);
-      const commercialCarSnapshot = asRecord(card.commercialCarSnapshot);
-      const commercialCarVin = asString(card.commercialCarVin) ?? asString(commercialCarSnapshot["vin"]);
-      const commercialOffer = card.commercialBrand || card.commercialModel || card.commercialCarId
-        ? {
-            brand: card.commercialBrand,
-            model: card.commercialModel,
-            car_vin: commercialCarVin,
-            car: getCommercialCarSummary(card.commercialCarSnapshot),
-            organization_code: offerMapping?.organizationCode ?? null,
-            department_code: offerMapping?.departmentCode ?? null,
-          }
-        : null;
-      const recordsByBrand = new Map<number, {
-        source_key: string;
-        brand_name: string;
-        organization_code: string;
-        department_code: string;
-        needs: typeof mappedNeeds;
-        commercial_offer: typeof commercialOffer;
-      }>();
-      const addBrandRecord = (mapping: MappingRow | null) => {
-        if (!mapping?.locationId || !mapping.organizationCode || !mapping.locationTitle || !mapping.departmentCode) return;
-        if (!recordsByBrand.has(mapping.brandId)) {
-          recordsByBrand.set(mapping.brandId, {
-            source_key: `${card.id}:${brandKeyForSource(mapping.brandName)}`,
-            brand_name: mapping.brandName,
-            organization_code: mapping.organizationCode,
-            department_code: mapping.departmentCode,
-            needs: [],
-            commercial_offer: null,
-          });
-        }
-        return recordsByBrand.get(mapping.brandId)!;
-      };
-      for (const need of mappedNeeds) {
-        const group = addBrandRecord(findMapping(need.brand));
-        if (group) group.needs.push(need);
-      }
-      if (commercialOffer && offerMapping) {
-        const group = addBrandRecord(offerMapping);
-        if (group) group.commercial_offer = commercialOffer;
-      }
-      const brandRecords = [...recordsByBrand.values()];
-      const primaryRecord = brandRecords[0];
-      const firstNeed = mappedNeeds[0];
-      const firstCar = currentCars[0] ?? {};
-      const currentCarName = [asString(firstCar["brand"]), asString(firstCar["model"])].filter(Boolean).join(" ") || null;
-
-      return {
-        id: card.id,
-        created_at: card.createdAt.toISOString(),
-        manager_id: card.managerId,
-        manager_name: card.managerName,
-        organization_code: primaryRecord?.organization_code ?? "",
-        department_code: primaryRecord?.department_code ?? "",
-        client_name: card.clientName,
-        client_phone: card.clientPhone,
-        client_gender: card.clientGender,
-        desired_brand: firstNeed?.brand ?? null,
-        desired_model: firstNeed?.model ?? null,
-        desired_vehicle_undecided: firstNeed?.undecided ?? false,
-        budget_range: firstNeed?.budget_range ?? null,
-        current_car: currentCarName,
-        current_car_brand: asString(firstCar["brand"]),
-        current_car_model: asString(firstCar["model"]),
-        current_car_year: asNumber(firstCar["year"]),
-        current_car_mileage: asNumber(firstCar["mileage"]),
-        current_car_generation: asString(firstCar["generation"]),
-        current_car_body_type: asString(firstCar["bodyType"]),
-        current_car_owners_count: asString(firstCar["ownersCount"]),
-        trade_in_plan: asString(firstCar["tradeInPlan"]),
-        commercial_brand: card.commercialBrand,
-        commercial_model: card.commercialModel,
-        commercial_car_vin: commercialCarVin,
-        commercial_car: getCommercialCarSummary(card.commercialCarSnapshot),
-        needs: mappedNeeds,
-        current_cars: currentCars.map(car => ({
-          brand: asString(car["brand"]) ?? "",
-          model: asString(car["model"]) ?? "",
-          year: asNumber(car["year"]) ?? 0,
-          mileage: asNumber(car["mileage"]) ?? 0,
-          generation: asString(car["generation"]),
-          body_type: asString(car["bodyType"]),
-          owners_count: asString(car["ownersCount"]),
-          trade_in_plan: asString(car["tradeInPlan"]),
-        })),
-        commercial_offer: commercialOffer,
-        brand_records: brandRecords,
-        payment_method: card.paymentMethod,
-        comment: card.comment,
-      };
-    });
+    const items = cards.map(card => buildOneCClientCardFeedItem(card, mappings));
 
     const nextCursor = cards.length ? cards[cards.length - 1]!.id : afterId;
     setOneCRequestAudit(res, {
@@ -515,6 +554,190 @@ router.get("/client-cards", async (req, res): Promise<void> => {
   } catch (error) {
     setOneCRequestAudit(res, { errorCode: "internal_error" });
     req.log.error({ err: error }, "1C manager client-card feed failed");
+    res.status(500).json({ ok: false, error: "internal_error" } satisfies FeedError);
+  }
+});
+
+router.get("/client-cards/changes/initial-cursor", async (req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Vary", "Authorization");
+
+  const tokenStatus = hasValidToken(req.get("authorization"));
+  if (tokenStatus === "not_configured") {
+    sendTokenError(res, 503, "integration_not_configured");
+    return;
+  }
+  if (tokenStatus === "invalid") {
+    sendTokenError(res, 401, "unauthorized");
+    return;
+  }
+
+  try {
+    const [row] = await db
+      .select({ afterChangeId: max(managerClientCardHistoryTable.id) })
+      .from(managerClientCardHistoryTable);
+    const afterChangeId = Number(row?.afterChangeId ?? 0);
+    setOneCRequestAudit(res, { nextCursor: afterChangeId, hasMore: false });
+    res.json(GetOneCClientCardChangesInitialCursorResponse.parse({
+      ok: true,
+      data: {
+        after_change_id: afterChangeId,
+        as_of: new Date().toISOString(),
+      },
+    }));
+  } catch (error) {
+    setOneCRequestAudit(res, { errorCode: "internal_error" });
+    req.log.error({ err: error }, "1C client-card changes initial cursor failed");
+    res.status(500).json({ ok: false, error: "internal_error" } satisfies FeedError);
+  }
+});
+
+router.get("/client-cards/changes", async (req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Vary", "Authorization");
+
+  const tokenStatus = hasValidToken(req.get("authorization"));
+  if (tokenStatus === "not_configured") {
+    sendTokenError(res, 503, "integration_not_configured");
+    return;
+  }
+  if (tokenStatus === "invalid") {
+    sendTokenError(res, 401, "unauthorized");
+    return;
+  }
+
+  const parsedQuery = GetOneCClientCardChangesQueryParams.safeParse(req.query);
+  if (!parsedQuery.success) {
+    setOneCRequestAudit(res, { errorCode: "invalid_query" });
+    res.status(400).json({ ok: false, error: "invalid_query" } satisfies FeedError);
+    return;
+  }
+
+  try {
+    const { after_change_id: afterChangeId, limit } = parsedQuery.data;
+    setOneCRequestAudit(res, { afterId: afterChangeId });
+    const pageRows = await db.select({
+      id: managerClientCardHistoryTable.id,
+      cardId: managerClientCardHistoryTable.cardId,
+      previousBrands: managerClientCardHistoryTable.previousBrands,
+      createdAt: managerClientCardHistoryTable.createdAt,
+    })
+      .from(managerClientCardHistoryTable)
+      .where(gt(managerClientCardHistoryTable.id, afterChangeId))
+      .orderBy(asc(managerClientCardHistoryTable.id))
+      .limit(limit + 1);
+    const hasMore = pageRows.length > limit;
+    const events = pageRows.slice(0, limit);
+    const cardIds = [...new Set(events.map(event => event.cardId))];
+    const cards = cardIds.length
+      ? await db.select({
+          id: managerClientCardsTable.id,
+          managerId: managerClientCardsTable.managerId,
+          managerName: managersTable.name,
+          clientName: managerClientCardsTable.clientName,
+          clientPhone: managerClientCardsTable.clientPhone,
+          clientGender: managerClientCardsTable.clientGender,
+          desiredBrand: managerClientCardsTable.desiredBrand,
+          desiredModel: managerClientCardsTable.desiredModel,
+          desiredVehicleUndecided: managerClientCardsTable.desiredVehicleUndecided,
+          budgetRange: managerClientCardsTable.budgetRange,
+          currentCar: managerClientCardsTable.currentCar,
+          currentCarBrand: managerClientCardsTable.currentCarBrand,
+          currentCarModel: managerClientCardsTable.currentCarModel,
+          currentCarYear: managerClientCardsTable.currentCarYear,
+          currentCarMileage: managerClientCardsTable.currentCarMileage,
+          currentCarGeneration: managerClientCardsTable.currentCarGeneration,
+          currentCarBodyType: managerClientCardsTable.currentCarBodyType,
+          currentCarOwnersCount: managerClientCardsTable.currentCarOwnersCount,
+          tradeInPlan: managerClientCardsTable.tradeInPlan,
+          needs: managerClientCardsTable.needs,
+          currentCars: managerClientCardsTable.currentCars,
+          commercialBrand: managerClientCardsTable.commercialBrand,
+          commercialModel: managerClientCardsTable.commercialModel,
+          commercialCarId: managerClientCardsTable.commercialCarId,
+          commercialCarSnapshot: managerClientCardsTable.commercialCarSnapshot,
+          paymentMethod: managerClientCardsTable.paymentMethod,
+          comment: managerClientCardsTable.comment,
+          createdAt: managerClientCardsTable.createdAt,
+          commercialCarVin: carsTable.vin,
+        })
+          .from(managerClientCardsTable)
+          .leftJoin(managersTable, eq(managersTable.id, managerClientCardsTable.managerId))
+          .leftJoin(carsTable, eq(carsTable.id, managerClientCardsTable.commercialCarId))
+          .where(inArray(managerClientCardsTable.id, cardIds))
+      : [];
+    const cardById = new Map(cards.map(card => [card.id, card]));
+    const mappings = cardIds.length ? await getBrandLocationMappings() : [];
+
+    for (const card of cards) {
+      const targetBrands = brandNamesForCard(card);
+      if (targetBrands.length === 0) {
+        setOneCRequestAudit(res, { afterId: afterChangeId, errorCode: "mapping_not_ready" });
+        res.status(409).json({
+          ok: false,
+          error: "mapping_not_ready",
+          card_id: card.id,
+          missing_fields: ["department_code", "organization_code"],
+        } satisfies FeedError);
+        return;
+      }
+      for (const brand of targetBrands) {
+        const problem = getMappingProblem(card.id, brand, mappings);
+        if (problem) {
+          setOneCRequestAudit(res, { afterId: afterChangeId, errorCode: "mapping_not_ready" });
+          res.status(409).json({
+            ok: false,
+            error: "mapping_not_ready",
+            card_id: problem.cardId,
+            missing_fields: problem.missingFields,
+          } satisfies FeedError);
+          return;
+        }
+      }
+    }
+
+    const itemByCardId = new Map(
+      cards.map(card => [card.id, buildOneCClientCardFeedItem(card, mappings)]),
+    );
+    const changeEvents = events.flatMap(event => {
+      const card = cardById.get(event.cardId);
+      const item = itemByCardId.get(event.cardId);
+      if (!card || !item) return [];
+      const activeSourceKeys = new Set(item.brand_records.map(record => record.source_key));
+      const previousBrands = Array.isArray(event.previousBrands) ? event.previousBrands : [];
+      const deletedSourceKeys = previousBrands
+        .map(brand => {
+          const mapping = findMapping(brand, mappings);
+          return `${event.cardId}:${brandKeyForSource(mapping?.brandName ?? brand)}`;
+        })
+        .filter(sourceKey => !activeSourceKeys.has(sourceKey));
+      return [{
+        change_id: event.id,
+        worksheet_id: event.cardId,
+        changed_at: event.createdAt.toISOString(),
+        deleted_source_keys: [...new Set(deletedSourceKeys)],
+        item,
+      }];
+    });
+
+    const nextCursor = events.length ? events[events.length - 1]!.id : afterChangeId;
+    setOneCRequestAudit(res, {
+      afterId: afterChangeId,
+      nextCursor,
+      itemCount: changeEvents.length,
+      hasMore,
+    });
+    res.json(GetOneCClientCardChangesResponse.parse({
+      ok: true,
+      data: {
+        events: changeEvents,
+        next_cursor: nextCursor,
+        has_more: hasMore,
+      },
+    }));
+  } catch (error) {
+    setOneCRequestAudit(res, { errorCode: "internal_error" });
+    req.log.error({ err: error }, "1C manager client-card changes feed failed");
     res.status(500).json({ ok: false, error: "internal_error" } satisfies FeedError);
   }
 });
