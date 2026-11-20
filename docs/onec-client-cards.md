@@ -105,6 +105,7 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
             "model": "DARGO",
             "undecided": false,
             "budget_range": "3–5 млн",
+            "planned_purchase_date": "2027-05-21",
             "organization_code": "<код организации>",
             "organization_name": "Литейная",
             "department_code": "<код подразделения>",
@@ -116,6 +117,7 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
             "model": "DASHING",
             "undecided": false,
             "budget_range": "3–5 млн",
+            "planned_purchase_date": null,
             "organization_code": "<код организации>",
             "organization_name": "Московский",
             "department_code": "<код подразделения>",
@@ -131,13 +133,12 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
             "generation": null,
             "body_type": "Седан",
             "owners_count": "2",
-            "inventory_id": null,
             "trade_in_plan": "Да"
           }
         ],
         "commercial_brand": null,
         "commercial_model": null,
-        "commercial_car_id": null,
+        "commercial_car_vin": null,
         "commercial_car": null,
         "commercial_offer": null,
         "brand_records": [
@@ -156,6 +157,7 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
                 "model": "DARGO",
                 "undecided": false,
                 "budget_range": "3–5 млн",
+                "planned_purchase_date": "2027-05-21",
                 "organization_code": "<код организации>",
                 "organization_name": "Литейная",
                 "department_code": "<код подразделения>",
@@ -179,6 +181,7 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
                 "model": "DASHING",
                 "undecided": false,
                 "budget_range": "3–5 млн",
+                "planned_purchase_date": null,
                 "organization_code": "<код организации>",
                 "organization_name": "Московский",
                 "department_code": "<код подразделения>",
@@ -211,11 +214,11 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
 | `manager_id`, `manager_name` | integer, string/null | Менеджер, создавший РЛ |
 | `client_name`, `client_phone` | string | ФИО и телефон клиента |
 | `client_gender` | `male`, `female` или `null` | Пол, если указан |
-| `needs[]` | array | Потребности: марка, модель, признак неопределённости, бюджет и коды организации/подразделения для конкретной марки |
-| `current_cars[]` | array | Все автомобили клиента: марка, модель, год, пробег, поколение, кузов, владельцы, связь с базой и трейд-ин |
+| `needs[]` | array | Потребности: марка, модель, признак неопределённости, бюджет, планируемая дата покупки и коды организации/подразделения для конкретной марки |
+| `current_cars[]` | array | Все автомобили клиента: марка, модель, год, пробег, поколение, кузов, владельцы и трейд-ин |
 | `commercial_brand`, `commercial_model` | string/null | Марка и модель предложения |
-| `commercial_car_id` | integer/null | ID конкретного автомобиля из предложения |
-| `commercial_car` | object/null | Снимок автомобиля: `id`, `external_id`, `brand`, `model`, `year`, `modification`, `complectation`, `color`, `price`; поля могут быть `null` |
+| `commercial_car_vin` | string/null | VIN выбранного автомобиля из предложения; `null`, если VIN отсутствует или автомобиль не выбран |
+| `commercial_car` | object/null | Данные выбранного автомобиля: `vin`, `brand`, `model`, `year`, `modification`, `complectation`, `color`, `price`; поля могут быть `null` |
 | `commercial_offer` | object/null | Данные предложения вместе с кодами его марки и локации |
 | `brand_records[]` | array | Подготовленные записи для 1С — по одной на каждую уникальную марку интереса или предложения |
 | `payment_method` | enum/null | Только `Кредит`, `Лизинг`, `Наличные / Безнал` или `null` |
@@ -224,6 +227,8 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
 В `brand_records[]` каждую запись импортируйте в 1С отдельно. `source_key` — стабильный внешний ключ вида `<id РЛ>:<id марки>`; используйте его для идемпотентного создания/обновления и безопасного повтора после ошибки. Внутри записи `needs[]` уже отфильтрован по этой марке. Список `current_cars[]`, данные клиента, менеджера, оплата и комментарий относятся к карточке целиком и могут копироваться в каждую запись 1С.
 
 Поля `organization_*` и `department_*` верхнего уровня содержат коды первой записи `brand_records[]`; старые одиночные `desired_*` и `current_car_*` отражают первый элемент соответствующего массива. Они оставлены только для совместимости. Для новых интеграций используйте `needs[]`, `current_cars[]` и `brand_records[]`.
+
+`planned_purchase_date` — необязательная календарная дата в формате `YYYY-MM-DD`. Время и часовой пояс не передаются.
 
 Потребность с `brand_id: null` означает, что клиент ещё не выбрал марку. Она остаётся в общем `needs[]`, но не образует отдельную запись 1С без кода подразделения. Если в РЛ нет ни одной марки потребности и нет марки предложения, API возвращает `409 mapping_not_ready`.
 
