@@ -379,6 +379,95 @@ paths:
           description: Invalid worksheet data
         "401":
           description: Manager authentication required
+  /integrations/1c/v1/client-cards:
+    get:
+      operationId: getOneCClientCards
+      summary: Poll new manager client worksheets for 1C
+      description: >
+        Returns client worksheets with IDs greater than after_id in ascending order.
+        The caller must persist next_cursor only after successfully importing every returned item.
+        Records are not returned while organization or department codes are provisional.
+      security:
+        - oneCClientCardsToken: []
+      parameters:
+        - name: after_id
+          in: query
+          required: true
+          description: Last source ID successfully imported by 1C
+          schema: { type: integer, minimum: 0 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 100 }
+      responses:
+        "200":
+          description: Next page of worksheets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsResponse"
+        "400":
+          description: Invalid cursor or page size
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "401":
+          description: Missing or invalid dedicated 1C token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "409":
+          description: A worksheet has an unresolved brand/location or unconfirmed 1C code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "503":
+          description: The 1C token is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "500":
+          description: Internal error while reading the worksheet feed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+  /integrations/1c/v1/client-cards/initial-cursor:
+    get:
+      operationId: getOneCClientCardsInitialCursor
+      summary: Get the starting cursor without exporting historical client data
+      description: Call once during initial setup, store after_id in 1C, then poll the feed endpoint.
+      security:
+        - oneCClientCardsToken: []
+      responses:
+        "200":
+          description: Initial cursor at the current end of the client worksheet table
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsInitialCursorResponse"
+        "401":
+          description: Missing or invalid dedicated 1C token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "503":
+          description: The 1C token is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "500":
+          description: Internal error while reading the cursor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
   /manager/client-cards/managers:
     get:
       operationId: listManagerClientCardManagers
@@ -563,6 +652,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 components:
+  securitySchemes:
+    oneCClientCardsToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: Dedicated read-only token for the 1C client worksheet feed
   schemas:
     AiImageModelCatalogue:
       type: object
@@ -1158,6 +1253,93 @@ components:
         data:
           type: array
           items: { $ref: "#/components/schemas/ManagerClientCardInventoryItem" }
+    OneCClientCarSummary:
+      type: object
+      required: [id, external_id, brand, model, year, modification, complectation, color, price]
+      properties:
+        id: { type: ["integer", "null"] }
+        external_id: { type: ["string", "null"] }
+        brand: { type: ["string", "null"] }
+        model: { type: ["string", "null"] }
+        year: { type: ["integer", "null"] }
+        modification: { type: ["string", "null"] }
+        complectation: { type: ["string", "null"] }
+        color: { type: ["string", "null"] }
+        price: { type: ["number", "null"] }
+    OneCClientCardFeedItem:
+      type: object
+      required: [id, created_at, manager_id, manager_name, organization_code, organization_name, department_code, department_name, client_name, client_phone, client_gender, desired_brand, desired_model, desired_vehicle_undecided, budget_range, current_car, current_car_brand, current_car_model, current_car_year, current_car_mileage, current_car_generation, current_car_body_type, current_car_owners_count, current_car_inventory_id, trade_in_plan, commercial_brand, commercial_model, commercial_car_id, commercial_car, payment_method, comment]
+      properties:
+        id: { type: integer }
+        created_at: { type: string, format: date-time }
+        manager_id: { type: integer }
+        manager_name: { type: ["string", "null"] }
+        organization_code: { type: string }
+        organization_name: { type: string }
+        department_code: { type: string }
+        department_name: { type: string }
+        client_name: { type: string }
+        client_phone: { type: string }
+        client_gender: { type: ["string", "null"], enum: [male, female, null] }
+        desired_brand: { type: ["string", "null"] }
+        desired_model: { type: ["string", "null"] }
+        desired_vehicle_undecided: { type: boolean }
+        budget_range: { type: ["string", "null"] }
+        current_car: { type: ["string", "null"] }
+        current_car_brand: { type: ["string", "null"] }
+        current_car_model: { type: ["string", "null"] }
+        current_car_year: { type: ["integer", "null"] }
+        current_car_mileage: { type: ["integer", "null"] }
+        current_car_generation: { type: ["string", "null"] }
+        current_car_body_type: { type: ["string", "null"] }
+        current_car_owners_count: { type: ["string", "null"] }
+        current_car_inventory_id: { type: ["integer", "null"] }
+        trade_in_plan: { type: ["string", "null"] }
+        commercial_brand: { type: ["string", "null"] }
+        commercial_model: { type: ["string", "null"] }
+        commercial_car_id: { type: ["integer", "null"] }
+        commercial_car:
+          oneOf:
+            - $ref: "#/components/schemas/OneCClientCarSummary"
+            - type: "null"
+        payment_method: { type: ["string", "null"] }
+        comment: { type: ["string", "null"] }
+    OneCClientCardsPage:
+      type: object
+      required: [items, next_cursor, has_more]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OneCClientCardFeedItem" }
+        next_cursor: { type: integer }
+        has_more: { type: boolean }
+    OneCClientCardsResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data: { $ref: "#/components/schemas/OneCClientCardsPage" }
+    OneCClientCardsInitialCursorResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data:
+          type: object
+          required: [after_id, as_of]
+          properties:
+            after_id: { type: integer }
+            as_of: { type: string, format: date-time }
+    OneCClientCardsErrorResponse:
+      type: object
+      required: [ok, error]
+      properties:
+        ok: { type: boolean }
+        error: { type: string }
+        card_id: { type: ["integer", "null"] }
+        missing_fields:
+          type: array
+          items: { type: string }
     HealthStatus:
       type: object
       properties:
