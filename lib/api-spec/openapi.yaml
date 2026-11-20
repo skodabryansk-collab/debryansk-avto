@@ -1303,18 +1303,15 @@ components:
         price: { type: ["number", "null"] }
     OneCClientNeed:
       type: object
-      required: [brand_id, brand, model, undecided, budget_range, planned_purchase_date, organization_code, organization_name, department_code, department_name]
+      required: [brand, model, undecided, budget_range, planned_purchase_date, organization_code, department_code]
       properties:
-        brand_id: { type: ["integer", "null"] }
         brand: { type: ["string", "null"] }
         model: { type: ["string", "null"] }
         undecided: { type: boolean }
         budget_range: { type: ["string", "null"], enum: ["Не указан", "до 2 млн", "2–3 млн", "3–5 млн", "5+ млн", null] }
         planned_purchase_date: { type: ["string", "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
         organization_code: { type: ["string", "null"] }
-        organization_name: { type: ["string", "null"] }
         department_code: { type: ["string", "null"] }
-        department_name: { type: ["string", "null"] }
     OneCClientCurrentCar:
       type: object
       required: [brand, model, year, mileage, generation, body_type, owners_count, trade_in_plan]
@@ -1329,9 +1326,8 @@ components:
         trade_in_plan: { type: ["string", "null"], enum: ["Да", "Нет", "Пока не решил", null] }
     OneCClientCommercialOffer:
       type: object
-      required: [brand_id, brand, model, car_vin, car, organization_code, organization_name, department_code, department_name]
+      required: [brand, model, car_vin, car, organization_code, department_code]
       properties:
-        brand_id: { type: ["integer", "null"] }
         brand: { type: ["string", "null"] }
         model: { type: ["string", "null"] }
         car_vin: { type: ["string", "null"] }
@@ -1340,20 +1336,15 @@ components:
             - $ref: "#/components/schemas/OneCClientCarSummary"
             - type: "null"
         organization_code: { type: ["string", "null"] }
-        organization_name: { type: ["string", "null"] }
         department_code: { type: ["string", "null"] }
-        department_name: { type: ["string", "null"] }
     OneCClientBrandRecord:
       type: object
-      required: [source_key, brand_id, brand_name, organization_code, organization_name, department_code, department_name, needs, commercial_offer]
+      required: [source_key, brand_name, organization_code, department_code, needs, commercial_offer]
       properties:
         source_key: { type: string }
-        brand_id: { type: integer }
         brand_name: { type: string }
         organization_code: { type: string }
-        organization_name: { type: string }
         department_code: { type: string }
-        department_name: { type: string }
         needs:
           type: array
           items: { $ref: "#/components/schemas/OneCClientNeed" }
@@ -1363,16 +1354,14 @@ components:
             - type: "null"
     OneCClientCardFeedItem:
       type: object
-      required: [id, created_at, manager_id, manager_name, organization_code, organization_name, department_code, department_name, client_name, client_phone, client_gender, desired_brand, desired_model, desired_vehicle_undecided, budget_range, current_car, current_car_brand, current_car_model, current_car_year, current_car_mileage, current_car_generation, current_car_body_type, current_car_owners_count, trade_in_plan, commercial_brand, commercial_model, commercial_car_vin, commercial_car, needs, current_cars, commercial_offer, brand_records, payment_method, comment]
+      required: [id, created_at, manager_id, manager_name, organization_code, department_code, client_name, client_phone, client_gender, desired_brand, desired_model, desired_vehicle_undecided, budget_range, current_car, current_car_brand, current_car_model, current_car_year, current_car_mileage, current_car_generation, current_car_body_type, current_car_owners_count, trade_in_plan, commercial_brand, commercial_model, commercial_car_vin, commercial_car, needs, current_cars, commercial_offer, brand_records, payment_method, comment]
       properties:
         id: { type: integer }
         created_at: { type: string, format: date-time }
         manager_id: { type: integer }
         manager_name: { type: ["string", "null"] }
         organization_code: { type: string }
-        organization_name: { type: string }
         department_code: { type: string }
-        department_name: { type: string }
         client_name: { type: string }
         client_phone: { type: string }
         client_gender: { type: ["string", "null"], enum: [male, female, null] }
