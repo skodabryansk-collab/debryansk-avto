@@ -50,6 +50,7 @@ import managerAuthRouter from "./manager-auth";
 import managerRegisterRouter from "./manager-register";
 import managerQuotesRouter from "./manager-quotes";
 import managerClientCardsRouter from "./manager-client-cards";
+import oneCIntegrationRouter from "./onec-integration";
 import quoteShareRouter from "./quote-share";
 import managerProfileRouter from "./manager-profile";
 import adminManagersRouter from "./admin-managers";
@@ -152,6 +153,7 @@ router.use("/quote-share", quoteShareRouter);
 router.use("/manager", managerProfileRouter);
 router.use("/manager", managerQuotesRouter);
 router.use("/manager", managerClientCardsRouter);
+router.use("/integrations/1c/v1", oneCIntegrationRouter);
 
 // AI Image Studio
 router.use("/admin/ai-images", adminAiImagesRouter);
