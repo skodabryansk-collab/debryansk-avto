@@ -3,6 +3,7 @@ import { and, count, desc, eq, gte, ilike, isNotNull, lt, or } from "drizzle-orm
 import {
   carsTable,
   db,
+  managerClientCardHistoryTable,
   managerClientCardsTable,
   managersTable,
 } from "@workspace/db";
@@ -28,6 +29,19 @@ const budgetRanges = ["Не указан", "до 2 млн", "2–3 млн", "3�
 const tradeInPlans = ["Да", "Нет", "Пока не решил"] as const;
 const paymentMethods = ["Кредит", "Лизинг", "Наличные / Безнал"] as const;
 const genders = ["male", "female"] as const;
+const auditedCardFields = [
+  "clientName",
+  "clientPhone",
+  "clientGender",
+  "needs",
+  "currentCars",
+  "commercialBrand",
+  "commercialModel",
+  "commercialCarId",
+  "commercialCarSnapshot",
+  "paymentMethod",
+  "comment",
+] as const;
 
 type CreateClientCardInput = {
   clientName: string;
@@ -287,6 +301,50 @@ function getScope(req: Parameters<typeof getManagerPayload>[0]): ManagerScope {
   };
 }
 
+function normalizeAuditValue(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(normalizeAuditValue);
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, item]) => [key, normalizeAuditValue(item)]),
+    );
+  }
+  return value;
+}
+
+function getCardChanges(
+  previous: Record<string, unknown>,
+  next: Record<string, unknown>,
+): Array<{ field: string; oldValue: unknown; newValue: unknown }> {
+  return auditedCardFields.flatMap(field => {
+    const oldValue = normalizeAuditValue(previous[field]);
+    const newValue = normalizeAuditValue(next[field]);
+    return JSON.stringify(oldValue) === JSON.stringify(newValue)
+      ? []
+      : [{ field, oldValue, newValue }];
+  });
+}
+
+function cardBrands(value: {
+  needs?: unknown;
+  desiredBrand?: unknown;
+  commercialBrand?: unknown;
+}): string[] {
+  const needs = Array.isArray(value.needs) ? value.needs : [];
+  const brands = needs
+    .map(need => need && typeof need === "object" ? (need as Record<string, unknown>)["brand"] : null)
+    .filter((brand): brand is string => typeof brand === "string" && Boolean(brand.trim()));
+  if (brands.length === 0 && typeof value.desiredBrand === "string" && value.desiredBrand.trim()) {
+    brands.push(value.desiredBrand.trim());
+  }
+  if (typeof value.commercialBrand === "string" && value.commercialBrand.trim()) {
+    brands.push(value.commercialBrand.trim());
+  }
+  return [...new Set(brands)];
+}
+
 function isCarVisibleToManager(
   car: { type: string; brand: string | null },
   assignedBrands: string[],
@@ -399,6 +457,7 @@ const cardProjection = {
   paymentMethod: managerClientCardsTable.paymentMethod,
   comment: managerClientCardsTable.comment,
   createdAt: managerClientCardsTable.createdAt,
+  updatedAt: managerClientCardsTable.updatedAt,
 };
 
 function csvCell(value: unknown): string {
@@ -801,10 +860,204 @@ router.get("/client-cards/:id", async (req, res): Promise<void> => {
       res.status(404).json({ ok: false, error: "Рабочий лист не найден" });
       return;
     }
-    res.json(GetManagerClientCardResponse.parse({ ok: true, data: card }));
+    const editHistory = await db.select({
+      id: managerClientCardHistoryTable.id,
+      editorName: managerClientCardHistoryTable.editorName,
+      editorRole: managerClientCardHistoryTable.editorRole,
+      createdAt: managerClientCardHistoryTable.createdAt,
+      changes: managerClientCardHistoryTable.changes,
+    })
+      .from(managerClientCardHistoryTable)
+      .where(eq(managerClientCardHistoryTable.cardId, id))
+      .orderBy(desc(managerClientCardHistoryTable.id));
+    res.json(GetManagerClientCardResponse.parse({
+      ok: true,
+      data: { ...card, editHistory },
+    }));
   } catch (error) {
     req.log.error({ err: error, id }, "Manager client card details failed");
     res.status(500).json({ ok: false, error: "Не удалось загрузить рабочий лист" });
+  }
+});
+
+router.put("/client-cards/:id", async (req, res): Promise<void> => {
+  const scope = getScope(req);
+  const id = Number(req.params["id"]);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    res.status(400).json({ ok: false, error: "Некорректный номер рабочего листа" });
+    return;
+  }
+  if (!scope.isAdmin && !scope.managerId) {
+    res.status(403).json({ ok: false, error: "Не удалось определить пользователя" });
+    return;
+  }
+
+  const parsed = parseCreateClientCardInput(req.body);
+  if (!parsed.data) {
+    res.status(400).json({ ok: false, error: parsed.error ?? "Проверьте заполненные данные" });
+    return;
+  }
+  const input = parsed.data;
+
+  try {
+    const result = await db.transaction(async tx => {
+      const cardConditions = [eq(managerClientCardsTable.id, id)];
+      if (!scope.isAdmin) cardConditions.push(eq(managerClientCardsTable.managerId, scope.managerId!));
+      const [existing] = await tx.select()
+        .from(managerClientCardsTable)
+        .where(and(...cardConditions))
+        .for("update")
+        .limit(1);
+      if (!existing) return { status: 404 as const, error: "Рабочий лист не найден" };
+
+      let assignedBrands: string[] = [];
+      let editorName = "Администратор";
+      if (!scope.isAdmin) {
+        const [manager] = await tx.select({ name: managersTable.name, brands: managersTable.brands })
+          .from(managersTable)
+          .where(eq(managersTable.id, scope.managerId!))
+          .limit(1);
+        assignedBrands = Array.isArray(manager?.brands) ? manager.brands : [];
+        editorName = manager?.name || getManagerPayload(req).name || "Менеджер";
+      } else {
+        const payload = getManagerPayload(req) as unknown as Record<string, unknown>;
+        if (typeof payload["login"] === "string" && payload["login"].trim()) {
+          editorName = `Администратор (${payload["login"].trim()})`;
+        }
+      }
+
+      const previousNeeds = Array.isArray(existing.needs) && existing.needs.length > 0
+        ? existing.needs
+        : [{
+            brand: existing.desiredBrand,
+            model: existing.desiredModel,
+            undecided: existing.desiredVehicleUndecided,
+            budgetRange: existing.budgetRange,
+            plannedPurchaseDate: null,
+          }];
+      for (const need of input.needs) {
+        if (!need.brand || !need.model) continue;
+        const alreadySaved = previousNeeds.some(previous =>
+          previous.brand === need.brand && previous.model === need.model,
+        );
+        if (alreadySaved) continue;
+
+        const [matchingModel] = await tx.select({
+          id: carsTable.id,
+          brand: carsTable.brand,
+          type: carsTable.type,
+        })
+          .from(carsTable)
+          .where(and(
+            eq(carsTable.brand, need.brand),
+            eq(carsTable.model, need.model),
+            eq(carsTable.type, "new"),
+            eq(carsTable.catalogSource, "cm_business"),
+            eq(carsTable.cmStockState, "in"),
+          ))
+          .limit(1);
+        if (!matchingModel) {
+          return {
+            status: 400 as const,
+            error: `Выберите марку и модель «${need.brand} ${need.model}» из актуального склада CM Expert`,
+          };
+        }
+        if (!scope.isAdmin && !isCarVisibleToManager(matchingModel, assignedBrands)) {
+          return { status: 403 as const, error: "У вас нет доступа к выбранной марке" };
+        }
+      }
+
+      let commercialCarSnapshot: Record<string, unknown> | null = null;
+      if (input.commercialCarId && input.commercialCarId === existing.commercialCarId) {
+        commercialCarSnapshot = existing.commercialCarSnapshot as Record<string, unknown> | null;
+      } else if (input.commercialCarId) {
+        const [car] = await tx.select(inventoryCarProjection)
+          .from(carsTable)
+          .where(eq(carsTable.id, input.commercialCarId))
+          .limit(1);
+        if (!car) return { status: 400 as const, error: "Выбранный автомобиль больше не найден в базе" };
+        if (!isCurrentInventoryCar(car)) {
+          return { status: 400 as const, error: "Этот автомобиль больше не числится в актуальной базе" };
+        }
+        if (!scope.isAdmin && !isCarVisibleToManager(car, assignedBrands)) {
+          return { status: 403 as const, error: "У вас нет доступа к выбранному автомобилю" };
+        }
+        commercialCarSnapshot = { ...car };
+      }
+
+      const firstNeed = input.needs[0]!;
+      const firstCurrentCar = input.currentCars[0] ?? null;
+      const commercialBrand = input.commercialBrand ||
+        (commercialCarSnapshot?.["brand"] as string | null | undefined) || null;
+      const commercialModel = input.commercialModel ||
+        (commercialCarSnapshot?.["model"] as string | null | undefined) || null;
+      const values = {
+        clientName: input.clientName,
+        clientPhone: input.clientPhone,
+        clientGender: input.clientGender,
+        desiredBrand: firstNeed.brand,
+        desiredModel: firstNeed.model,
+        desiredVehicleUndecided: firstNeed.undecided,
+        budgetRange: firstNeed.budgetRange,
+        needs: input.needs,
+        currentCar: firstCurrentCar ? [firstCurrentCar.brand, firstCurrentCar.model].join(" ") : null,
+        currentCarBrand: firstCurrentCar?.brand ?? null,
+        currentCarModel: firstCurrentCar?.model ?? null,
+        currentCarYear: firstCurrentCar?.year ?? null,
+        currentCarMileage: firstCurrentCar?.mileage ?? null,
+        currentCarGeneration: firstCurrentCar?.generation ?? null,
+        currentCarBodyType: firstCurrentCar?.bodyType ?? null,
+        currentCarOwnersCount: firstCurrentCar?.ownersCount ?? null,
+        currentCarSnapshot: firstCurrentCar?.snapshot ?? null,
+        currentCars: input.currentCars,
+        tradeInPlan: firstCurrentCar?.tradeInPlan ?? null,
+        commercialBrand,
+        commercialModel,
+        commercialCarId: input.commercialCarId,
+        commercialCarSnapshot,
+        paymentMethod: input.paymentMethod,
+        comment: input.comment,
+      };
+      const changes = getCardChanges(
+        existing as unknown as Record<string, unknown>,
+        values as unknown as Record<string, unknown>,
+      );
+      if (changes.length === 0) {
+        return { status: 200 as const, id, changed: false, updatedAt: existing.updatedAt };
+      }
+
+      const updatedAt = new Date();
+      await tx.update(managerClientCardsTable)
+        .set({ ...values, updatedAt })
+        .where(eq(managerClientCardsTable.id, id));
+      await tx.insert(managerClientCardHistoryTable).values({
+        cardId: id,
+        editorManagerId: scope.managerId ?? null,
+        editorName,
+        editorRole: scope.isAdmin ? "admin" : "manager",
+        changes,
+        previousBrands: cardBrands(existing),
+        currentBrands: cardBrands(values),
+        createdAt: updatedAt,
+      });
+      return { status: 200 as const, id, changed: true, updatedAt };
+    });
+
+    if (result.status !== 200) {
+      res.status(result.status).json({ ok: false, error: result.error });
+      return;
+    }
+    res.json({
+      ok: true,
+      data: {
+        id: result.id,
+        changed: result.changed,
+        updatedAt: result.updatedAt.toISOString(),
+      },
+    });
+  } catch (error) {
+    req.log.error({ err: error, id }, "Manager client card update failed");
+    res.status(500).json({ ok: false, error: "Не удалось обновить рабочий лист" });
   }
 });
 
