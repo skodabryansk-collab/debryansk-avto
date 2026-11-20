@@ -9,6 +9,8 @@ import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
 import NewsPage from "@/pages/news";
 import LeadsPage from "@/pages/leads";
+import SurveysPage from "@/pages/surveys";
+import SurveyEditorPage from "@/pages/survey-editor";
 import DealersPage from "@/pages/dealers";
 import BrandsPage from "@/pages/brands";
 import UsersPage from "@/pages/users";
@@ -28,10 +30,15 @@ import AdminManagersPage from "@/pages/admin-managers";
 import AdminQuotesPage from "@/pages/admin-quotes";
 import AdminSalesManagersPage from "@/pages/admin-sales-managers";
 import VisitorsPage from "@/pages/visitors";
+import PrerenderMonitorPage from "@/pages/prerender-monitor";
+import AiImagesPage from "@/pages/ai-images";
+import BrandGuidelinesPage from "@/pages/brand-guidelines";
 import ManagerLoginPage from "@/pages/manager-login";
 import ManagerRegisterPage from "@/pages/manager-register";
 import ManagerQuotesPage from "@/pages/manager-quotes";
+import ManagerClientCardsPage from "@/pages/manager-client-cards";
 import ManagerProfilePage from "@/pages/manager-profile";
+import CmStockPage from "@/pages/cm-stock";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -43,15 +50,19 @@ function AppRouter() {
       <Route path="/manager/login" component={ManagerLoginPage} />
       <Route path="/manager/register" component={ManagerRegisterPage} />
       <Route path="/manager/quotes" component={() => <ManagerAuthProvider><RequireManagerAuth><ManagerQuotesPage /></RequireManagerAuth></ManagerAuthProvider>} />
+      <Route path="/manager/client-cards" component={() => <ManagerAuthProvider><RequireManagerAuth><ManagerClientCardsPage /></RequireManagerAuth></ManagerAuthProvider>} />
       <Route path="/manager/profile" component={() => <ManagerAuthProvider><RequireManagerAuth><ManagerProfilePage /></RequireManagerAuth></ManagerAuthProvider>} />
       <Route path="/" component={() => <RequireAuth><AdminLayout><DashboardPage /></AdminLayout></RequireAuth>} />
       <Route path="/news" component={() => <RequireAuth><AdminLayout><NewsPage /></AdminLayout></RequireAuth>} />
       <Route path="/leads" component={() => <RequireAuth><AdminLayout><LeadsPage /></AdminLayout></RequireAuth>} />
+      <Route path="/surveys/:id" component={() => <RequireAuth><AdminLayout><SurveyEditorPage /></AdminLayout></RequireAuth>} />
+      <Route path="/surveys" component={() => <RequireAuth><AdminLayout><SurveysPage /></AdminLayout></RequireAuth>} />
       <Route path="/dealers" component={() => <RequireAuth><AdminLayout><DealersPage /></AdminLayout></RequireAuth>} />
       <Route path="/brands" component={() => <RequireAuth><AdminLayout><BrandsPage /></AdminLayout></RequireAuth>} />
       <Route path="/users" component={() => <RequireAuth><AdminLayout><UsersPage /></AdminLayout></RequireAuth>} />
       <Route path="/locations" component={() => <RequireAuth><AdminLayout><LocationsPage /></AdminLayout></RequireAuth>} />
       <Route path="/settings" component={() => <RequireAuth><AdminLayout><SettingsPage /></AdminLayout></RequireAuth>} />
+      <Route path="/cm-stock" component={() => <RequireAuth><AdminLayout><CmStockPage /></AdminLayout></RequireAuth>} />
       <Route path="/navigator" component={() => <RequireAuth><AdminLayout><NavigatorPage /></AdminLayout></RequireAuth>} />
       <Route path="/reviews" component={() => <RequireAuth><AdminLayout><ReviewsPage /></AdminLayout></RequireAuth>} />
       <Route path="/promotions" component={() => <RequireAuth><AdminLayout><PromotionsPage /></AdminLayout></RequireAuth>} />
@@ -68,6 +79,9 @@ function AppRouter() {
       <Route path="/quotes" component={() => <RequireAuth><AdminLayout><AdminQuotesPage /></AdminLayout></RequireAuth>} />
       <Route path="/sales-managers" component={() => <RequireAuth><AdminLayout><AdminSalesManagersPage /></AdminLayout></RequireAuth>} />
       <Route path="/visitors" component={() => <RequireAuth><AdminLayout><VisitorsPage /></AdminLayout></RequireAuth>} />
+      <Route path="/prerender-monitor" component={() => <RequireAuth><AdminLayout><PrerenderMonitorPage /></AdminLayout></RequireAuth>} />
+      <Route path="/ai-images" component={() => <RequireAuth><AiImagesPage /></RequireAuth>} />
+      <Route path="/brand-guidelines" component={() => <RequireAuth><AdminLayout><BrandGuidelinesPage /></AdminLayout></RequireAuth>} />
       <Route component={() => <RequireAuth><AdminLayout><NotFound /></AdminLayout></RequireAuth>} />
     </Switch>
   );
