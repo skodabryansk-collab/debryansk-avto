@@ -114,7 +114,6 @@ test("manager client cards are saved and isolated by manager", async () => {
         currentCarGeneration: null,
         currentCarBodyType: null,
         currentCarOwnersCount: null,
-        currentCarInventoryId: null,
         tradeInPlan: null,
         commercialBrand: null,
         commercialModel: null,
@@ -141,9 +140,9 @@ test("manager client cards are saved and isolated by manager", async () => {
         desiredModel: "Jolion",
         desiredVehicleUndecided: false,
         budgetRange: "2–3 млн",
-         needs: [
-           { brand: "Haval City", model: "Jolion", undecided: false, budgetRange: "2–3 млн" },
-           { brand: "Haval City", model: "Jolion", undecided: false, budgetRange: "3–5 млн" },
+          needs: [
+            { brand: "Haval City", model: "Jolion", undecided: false, budgetRange: "2–3 млн", plannedPurchaseDate: "2027-05-21" },
+            { brand: "Haval City", model: "Jolion", undecided: false, budgetRange: "3–5 млн" },
          ],
         currentCar: "Haval City Jolion",
         currentCarBrand: "Haval City",
@@ -153,7 +152,6 @@ test("manager client cards are saved and isolated by manager", async () => {
         currentCarGeneration: "I",
         currentCarBodyType: "Кроссовер",
         currentCarOwnersCount: "2",
-        currentCarInventoryId: currentCar.id,
         tradeInPlan: null,
          currentCars: [
            {
@@ -164,7 +162,6 @@ test("manager client cards are saved and isolated by manager", async () => {
              generation: "I",
              bodyType: "Кроссовер",
              ownersCount: "2",
-             inventoryId: currentCar.id,
              snapshot: null,
              tradeInPlan: "Да",
            },
@@ -176,7 +173,6 @@ test("manager client cards are saved and isolated by manager", async () => {
              generation: null,
              bodyType: "Седан",
              ownersCount: null,
-             inventoryId: null,
              snapshot: null,
              tradeInPlan: null,
            },
@@ -210,7 +206,7 @@ test("manager client cards are saved and isolated by manager", async () => {
         currentCarOwnersCount: string;
         currentCarSnapshot: { vin: string };
         commercialCarSnapshot: { model: string };
-         needs: Array<{ brand: string; model: string; budgetRange: string }>;
+         needs: Array<{ brand: string; model: string; budgetRange: string; plannedPurchaseDate: string | null }>;
          currentCars: Array<{ brand: string; model: string; mileage: number; snapshot: { vin: string } | null }>;
       }>;
       total: number;
@@ -228,11 +224,15 @@ test("manager client cards are saved and isolated by manager", async () => {
     assert.equal(own.data?.items[0]?.currentCarGeneration, "I");
     assert.equal(own.data?.items[0]?.currentCarBodyType, "Кроссовер");
     assert.equal(own.data?.items[0]?.currentCarOwnersCount, "2");
-    assert.equal(own.data?.items[0]?.currentCarSnapshot.vin, "XW8ZZZ61ZHG000456");
     assert.equal(own.data?.items[0]?.needs.length, 2);
     assert.equal(own.data?.items[0]?.needs[1]?.budgetRange, "3–5 млн");
+    assert.equal(own.data?.items[0]?.needs[0]?.plannedPurchaseDate, "2027-05-21");
+    assert.equal(own.data?.items[0]?.needs[1]?.plannedPurchaseDate, null);
     assert.equal(own.data?.items[0]?.currentCars.length, 2);
     assert.equal(own.data?.items[0]?.currentCars[1]?.brand, "Toyota");
+    assert.equal(own.data?.items[0]?.currentCars[0]?.snapshot, null);
+    assert.equal("currentCarInventoryId" in (own.data?.items[0] ?? {}), false);
+    assert.equal("inventoryId" in ((own.data?.items[0]?.currentCars[0] ?? {}) as object), false);
 
     const ownDetail = await fetch(`${started.baseUrl}/api/manager/client-cards/${created.data!.id}`, {
       headers: { authorization: `Bearer ${managerToken(managerIds[0]!)}` },
@@ -356,7 +356,6 @@ test("manager client cards are saved and isolated by manager", async () => {
         currentCarGeneration: null,
         currentCarBodyType: null,
         currentCarOwnersCount: null,
-        currentCarInventoryId: null,
         tradeInPlan: null,
         commercialBrand: null,
         commercialModel: null,
