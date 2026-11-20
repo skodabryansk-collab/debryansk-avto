@@ -10,6 +10,8 @@ import type { ManagerClientCardInputClientGender } from './managerClientCardInpu
 import type { ManagerClientCardInputCurrentCarOwnersCount } from './managerClientCardInputCurrentCarOwnersCount';
 import type { ManagerClientCardInputPaymentMethod } from './managerClientCardInputPaymentMethod';
 import type { ManagerClientCardInputTradeInPlan } from './managerClientCardInputTradeInPlan';
+import type { ManagerClientCurrentCar } from './managerClientCurrentCar';
+import type { ManagerClientNeed } from './managerClientNeed';
 
 export interface ManagerClientCardInput {
   /**
@@ -83,6 +85,9 @@ export interface ManagerClientCardInput {
   currentCarInventoryId: number | null;
   /** @nullable */
   tradeInPlan: ManagerClientCardInputTradeInPlan;
+  /** @minItems 1 */
+  needs?: ManagerClientNeed[];
+  currentCars?: ManagerClientCurrentCar[];
   /**
      * @maxLength 180
      * @nullable
