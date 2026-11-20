@@ -10,12 +10,9 @@ import type { OneCClientNeed } from './oneCClientNeed';
 
 export interface OneCClientBrandRecord {
   source_key: string;
-  brand_id: number;
   brand_name: string;
   organization_code: string;
-  organization_name: string;
   department_code: string;
-  department_name: string;
   needs: OneCClientNeed[];
   commercial_offer: OneCClientCommercialOffer | null;
 }
