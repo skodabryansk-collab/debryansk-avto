@@ -8,6 +8,7 @@ import {
 } from "@workspace/api-zod";
 import {
   brandsTable,
+  carsTable,
   db,
   locationsTable,
   locationBrandsTable,
@@ -84,12 +85,11 @@ function asNumber(value: unknown): number | null {
   return null;
 }
 
-function getCommercialCarSummary(snapshotValue: unknown, fallbackId: number | null) {
+function getCommercialCarSummary(snapshotValue: unknown) {
   const snapshot = asRecord(snapshotValue);
-  if (!fallbackId && Object.keys(snapshot).length === 0) return null;
+  if (Object.keys(snapshot).length === 0) return null;
   return {
-    id: fallbackId ?? asNumber(snapshot["id"]),
-    external_id: asString(snapshot["externalId"]) ?? asString(snapshot["external_id"]),
+    vin: asString(snapshot["vin"]),
     brand: asString(snapshot["brand"]),
     model: asString(snapshot["model"]),
     year: asNumber(snapshot["year"]),
@@ -237,7 +237,6 @@ router.get("/client-cards", async (req, res): Promise<void> => {
         currentCarGeneration: managerClientCardsTable.currentCarGeneration,
         currentCarBodyType: managerClientCardsTable.currentCarBodyType,
         currentCarOwnersCount: managerClientCardsTable.currentCarOwnersCount,
-        currentCarInventoryId: managerClientCardsTable.currentCarInventoryId,
         tradeInPlan: managerClientCardsTable.tradeInPlan,
         needs: managerClientCardsTable.needs,
         currentCars: managerClientCardsTable.currentCars,
@@ -248,9 +247,11 @@ router.get("/client-cards", async (req, res): Promise<void> => {
         paymentMethod: managerClientCardsTable.paymentMethod,
         comment: managerClientCardsTable.comment,
         createdAt: managerClientCardsTable.createdAt,
+        commercialCarVin: carsTable.vin,
       })
       .from(managerClientCardsTable)
       .leftJoin(managersTable, eq(managersTable.id, managerClientCardsTable.managerId))
+      .leftJoin(carsTable, eq(carsTable.id, managerClientCardsTable.commercialCarId))
       .where(gt(managerClientCardsTable.id, afterId))
       .orderBy(asc(managerClientCardsTable.id))
       .limit(limit + 1);
@@ -266,6 +267,7 @@ router.get("/client-cards", async (req, res): Promise<void> => {
         model: card.desiredModel,
         undecided: card.desiredVehicleUndecided,
         budgetRange: card.budgetRange,
+        plannedPurchaseDate: null,
       }];
     };
     const currentCarsForCard = (card: (typeof cards)[number]) => {
@@ -279,7 +281,6 @@ router.get("/client-cards", async (req, res): Promise<void> => {
         generation: card.currentCarGeneration,
         bodyType: card.currentCarBodyType,
         ownersCount: card.currentCarOwnersCount,
-        inventoryId: card.currentCarInventoryId,
         tradeInPlan: card.tradeInPlan,
       }];
     };
@@ -338,6 +339,7 @@ router.get("/client-cards", async (req, res): Promise<void> => {
           model: asString(need["model"]),
           undecided: need["undecided"] === true,
           budget_range: asString(need["budgetRange"]),
+          planned_purchase_date: asString(need["plannedPurchaseDate"]),
           organization_code: mapping?.organizationCode ?? null,
           organization_name: mapping?.locationTitle ?? null,
           department_code: mapping?.departmentCode ?? null,
@@ -345,13 +347,15 @@ router.get("/client-cards", async (req, res): Promise<void> => {
         };
       });
       const offerMapping = findMapping(card.commercialBrand);
+      const commercialCarSnapshot = asRecord(card.commercialCarSnapshot);
+      const commercialCarVin = asString(card.commercialCarVin) ?? asString(commercialCarSnapshot["vin"]);
       const commercialOffer = card.commercialBrand || card.commercialModel || card.commercialCarId
         ? {
             brand_id: offerMapping?.brandId ?? null,
             brand: card.commercialBrand,
             model: card.commercialModel,
-            car_id: card.commercialCarId,
-            car: getCommercialCarSummary(card.commercialCarSnapshot, card.commercialCarId),
+            car_vin: commercialCarVin,
+            car: getCommercialCarSummary(card.commercialCarSnapshot),
             organization_code: offerMapping?.organizationCode ?? null,
             organization_name: offerMapping?.locationTitle ?? null,
             department_code: offerMapping?.departmentCode ?? null,
@@ -425,12 +429,11 @@ router.get("/client-cards", async (req, res): Promise<void> => {
         current_car_generation: asString(firstCar["generation"]),
         current_car_body_type: asString(firstCar["bodyType"]),
         current_car_owners_count: asString(firstCar["ownersCount"]),
-        current_car_inventory_id: asNumber(firstCar["inventoryId"]),
         trade_in_plan: asString(firstCar["tradeInPlan"]),
         commercial_brand: card.commercialBrand,
         commercial_model: card.commercialModel,
-        commercial_car_id: card.commercialCarId,
-        commercial_car: getCommercialCarSummary(card.commercialCarSnapshot, card.commercialCarId),
+        commercial_car_vin: commercialCarVin,
+        commercial_car: getCommercialCarSummary(card.commercialCarSnapshot),
         needs: mappedNeeds,
         current_cars: currentCars.map(car => ({
           brand: asString(car["brand"]) ?? "",
@@ -440,7 +443,6 @@ router.get("/client-cards", async (req, res): Promise<void> => {
           generation: asString(car["generation"]),
           body_type: asString(car["bodyType"]),
           owners_count: asString(car["ownersCount"]),
-          inventory_id: asNumber(car["inventoryId"]),
           trade_in_plan: asString(car["tradeInPlan"]),
         })),
         commercial_offer: commercialOffer,
