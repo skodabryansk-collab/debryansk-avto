@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { asc, eq, gt, max } from "drizzle-orm";
 import {
   GetOneCClientCardsInitialCursorResponse,
@@ -16,6 +16,7 @@ import {
   managersTable,
 } from "@workspace/db";
 import { normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
+import { recordOneCExchangeLog } from "../lib/onec-exchange-log";
 
 const router: IRouter = Router();
 
@@ -36,6 +37,48 @@ type MappingRow = {
   organizationCode: string | null;
   organizationCodeConfirmed: boolean | null;
 };
+
+type OneCRequestAudit = {
+  afterId?: number | null;
+  nextCursor?: number | null;
+  itemCount?: number;
+  hasMore?: boolean | null;
+  errorCode?: string | null;
+};
+
+function setOneCRequestAudit(res: Response, audit: OneCRequestAudit): void {
+  const current = ((res.locals as Record<string, unknown>)["onecRequestAudit"] ?? {}) as OneCRequestAudit;
+  (res.locals as Record<string, unknown>)["onecRequestAudit"] = { ...current, ...audit };
+}
+
+router.use((req: Request, res: Response, next) => {
+  const startedAt = Date.now();
+  res.on("finish", () => {
+    const audit = ((res.locals as Record<string, unknown>)["onecRequestAudit"] ?? {}) as OneCRequestAudit;
+    const requestId = (req as Request & { id?: string | number }).id;
+    recordOneCExchangeLog({
+      eventType: "api_request",
+      endpoint: req.path,
+      method: req.method,
+      httpStatus: res.statusCode,
+      outcome: res.statusCode < 400 ? "success" : "error",
+      afterId: audit.afterId ?? null,
+      nextCursor: audit.nextCursor ?? null,
+      itemCount: audit.itemCount ?? 0,
+      hasMore: audit.hasMore ?? null,
+      durationMs: Math.max(0, Date.now() - startedAt),
+      errorCode: audit.errorCode ?? null,
+      requestId: requestId == null ? null : String(requestId),
+      entityType: null,
+      entityId: null,
+      entityName: null,
+      previousCode: null,
+      newCode: null,
+      actorLogin: null,
+    }).catch(error => req.log.error({ err: error }, "1C exchange journal write failed"));
+  });
+  next();
+});
 
 function isTokenMatch(provided: string, expected: string): boolean {
   const providedBytes = Buffer.from(provided, "utf8");
@@ -59,10 +102,11 @@ function hasValidToken(authorization: string | undefined): "not_configured" | "i
 }
 
 function sendTokenError(
-  res: Parameters<Parameters<IRouter["get"]>[1]>[1],
+  res: Response,
   status: 401 | 503,
   error: string,
 ): void {
+  setOneCRequestAudit(res, { errorCode: error });
   res.status(status).json({ ok: false, error } satisfies FeedError);
 }
 
@@ -191,14 +235,17 @@ router.get("/client-cards/initial-cursor", async (req, res): Promise<void> => {
     const [row] = await db
       .select({ afterId: max(managerClientCardsTable.id) })
       .from(managerClientCardsTable);
+    const afterId = Number(row?.afterId ?? 0);
+    setOneCRequestAudit(res, { nextCursor: afterId, hasMore: false });
     res.json(GetOneCClientCardsInitialCursorResponse.parse({
       ok: true,
       data: {
-        after_id: Number(row?.afterId ?? 0),
+        after_id: afterId,
         as_of: new Date().toISOString(),
       },
     }));
   } catch (error) {
+    setOneCRequestAudit(res, { errorCode: "internal_error" });
     req.log.error({ err: error }, "1C initial client-card cursor failed");
     res.status(500).json({ ok: false, error: "internal_error" } satisfies FeedError);
   }
@@ -220,12 +267,14 @@ router.get("/client-cards", async (req, res): Promise<void> => {
 
   const parsedQuery = GetOneCClientCardsQueryParams.safeParse(req.query);
   if (!parsedQuery.success) {
+    setOneCRequestAudit(res, { errorCode: "invalid_query" });
     res.status(400).json({ ok: false, error: "invalid_query" } satisfies FeedError);
     return;
   }
 
   try {
     const { after_id: afterId, limit } = parsedQuery.data;
+    setOneCRequestAudit(res, { afterId });
     const pageRows = await db
       .select({
         id: managerClientCardsTable.id,
@@ -314,6 +363,7 @@ router.get("/client-cards", async (req, res): Promise<void> => {
         targetBrands.set(normalizeManagerQuoteBrand(brand), brand);
       }
       if (targetBrands.size === 0) {
+        setOneCRequestAudit(res, { afterId, errorCode: "mapping_not_ready" });
         res.status(409).json({
           ok: false,
           error: "mapping_not_ready",
@@ -325,6 +375,7 @@ router.get("/client-cards", async (req, res): Promise<void> => {
       for (const brand of targetBrands.values()) {
         const problem = getMappingProblem(card.id, brand, mappings);
         if (problem) {
+          setOneCRequestAudit(res, { afterId, errorCode: "mapping_not_ready" });
           res.status(409).json({
             ok: false,
             error: "mapping_not_ready",
@@ -446,15 +497,23 @@ router.get("/client-cards", async (req, res): Promise<void> => {
       };
     });
 
+    const nextCursor = cards.length ? cards[cards.length - 1]!.id : afterId;
+    setOneCRequestAudit(res, {
+      afterId,
+      nextCursor,
+      itemCount: items.length,
+      hasMore,
+    });
     res.json(GetOneCClientCardsResponse.parse({
       ok: true,
       data: {
         items,
-        next_cursor: cards.length ? cards[cards.length - 1]!.id : afterId,
+        next_cursor: nextCursor,
         has_more: hasMore,
       },
     }));
   } catch (error) {
+    setOneCRequestAudit(res, { errorCode: "internal_error" });
     req.log.error({ err: error }, "1C manager client-card feed failed");
     res.status(500).json({ ok: false, error: "internal_error" } satisfies FeedError);
   }
