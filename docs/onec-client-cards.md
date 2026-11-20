@@ -88,7 +88,7 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
 - `commercial_car_vin` — VIN выбранного автомобиля из предложения; `null`, если автомобиль не выбран или VIN отсутствует.
 - `commercial_offer.car_vin` — тот же VIN внутри блока предложения. Вложенный `commercial_offer.car` содержит снимок характеристик автомобиля и его `vin`.
 
-Внешний контракт не содержит `current_car_inventory_id`, `current_cars[].inventory_id` или числовой `commercial_car_id`. Внутренний ID записи каталога используется только порталом для связи с выбранным автомобилем; в 1С передаётся VIN.
+Внешний контракт не содержит `current_car_inventory_id`, `current_cars[].inventory_id`, числовой `commercial_car_id`, `brand_id`, `organization_name` или `department_name`. Для маршрутизации 1С получает только `organization_code` и `department_code`; для марки — название `brand`/`brand_name`. Внутренний ID записи каталога используется только порталом для связи с выбранным автомобилем; в 1С передаётся VIN.
 
 Пример, когда менеджер выбрал автомобиль из предложения:
 
@@ -106,7 +106,6 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
     "price": 3899000
   },
   "commercial_offer": {
-    "brand_id": 9,
     "brand": "Haval City",
     "model": "DARGO",
     "car_vin": "XW8ZZZ61ZHG000456",
@@ -121,9 +120,7 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
       "price": 3899000
     },
     "organization_code": "<код организации>",
-    "organization_name": "Литейная",
-    "department_code": "<код подразделения>",
-    "department_name": "Haval City"
+    "department_code": "<код подразделения>"
   }
 }
 ```
@@ -141,36 +138,28 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
         "manager_id": 7,
         "manager_name": "Имя менеджера",
         "organization_code": "<официальный код организации>",
-        "organization_name": "Литейная",
         "department_code": "<официальный код подразделения>",
-        "department_name": "Haval City",
         "client_name": "<ФИО клиента>",
         "client_phone": "<телефон клиента>",
         "client_gender": null,
         "needs": [
           {
-            "brand_id": 9,
             "brand": "Haval City",
             "model": "DARGO",
             "undecided": false,
             "budget_range": "3–5 млн",
             "planned_purchase_date": "2027-05-21",
             "organization_code": "<код организации>",
-            "organization_name": "Литейная",
-            "department_code": "<код подразделения>",
-            "department_name": "Haval City"
+            "department_code": "<код подразделения>"
           },
           {
-            "brand_id": 14,
             "brand": "JETOUR",
             "model": "DASHING",
             "undecided": false,
             "budget_range": "3–5 млн",
             "planned_purchase_date": null,
             "organization_code": "<код организации>",
-            "organization_name": "Московский",
-            "department_code": "<код подразделения>",
-            "department_name": "JETOUR"
+            "department_code": "<код подразделения>"
           }
         ],
         "current_cars": [
@@ -192,49 +181,37 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
         "commercial_offer": null,
         "brand_records": [
           {
-            "source_key": "121:9",
-            "brand_id": 9,
+            "source_key": "121:haval-city",
             "brand_name": "Haval City",
             "organization_code": "<код организации>",
-            "organization_name": "Литейная",
             "department_code": "<код подразделения>",
-            "department_name": "Haval City",
             "needs": [
               {
-                "brand_id": 9,
                 "brand": "Haval City",
                 "model": "DARGO",
                 "undecided": false,
                 "budget_range": "3–5 млн",
                 "planned_purchase_date": "2027-05-21",
                 "organization_code": "<код организации>",
-                "organization_name": "Литейная",
-                "department_code": "<код подразделения>",
-                "department_name": "Haval City"
+                "department_code": "<код подразделения>"
               }
             ],
             "commercial_offer": null
           },
           {
-            "source_key": "121:14",
-            "brand_id": 14,
+            "source_key": "121:jetour",
             "brand_name": "JETOUR",
             "organization_code": "<код организации>",
-            "organization_name": "Московский",
             "department_code": "<код подразделения>",
-            "department_name": "JETOUR",
             "needs": [
               {
-                "brand_id": 14,
                 "brand": "JETOUR",
                 "model": "DASHING",
                 "undecided": false,
                 "budget_range": "3–5 млн",
                 "planned_purchase_date": null,
                 "organization_code": "<код организации>",
-                "organization_name": "Московский",
-                "department_code": "<код подразделения>",
-                "department_name": "JETOUR"
+                "department_code": "<код подразделения>"
               }
             ],
             "commercial_offer": null
@@ -285,14 +262,14 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
 | `payment_method` | string/null | Способ оплаты: `Кредит`, `Лизинг`, `Наличные / Безнал`; `null`, если не выбран |
 | `comment` | string/null | Комментарий менеджера |
 
-В ответе также присутствуют одиночные поля `organization_code`, `organization_name`, `department_code`, `department_name`, `desired_*` и `current_car_*`. Они оставлены для совместимости: реквизиты организации/подразделения соответствуют первой записи `brand_records[]`, поля `desired_*` — первой потребности, а `current_car_*` — первому автомобилю. Для новой интеграции используйте массивы `needs[]`, `current_cars[]` и `brand_records[]`.
+В ответе также присутствуют одиночные поля `organization_code`, `department_code`, `desired_*` и `current_car_*`. Они оставлены для совместимости: коды организации/подразделения соответствуют первой записи `brand_records[]`, поля `desired_*` — первой потребности, а `current_car_*` — первому автомобилю. Для новой интеграции используйте массивы `needs[]`, `current_cars[]` и `brand_records[]`.
 
 #### Одиночные поля для совместимости
 
 | Поле | Значение |
 |---|---|
-| `organization_code`, `organization_name` | Код и название организации из первой записи `brand_records[]` |
-| `department_code`, `department_name` | Код и название подразделения из первой записи `brand_records[]` |
+| `organization_code` | Код организации из первой записи `brand_records[]` |
+| `department_code` | Код подразделения из первой записи `brand_records[]` |
 | `desired_brand`, `desired_model` | Марка и модель первой потребности |
 | `desired_vehicle_undecided` | Значение `undecided` первой потребности |
 | `budget_range` | Бюджет первой потребности |
@@ -308,18 +285,15 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
 
 | Поле | Тип | Значение |
 |---|---|---|
-| `brand_id` | integer/null | Внутренний ID марки в базе сайта. Это не код справочника марки в 1С |
 | `brand` | string/null | Название марки, которую рассматривает клиент |
 | `model` | string/null | Название модели; может быть `null`, если модель ещё не выбрана |
 | `undecided` | boolean | `true` означает, что клиент пока не определился с маркой/моделью. Это признак отсутствия выбора, а не признак ошибки или незаполненности РЛ |
 | `budget_range` | string/null | Выбранный диапазон: `Не указан`, `до 2 млн`, `2–3 млн`, `3–5 млн` или `5+ млн`; `null`, если значения нет |
 | `planned_purchase_date` | string/null | Планируемая дата покупки в формате `YYYY-MM-DD`; `null`, если дату не указали |
 | `organization_code` | string/null | Код организации 1С для локации выбранной марки |
-| `organization_name` | string/null | Название локации/организации |
 | `department_code` | string/null | Код подразделения 1С для выбранной марки |
-| `department_name` | string/null | Название марки, сопоставленной с подразделением |
 
-`brand_id: null` означает, что марка не сопоставлена с записью справочника. Такая потребность остаётся в `needs[]`, но сама по себе не создаёт отдельную запись `brand_records[]`. `undecided: true` дополнительно сообщает, что клиент прямо указал, что ещё не определился.
+В выгрузке не передаётся внутренний `brand_id`: для сопоставления с каталогом 1С используйте `brand` и `department_code`. Если `brand` равно `null`, клиент не указал марку; `undecided: true` означает, что он явно сообщил, что пока не определился.
 
 ### Текущий автомобиль `current_cars[]`
 
@@ -355,12 +329,11 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
 
 | Поле | Тип | Значение |
 |---|---|---|
-| `brand_id` | integer/null | Внутренний ID марки в базе сайта; это не код справочника марки в 1С |
 | `brand`, `model` | string/null | Марка и модель предложения |
 | `car_vin` | string/null | VIN выбранной машины; совпадает с `commercial_car_vin` |
 | `car` | object/null | Снимок автомобиля со структурой из таблицы выше |
-| `organization_code`, `organization_name` | string/null | Код и название локации/организации для марки предложения |
-| `department_code`, `department_name` | string/null | Код и название подразделения/марки |
+| `organization_code` | string/null | Код организации/локации для марки предложения |
+| `department_code` | string/null | Код подразделения/марки |
 
 Числовой ID автомобиля из каталога во внешнем контракте не передаётся.
 
@@ -370,19 +343,18 @@ curl --get 'https://debryansk-auto.ru/api/integrations/1c/v1/client-cards' \
 
 | Поле | Тип | Значение |
 |---|---|---|
-| `source_key` | string | Стабильный ключ `<id РЛ>:<brand_id>`. Используйте его для защиты от дублей при повторном запросе |
-| `brand_id` | integer | Внутренний ID марки в исходной базе; не код справочника 1С |
+| `source_key` | string | Стабильный ключ `<id РЛ>:<brand-key>`, например `121:haval-city`. Не разбирайте его на части; используйте целиком для защиты от дублей |
 | `brand_name` | string | Название марки |
-| `organization_code`, `organization_name` | string | Код и название организации/локации |
-| `department_code`, `department_name` | string | Код и название подразделения/марки |
+| `organization_code` | string | Код организации/локации |
+| `department_code` | string | Код подразделения/марки |
 | `needs[]` | array | Только потребности этой марки; каждый элемент имеет ту же структуру, что `items[].needs[]` |
 | `commercial_offer` | object/null | Предложение, если оно относится к этой марке; структура совпадает с `items[].commercial_offer` |
 
-В `brand_records[]` каждую запись импортируйте в 1С отдельно. `source_key` — стабильный внешний ключ вида `<id РЛ>:<id марки>`; используйте его для идемпотентного создания/обновления и безопасного повтора после ошибки. Внутри записи `needs[]` уже отфильтрован по этой марке. Список `current_cars[]`, данные клиента, менеджера, оплата и комментарий относятся к карточке целиком и могут копироваться в каждую запись 1С.
+В `brand_records[]` каждую запись импортируйте в 1С отдельно. `source_key` — стабильный внешний ключ вида `<id РЛ>:<brand-key>`; используйте его целиком для идемпотентного создания/обновления и безопасного повтора после ошибки. `brand-key` — нормализованное название марки, а не её внутренний ID. Внутри записи `needs[]` уже отфильтрован по этой марке. Список `current_cars[]`, данные клиента, менеджера, оплата и комментарий относятся к карточке целиком и могут копироваться в каждую запись 1С.
 
-Поля `organization_*` и `department_*` верхнего уровня содержат коды первой записи `brand_records[]`; старые одиночные `desired_*` и `current_car_*` отражают первый элемент соответствующего массива. Они оставлены только для совместимости. Для новых интеграций используйте `needs[]`, `current_cars[]` и `brand_records[]`.
+Поля `organization_code` и `department_code` верхнего уровня содержат коды первой записи `brand_records[]`; старые одиночные `desired_*` и `current_car_*` отражают первый элемент соответствующего массива. Они оставлены только для совместимости. Для новых интеграций используйте `needs[]`, `current_cars[]` и `brand_records[]`.
 
-Потребность с `brand_id: null` означает, что клиент ещё не выбрал марку. Она остаётся в общем `needs[]`, но не образует отдельную запись 1С без кода подразделения. Если в РЛ нет ни одной марки потребности и нет марки предложения, API возвращает `409 mapping_not_ready`.
+Потребность без марки остаётся в общем `needs[]`, но не образует отдельную запись 1С без сопоставленной марки и кода подразделения. Если в РЛ нет ни одной марки потребности и нет марки предложения, API возвращает `409 mapping_not_ready`.
 
 ## Алгоритм импорта и курсор
 
