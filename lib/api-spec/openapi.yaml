@@ -37,6 +37,271 @@ paths:
           description: Source image could not be processed
         "503":
           description: Thumbnail service is temporarily busy
+  /showroom-survey/models:
+    get:
+      operationId: getShowroomSurveyModels
+      summary: List models available in the public new-car catalogue for showroom surveys
+      responses:
+        "200":
+          description: Deduplicated new-car model directory
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShowroomSurveyModelsResponse"
+        "503":
+          description: New-car model catalogue is temporarily unavailable
+  /showroom-survey/submissions:
+    post:
+      operationId: submitShowroomSurvey
+      summary: Submit a showroom survey and create a qualified vehicle-interest lead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShowroomSurveySubmissionInput"
+      responses:
+        "200":
+          description: Survey was already submitted; existing lead returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShowroomSurveySubmissionResponse"
+        "201":
+          description: Survey and lead saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShowroomSurveySubmissionResponse"
+        "400":
+          description: Invalid survey data or missing consent
+        "409":
+          description: Submission key is already associated with a different payload
+        "503":
+          description: Survey could not be saved temporarily
+  /surveys/{slug}:
+    get:
+      operationId: getPublicSurvey
+      summary: Get a published customer survey by its public slug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+      responses:
+        "200":
+          description: Published survey configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSurveyPublicResponse"
+        "404":
+          description: Survey not found or not published
+  /surveys/{slug}/responses:
+    post:
+      operationId: submitCustomerSurveyResponse
+      summary: Submit answers to a published customer survey
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerSurveyResponseInput"
+      responses:
+        "200":
+          description: Duplicate response already saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSurveySubmissionResult"
+        "201":
+          description: Survey response saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSurveySubmissionResult"
+        "400":
+          description: Invalid answers or missing required consent
+        "404":
+          description: Survey not found or not published
+        "409":
+          description: Submission key was already used for different answers
+        "503":
+          description: Survey response could not be saved
+  /admin/surveys:
+    get:
+      operationId: listCustomerSurveys
+      summary: List surveys and response counts
+      responses:
+        "200":
+          description: Surveys available to administrators
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSurveyListResponse"
+        "401":
+          description: Administrator authentication required
+    post:
+      operationId: createCustomerSurvey
+      summary: Create a customer survey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerSurveyInput"
+      responses:
+        "201":
+          description: Survey created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSurveyRecordResponse"
+        "400":
+          description: Invalid survey definition
+        "409":
+          description: Survey slug already exists
+        "401":
+          description: Administrator authentication required
+  /admin/surveys/{id}:
+    get:
+      operationId: getCustomerSurvey
+      summary: Get a survey configuration for editing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Survey editor data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSurveyRecordResponse"
+        "404":
+          description: Survey not found
+        "401":
+          description: Administrator authentication required
+    put:
+      operationId: updateCustomerSurvey
+      summary: Update a survey and publish or archive it
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerSurveyInput"
+      responses:
+        "200":
+          description: Survey updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSurveyRecordResponse"
+        "400":
+          description: Invalid survey definition
+        "404":
+          description: Survey not found
+        "409":
+          description: Survey slug already exists
+        "401":
+          description: Administrator authentication required
+  /admin/survey-stats:
+    get:
+      operationId: getCustomerSurveyStats
+      summary: Get aggregated survey responses
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Aggregated response counts and answer distributions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSurveyStatsResponse"
+        "404":
+          description: Survey not found
+        "401":
+          description: Administrator authentication required
+  /admin/survey-responses:
+    get:
+      operationId: listCustomerSurveyResponses
+      summary: List survey responses and their original question snapshots
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        "200":
+          description: Survey response page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSurveyResponsesResponse"
+        "404":
+          description: Survey not found
+        "401":
+          description: Administrator authentication required
   /admin/ai-images/models:
     get:
       operationId: listAiImageModels
@@ -50,6 +315,240 @@ paths:
                 $ref: "#/components/schemas/AiImageModelCatalogue"
         "401":
           description: Administrator authentication required
+  /manager/client-cards:
+    get:
+      operationId: listManagerClientCards
+      summary: List manager client worksheets with filters and pagination
+      parameters:
+        - name: client
+          in: query
+          required: false
+          schema: { type: string, maxLength: 100 }
+        - name: phone
+          in: query
+          required: false
+          schema: { type: string, maxLength: 40 }
+        - name: dateFrom
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: dateTo
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: managerId
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+      responses:
+        "200":
+          description: Filtered page of client worksheets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagerClientCardsPageResponse"
+        "400":
+          description: Invalid filter
+        "401":
+          description: Manager authentication required
+    post:
+      operationId: createManagerClientCard
+      summary: Create a manager client worksheet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManagerClientCardInput"
+      responses:
+        "201":
+          description: Worksheet created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagerClientCardCreatedResponse"
+        "400":
+          description: Invalid worksheet data
+        "401":
+          description: Manager authentication required
+  /manager/client-cards/managers:
+    get:
+      operationId: listManagerClientCardManagers
+      summary: List managers available in the worksheet filter
+      responses:
+        "200":
+          description: Managers visible to the current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagerClientCardManagersResponse"
+        "401":
+          description: Manager authentication required
+  /manager/client-cards/needs/brands:
+    get:
+      operationId: listManagerClientNeedsBrands
+      summary: List active CM Expert new-car brands available to the manager
+      responses:
+        "200":
+          description: Available brands from active CM Expert stock
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagerClientCardStringListResponse"
+        "401":
+          description: Manager authentication required
+  /manager/client-cards/needs/models:
+    get:
+      operationId: listManagerClientNeedsModels
+      summary: List active CM Expert models for a selected brand
+      parameters:
+        - name: brand
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 180 }
+      responses:
+        "200":
+          description: Available models from active CM Expert stock
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagerClientCardStringListResponse"
+        "400":
+          description: Brand is missing
+        "401":
+          description: Manager authentication required
+  /manager/client-cards/inventory:
+    get:
+      operationId: searchManagerClientCardInventory
+      summary: Search manager-visible stock by vehicle model or partial VIN
+      parameters:
+        - name: brand
+          in: query
+          required: false
+          schema: { type: string, maxLength: 180 }
+        - name: model
+          in: query
+          required: false
+          schema: { type: string, maxLength: 180 }
+        - name: q
+          in: query
+          required: false
+          schema: { type: string, minLength: 2, maxLength: 180 }
+        - name: vin
+          in: query
+          required: false
+          schema: { type: string, minLength: 4, maxLength: 32 }
+        - name: type
+          in: query
+          required: false
+          schema: { type: string, enum: [new, used] }
+      responses:
+        "200":
+          description: Matching vehicles visible to the current manager
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagerClientCardInventoryResponse"
+        "400":
+          description: Invalid or incomplete search
+        "401":
+          description: Manager authentication required
+  /manager/client-cards/export.csv:
+    get:
+      operationId: exportManagerClientCards
+      summary: Export filtered manager client worksheets as CSV
+      parameters:
+        - name: client
+          in: query
+          required: false
+          schema: { type: string, maxLength: 100 }
+        - name: phone
+          in: query
+          required: false
+          schema: { type: string, maxLength: 40 }
+        - name: dateFrom
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: dateTo
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: managerId
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: UTF-8 CSV file
+          content:
+            text/csv:
+              schema: { type: string }
+        "400":
+          description: Invalid filter
+        "401":
+          description: Manager authentication required
+  /manager/client-cards/{id}:
+    get:
+      operationId: getManagerClientCard
+      summary: Get a manager client worksheet
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Worksheet details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagerClientCardResponse"
+        "401":
+          description: Manager authentication required
+        "404":
+          description: Worksheet not found
+  /car-catalog/brands:
+    get:
+      operationId: listAutoRuCarBrands
+      summary: List car brands from the server-side Auto.ru catalog proxy
+      responses:
+        "200":
+          description: Auto.ru car brands
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutoRuCatalogBrandsResponse"
+        "500":
+          description: Auto.ru catalog is temporarily unavailable
+  /car-catalog/models:
+    get:
+      operationId: listAutoRuCarModels
+      summary: List Auto.ru models for a selected brand
+      parameters:
+        - name: brandId
+          in: query
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Auto.ru car models
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutoRuCatalogModelsResponse"
+        "400":
+          description: Brand identifier is missing
+        "500":
+          description: Auto.ru catalog is temporarily unavailable
   /healthz:
     get:
       operationId: healthCheck
@@ -95,6 +594,558 @@ components:
           type: boolean
         reason:
           type: string
+    ShowroomSurveyModelsResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShowroomSurveyModel"
+    ShowroomSurveyModel:
+      type: object
+      required: [id, brand, model]
+      properties:
+        id:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+    ShowroomSurveyRatings:
+      type: object
+      required: [design, interior, driverComfort, rearSeat, trunk]
+      properties:
+        design:
+          type: integer
+          minimum: 1
+          maximum: 5
+        interior:
+          type: integer
+          minimum: 1
+          maximum: 5
+        driverComfort:
+          type: integer
+          minimum: 1
+          maximum: 5
+        rearSeat:
+          type: integer
+          minimum: 1
+          maximum: 5
+        trunk:
+          type: integer
+          minimum: 1
+          maximum: 5
+    ShowroomSurveyEvaluationInput:
+      type: object
+      required: [modelId, ratings]
+      properties:
+        modelId:
+          type: string
+          minLength: 1
+          maxLength: 180
+        ratings:
+          $ref: "#/components/schemas/ShowroomSurveyRatings"
+    ShowroomSurveySubmissionInput:
+      type: object
+      required: [submissionId, name, phone, consent, evaluations]
+      properties:
+        submissionId:
+          type: string
+          minLength: 16
+          maxLength: 80
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        phone:
+          type: string
+          minLength: 10
+          maxLength: 32
+        consent:
+          type: boolean
+          enum: [true]
+        communicationsConsent:
+          type: boolean
+          description: Optional permission to contact the visitor about the vehicles they selected
+        source:
+          type: ["string", "null"]
+          maxLength: 120
+        evaluations:
+          type: array
+          minItems: 1
+          maxItems: 30
+          items:
+            $ref: "#/components/schemas/ShowroomSurveyEvaluationInput"
+    ShowroomSurveySubmissionResponse:
+      type: object
+      required: [ok, submissionId, leadId, duplicate]
+      properties:
+        ok:
+          type: boolean
+        submissionId:
+          type: string
+        leadId:
+          type: integer
+        duplicate:
+          type: boolean
+    CustomerSurveyQuestionType:
+      type: string
+      enum: [rating, single_choice, multiple_choice, text, brand_picker, model_picker]
+    CustomerSurveyQuestion:
+      type: object
+      required: [id, type, label, required]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 48
+        type:
+          $ref: "#/components/schemas/CustomerSurveyQuestionType"
+        label:
+          type: string
+          minLength: 2
+          maxLength: 180
+        description:
+          type: ["string", "null"]
+          maxLength: 300
+        required:
+          type: boolean
+        options:
+          type: array
+          items:
+            type: string
+            maxLength: 100
+        min:
+          type: integer
+          minimum: 0
+          maximum: 10
+        max:
+          type: integer
+          minimum: 1
+          maximum: 10
+        minLabel:
+          type: string
+          maxLength: 50
+        maxLabel:
+          type: string
+          maxLength: 50
+        dependsOn:
+          type: string
+          maxLength: 48
+    CustomerSurveyDefinition:
+      type: object
+      required: [mode, questions, collectContact, processingConsent, communicationsConsent]
+      properties:
+        mode:
+          type: string
+          enum: [standard, showroom]
+        questions:
+          type: array
+          minItems: 1
+          maxItems: 40
+          items:
+            $ref: "#/components/schemas/CustomerSurveyQuestion"
+        collectContact:
+          type: boolean
+        processingConsent:
+          type: boolean
+        communicationsConsent:
+          type: boolean
+    CustomerSurveyInput:
+      type: object
+      required: [title, slug, status, definition]
+      properties:
+        title:
+          type: string
+          minLength: 2
+          maxLength: 120
+        slug:
+          type: string
+          minLength: 2
+          maxLength: 100
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        status:
+          type: string
+          enum: [draft, published, archived]
+        definition:
+          $ref: "#/components/schemas/CustomerSurveyDefinition"
+    CustomerSurveyRecord:
+      type: object
+      required: [id, title, slug, status, definition, version, responseCount, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+          enum: [draft, published, archived]
+        definition:
+          $ref: "#/components/schemas/CustomerSurveyDefinition"
+        version:
+          type: integer
+        responseCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CustomerSurveyListResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomerSurveyRecord"
+    CustomerSurveyRecordResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok:
+          type: boolean
+        data:
+          $ref: "#/components/schemas/CustomerSurveyRecord"
+    CustomerSurveyPublicResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok:
+          type: boolean
+        data:
+          type: object
+          required: [title, slug, version, definition]
+          properties:
+            title:
+              type: string
+            slug:
+              type: string
+            version:
+              type: integer
+            definition:
+              $ref: "#/components/schemas/CustomerSurveyDefinition"
+    CustomerSurveyResponseInput:
+      type: object
+      required: [submissionId, answers]
+      properties:
+        submissionId:
+          type: string
+          minLength: 16
+          maxLength: 80
+        answers:
+          type: object
+          additionalProperties: true
+        name:
+          type: ["string", "null"]
+          maxLength: 120
+        phone:
+          type: ["string", "null"]
+          maxLength: 32
+        consent:
+          type: boolean
+        communicationsConsent:
+          type: boolean
+        source:
+          type: ["string", "null"]
+          maxLength: 120
+    CustomerSurveySubmissionResult:
+      type: object
+      required: [ok, duplicate, responseId, leadId]
+      properties:
+        ok:
+          type: boolean
+        duplicate:
+          type: boolean
+        responseId:
+          type: integer
+        leadId:
+          type: ["integer", "null"]
+    CustomerSurveyBucket:
+      type: object
+      required: [value, count]
+      properties:
+        value:
+          type: string
+        count:
+          type: integer
+    CustomerSurveyQuestionStats:
+      type: object
+      required: [questionId, label, type, answered, average, buckets]
+      properties:
+        questionId:
+          type: string
+        label:
+          type: string
+        type:
+          $ref: "#/components/schemas/CustomerSurveyQuestionType"
+        answered:
+          type: integer
+        average:
+          type: ["number", "null"]
+        buckets:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomerSurveyBucket"
+    CustomerSurveyDayCount:
+      type: object
+      required: [date, count]
+      properties:
+        date:
+          type: string
+          format: date
+        count:
+          type: integer
+    CustomerSurveyStats:
+      type: object
+      required: [totalResponses, byDate, questions]
+      properties:
+        totalResponses:
+          type: integer
+        byDate:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomerSurveyDayCount"
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomerSurveyQuestionStats"
+    CustomerSurveyStatsResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok:
+          type: boolean
+        data:
+          $ref: "#/components/schemas/CustomerSurveyStats"
+    CustomerSurveyResponseItem:
+      type: object
+      required: [id, submittedAt, surveyVersion, answers, definitionSnapshot, name, phone, source, processingConsent, communicationsConsent]
+      properties:
+        id:
+          type: integer
+        submittedAt:
+          type: string
+          format: date-time
+        surveyVersion:
+          type: integer
+        answers:
+          type: object
+          additionalProperties: true
+        definitionSnapshot:
+          $ref: "#/components/schemas/CustomerSurveyDefinition"
+        name:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        source:
+          type: ["string", "null"]
+        processingConsent:
+          type: ["boolean", "null"]
+        communicationsConsent:
+          type: ["boolean", "null"]
+    CustomerSurveyResponsesResponse:
+      type: object
+      required: [ok, data, total, page, pages]
+      properties:
+        ok:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomerSurveyResponseItem"
+        total:
+          type: integer
+        page:
+          type: integer
+        pages:
+          type: integer
+    AutoRuCatalogBrand:
+      type: object
+      required: [id, name, cyrillicName, isPopular]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        cyrillicName: { type: string }
+        isPopular: { type: boolean }
+    AutoRuCatalogModel:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+    AutoRuCatalogBrandsResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/AutoRuCatalogBrand" }
+    AutoRuCatalogModelsResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/AutoRuCatalogModel" }
+    ManagerClientCarSnapshot:
+      type: object
+      required: [id, externalId, type, brand, model, year, modification, complectation, color, price, imageUrl, vin]
+      properties:
+        id: { type: integer }
+        externalId: { type: string }
+        type: { type: string }
+        brand: { type: ["string", "null"] }
+        model: { type: ["string", "null"] }
+        year: { type: ["integer", "null"] }
+        modification: { type: ["string", "null"] }
+        complectation: { type: ["string", "null"] }
+        color: { type: ["string", "null"] }
+        price: { type: ["number", "null"] }
+        imageUrl: { type: ["string", "null"] }
+        vin: { type: ["string", "null"] }
+    ManagerClientCard:
+      type: object
+      required: [id, managerId, managerName, clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarYear, currentCarInventoryId, currentCarSnapshot, tradeInPlan, commercialBrand, commercialModel, commercialCarId, commercialCarSnapshot, paymentMethod, comment, createdAt]
+      properties:
+        id: { type: integer }
+        managerId: { type: integer }
+        managerName: { type: ["string", "null"] }
+        clientName: { type: string }
+        clientPhone: { type: string }
+        clientGender: { type: ["string", "null"], enum: [male, female, null] }
+        desiredBrand: { type: ["string", "null"] }
+        desiredModel: { type: ["string", "null"] }
+        desiredVehicleUndecided: { type: boolean }
+        budgetRange: { type: ["string", "null"] }
+        currentCar: { type: ["string", "null"] }
+        currentCarYear: { type: ["integer", "null"] }
+        currentCarInventoryId: { type: ["integer", "null"] }
+        currentCarSnapshot:
+          oneOf:
+            - $ref: "#/components/schemas/ManagerClientCarSnapshot"
+            - type: "null"
+        tradeInPlan: { type: ["string", "null"] }
+        commercialBrand: { type: ["string", "null"] }
+        commercialModel: { type: ["string", "null"] }
+        commercialCarId: { type: ["integer", "null"] }
+        commercialCarSnapshot:
+          oneOf:
+            - $ref: "#/components/schemas/ManagerClientCarSnapshot"
+            - type: "null"
+        paymentMethod: { type: ["string", "null"] }
+        comment: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    ManagerClientCardInput:
+      type: object
+      required: [clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarYear, currentCarInventoryId, tradeInPlan, commercialBrand, commercialModel, commercialCarId, paymentMethod, comment]
+      properties:
+        clientName: { type: string, minLength: 2, maxLength: 120 }
+        clientPhone: { type: string, minLength: 10, maxLength: 40 }
+        clientGender: { type: ["string", "null"], enum: [male, female, null] }
+        desiredBrand: { type: ["string", "null"], maxLength: 180 }
+        desiredModel: { type: ["string", "null"], maxLength: 180 }
+        desiredVehicleUndecided: { type: boolean }
+        budgetRange: { type: ["string", "null"], enum: ["Не указан", "до 2 млн", "2–3 млн", "3–5 млн", "5+ млн", null] }
+        currentCar: { type: ["string", "null"], maxLength: 180 }
+        currentCarYear: { type: ["integer", "null"], minimum: 1950, maximum: 2100 }
+        currentCarInventoryId: { type: ["integer", "null"], minimum: 1 }
+        tradeInPlan: { type: ["string", "null"], enum: ["Да", "Нет", "Пока не решил", null] }
+        commercialBrand: { type: ["string", "null"], maxLength: 180 }
+        commercialModel: { type: ["string", "null"], maxLength: 180 }
+        commercialCarId: { type: ["integer", "null"], minimum: 1 }
+        paymentMethod: { type: ["string", "null"], enum: ["Кредит", "Лизинг", "Наличные / Безнал", null] }
+        comment: { type: string, maxLength: 4000 }
+    ManagerClientCardsPage:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ManagerClientCard" }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+    ManagerClientCardsPageResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data: { $ref: "#/components/schemas/ManagerClientCardsPage" }
+    ManagerClientCardResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data: { $ref: "#/components/schemas/ManagerClientCard" }
+    ManagerClientCardCreatedResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data:
+          type: object
+          required: [id, createdAt]
+          properties:
+            id: { type: integer }
+            createdAt: { type: string, format: date-time }
+    ManagerClientCardManager:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    ManagerClientCardManagersResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/ManagerClientCardManager" }
+    ManagerClientCardStringListResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data:
+          type: array
+          items: { type: string }
+    ManagerClientCardInventoryItem:
+      type: object
+      required: [id, externalId, type, brand, model, year, modification, complectation, color, price, imageUrl, vin, dealer]
+      properties:
+        id: { type: integer }
+        externalId: { type: string }
+        type: { type: string }
+        brand: { type: ["string", "null"] }
+        model: { type: ["string", "null"] }
+        year: { type: ["integer", "null"] }
+        modification: { type: ["string", "null"] }
+        complectation: { type: ["string", "null"] }
+        color: { type: ["string", "null"] }
+        price: { type: ["number", "null"] }
+        imageUrl: { type: ["string", "null"] }
+        vin: { type: ["string", "null"] }
+        dealer: { type: ["string", "null"] }
+    ManagerClientCardInventoryResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/ManagerClientCardInventoryItem" }
     HealthStatus:
       type: object
       properties:
