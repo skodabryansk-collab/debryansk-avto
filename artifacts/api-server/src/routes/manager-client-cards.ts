@@ -294,12 +294,12 @@ function normalizeSearchText(value: string): string {
 
 function matchesCatalogVehicle(car: { brand: string | null; model: string | null }, brand: string, model: string): boolean {
   const wantedBrand = normalizeSearchText(brand);
+  const wantedModel = normalizeSearchText(model);
   const actualBrand = normalizeSearchText(car.brand ?? "");
-  const wantedModel = normalizeSearchText(model).replace(wantedBrand, "");
-  const actualModel = normalizeSearchText(car.model ?? "").replace(actualBrand, "");
-  if (!wantedBrand || !wantedModel || !actualBrand || !actualModel) return false;
-  const brandMatches = actualBrand.includes(wantedBrand) || wantedBrand.includes(actualBrand);
-  const modelMatches = actualModel === wantedModel || actualModel.includes(wantedModel) || wantedModel.includes(actualModel);
+  const actualModel = normalizeSearchText(car.model ?? "");
+  if ((!wantedBrand && !wantedModel) || (wantedBrand && !actualBrand) || (wantedModel && !actualModel)) return false;
+  const brandMatches = !wantedBrand || actualBrand.includes(wantedBrand) || wantedBrand.includes(actualBrand);
+  const modelMatches = !wantedModel || actualModel.includes(wantedModel) || wantedModel.includes(actualModel);
   return brandMatches && modelMatches;
 }
 
@@ -497,8 +497,9 @@ router.get("/client-cards/inventory", async (req, res): Promise<void> => {
   const search = query.data.q?.trim() ?? "";
   const vin = query.data.vin?.replace(/\s/g, "") ?? "";
   const type = query.data.type ?? "";
-  if (!vin && !search && (!brand || !model)) {
-    res.status(400).json({ ok: false, error: "Выберите марку и модель" });
+  const hasBrandModelSearch = brand.length >= 2 || model.length >= 2;
+  if (!vin && !search && !hasBrandModelSearch) {
+    res.status(400).json({ ok: false, error: "Введите минимум два символа марки или модели" });
     return;
   }
 
@@ -513,9 +514,8 @@ router.get("/client-cards/inventory", async (req, res): Promise<void> => {
     )!;
     const conditions = [stockCondition];
     if (type) conditions.push(eq(carsTable.type, type));
-    if (vin) {
-      conditions.push(ilike(carsTable.vin, `%${vin}%`));
-    } else if (search) {
+    if (vin) conditions.push(ilike(carsTable.vin, `%${vin}%`));
+    if (search) {
       conditions.push(or(
         ilike(carsTable.brand, `%${search}%`),
         ilike(carsTable.model, `%${search}%`),
@@ -553,7 +553,10 @@ router.get("/client-cards/inventory", async (req, res): Promise<void> => {
     const visible = rows
       .filter(row => isCurrentInventoryCar(row))
       .filter(row => scope.isAdmin || isCarVisibleToManager(row, assignedBrands))
-      .filter(row => vin || search || matchesCatalogVehicle(row, brand, model))
+      .filter(row => (
+        (brand.length < 2 && model.length < 2) ||
+        matchesCatalogVehicle(row, brand.length >= 2 ? brand : "", model.length >= 2 ? model : "")
+      ))
       .slice(0, 50)
       .map(({ catalogSource: _catalogSource, cmStockState: _cmStockState, ...car }) => car);
     res.json(SearchManagerClientCardInventoryResponse.parse({ ok: true, data: visible }));
