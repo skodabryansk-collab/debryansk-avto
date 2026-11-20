@@ -17,6 +17,606 @@ export const GetCarImageThumbnailQueryParams = zod.object({
 
 
 /**
+ * @summary List models available in the public new-car catalogue for showroom surveys
+ */
+export const GetShowroomSurveyModelsResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.array(zod.object({
+  "id": zod.string(),
+  "brand": zod.string(),
+  "model": zod.string()
+}))
+})
+
+
+/**
+ * @summary Submit a showroom survey and create a qualified vehicle-interest lead
+ */
+export const submitShowroomSurveyBodySubmissionIdMin = 16;
+export const submitShowroomSurveyBodySubmissionIdMax = 80;
+
+export const submitShowroomSurveyBodyNameMax = 120;
+
+export const submitShowroomSurveyBodyPhoneMin = 10;
+export const submitShowroomSurveyBodyPhoneMax = 32;
+
+export const submitShowroomSurveyBodySourceMax = 120;
+
+export const submitShowroomSurveyBodyEvaluationsItemModelIdMax = 180;
+
+export const submitShowroomSurveyBodyEvaluationsItemRatingsDesignMax = 5;
+
+export const submitShowroomSurveyBodyEvaluationsItemRatingsInteriorMax = 5;
+
+export const submitShowroomSurveyBodyEvaluationsItemRatingsDriverComfortMax = 5;
+
+export const submitShowroomSurveyBodyEvaluationsItemRatingsRearSeatMax = 5;
+
+export const submitShowroomSurveyBodyEvaluationsItemRatingsTrunkMax = 5;
+
+export const submitShowroomSurveyBodyEvaluationsMax = 30;
+
+
+
+export const SubmitShowroomSurveyBody = zod.object({
+  "submissionId": zod.string().min(submitShowroomSurveyBodySubmissionIdMin).max(submitShowroomSurveyBodySubmissionIdMax),
+  "name": zod.string().min(1).max(submitShowroomSurveyBodyNameMax),
+  "phone": zod.string().min(submitShowroomSurveyBodyPhoneMin).max(submitShowroomSurveyBodyPhoneMax),
+  "consent": zod.literal(true),
+  "communicationsConsent": zod.boolean().optional().describe('Optional permission to contact the visitor about the vehicles they selected'),
+  "source": zod.string().max(submitShowroomSurveyBodySourceMax).nullish(),
+  "evaluations": zod.array(zod.object({
+  "modelId": zod.string().min(1).max(submitShowroomSurveyBodyEvaluationsItemModelIdMax),
+  "ratings": zod.object({
+  "design": zod.number().min(1).max(submitShowroomSurveyBodyEvaluationsItemRatingsDesignMax),
+  "interior": zod.number().min(1).max(submitShowroomSurveyBodyEvaluationsItemRatingsInteriorMax),
+  "driverComfort": zod.number().min(1).max(submitShowroomSurveyBodyEvaluationsItemRatingsDriverComfortMax),
+  "rearSeat": zod.number().min(1).max(submitShowroomSurveyBodyEvaluationsItemRatingsRearSeatMax),
+  "trunk": zod.number().min(1).max(submitShowroomSurveyBodyEvaluationsItemRatingsTrunkMax)
+})
+})).min(1).max(submitShowroomSurveyBodyEvaluationsMax)
+})
+
+export const SubmitShowroomSurveyResponse = zod.object({
+  "ok": zod.boolean(),
+  "submissionId": zod.string(),
+  "leadId": zod.number(),
+  "duplicate": zod.boolean()
+})
+
+
+/**
+ * @summary Get a published customer survey by its public slug
+ */
+export const getPublicSurveyPathSlugMax = 100;
+
+
+
+export const GetPublicSurveyParams = zod.object({
+  "slug": zod.coerce.string().min(1).max(getPublicSurveyPathSlugMax)
+})
+
+export const getPublicSurveyResponseDataDefinitionQuestionsItemIdMax = 48;
+
+export const getPublicSurveyResponseDataDefinitionQuestionsItemLabelMin = 2;
+export const getPublicSurveyResponseDataDefinitionQuestionsItemLabelMax = 180;
+
+export const getPublicSurveyResponseDataDefinitionQuestionsItemDescriptionMax = 300;
+
+export const getPublicSurveyResponseDataDefinitionQuestionsItemOptionsItemMax = 100;
+
+export const getPublicSurveyResponseDataDefinitionQuestionsItemMinMin = 0;
+export const getPublicSurveyResponseDataDefinitionQuestionsItemMinMax = 10;
+
+export const getPublicSurveyResponseDataDefinitionQuestionsItemMaxMax = 10;
+
+export const getPublicSurveyResponseDataDefinitionQuestionsItemMinLabelMax = 50;
+
+export const getPublicSurveyResponseDataDefinitionQuestionsItemMaxLabelMax = 50;
+
+export const getPublicSurveyResponseDataDefinitionQuestionsItemDependsOnMax = 48;
+
+export const getPublicSurveyResponseDataDefinitionQuestionsMax = 40;
+
+
+
+export const GetPublicSurveyResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.object({
+  "title": zod.string(),
+  "slug": zod.string(),
+  "version": zod.number(),
+  "definition": zod.object({
+  "mode": zod.enum(['standard', 'showroom']),
+  "questions": zod.array(zod.object({
+  "id": zod.string().min(1).max(getPublicSurveyResponseDataDefinitionQuestionsItemIdMax),
+  "type": zod.enum(['rating', 'single_choice', 'multiple_choice', 'text', 'brand_picker', 'model_picker']),
+  "label": zod.string().min(getPublicSurveyResponseDataDefinitionQuestionsItemLabelMin).max(getPublicSurveyResponseDataDefinitionQuestionsItemLabelMax),
+  "description": zod.string().max(getPublicSurveyResponseDataDefinitionQuestionsItemDescriptionMax).nullish(),
+  "required": zod.boolean(),
+  "options": zod.array(zod.string().max(getPublicSurveyResponseDataDefinitionQuestionsItemOptionsItemMax)).optional(),
+  "min": zod.number().min(getPublicSurveyResponseDataDefinitionQuestionsItemMinMin).max(getPublicSurveyResponseDataDefinitionQuestionsItemMinMax).optional(),
+  "max": zod.number().min(1).max(getPublicSurveyResponseDataDefinitionQuestionsItemMaxMax).optional(),
+  "minLabel": zod.string().max(getPublicSurveyResponseDataDefinitionQuestionsItemMinLabelMax).optional(),
+  "maxLabel": zod.string().max(getPublicSurveyResponseDataDefinitionQuestionsItemMaxLabelMax).optional(),
+  "dependsOn": zod.string().max(getPublicSurveyResponseDataDefinitionQuestionsItemDependsOnMax).optional()
+})).min(1).max(getPublicSurveyResponseDataDefinitionQuestionsMax),
+  "collectContact": zod.boolean(),
+  "processingConsent": zod.boolean(),
+  "communicationsConsent": zod.boolean()
+})
+})
+})
+
+
+/**
+ * @summary Submit answers to a published customer survey
+ */
+export const submitCustomerSurveyResponsePathSlugMax = 100;
+
+
+
+export const SubmitCustomerSurveyResponseParams = zod.object({
+  "slug": zod.coerce.string().min(1).max(submitCustomerSurveyResponsePathSlugMax)
+})
+
+export const submitCustomerSurveyResponseBodySubmissionIdMin = 16;
+export const submitCustomerSurveyResponseBodySubmissionIdMax = 80;
+
+export const submitCustomerSurveyResponseBodyNameMax = 120;
+
+export const submitCustomerSurveyResponseBodyPhoneMax = 32;
+
+export const submitCustomerSurveyResponseBodySourceMax = 120;
+
+
+
+export const SubmitCustomerSurveyResponseBody = zod.object({
+  "submissionId": zod.string().min(submitCustomerSurveyResponseBodySubmissionIdMin).max(submitCustomerSurveyResponseBodySubmissionIdMax),
+  "answers": zod.record(zod.string(), zod.unknown()),
+  "name": zod.string().max(submitCustomerSurveyResponseBodyNameMax).nullish(),
+  "phone": zod.string().max(submitCustomerSurveyResponseBodyPhoneMax).nullish(),
+  "consent": zod.boolean().optional(),
+  "communicationsConsent": zod.boolean().optional(),
+  "source": zod.string().max(submitCustomerSurveyResponseBodySourceMax).nullish()
+})
+
+export const SubmitCustomerSurveyResponseResponse = zod.object({
+  "ok": zod.boolean(),
+  "duplicate": zod.boolean(),
+  "responseId": zod.number(),
+  "leadId": zod.number().nullable()
+})
+
+
+/**
+ * @summary List surveys and response counts
+ */
+export const listCustomerSurveysResponseDataItemDefinitionQuestionsItemIdMax = 48;
+
+export const listCustomerSurveysResponseDataItemDefinitionQuestionsItemLabelMin = 2;
+export const listCustomerSurveysResponseDataItemDefinitionQuestionsItemLabelMax = 180;
+
+export const listCustomerSurveysResponseDataItemDefinitionQuestionsItemDescriptionMax = 300;
+
+export const listCustomerSurveysResponseDataItemDefinitionQuestionsItemOptionsItemMax = 100;
+
+export const listCustomerSurveysResponseDataItemDefinitionQuestionsItemMinMin = 0;
+export const listCustomerSurveysResponseDataItemDefinitionQuestionsItemMinMax = 10;
+
+export const listCustomerSurveysResponseDataItemDefinitionQuestionsItemMaxMax = 10;
+
+export const listCustomerSurveysResponseDataItemDefinitionQuestionsItemMinLabelMax = 50;
+
+export const listCustomerSurveysResponseDataItemDefinitionQuestionsItemMaxLabelMax = 50;
+
+export const listCustomerSurveysResponseDataItemDefinitionQuestionsItemDependsOnMax = 48;
+
+export const listCustomerSurveysResponseDataItemDefinitionQuestionsMax = 40;
+
+
+
+export const ListCustomerSurveysResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.array(zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "slug": zod.string(),
+  "status": zod.enum(['draft', 'published', 'archived']),
+  "definition": zod.object({
+  "mode": zod.enum(['standard', 'showroom']),
+  "questions": zod.array(zod.object({
+  "id": zod.string().min(1).max(listCustomerSurveysResponseDataItemDefinitionQuestionsItemIdMax),
+  "type": zod.enum(['rating', 'single_choice', 'multiple_choice', 'text', 'brand_picker', 'model_picker']),
+  "label": zod.string().min(listCustomerSurveysResponseDataItemDefinitionQuestionsItemLabelMin).max(listCustomerSurveysResponseDataItemDefinitionQuestionsItemLabelMax),
+  "description": zod.string().max(listCustomerSurveysResponseDataItemDefinitionQuestionsItemDescriptionMax).nullish(),
+  "required": zod.boolean(),
+  "options": zod.array(zod.string().max(listCustomerSurveysResponseDataItemDefinitionQuestionsItemOptionsItemMax)).optional(),
+  "min": zod.number().min(listCustomerSurveysResponseDataItemDefinitionQuestionsItemMinMin).max(listCustomerSurveysResponseDataItemDefinitionQuestionsItemMinMax).optional(),
+  "max": zod.number().min(1).max(listCustomerSurveysResponseDataItemDefinitionQuestionsItemMaxMax).optional(),
+  "minLabel": zod.string().max(listCustomerSurveysResponseDataItemDefinitionQuestionsItemMinLabelMax).optional(),
+  "maxLabel": zod.string().max(listCustomerSurveysResponseDataItemDefinitionQuestionsItemMaxLabelMax).optional(),
+  "dependsOn": zod.string().max(listCustomerSurveysResponseDataItemDefinitionQuestionsItemDependsOnMax).optional()
+})).min(1).max(listCustomerSurveysResponseDataItemDefinitionQuestionsMax),
+  "collectContact": zod.boolean(),
+  "processingConsent": zod.boolean(),
+  "communicationsConsent": zod.boolean()
+}),
+  "version": zod.number(),
+  "responseCount": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Create a customer survey
+ */
+export const createCustomerSurveyBodyTitleMin = 2;
+export const createCustomerSurveyBodyTitleMax = 120;
+
+export const createCustomerSurveyBodySlugMin = 2;
+export const createCustomerSurveyBodySlugMax = 100;
+
+
+export const createCustomerSurveyBodySlugRegExp = new RegExp('^[a-z0-9]+(?:-[a-z0-9]+)\*$');
+export const createCustomerSurveyBodyDefinitionQuestionsItemIdMax = 48;
+
+export const createCustomerSurveyBodyDefinitionQuestionsItemLabelMin = 2;
+export const createCustomerSurveyBodyDefinitionQuestionsItemLabelMax = 180;
+
+export const createCustomerSurveyBodyDefinitionQuestionsItemDescriptionMax = 300;
+
+export const createCustomerSurveyBodyDefinitionQuestionsItemOptionsItemMax = 100;
+
+export const createCustomerSurveyBodyDefinitionQuestionsItemMinMin = 0;
+export const createCustomerSurveyBodyDefinitionQuestionsItemMinMax = 10;
+
+export const createCustomerSurveyBodyDefinitionQuestionsItemMaxMax = 10;
+
+export const createCustomerSurveyBodyDefinitionQuestionsItemMinLabelMax = 50;
+
+export const createCustomerSurveyBodyDefinitionQuestionsItemMaxLabelMax = 50;
+
+export const createCustomerSurveyBodyDefinitionQuestionsItemDependsOnMax = 48;
+
+export const createCustomerSurveyBodyDefinitionQuestionsMax = 40;
+
+
+
+export const CreateCustomerSurveyBody = zod.object({
+  "title": zod.string().min(createCustomerSurveyBodyTitleMin).max(createCustomerSurveyBodyTitleMax),
+  "slug": zod.string().min(createCustomerSurveyBodySlugMin).max(createCustomerSurveyBodySlugMax).regex(createCustomerSurveyBodySlugRegExp),
+  "status": zod.enum(['draft', 'published', 'archived']),
+  "definition": zod.object({
+  "mode": zod.enum(['standard', 'showroom']),
+  "questions": zod.array(zod.object({
+  "id": zod.string().min(1).max(createCustomerSurveyBodyDefinitionQuestionsItemIdMax),
+  "type": zod.enum(['rating', 'single_choice', 'multiple_choice', 'text', 'brand_picker', 'model_picker']),
+  "label": zod.string().min(createCustomerSurveyBodyDefinitionQuestionsItemLabelMin).max(createCustomerSurveyBodyDefinitionQuestionsItemLabelMax),
+  "description": zod.string().max(createCustomerSurveyBodyDefinitionQuestionsItemDescriptionMax).nullish(),
+  "required": zod.boolean(),
+  "options": zod.array(zod.string().max(createCustomerSurveyBodyDefinitionQuestionsItemOptionsItemMax)).optional(),
+  "min": zod.number().min(createCustomerSurveyBodyDefinitionQuestionsItemMinMin).max(createCustomerSurveyBodyDefinitionQuestionsItemMinMax).optional(),
+  "max": zod.number().min(1).max(createCustomerSurveyBodyDefinitionQuestionsItemMaxMax).optional(),
+  "minLabel": zod.string().max(createCustomerSurveyBodyDefinitionQuestionsItemMinLabelMax).optional(),
+  "maxLabel": zod.string().max(createCustomerSurveyBodyDefinitionQuestionsItemMaxLabelMax).optional(),
+  "dependsOn": zod.string().max(createCustomerSurveyBodyDefinitionQuestionsItemDependsOnMax).optional()
+})).min(1).max(createCustomerSurveyBodyDefinitionQuestionsMax),
+  "collectContact": zod.boolean(),
+  "processingConsent": zod.boolean(),
+  "communicationsConsent": zod.boolean()
+})
+})
+
+
+/**
+ * @summary Get a survey configuration for editing
+ */
+
+
+
+export const GetCustomerSurveyParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const getCustomerSurveyResponseDataDefinitionQuestionsItemIdMax = 48;
+
+export const getCustomerSurveyResponseDataDefinitionQuestionsItemLabelMin = 2;
+export const getCustomerSurveyResponseDataDefinitionQuestionsItemLabelMax = 180;
+
+export const getCustomerSurveyResponseDataDefinitionQuestionsItemDescriptionMax = 300;
+
+export const getCustomerSurveyResponseDataDefinitionQuestionsItemOptionsItemMax = 100;
+
+export const getCustomerSurveyResponseDataDefinitionQuestionsItemMinMin = 0;
+export const getCustomerSurveyResponseDataDefinitionQuestionsItemMinMax = 10;
+
+export const getCustomerSurveyResponseDataDefinitionQuestionsItemMaxMax = 10;
+
+export const getCustomerSurveyResponseDataDefinitionQuestionsItemMinLabelMax = 50;
+
+export const getCustomerSurveyResponseDataDefinitionQuestionsItemMaxLabelMax = 50;
+
+export const getCustomerSurveyResponseDataDefinitionQuestionsItemDependsOnMax = 48;
+
+export const getCustomerSurveyResponseDataDefinitionQuestionsMax = 40;
+
+
+
+export const GetCustomerSurveyResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "slug": zod.string(),
+  "status": zod.enum(['draft', 'published', 'archived']),
+  "definition": zod.object({
+  "mode": zod.enum(['standard', 'showroom']),
+  "questions": zod.array(zod.object({
+  "id": zod.string().min(1).max(getCustomerSurveyResponseDataDefinitionQuestionsItemIdMax),
+  "type": zod.enum(['rating', 'single_choice', 'multiple_choice', 'text', 'brand_picker', 'model_picker']),
+  "label": zod.string().min(getCustomerSurveyResponseDataDefinitionQuestionsItemLabelMin).max(getCustomerSurveyResponseDataDefinitionQuestionsItemLabelMax),
+  "description": zod.string().max(getCustomerSurveyResponseDataDefinitionQuestionsItemDescriptionMax).nullish(),
+  "required": zod.boolean(),
+  "options": zod.array(zod.string().max(getCustomerSurveyResponseDataDefinitionQuestionsItemOptionsItemMax)).optional(),
+  "min": zod.number().min(getCustomerSurveyResponseDataDefinitionQuestionsItemMinMin).max(getCustomerSurveyResponseDataDefinitionQuestionsItemMinMax).optional(),
+  "max": zod.number().min(1).max(getCustomerSurveyResponseDataDefinitionQuestionsItemMaxMax).optional(),
+  "minLabel": zod.string().max(getCustomerSurveyResponseDataDefinitionQuestionsItemMinLabelMax).optional(),
+  "maxLabel": zod.string().max(getCustomerSurveyResponseDataDefinitionQuestionsItemMaxLabelMax).optional(),
+  "dependsOn": zod.string().max(getCustomerSurveyResponseDataDefinitionQuestionsItemDependsOnMax).optional()
+})).min(1).max(getCustomerSurveyResponseDataDefinitionQuestionsMax),
+  "collectContact": zod.boolean(),
+  "processingConsent": zod.boolean(),
+  "communicationsConsent": zod.boolean()
+}),
+  "version": zod.number(),
+  "responseCount": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+})
+
+
+/**
+ * @summary Update a survey and publish or archive it
+ */
+
+
+
+export const UpdateCustomerSurveyParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const updateCustomerSurveyBodyTitleMin = 2;
+export const updateCustomerSurveyBodyTitleMax = 120;
+
+export const updateCustomerSurveyBodySlugMin = 2;
+export const updateCustomerSurveyBodySlugMax = 100;
+
+
+export const updateCustomerSurveyBodySlugRegExp = new RegExp('^[a-z0-9]+(?:-[a-z0-9]+)\*$');
+export const updateCustomerSurveyBodyDefinitionQuestionsItemIdMax = 48;
+
+export const updateCustomerSurveyBodyDefinitionQuestionsItemLabelMin = 2;
+export const updateCustomerSurveyBodyDefinitionQuestionsItemLabelMax = 180;
+
+export const updateCustomerSurveyBodyDefinitionQuestionsItemDescriptionMax = 300;
+
+export const updateCustomerSurveyBodyDefinitionQuestionsItemOptionsItemMax = 100;
+
+export const updateCustomerSurveyBodyDefinitionQuestionsItemMinMin = 0;
+export const updateCustomerSurveyBodyDefinitionQuestionsItemMinMax = 10;
+
+export const updateCustomerSurveyBodyDefinitionQuestionsItemMaxMax = 10;
+
+export const updateCustomerSurveyBodyDefinitionQuestionsItemMinLabelMax = 50;
+
+export const updateCustomerSurveyBodyDefinitionQuestionsItemMaxLabelMax = 50;
+
+export const updateCustomerSurveyBodyDefinitionQuestionsItemDependsOnMax = 48;
+
+export const updateCustomerSurveyBodyDefinitionQuestionsMax = 40;
+
+
+
+export const UpdateCustomerSurveyBody = zod.object({
+  "title": zod.string().min(updateCustomerSurveyBodyTitleMin).max(updateCustomerSurveyBodyTitleMax),
+  "slug": zod.string().min(updateCustomerSurveyBodySlugMin).max(updateCustomerSurveyBodySlugMax).regex(updateCustomerSurveyBodySlugRegExp),
+  "status": zod.enum(['draft', 'published', 'archived']),
+  "definition": zod.object({
+  "mode": zod.enum(['standard', 'showroom']),
+  "questions": zod.array(zod.object({
+  "id": zod.string().min(1).max(updateCustomerSurveyBodyDefinitionQuestionsItemIdMax),
+  "type": zod.enum(['rating', 'single_choice', 'multiple_choice', 'text', 'brand_picker', 'model_picker']),
+  "label": zod.string().min(updateCustomerSurveyBodyDefinitionQuestionsItemLabelMin).max(updateCustomerSurveyBodyDefinitionQuestionsItemLabelMax),
+  "description": zod.string().max(updateCustomerSurveyBodyDefinitionQuestionsItemDescriptionMax).nullish(),
+  "required": zod.boolean(),
+  "options": zod.array(zod.string().max(updateCustomerSurveyBodyDefinitionQuestionsItemOptionsItemMax)).optional(),
+  "min": zod.number().min(updateCustomerSurveyBodyDefinitionQuestionsItemMinMin).max(updateCustomerSurveyBodyDefinitionQuestionsItemMinMax).optional(),
+  "max": zod.number().min(1).max(updateCustomerSurveyBodyDefinitionQuestionsItemMaxMax).optional(),
+  "minLabel": zod.string().max(updateCustomerSurveyBodyDefinitionQuestionsItemMinLabelMax).optional(),
+  "maxLabel": zod.string().max(updateCustomerSurveyBodyDefinitionQuestionsItemMaxLabelMax).optional(),
+  "dependsOn": zod.string().max(updateCustomerSurveyBodyDefinitionQuestionsItemDependsOnMax).optional()
+})).min(1).max(updateCustomerSurveyBodyDefinitionQuestionsMax),
+  "collectContact": zod.boolean(),
+  "processingConsent": zod.boolean(),
+  "communicationsConsent": zod.boolean()
+})
+})
+
+export const updateCustomerSurveyResponseDataDefinitionQuestionsItemIdMax = 48;
+
+export const updateCustomerSurveyResponseDataDefinitionQuestionsItemLabelMin = 2;
+export const updateCustomerSurveyResponseDataDefinitionQuestionsItemLabelMax = 180;
+
+export const updateCustomerSurveyResponseDataDefinitionQuestionsItemDescriptionMax = 300;
+
+export const updateCustomerSurveyResponseDataDefinitionQuestionsItemOptionsItemMax = 100;
+
+export const updateCustomerSurveyResponseDataDefinitionQuestionsItemMinMin = 0;
+export const updateCustomerSurveyResponseDataDefinitionQuestionsItemMinMax = 10;
+
+export const updateCustomerSurveyResponseDataDefinitionQuestionsItemMaxMax = 10;
+
+export const updateCustomerSurveyResponseDataDefinitionQuestionsItemMinLabelMax = 50;
+
+export const updateCustomerSurveyResponseDataDefinitionQuestionsItemMaxLabelMax = 50;
+
+export const updateCustomerSurveyResponseDataDefinitionQuestionsItemDependsOnMax = 48;
+
+export const updateCustomerSurveyResponseDataDefinitionQuestionsMax = 40;
+
+
+
+export const UpdateCustomerSurveyResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "slug": zod.string(),
+  "status": zod.enum(['draft', 'published', 'archived']),
+  "definition": zod.object({
+  "mode": zod.enum(['standard', 'showroom']),
+  "questions": zod.array(zod.object({
+  "id": zod.string().min(1).max(updateCustomerSurveyResponseDataDefinitionQuestionsItemIdMax),
+  "type": zod.enum(['rating', 'single_choice', 'multiple_choice', 'text', 'brand_picker', 'model_picker']),
+  "label": zod.string().min(updateCustomerSurveyResponseDataDefinitionQuestionsItemLabelMin).max(updateCustomerSurveyResponseDataDefinitionQuestionsItemLabelMax),
+  "description": zod.string().max(updateCustomerSurveyResponseDataDefinitionQuestionsItemDescriptionMax).nullish(),
+  "required": zod.boolean(),
+  "options": zod.array(zod.string().max(updateCustomerSurveyResponseDataDefinitionQuestionsItemOptionsItemMax)).optional(),
+  "min": zod.number().min(updateCustomerSurveyResponseDataDefinitionQuestionsItemMinMin).max(updateCustomerSurveyResponseDataDefinitionQuestionsItemMinMax).optional(),
+  "max": zod.number().min(1).max(updateCustomerSurveyResponseDataDefinitionQuestionsItemMaxMax).optional(),
+  "minLabel": zod.string().max(updateCustomerSurveyResponseDataDefinitionQuestionsItemMinLabelMax).optional(),
+  "maxLabel": zod.string().max(updateCustomerSurveyResponseDataDefinitionQuestionsItemMaxLabelMax).optional(),
+  "dependsOn": zod.string().max(updateCustomerSurveyResponseDataDefinitionQuestionsItemDependsOnMax).optional()
+})).min(1).max(updateCustomerSurveyResponseDataDefinitionQuestionsMax),
+  "collectContact": zod.boolean(),
+  "processingConsent": zod.boolean(),
+  "communicationsConsent": zod.boolean()
+}),
+  "version": zod.number(),
+  "responseCount": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+})
+
+
+/**
+ * @summary Get aggregated survey responses
+ */
+
+
+
+export const GetCustomerSurveyStatsQueryParams = zod.object({
+  "id": zod.coerce.number().min(1),
+  "from": zod.date().optional(),
+  "to": zod.date().optional()
+})
+
+export const GetCustomerSurveyStatsResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.object({
+  "totalResponses": zod.number(),
+  "byDate": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "count": zod.number()
+})),
+  "questions": zod.array(zod.object({
+  "questionId": zod.string(),
+  "label": zod.string(),
+  "type": zod.enum(['rating', 'single_choice', 'multiple_choice', 'text', 'brand_picker', 'model_picker']),
+  "answered": zod.number(),
+  "average": zod.number().nullable(),
+  "buckets": zod.array(zod.object({
+  "value": zod.string(),
+  "count": zod.number()
+}))
+}))
+})
+})
+
+
+/**
+ * @summary List survey responses and their original question snapshots
+ */
+
+export const listCustomerSurveyResponsesQueryPageDefault = 1;
+
+
+
+export const ListCustomerSurveyResponsesQueryParams = zod.object({
+  "id": zod.coerce.number().min(1),
+  "from": zod.date().optional(),
+  "to": zod.date().optional(),
+  "page": zod.coerce.number().min(1).default(listCustomerSurveyResponsesQueryPageDefault)
+})
+
+export const listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemIdMax = 48;
+
+export const listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemLabelMin = 2;
+export const listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemLabelMax = 180;
+
+export const listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemDescriptionMax = 300;
+
+export const listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemOptionsItemMax = 100;
+
+export const listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemMinMin = 0;
+export const listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemMinMax = 10;
+
+export const listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemMaxMax = 10;
+
+export const listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemMinLabelMax = 50;
+
+export const listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemMaxLabelMax = 50;
+
+export const listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemDependsOnMax = 48;
+
+export const listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsMax = 40;
+
+
+
+export const ListCustomerSurveyResponsesResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.array(zod.object({
+  "id": zod.number(),
+  "submittedAt": zod.coerce.date(),
+  "surveyVersion": zod.number(),
+  "answers": zod.record(zod.string(), zod.unknown()),
+  "definitionSnapshot": zod.object({
+  "mode": zod.enum(['standard', 'showroom']),
+  "questions": zod.array(zod.object({
+  "id": zod.string().min(1).max(listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemIdMax),
+  "type": zod.enum(['rating', 'single_choice', 'multiple_choice', 'text', 'brand_picker', 'model_picker']),
+  "label": zod.string().min(listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemLabelMin).max(listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemLabelMax),
+  "description": zod.string().max(listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemDescriptionMax).nullish(),
+  "required": zod.boolean(),
+  "options": zod.array(zod.string().max(listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemOptionsItemMax)).optional(),
+  "min": zod.number().min(listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemMinMin).max(listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemMinMax).optional(),
+  "max": zod.number().min(1).max(listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemMaxMax).optional(),
+  "minLabel": zod.string().max(listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemMinLabelMax).optional(),
+  "maxLabel": zod.string().max(listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemMaxLabelMax).optional(),
+  "dependsOn": zod.string().max(listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsItemDependsOnMax).optional()
+})).min(1).max(listCustomerSurveyResponsesResponseDataItemDefinitionSnapshotQuestionsMax),
+  "collectContact": zod.boolean(),
+  "processingConsent": zod.boolean(),
+  "communicationsConsent": zod.boolean()
+}),
+  "name": zod.string().nullable(),
+  "phone": zod.string().nullable(),
+  "source": zod.string().nullable(),
+  "processingConsent": zod.boolean().nullable(),
+  "communicationsConsent": zod.boolean().nullable()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "pages": zod.number()
+})
+
+
+/**
  * @summary Available image models and verified generation capabilities
  */
 export const ListAiImageModelsResponse = zod.object({
@@ -30,6 +630,337 @@ export const ListAiImageModelsResponse = zod.object({
   "referenceLimit": zod.number(),
   "available": zod.boolean(),
   "reason": zod.string()
+}))
+})
+
+
+/**
+ * @summary List manager client worksheets with filters and pagination
+ */
+export const listManagerClientCardsQueryClientMax = 100;
+
+export const listManagerClientCardsQueryPhoneMax = 40;
+
+
+export const listManagerClientCardsQueryPageDefault = 1;
+
+export const listManagerClientCardsQueryPageSizeDefault = 25;
+export const listManagerClientCardsQueryPageSizeMax = 100;
+
+
+
+export const ListManagerClientCardsQueryParams = zod.object({
+  "client": zod.coerce.string().max(listManagerClientCardsQueryClientMax).optional(),
+  "phone": zod.coerce.string().max(listManagerClientCardsQueryPhoneMax).optional(),
+  "dateFrom": zod.date().optional(),
+  "dateTo": zod.date().optional(),
+  "managerId": zod.coerce.number().min(1).optional(),
+  "page": zod.coerce.number().min(1).default(listManagerClientCardsQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listManagerClientCardsQueryPageSizeMax).default(listManagerClientCardsQueryPageSizeDefault)
+})
+
+export const ListManagerClientCardsResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "managerId": zod.number(),
+  "managerName": zod.string().nullable(),
+  "clientName": zod.string(),
+  "clientPhone": zod.string(),
+  "clientGender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullable(),
+  "desiredBrand": zod.string().nullable(),
+  "desiredModel": zod.string().nullable(),
+  "desiredVehicleUndecided": zod.boolean(),
+  "budgetRange": zod.string().nullable(),
+  "currentCar": zod.string().nullable(),
+  "currentCarYear": zod.number().nullable(),
+  "currentCarInventoryId": zod.number().nullable(),
+  "currentCarSnapshot": zod.union([zod.object({
+  "id": zod.number(),
+  "externalId": zod.string(),
+  "type": zod.string(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "year": zod.number().nullable(),
+  "modification": zod.string().nullable(),
+  "complectation": zod.string().nullable(),
+  "color": zod.string().nullable(),
+  "price": zod.number().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "vin": zod.string().nullable()
+}),zod.null()]),
+  "tradeInPlan": zod.string().nullable(),
+  "commercialBrand": zod.string().nullable(),
+  "commercialModel": zod.string().nullable(),
+  "commercialCarId": zod.number().nullable(),
+  "commercialCarSnapshot": zod.union([zod.object({
+  "id": zod.number(),
+  "externalId": zod.string(),
+  "type": zod.string(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "year": zod.number().nullable(),
+  "modification": zod.string().nullable(),
+  "complectation": zod.string().nullable(),
+  "color": zod.string().nullable(),
+  "price": zod.number().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "vin": zod.string().nullable()
+}),zod.null()]),
+  "paymentMethod": zod.string().nullable(),
+  "comment": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "pageSize": zod.number()
+})
+})
+
+
+/**
+ * @summary Create a manager client worksheet
+ */
+export const createManagerClientCardBodyClientNameMin = 2;
+export const createManagerClientCardBodyClientNameMax = 120;
+
+export const createManagerClientCardBodyClientPhoneMin = 10;
+export const createManagerClientCardBodyClientPhoneMax = 40;
+
+export const createManagerClientCardBodyDesiredBrandMax = 180;
+
+export const createManagerClientCardBodyDesiredModelMax = 180;
+
+export const createManagerClientCardBodyCurrentCarMax = 180;
+
+export const createManagerClientCardBodyCurrentCarYearMin = 1950;
+export const createManagerClientCardBodyCurrentCarYearMax = 2100;
+
+
+export const createManagerClientCardBodyCommercialBrandMax = 180;
+
+export const createManagerClientCardBodyCommercialModelMax = 180;
+
+
+export const createManagerClientCardBodyCommentMax = 4000;
+
+
+
+export const CreateManagerClientCardBody = zod.object({
+  "clientName": zod.string().min(createManagerClientCardBodyClientNameMin).max(createManagerClientCardBodyClientNameMax),
+  "clientPhone": zod.string().min(createManagerClientCardBodyClientPhoneMin).max(createManagerClientCardBodyClientPhoneMax),
+  "clientGender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullable(),
+  "desiredBrand": zod.string().max(createManagerClientCardBodyDesiredBrandMax).nullable(),
+  "desiredModel": zod.string().max(createManagerClientCardBodyDesiredModelMax).nullable(),
+  "desiredVehicleUndecided": zod.boolean(),
+  "budgetRange": zod.union([zod.literal('Не указан'),zod.literal('до 2 млн'),zod.literal('2–3 млн'),zod.literal('3–5 млн'),zod.literal('5+ млн'),zod.literal(null)]).nullable(),
+  "currentCar": zod.string().max(createManagerClientCardBodyCurrentCarMax).nullable(),
+  "currentCarYear": zod.number().min(createManagerClientCardBodyCurrentCarYearMin).max(createManagerClientCardBodyCurrentCarYearMax).nullable(),
+  "currentCarInventoryId": zod.number().min(1).nullable(),
+  "tradeInPlan": zod.union([zod.literal('Да'),zod.literal('Нет'),zod.literal('Пока не решил'),zod.literal(null)]).nullable(),
+  "commercialBrand": zod.string().max(createManagerClientCardBodyCommercialBrandMax).nullable(),
+  "commercialModel": zod.string().max(createManagerClientCardBodyCommercialModelMax).nullable(),
+  "commercialCarId": zod.number().min(1).nullable(),
+  "paymentMethod": zod.union([zod.literal('Кредит'),zod.literal('Лизинг'),zod.literal('Наличные / Безнал'),zod.literal(null)]).nullable(),
+  "comment": zod.string().max(createManagerClientCardBodyCommentMax)
+})
+
+
+/**
+ * @summary List managers available in the worksheet filter
+ */
+export const ListManagerClientCardManagersResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+}))
+})
+
+
+/**
+ * @summary List active CM Expert new-car brands available to the manager
+ */
+export const ListManagerClientNeedsBrandsResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.array(zod.string())
+})
+
+
+/**
+ * @summary List active CM Expert models for a selected brand
+ */
+export const listManagerClientNeedsModelsQueryBrandMax = 180;
+
+
+
+export const ListManagerClientNeedsModelsQueryParams = zod.object({
+  "brand": zod.coerce.string().min(1).max(listManagerClientNeedsModelsQueryBrandMax)
+})
+
+export const ListManagerClientNeedsModelsResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Search manager-visible stock by vehicle model or partial VIN
+ */
+export const searchManagerClientCardInventoryQueryBrandMax = 180;
+
+export const searchManagerClientCardInventoryQueryModelMax = 180;
+
+export const searchManagerClientCardInventoryQueryQMin = 2;
+export const searchManagerClientCardInventoryQueryQMax = 180;
+
+export const searchManagerClientCardInventoryQueryVinMin = 4;
+export const searchManagerClientCardInventoryQueryVinMax = 32;
+
+
+
+export const SearchManagerClientCardInventoryQueryParams = zod.object({
+  "brand": zod.coerce.string().max(searchManagerClientCardInventoryQueryBrandMax).optional(),
+  "model": zod.coerce.string().max(searchManagerClientCardInventoryQueryModelMax).optional(),
+  "q": zod.coerce.string().min(searchManagerClientCardInventoryQueryQMin).max(searchManagerClientCardInventoryQueryQMax).optional(),
+  "vin": zod.coerce.string().min(searchManagerClientCardInventoryQueryVinMin).max(searchManagerClientCardInventoryQueryVinMax).optional(),
+  "type": zod.enum(['new', 'used']).optional()
+})
+
+export const SearchManagerClientCardInventoryResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.array(zod.object({
+  "id": zod.number(),
+  "externalId": zod.string(),
+  "type": zod.string(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "year": zod.number().nullable(),
+  "modification": zod.string().nullable(),
+  "complectation": zod.string().nullable(),
+  "color": zod.string().nullable(),
+  "price": zod.number().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "vin": zod.string().nullable(),
+  "dealer": zod.string().nullable()
+}))
+})
+
+
+/**
+ * @summary Export filtered manager client worksheets as CSV
+ */
+export const exportManagerClientCardsQueryClientMax = 100;
+
+export const exportManagerClientCardsQueryPhoneMax = 40;
+
+
+
+
+export const ExportManagerClientCardsQueryParams = zod.object({
+  "client": zod.coerce.string().max(exportManagerClientCardsQueryClientMax).optional(),
+  "phone": zod.coerce.string().max(exportManagerClientCardsQueryPhoneMax).optional(),
+  "dateFrom": zod.date().optional(),
+  "dateTo": zod.date().optional(),
+  "managerId": zod.coerce.number().min(1).optional()
+})
+
+
+/**
+ * @summary Get a manager client worksheet
+ */
+
+
+
+export const GetManagerClientCardParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const GetManagerClientCardResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.object({
+  "id": zod.number(),
+  "managerId": zod.number(),
+  "managerName": zod.string().nullable(),
+  "clientName": zod.string(),
+  "clientPhone": zod.string(),
+  "clientGender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullable(),
+  "desiredBrand": zod.string().nullable(),
+  "desiredModel": zod.string().nullable(),
+  "desiredVehicleUndecided": zod.boolean(),
+  "budgetRange": zod.string().nullable(),
+  "currentCar": zod.string().nullable(),
+  "currentCarYear": zod.number().nullable(),
+  "currentCarInventoryId": zod.number().nullable(),
+  "currentCarSnapshot": zod.union([zod.object({
+  "id": zod.number(),
+  "externalId": zod.string(),
+  "type": zod.string(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "year": zod.number().nullable(),
+  "modification": zod.string().nullable(),
+  "complectation": zod.string().nullable(),
+  "color": zod.string().nullable(),
+  "price": zod.number().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "vin": zod.string().nullable()
+}),zod.null()]),
+  "tradeInPlan": zod.string().nullable(),
+  "commercialBrand": zod.string().nullable(),
+  "commercialModel": zod.string().nullable(),
+  "commercialCarId": zod.number().nullable(),
+  "commercialCarSnapshot": zod.union([zod.object({
+  "id": zod.number(),
+  "externalId": zod.string(),
+  "type": zod.string(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "year": zod.number().nullable(),
+  "modification": zod.string().nullable(),
+  "complectation": zod.string().nullable(),
+  "color": zod.string().nullable(),
+  "price": zod.number().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "vin": zod.string().nullable()
+}),zod.null()]),
+  "paymentMethod": zod.string().nullable(),
+  "comment": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})
+})
+
+
+/**
+ * @summary List car brands from the server-side Auto.ru catalog proxy
+ */
+export const ListAutoRuCarBrandsResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "cyrillicName": zod.string(),
+  "isPopular": zod.boolean()
+}))
+})
+
+
+/**
+ * @summary List Auto.ru models for a selected brand
+ */
+
+
+
+export const ListAutoRuCarModelsQueryParams = zod.object({
+  "brandId": zod.coerce.string().min(1)
+})
+
+export const ListAutoRuCarModelsResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string()
 }))
 })
 
