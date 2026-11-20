@@ -291,6 +291,8 @@ function isCarVisibleToManager(
   car: { type: string; brand: string | null },
   assignedBrands: string[],
 ): boolean {
+  // The manager settings screen explicitly defines an empty selection as access to all brands.
+  if (assignedBrands.length === 0) return true;
   if (car.type === "used") return assignedBrands.includes("С пробегом");
   const normalizedCarBrand = normalizeManagerQuoteBrand(car.brand ?? "");
   return assignedBrands
