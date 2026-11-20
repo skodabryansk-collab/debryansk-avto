@@ -74,7 +74,8 @@
 - [Karpathy evaluator schedule](karpathy-evaluator-schedule.md) — оценка должна иметь ежедневный catch-up, а не зависеть только от воскресного снапшота позиций.
 - [GAP pending stability](gap-pending-stability.md) — pending-гипотезы принадлежат менеджеру: GAP не создаёт и не перезаписывает их до решения.
 - [Visitor conversion calls](visitor-conversion-calls.md) — completed >30 сек; звонки и заявки уникальны в rolling-окне 24 часа с учётом границы периода.
-- [Safe post-merge schema updates](post-merge-drizzle.md) — unfiltered Drizzle force-push can delete live schema data; use additive, idempotent development migrations and Replit Publish for production.
+- [Safe post-merge schema updates](post-merge-drizzle.md) — avoid force-push; use additive development migrations and apply targeted migrations to the VPS production database.
+- [1C work-sheet feed](onec-client-cards.md) — a location is the 1C organization and a brand is its department; provisional codes must never be exported.
 - [GEO active hypothesis ownership](geo-active-hypothesis.md) — legacy applied rows without an evaluation schedule must not block new GEO recommendations forever.
 - [GEO measurement refresh](geo-citation-refresh.md) — the admin GEO button starts a fresh weekly measurement, not just a reread of the saved report; account for AI-provider request costs.
 - [Yandex Webmaster indexing samples](webmaster-indexing-samples.md) — v4 uses /indexing/samples, not /crawling/samples; read the tail because offset=0 can be historical.
