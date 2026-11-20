@@ -50,6 +50,7 @@ export * from './managerClientCardCreatedResponseData';
 export * from './managerClientCardInput';
 export * from './managerClientCardInputBudgetRange';
 export * from './managerClientCardInputClientGender';
+export * from './managerClientCardInputCurrentCarOwnersCount';
 export * from './managerClientCardInputPaymentMethod';
 export * from './managerClientCardInputTradeInPlan';
 export * from './managerClientCardInventoryItem';
