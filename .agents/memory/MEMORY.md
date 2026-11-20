@@ -61,6 +61,7 @@
 - [Timeweb image capabilities](timeweb-image-capabilities.md) — catalogue omissions and deprecated flags are not availability checks; verify native reference formats and never silently discard photos.
 - [Timeweb available models](timeweb-models.md) — use provider-qualified model IDs like `openai/gpt-4.1`; bare IDs can 404 at the gateway.
 - [Vite admin-panel stale dist bug](vite-admin-dist-stale.md) — Vite сканирует dist/public/index.html как entry point; старый билд → "No matching export" на новые функции. Лечится: rm -rf dist/public && restart workflow.
+- [Vite React hook dependency optimization](vite-react-hook-optimization.md) — include react-hook-form in optimizeDeps when late Vite optimization is followed by dispatcher.useEffect runtime errors.
 - [SEO AI Autopilot](seo-ai-autopilot.md) — gpt-4.1 через Timeweb Gateway; apply-time generation; сигнатуры aiQueryToFaq/aiQueryToFaqCars/aiQueryToFaqModel/aiTextBlock/aiMetaDescription; DB: seo_ai_cache, seo_ai_examples, generated_by/reject_reason в seo_suggestions.
 - [SEO GAP Engine](seo-gap-engine.md) — полная архитектура SEO-центра: 8 шагов GAP, Karpathy Loop, формула приоритета, типы предложений, BRAND_KEYWORDS vs site-wide coverage, правила доработки.
 - [Prerender title sync from og:title](prerender-title-fix.md) — prerender.ts served cached HTML with wrong `<title>` (SPA default); fix: extract og:title from cached HTML and use it as `<title>` before res.send.
