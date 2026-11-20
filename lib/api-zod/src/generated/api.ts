@@ -674,7 +674,13 @@ export const ListManagerClientCardsResponse = zod.object({
   "desiredVehicleUndecided": zod.boolean(),
   "budgetRange": zod.string().nullable(),
   "currentCar": zod.string().nullable(),
+  "currentCarBrand": zod.string().nullable(),
+  "currentCarModel": zod.string().nullable(),
   "currentCarYear": zod.number().nullable(),
+  "currentCarMileage": zod.number().nullable(),
+  "currentCarGeneration": zod.string().nullable(),
+  "currentCarBodyType": zod.string().nullable(),
+  "currentCarOwnersCount": zod.string().nullable(),
   "currentCarInventoryId": zod.number().nullable(),
   "currentCarSnapshot": zod.union([zod.object({
   "id": zod.number(),
@@ -734,8 +740,19 @@ export const createManagerClientCardBodyDesiredModelMax = 180;
 
 export const createManagerClientCardBodyCurrentCarMax = 180;
 
+export const createManagerClientCardBodyCurrentCarBrandMax = 120;
+
+export const createManagerClientCardBodyCurrentCarModelMax = 120;
+
 export const createManagerClientCardBodyCurrentCarYearMin = 1950;
 export const createManagerClientCardBodyCurrentCarYearMax = 2100;
+
+export const createManagerClientCardBodyCurrentCarMileageMin = 0;
+export const createManagerClientCardBodyCurrentCarMileageMax = 2000000;
+
+export const createManagerClientCardBodyCurrentCarGenerationMax = 120;
+
+export const createManagerClientCardBodyCurrentCarBodyTypeMax = 120;
 
 
 export const createManagerClientCardBodyCommercialBrandMax = 180;
@@ -756,7 +773,13 @@ export const CreateManagerClientCardBody = zod.object({
   "desiredVehicleUndecided": zod.boolean(),
   "budgetRange": zod.union([zod.literal('Не указан'),zod.literal('до 2 млн'),zod.literal('2–3 млн'),zod.literal('3–5 млн'),zod.literal('5+ млн'),zod.literal(null)]).nullable(),
   "currentCar": zod.string().max(createManagerClientCardBodyCurrentCarMax).nullable(),
+  "currentCarBrand": zod.string().max(createManagerClientCardBodyCurrentCarBrandMax).nullable(),
+  "currentCarModel": zod.string().max(createManagerClientCardBodyCurrentCarModelMax).nullable(),
   "currentCarYear": zod.number().min(createManagerClientCardBodyCurrentCarYearMin).max(createManagerClientCardBodyCurrentCarYearMax).nullable(),
+  "currentCarMileage": zod.number().min(createManagerClientCardBodyCurrentCarMileageMin).max(createManagerClientCardBodyCurrentCarMileageMax).nullable(),
+  "currentCarGeneration": zod.string().max(createManagerClientCardBodyCurrentCarGenerationMax).nullable(),
+  "currentCarBodyType": zod.string().max(createManagerClientCardBodyCurrentCarBodyTypeMax).nullable(),
+  "currentCarOwnersCount": zod.union([zod.literal('1'),zod.literal('2'),zod.literal('3'),zod.literal('4+'),zod.literal(null)]).nullable(),
   "currentCarInventoryId": zod.number().min(1).nullable(),
   "tradeInPlan": zod.union([zod.literal('Да'),zod.literal('Нет'),zod.literal('Пока не решил'),zod.literal(null)]).nullable(),
   "commercialBrand": zod.string().max(createManagerClientCardBodyCommercialBrandMax).nullable(),
@@ -891,7 +914,13 @@ export const GetManagerClientCardResponse = zod.object({
   "desiredVehicleUndecided": zod.boolean(),
   "budgetRange": zod.string().nullable(),
   "currentCar": zod.string().nullable(),
+  "currentCarBrand": zod.string().nullable(),
+  "currentCarModel": zod.string().nullable(),
   "currentCarYear": zod.number().nullable(),
+  "currentCarMileage": zod.number().nullable(),
+  "currentCarGeneration": zod.string().nullable(),
+  "currentCarBodyType": zod.string().nullable(),
+  "currentCarOwnersCount": zod.string().nullable(),
   "currentCarInventoryId": zod.number().nullable(),
   "currentCarSnapshot": zod.union([zod.object({
   "id": zod.number(),
