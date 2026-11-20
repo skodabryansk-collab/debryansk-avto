@@ -38,6 +38,7 @@ type CreateClientCardInput = {
     model: string | null;
     undecided: boolean;
     budgetRange: typeof budgetRanges[number] | null;
+    plannedPurchaseDate: string | null;
   }>;
   currentCars: Array<{
     brand: string;
@@ -47,7 +48,6 @@ type CreateClientCardInput = {
     generation: string | null;
     bodyType: string | null;
     ownersCount: "1" | "2" | "3" | "4+" | null;
-    inventoryId: number | null;
     snapshot: Record<string, unknown> | null;
     tradeInPlan: typeof tradeInPlans[number] | null;
   }>;
@@ -63,7 +63,6 @@ type CreateClientCardInput = {
   currentCarGeneration: string | null;
   currentCarBodyType: string | null;
   currentCarOwnersCount: "1" | "2" | "3" | "4+" | null;
-  currentCarInventoryId: number | null;
   tradeInPlan: typeof tradeInPlans[number] | null;
   commercialBrand: string | null;
   commercialModel: string | null;
@@ -112,6 +111,7 @@ function parseCreateClientCardInput(body: unknown): { data?: CreateClientCardInp
           model: legacyModel,
           undecided: value["desiredVehicleUndecided"] === true,
           budgetRange: value["budgetRange"],
+          plannedPurchaseDate: null,
         }]
       : needsRaw;
     if (!Array.isArray(rawNeeds) || rawNeeds.length === 0 || rawNeeds.length > 20) {
@@ -135,11 +135,27 @@ function parseCreateClientCardInput(body: unknown): { data?: CreateClientCardInp
       }
       const budgetRange = enumValue(need["budgetRange"], budgetRanges, `бюджет в потребности ${index + 1}`);
       if (!budgetRange) throw new Error(`Укажите бюджет в потребности ${index + 1}`);
+      const plannedPurchaseDateValue = need["plannedPurchaseDate"];
+      let plannedPurchaseDate: string | null = null;
+      if (plannedPurchaseDateValue != null && plannedPurchaseDateValue !== "") {
+        const plannedDate = typeof plannedPurchaseDateValue === "string" && /^\d{4}-\d{2}-\d{2}$/.test(plannedPurchaseDateValue)
+          ? new Date(`${plannedPurchaseDateValue}T00:00:00.000Z`)
+          : null;
+        if (
+          !plannedDate ||
+          !Number.isFinite(plannedDate.getTime()) ||
+          plannedDate.toISOString().slice(0, 10) !== plannedPurchaseDateValue
+        ) {
+          throw new Error(`Проверьте планируемую дату покупки в потребности ${index + 1}`);
+        }
+        plannedPurchaseDate = plannedDate.toISOString().slice(0, 10);
+      }
       return {
         brand,
         model,
         undecided,
         budgetRange,
+        plannedPurchaseDate,
       };
     });
     const commercialBrand = text(value["commercialBrand"], "марку предложения", 180);
@@ -157,7 +173,6 @@ function parseCreateClientCardInput(body: unknown): { data?: CreateClientCardInp
       generation: value["currentCarGeneration"],
       bodyType: value["currentCarBodyType"],
       ownersCount: value["currentCarOwnersCount"],
-      inventoryId: value["currentCarInventoryId"],
       snapshot: value["currentCarSnapshot"],
       tradeInPlan: value["tradeInPlan"],
     };
@@ -185,14 +200,6 @@ function parseCreateClientCardInput(body: unknown): { data?: CreateClientCardInp
       ) {
         throw new Error("Для каждого текущего автомобиля заполните марку, модель, год и пробег");
       }
-      let inventoryId: number | null = null;
-      if (car["inventoryId"] != null && car["inventoryId"] !== "") {
-        const parsedId = Number(car["inventoryId"]);
-        if (!Number.isSafeInteger(parsedId) || parsedId <= 0) {
-          throw new Error(`Некорректно выбран ${label}`);
-        }
-        inventoryId = parsedId;
-      }
       const snapshot = car["snapshot"] && typeof car["snapshot"] === "object" && !Array.isArray(car["snapshot"])
         ? car["snapshot"] as Record<string, unknown>
         : null;
@@ -204,7 +211,6 @@ function parseCreateClientCardInput(body: unknown): { data?: CreateClientCardInp
         generation: text(car["generation"], `поколение ${label}`, 120),
         bodyType: text(car["bodyType"], `тип кузова ${label}`, 120),
         ownersCount: enumValue(car["ownersCount"], ["1", "2", "3", "4+"] as const, `количество владельцев ${label}`),
-        inventoryId,
         snapshot,
         tradeInPlan: enumValue(car["tradeInPlan"], tradeInPlans, `трейд-ин ${label}`),
       };
@@ -245,7 +251,6 @@ function parseCreateClientCardInput(body: unknown): { data?: CreateClientCardInp
         currentCarGeneration: currentCars[0]?.generation ?? null,
         currentCarBodyType: currentCars[0]?.bodyType ?? null,
         currentCarOwnersCount: currentCars[0]?.ownersCount ?? null,
-        currentCarInventoryId: currentCars[0]?.inventoryId ?? null,
         tradeInPlan: currentCars[0]?.tradeInPlan ?? null,
         commercialBrand,
         commercialModel,
@@ -381,7 +386,6 @@ const cardProjection = {
   currentCarGeneration: managerClientCardsTable.currentCarGeneration,
   currentCarBodyType: managerClientCardsTable.currentCarBodyType,
   currentCarOwnersCount: managerClientCardsTable.currentCarOwnersCount,
-  currentCarInventoryId: managerClientCardsTable.currentCarInventoryId,
   currentCarSnapshot: managerClientCardsTable.currentCarSnapshot,
   tradeInPlan: managerClientCardsTable.tradeInPlan,
   needs: managerClientCardsTable.needs,
@@ -701,7 +705,7 @@ router.get("/client-cards/export.csv", async (req, res): Promise<void> => {
       .orderBy(desc(managerClientCardsTable.createdAt));
     const header = [
       "Дата", "Менеджер", "ФИО клиента", "Телефон", "Пол", "Марка интереса",
-      "Модель интереса", "Не определился", "Бюджет", "Текущий автомобиль",
+      "Модель интереса", "Не определился", "Бюджет", "Планируемая дата покупки", "Текущий автомобиль",
       "Марка текущего автомобиля", "Модель текущего автомобиля", "Год текущего автомобиля",
       "Пробег, км", "Поколение", "Тип кузова", "Количество владельцев", "VIN текущего автомобиля",
       "Трейд-ин", "Марка предложения", "Модель предложения",
@@ -717,6 +721,7 @@ router.get("/client-cards/export.csv", async (req, res): Promise<void> => {
       card.desiredModel,
       card.desiredVehicleUndecided ? "Да" : "Нет",
       card.budgetRange,
+      Array.isArray(card.needs) ? (card.needs[0] as Record<string, unknown> | undefined)?.["plannedPurchaseDate"] : "",
       card.currentCar,
       card.currentCarBrand,
       card.currentCarModel,
@@ -744,7 +749,10 @@ router.get("/client-cards/export.csv", async (req, res): Promise<void> => {
         const need = needValue as Record<string, unknown>;
         const vehicle = [need["brand"], need["model"]].filter(Boolean).join(" ") ||
           (need["undecided"] ? "Пока не определился" : "Не указано");
-        return `${vehicle}; бюджет: ${String(need["budgetRange"] ?? "Не указан")}`;
+        const purchaseDate = typeof need["plannedPurchaseDate"] === "string"
+          ? `; планируемая покупка: ${need["plannedPurchaseDate"]}`
+          : "";
+        return `${vehicle}; бюджет: ${String(need["budgetRange"] ?? "Не указан")}${purchaseDate}`;
       }).join(" | "),
       (Array.isArray(card.currentCars) ? card.currentCars : []).map(carValue => {
         const car = carValue as Record<string, unknown>;
@@ -852,23 +860,7 @@ router.post("/client-cards", async (req, res): Promise<void> => {
       }
     }
 
-    const currentCars: CreateClientCardInput["currentCars"] = [];
-    for (const currentCarInput of input.currentCars) {
-      let snapshot = currentCarInput.snapshot;
-      if (currentCarInput.inventoryId) {
-        const car = await getInventoryCar(currentCarInput.inventoryId);
-        if (!car || car.type !== "used" || !isCurrentInventoryCar(car)) {
-          res.status(400).json({ ok: false, error: "Выбранный текущий автомобиль больше не найден в базе" });
-          return;
-        }
-        if (!scope.isAdmin && !isCarVisibleToManager(car, assignedBrands)) {
-          res.status(403).json({ ok: false, error: "У вас нет доступа к выбранному текущему автомобилю" });
-          return;
-        }
-        snapshot = { ...car };
-      }
-      currentCars.push({ ...currentCarInput, snapshot });
-    }
+    const currentCars = input.currentCars;
     const firstCurrentCar = currentCars[0] ?? null;
     const currentCarSnapshot = firstCurrentCar?.snapshot ?? null;
     const currentCar = input.currentCar || (
@@ -917,7 +909,6 @@ router.post("/client-cards", async (req, res): Promise<void> => {
       currentCarGeneration: firstCurrentCar?.generation ?? null,
       currentCarBodyType: firstCurrentCar?.bodyType ?? null,
       currentCarOwnersCount: firstCurrentCar?.ownersCount ?? null,
-      currentCarInventoryId: firstCurrentCar?.inventoryId ?? null,
       currentCarSnapshot,
       currentCars,
       tradeInPlan: firstCurrentCar?.tradeInPlan ?? null,
