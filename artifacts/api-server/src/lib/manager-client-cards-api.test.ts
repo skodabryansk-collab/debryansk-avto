@@ -141,6 +141,10 @@ test("manager client cards are saved and isolated by manager", async () => {
         desiredModel: "Jolion",
         desiredVehicleUndecided: false,
         budgetRange: "2–3 млн",
+         needs: [
+           { brand: "Haval City", model: "Jolion", undecided: false, budgetRange: "2–3 млн" },
+           { brand: "Haval City", model: "Jolion", undecided: false, budgetRange: "3–5 млн" },
+         ],
         currentCar: "Haval City Jolion",
         currentCarBrand: "Haval City",
         currentCarModel: "Jolion",
@@ -151,6 +155,32 @@ test("manager client cards are saved and isolated by manager", async () => {
         currentCarOwnersCount: "2",
         currentCarInventoryId: currentCar.id,
         tradeInPlan: null,
+         currentCars: [
+           {
+             brand: "Haval City",
+             model: "Jolion",
+             year: 2022,
+             mileage: 68500,
+             generation: "I",
+             bodyType: "Кроссовер",
+             ownersCount: "2",
+             inventoryId: currentCar.id,
+             snapshot: null,
+             tradeInPlan: "Да",
+           },
+           {
+             brand: "Toyota",
+             model: "Camry",
+             year: 2019,
+             mileage: 75000,
+             generation: null,
+             bodyType: "Седан",
+             ownersCount: null,
+             inventoryId: null,
+             snapshot: null,
+             tradeInPlan: null,
+           },
+         ],
         commercialBrand: null,
         commercialModel: null,
         commercialCarId: car.id,
@@ -180,6 +210,8 @@ test("manager client cards are saved and isolated by manager", async () => {
         currentCarOwnersCount: string;
         currentCarSnapshot: { vin: string };
         commercialCarSnapshot: { model: string };
+         needs: Array<{ brand: string; model: string; budgetRange: string }>;
+         currentCars: Array<{ brand: string; model: string; mileage: number; snapshot: { vin: string } | null }>;
       }>;
       total: number;
     }>;
@@ -197,6 +229,10 @@ test("manager client cards are saved and isolated by manager", async () => {
     assert.equal(own.data?.items[0]?.currentCarBodyType, "Кроссовер");
     assert.equal(own.data?.items[0]?.currentCarOwnersCount, "2");
     assert.equal(own.data?.items[0]?.currentCarSnapshot.vin, "XW8ZZZ61ZHG000456");
+    assert.equal(own.data?.items[0]?.needs.length, 2);
+    assert.equal(own.data?.items[0]?.needs[1]?.budgetRange, "3–5 млн");
+    assert.equal(own.data?.items[0]?.currentCars.length, 2);
+    assert.equal(own.data?.items[0]?.currentCars[1]?.brand, "Toyota");
 
     const ownDetail = await fetch(`${started.baseUrl}/api/manager/client-cards/${created.data!.id}`, {
       headers: { authorization: `Bearer ${managerToken(managerIds[0]!)}` },
@@ -288,6 +324,7 @@ test("manager client cards are saved and isolated by manager", async () => {
     assert.match(csvResponse.headers.get("content-type") ?? "", /text\/csv/);
     assert.match(csv, /Тестовый клиент/);
     assert.match(csv, /68500/);
+    assert.match(csv, /Toyota Camry/);
 
     const otherResponse = await fetch(`${started.baseUrl}/api/manager/client-cards`, {
       headers: { authorization: `Bearer ${managerToken(managerIds[1]!)}` },
