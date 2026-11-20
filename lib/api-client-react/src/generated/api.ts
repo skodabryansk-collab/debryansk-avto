@@ -6,23 +6,54 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
   AiImageModelCatalogue,
+  AutoRuCatalogBrandsResponse,
+  AutoRuCatalogModelsResponse,
+  CustomerSurveyInput,
+  CustomerSurveyListResponse,
+  CustomerSurveyPublicResponse,
+  CustomerSurveyRecordResponse,
+  CustomerSurveyResponseInput,
+  CustomerSurveyResponsesResponse,
+  CustomerSurveyStatsResponse,
+  CustomerSurveySubmissionResult,
+  ExportManagerClientCardsParams,
   GetCarImageThumbnailParams,
-  HealthStatus
+  GetCustomerSurveyStatsParams,
+  HealthStatus,
+  ListAutoRuCarModelsParams,
+  ListCustomerSurveyResponsesParams,
+  ListManagerClientCardsParams,
+  ListManagerClientNeedsModelsParams,
+  ManagerClientCardCreatedResponse,
+  ManagerClientCardInput,
+  ManagerClientCardInventoryResponse,
+  ManagerClientCardManagersResponse,
+  ManagerClientCardResponse,
+  ManagerClientCardStringListResponse,
+  ManagerClientCardsPageResponse,
+  SearchManagerClientCardInventoryParams,
+  ShowroomSurveyModelsResponse,
+  ShowroomSurveySubmissionInput,
+  ShowroomSurveySubmissionResponse
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
-import type { ErrorType } from '../custom-fetch';
+import type { ErrorType , BodyType } from '../custom-fetch';
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -117,6 +148,768 @@ export function useGetCarImageThumbnail<TData = Awaited<ReturnType<typeof getCar
 
 
 
+export const getGetShowroomSurveyModelsUrl = () => {
+
+
+
+
+  return `/api/showroom-survey/models`
+}
+
+/**
+ * @summary List models available in the public new-car catalogue for showroom surveys
+ */
+export const getShowroomSurveyModels = async ( options?: RequestInit): Promise<ShowroomSurveyModelsResponse> => {
+
+  return customFetch<ShowroomSurveyModelsResponse>(getGetShowroomSurveyModelsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetShowroomSurveyModelsQueryKey = () => {
+    return [
+    `/api/showroom-survey/models`
+    ] as const;
+    }
+
+
+export const getGetShowroomSurveyModelsQueryOptions = <TData = Awaited<ReturnType<typeof getShowroomSurveyModels>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getShowroomSurveyModels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetShowroomSurveyModelsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getShowroomSurveyModels>>> = ({ signal }) => getShowroomSurveyModels({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getShowroomSurveyModels>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetShowroomSurveyModelsQueryResult = NonNullable<Awaited<ReturnType<typeof getShowroomSurveyModels>>>
+export type GetShowroomSurveyModelsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List models available in the public new-car catalogue for showroom surveys
+ */
+
+export function useGetShowroomSurveyModels<TData = Awaited<ReturnType<typeof getShowroomSurveyModels>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getShowroomSurveyModels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetShowroomSurveyModelsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSubmitShowroomSurveyUrl = () => {
+
+
+
+
+  return `/api/showroom-survey/submissions`
+}
+
+/**
+ * @summary Submit a showroom survey and create a qualified vehicle-interest lead
+ */
+export const submitShowroomSurvey = async (showroomSurveySubmissionInput: ShowroomSurveySubmissionInput, options?: RequestInit): Promise<ShowroomSurveySubmissionResponse> => {
+
+  return customFetch<ShowroomSurveySubmissionResponse>(getSubmitShowroomSurveyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      showroomSurveySubmissionInput,)
+  }
+);}
+
+
+
+
+export const getSubmitShowroomSurveyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitShowroomSurvey>>, TError,{data: BodyType<ShowroomSurveySubmissionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitShowroomSurvey>>, TError,{data: BodyType<ShowroomSurveySubmissionInput>}, TContext> => {
+
+const mutationKey = ['submitShowroomSurvey'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitShowroomSurvey>>, {data: BodyType<ShowroomSurveySubmissionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitShowroomSurvey(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitShowroomSurveyMutationResult = NonNullable<Awaited<ReturnType<typeof submitShowroomSurvey>>>
+    export type SubmitShowroomSurveyMutationBody = BodyType<ShowroomSurveySubmissionInput>
+    export type SubmitShowroomSurveyMutationError = ErrorType<void>
+
+    /**
+ * @summary Submit a showroom survey and create a qualified vehicle-interest lead
+ */
+export const useSubmitShowroomSurvey = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitShowroomSurvey>>, TError,{data: BodyType<ShowroomSurveySubmissionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitShowroomSurvey>>,
+        TError,
+        {data: BodyType<ShowroomSurveySubmissionInput>},
+        TContext
+      > => {
+      return useMutation(getSubmitShowroomSurveyMutationOptions(options));
+    }
+
+export const getGetPublicSurveyUrl = (slug: string,) => {
+
+
+
+
+  return `/api/surveys/${slug}`
+}
+
+/**
+ * @summary Get a published customer survey by its public slug
+ */
+export const getPublicSurvey = async (slug: string, options?: RequestInit): Promise<CustomerSurveyPublicResponse> => {
+
+  return customFetch<CustomerSurveyPublicResponse>(getGetPublicSurveyUrl(slug),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicSurveyQueryKey = (slug: string,) => {
+    return [
+    `/api/surveys/${slug}`
+    ] as const;
+    }
+
+
+export const getGetPublicSurveyQueryOptions = <TData = Awaited<ReturnType<typeof getPublicSurvey>>, TError = ErrorType<void>>(slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicSurvey>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicSurveyQueryKey(slug);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicSurvey>>> = ({ signal }) => getPublicSurvey(slug, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(slug), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicSurvey>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicSurveyQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicSurvey>>>
+export type GetPublicSurveyQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a published customer survey by its public slug
+ */
+
+export function useGetPublicSurvey<TData = Awaited<ReturnType<typeof getPublicSurvey>>, TError = ErrorType<void>>(
+ slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicSurvey>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicSurveyQueryOptions(slug,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSubmitCustomerSurveyResponseUrl = (slug: string,) => {
+
+
+
+
+  return `/api/surveys/${slug}/responses`
+}
+
+/**
+ * @summary Submit answers to a published customer survey
+ */
+export const submitCustomerSurveyResponse = async (slug: string,
+    customerSurveyResponseInput: CustomerSurveyResponseInput, options?: RequestInit): Promise<CustomerSurveySubmissionResult> => {
+
+  return customFetch<CustomerSurveySubmissionResult>(getSubmitCustomerSurveyResponseUrl(slug),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      customerSurveyResponseInput,)
+  }
+);}
+
+
+
+
+export const getSubmitCustomerSurveyResponseMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitCustomerSurveyResponse>>, TError,{slug: string;data: BodyType<CustomerSurveyResponseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitCustomerSurveyResponse>>, TError,{slug: string;data: BodyType<CustomerSurveyResponseInput>}, TContext> => {
+
+const mutationKey = ['submitCustomerSurveyResponse'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitCustomerSurveyResponse>>, {slug: string;data: BodyType<CustomerSurveyResponseInput>}> = (props) => {
+          const {slug,data} = props ?? {};
+
+          return  submitCustomerSurveyResponse(slug,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitCustomerSurveyResponseMutationResult = NonNullable<Awaited<ReturnType<typeof submitCustomerSurveyResponse>>>
+    export type SubmitCustomerSurveyResponseMutationBody = BodyType<CustomerSurveyResponseInput>
+    export type SubmitCustomerSurveyResponseMutationError = ErrorType<void>
+
+    /**
+ * @summary Submit answers to a published customer survey
+ */
+export const useSubmitCustomerSurveyResponse = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitCustomerSurveyResponse>>, TError,{slug: string;data: BodyType<CustomerSurveyResponseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitCustomerSurveyResponse>>,
+        TError,
+        {slug: string;data: BodyType<CustomerSurveyResponseInput>},
+        TContext
+      > => {
+      return useMutation(getSubmitCustomerSurveyResponseMutationOptions(options));
+    }
+
+export const getListCustomerSurveysUrl = () => {
+
+
+
+
+  return `/api/admin/surveys`
+}
+
+/**
+ * @summary List surveys and response counts
+ */
+export const listCustomerSurveys = async ( options?: RequestInit): Promise<CustomerSurveyListResponse> => {
+
+  return customFetch<CustomerSurveyListResponse>(getListCustomerSurveysUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCustomerSurveysQueryKey = () => {
+    return [
+    `/api/admin/surveys`
+    ] as const;
+    }
+
+
+export const getListCustomerSurveysQueryOptions = <TData = Awaited<ReturnType<typeof listCustomerSurveys>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCustomerSurveys>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCustomerSurveysQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCustomerSurveys>>> = ({ signal }) => listCustomerSurveys({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCustomerSurveys>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCustomerSurveysQueryResult = NonNullable<Awaited<ReturnType<typeof listCustomerSurveys>>>
+export type ListCustomerSurveysQueryError = ErrorType<void>
+
+
+/**
+ * @summary List surveys and response counts
+ */
+
+export function useListCustomerSurveys<TData = Awaited<ReturnType<typeof listCustomerSurveys>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCustomerSurveys>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCustomerSurveysQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateCustomerSurveyUrl = () => {
+
+
+
+
+  return `/api/admin/surveys`
+}
+
+/**
+ * @summary Create a customer survey
+ */
+export const createCustomerSurvey = async (customerSurveyInput: CustomerSurveyInput, options?: RequestInit): Promise<CustomerSurveyRecordResponse> => {
+
+  return customFetch<CustomerSurveyRecordResponse>(getCreateCustomerSurveyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      customerSurveyInput,)
+  }
+);}
+
+
+
+
+export const getCreateCustomerSurveyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCustomerSurvey>>, TError,{data: BodyType<CustomerSurveyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCustomerSurvey>>, TError,{data: BodyType<CustomerSurveyInput>}, TContext> => {
+
+const mutationKey = ['createCustomerSurvey'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCustomerSurvey>>, {data: BodyType<CustomerSurveyInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCustomerSurvey(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCustomerSurveyMutationResult = NonNullable<Awaited<ReturnType<typeof createCustomerSurvey>>>
+    export type CreateCustomerSurveyMutationBody = BodyType<CustomerSurveyInput>
+    export type CreateCustomerSurveyMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a customer survey
+ */
+export const useCreateCustomerSurvey = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCustomerSurvey>>, TError,{data: BodyType<CustomerSurveyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCustomerSurvey>>,
+        TError,
+        {data: BodyType<CustomerSurveyInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCustomerSurveyMutationOptions(options));
+    }
+
+export const getGetCustomerSurveyUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/surveys/${id}`
+}
+
+/**
+ * @summary Get a survey configuration for editing
+ */
+export const getCustomerSurvey = async (id: number, options?: RequestInit): Promise<CustomerSurveyRecordResponse> => {
+
+  return customFetch<CustomerSurveyRecordResponse>(getGetCustomerSurveyUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCustomerSurveyQueryKey = (id: number,) => {
+    return [
+    `/api/admin/surveys/${id}`
+    ] as const;
+    }
+
+
+export const getGetCustomerSurveyQueryOptions = <TData = Awaited<ReturnType<typeof getCustomerSurvey>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCustomerSurvey>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCustomerSurveyQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCustomerSurvey>>> = ({ signal }) => getCustomerSurvey(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCustomerSurvey>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCustomerSurveyQueryResult = NonNullable<Awaited<ReturnType<typeof getCustomerSurvey>>>
+export type GetCustomerSurveyQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a survey configuration for editing
+ */
+
+export function useGetCustomerSurvey<TData = Awaited<ReturnType<typeof getCustomerSurvey>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCustomerSurvey>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCustomerSurveyQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateCustomerSurveyUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/surveys/${id}`
+}
+
+/**
+ * @summary Update a survey and publish or archive it
+ */
+export const updateCustomerSurvey = async (id: number,
+    customerSurveyInput: CustomerSurveyInput, options?: RequestInit): Promise<CustomerSurveyRecordResponse> => {
+
+  return customFetch<CustomerSurveyRecordResponse>(getUpdateCustomerSurveyUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      customerSurveyInput,)
+  }
+);}
+
+
+
+
+export const getUpdateCustomerSurveyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCustomerSurvey>>, TError,{id: number;data: BodyType<CustomerSurveyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCustomerSurvey>>, TError,{id: number;data: BodyType<CustomerSurveyInput>}, TContext> => {
+
+const mutationKey = ['updateCustomerSurvey'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCustomerSurvey>>, {id: number;data: BodyType<CustomerSurveyInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateCustomerSurvey(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCustomerSurveyMutationResult = NonNullable<Awaited<ReturnType<typeof updateCustomerSurvey>>>
+    export type UpdateCustomerSurveyMutationBody = BodyType<CustomerSurveyInput>
+    export type UpdateCustomerSurveyMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a survey and publish or archive it
+ */
+export const useUpdateCustomerSurvey = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCustomerSurvey>>, TError,{id: number;data: BodyType<CustomerSurveyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCustomerSurvey>>,
+        TError,
+        {id: number;data: BodyType<CustomerSurveyInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateCustomerSurveyMutationOptions(options));
+    }
+
+export const getGetCustomerSurveyStatsUrl = (params: GetCustomerSurveyStatsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/survey-stats?${stringifiedParams}` : `/api/admin/survey-stats`
+}
+
+/**
+ * @summary Get aggregated survey responses
+ */
+export const getCustomerSurveyStats = async (params: GetCustomerSurveyStatsParams, options?: RequestInit): Promise<CustomerSurveyStatsResponse> => {
+
+  return customFetch<CustomerSurveyStatsResponse>(getGetCustomerSurveyStatsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCustomerSurveyStatsQueryKey = (params?: GetCustomerSurveyStatsParams,) => {
+    return [
+    `/api/admin/survey-stats`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetCustomerSurveyStatsQueryOptions = <TData = Awaited<ReturnType<typeof getCustomerSurveyStats>>, TError = ErrorType<void>>(params: GetCustomerSurveyStatsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCustomerSurveyStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCustomerSurveyStatsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCustomerSurveyStats>>> = ({ signal }) => getCustomerSurveyStats(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCustomerSurveyStats>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCustomerSurveyStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getCustomerSurveyStats>>>
+export type GetCustomerSurveyStatsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get aggregated survey responses
+ */
+
+export function useGetCustomerSurveyStats<TData = Awaited<ReturnType<typeof getCustomerSurveyStats>>, TError = ErrorType<void>>(
+ params: GetCustomerSurveyStatsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCustomerSurveyStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCustomerSurveyStatsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListCustomerSurveyResponsesUrl = (params: ListCustomerSurveyResponsesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/survey-responses?${stringifiedParams}` : `/api/admin/survey-responses`
+}
+
+/**
+ * @summary List survey responses and their original question snapshots
+ */
+export const listCustomerSurveyResponses = async (params: ListCustomerSurveyResponsesParams, options?: RequestInit): Promise<CustomerSurveyResponsesResponse> => {
+
+  return customFetch<CustomerSurveyResponsesResponse>(getListCustomerSurveyResponsesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCustomerSurveyResponsesQueryKey = (params?: ListCustomerSurveyResponsesParams,) => {
+    return [
+    `/api/admin/survey-responses`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListCustomerSurveyResponsesQueryOptions = <TData = Awaited<ReturnType<typeof listCustomerSurveyResponses>>, TError = ErrorType<void>>(params: ListCustomerSurveyResponsesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCustomerSurveyResponses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCustomerSurveyResponsesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCustomerSurveyResponses>>> = ({ signal }) => listCustomerSurveyResponses(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCustomerSurveyResponses>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCustomerSurveyResponsesQueryResult = NonNullable<Awaited<ReturnType<typeof listCustomerSurveyResponses>>>
+export type ListCustomerSurveyResponsesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List survey responses and their original question snapshots
+ */
+
+export function useListCustomerSurveyResponses<TData = Awaited<ReturnType<typeof listCustomerSurveyResponses>>, TError = ErrorType<void>>(
+ params: ListCustomerSurveyResponsesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCustomerSurveyResponses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCustomerSurveyResponsesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListAiImageModelsUrl = () => {
 
 
@@ -182,6 +975,805 @@ export function useListAiImageModels<TData = Awaited<ReturnType<typeof listAiIma
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListAiImageModelsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListManagerClientCardsUrl = (params?: ListManagerClientCardsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/manager/client-cards?${stringifiedParams}` : `/api/manager/client-cards`
+}
+
+/**
+ * @summary List manager client worksheets with filters and pagination
+ */
+export const listManagerClientCards = async (params?: ListManagerClientCardsParams, options?: RequestInit): Promise<ManagerClientCardsPageResponse> => {
+
+  return customFetch<ManagerClientCardsPageResponse>(getListManagerClientCardsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListManagerClientCardsQueryKey = (params?: ListManagerClientCardsParams,) => {
+    return [
+    `/api/manager/client-cards`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListManagerClientCardsQueryOptions = <TData = Awaited<ReturnType<typeof listManagerClientCards>>, TError = ErrorType<void>>(params?: ListManagerClientCardsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listManagerClientCards>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListManagerClientCardsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listManagerClientCards>>> = ({ signal }) => listManagerClientCards(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listManagerClientCards>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListManagerClientCardsQueryResult = NonNullable<Awaited<ReturnType<typeof listManagerClientCards>>>
+export type ListManagerClientCardsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List manager client worksheets with filters and pagination
+ */
+
+export function useListManagerClientCards<TData = Awaited<ReturnType<typeof listManagerClientCards>>, TError = ErrorType<void>>(
+ params?: ListManagerClientCardsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listManagerClientCards>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListManagerClientCardsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateManagerClientCardUrl = () => {
+
+
+
+
+  return `/api/manager/client-cards`
+}
+
+/**
+ * @summary Create a manager client worksheet
+ */
+export const createManagerClientCard = async (managerClientCardInput: ManagerClientCardInput, options?: RequestInit): Promise<ManagerClientCardCreatedResponse> => {
+
+  return customFetch<ManagerClientCardCreatedResponse>(getCreateManagerClientCardUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      managerClientCardInput,)
+  }
+);}
+
+
+
+
+export const getCreateManagerClientCardMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createManagerClientCard>>, TError,{data: BodyType<ManagerClientCardInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createManagerClientCard>>, TError,{data: BodyType<ManagerClientCardInput>}, TContext> => {
+
+const mutationKey = ['createManagerClientCard'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createManagerClientCard>>, {data: BodyType<ManagerClientCardInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createManagerClientCard(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateManagerClientCardMutationResult = NonNullable<Awaited<ReturnType<typeof createManagerClientCard>>>
+    export type CreateManagerClientCardMutationBody = BodyType<ManagerClientCardInput>
+    export type CreateManagerClientCardMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a manager client worksheet
+ */
+export const useCreateManagerClientCard = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createManagerClientCard>>, TError,{data: BodyType<ManagerClientCardInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createManagerClientCard>>,
+        TError,
+        {data: BodyType<ManagerClientCardInput>},
+        TContext
+      > => {
+      return useMutation(getCreateManagerClientCardMutationOptions(options));
+    }
+
+export const getListManagerClientCardManagersUrl = () => {
+
+
+
+
+  return `/api/manager/client-cards/managers`
+}
+
+/**
+ * @summary List managers available in the worksheet filter
+ */
+export const listManagerClientCardManagers = async ( options?: RequestInit): Promise<ManagerClientCardManagersResponse> => {
+
+  return customFetch<ManagerClientCardManagersResponse>(getListManagerClientCardManagersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListManagerClientCardManagersQueryKey = () => {
+    return [
+    `/api/manager/client-cards/managers`
+    ] as const;
+    }
+
+
+export const getListManagerClientCardManagersQueryOptions = <TData = Awaited<ReturnType<typeof listManagerClientCardManagers>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listManagerClientCardManagers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListManagerClientCardManagersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listManagerClientCardManagers>>> = ({ signal }) => listManagerClientCardManagers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listManagerClientCardManagers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListManagerClientCardManagersQueryResult = NonNullable<Awaited<ReturnType<typeof listManagerClientCardManagers>>>
+export type ListManagerClientCardManagersQueryError = ErrorType<void>
+
+
+/**
+ * @summary List managers available in the worksheet filter
+ */
+
+export function useListManagerClientCardManagers<TData = Awaited<ReturnType<typeof listManagerClientCardManagers>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listManagerClientCardManagers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListManagerClientCardManagersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListManagerClientNeedsBrandsUrl = () => {
+
+
+
+
+  return `/api/manager/client-cards/needs/brands`
+}
+
+/**
+ * @summary List active CM Expert new-car brands available to the manager
+ */
+export const listManagerClientNeedsBrands = async ( options?: RequestInit): Promise<ManagerClientCardStringListResponse> => {
+
+  return customFetch<ManagerClientCardStringListResponse>(getListManagerClientNeedsBrandsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListManagerClientNeedsBrandsQueryKey = () => {
+    return [
+    `/api/manager/client-cards/needs/brands`
+    ] as const;
+    }
+
+
+export const getListManagerClientNeedsBrandsQueryOptions = <TData = Awaited<ReturnType<typeof listManagerClientNeedsBrands>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listManagerClientNeedsBrands>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListManagerClientNeedsBrandsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listManagerClientNeedsBrands>>> = ({ signal }) => listManagerClientNeedsBrands({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listManagerClientNeedsBrands>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListManagerClientNeedsBrandsQueryResult = NonNullable<Awaited<ReturnType<typeof listManagerClientNeedsBrands>>>
+export type ListManagerClientNeedsBrandsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List active CM Expert new-car brands available to the manager
+ */
+
+export function useListManagerClientNeedsBrands<TData = Awaited<ReturnType<typeof listManagerClientNeedsBrands>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listManagerClientNeedsBrands>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListManagerClientNeedsBrandsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListManagerClientNeedsModelsUrl = (params: ListManagerClientNeedsModelsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/manager/client-cards/needs/models?${stringifiedParams}` : `/api/manager/client-cards/needs/models`
+}
+
+/**
+ * @summary List active CM Expert models for a selected brand
+ */
+export const listManagerClientNeedsModels = async (params: ListManagerClientNeedsModelsParams, options?: RequestInit): Promise<ManagerClientCardStringListResponse> => {
+
+  return customFetch<ManagerClientCardStringListResponse>(getListManagerClientNeedsModelsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListManagerClientNeedsModelsQueryKey = (params?: ListManagerClientNeedsModelsParams,) => {
+    return [
+    `/api/manager/client-cards/needs/models`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListManagerClientNeedsModelsQueryOptions = <TData = Awaited<ReturnType<typeof listManagerClientNeedsModels>>, TError = ErrorType<void>>(params: ListManagerClientNeedsModelsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listManagerClientNeedsModels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListManagerClientNeedsModelsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listManagerClientNeedsModels>>> = ({ signal }) => listManagerClientNeedsModels(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listManagerClientNeedsModels>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListManagerClientNeedsModelsQueryResult = NonNullable<Awaited<ReturnType<typeof listManagerClientNeedsModels>>>
+export type ListManagerClientNeedsModelsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List active CM Expert models for a selected brand
+ */
+
+export function useListManagerClientNeedsModels<TData = Awaited<ReturnType<typeof listManagerClientNeedsModels>>, TError = ErrorType<void>>(
+ params: ListManagerClientNeedsModelsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listManagerClientNeedsModels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListManagerClientNeedsModelsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSearchManagerClientCardInventoryUrl = (params?: SearchManagerClientCardInventoryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/manager/client-cards/inventory?${stringifiedParams}` : `/api/manager/client-cards/inventory`
+}
+
+/**
+ * @summary Search manager-visible stock by vehicle model or partial VIN
+ */
+export const searchManagerClientCardInventory = async (params?: SearchManagerClientCardInventoryParams, options?: RequestInit): Promise<ManagerClientCardInventoryResponse> => {
+
+  return customFetch<ManagerClientCardInventoryResponse>(getSearchManagerClientCardInventoryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchManagerClientCardInventoryQueryKey = (params?: SearchManagerClientCardInventoryParams,) => {
+    return [
+    `/api/manager/client-cards/inventory`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchManagerClientCardInventoryQueryOptions = <TData = Awaited<ReturnType<typeof searchManagerClientCardInventory>>, TError = ErrorType<void>>(params?: SearchManagerClientCardInventoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchManagerClientCardInventory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchManagerClientCardInventoryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchManagerClientCardInventory>>> = ({ signal }) => searchManagerClientCardInventory(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchManagerClientCardInventory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchManagerClientCardInventoryQueryResult = NonNullable<Awaited<ReturnType<typeof searchManagerClientCardInventory>>>
+export type SearchManagerClientCardInventoryQueryError = ErrorType<void>
+
+
+/**
+ * @summary Search manager-visible stock by vehicle model or partial VIN
+ */
+
+export function useSearchManagerClientCardInventory<TData = Awaited<ReturnType<typeof searchManagerClientCardInventory>>, TError = ErrorType<void>>(
+ params?: SearchManagerClientCardInventoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchManagerClientCardInventory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchManagerClientCardInventoryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getExportManagerClientCardsUrl = (params?: ExportManagerClientCardsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/manager/client-cards/export.csv?${stringifiedParams}` : `/api/manager/client-cards/export.csv`
+}
+
+/**
+ * @summary Export filtered manager client worksheets as CSV
+ */
+export const exportManagerClientCards = async (params?: ExportManagerClientCardsParams, options?: RequestInit): Promise<string> => {
+
+  return customFetch<string>(getExportManagerClientCardsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportManagerClientCardsQueryKey = (params?: ExportManagerClientCardsParams,) => {
+    return [
+    `/api/manager/client-cards/export.csv`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportManagerClientCardsQueryOptions = <TData = Awaited<ReturnType<typeof exportManagerClientCards>>, TError = ErrorType<void>>(params?: ExportManagerClientCardsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportManagerClientCards>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportManagerClientCardsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportManagerClientCards>>> = ({ signal }) => exportManagerClientCards(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportManagerClientCards>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportManagerClientCardsQueryResult = NonNullable<Awaited<ReturnType<typeof exportManagerClientCards>>>
+export type ExportManagerClientCardsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Export filtered manager client worksheets as CSV
+ */
+
+export function useExportManagerClientCards<TData = Awaited<ReturnType<typeof exportManagerClientCards>>, TError = ErrorType<void>>(
+ params?: ExportManagerClientCardsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportManagerClientCards>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportManagerClientCardsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetManagerClientCardUrl = (id: number,) => {
+
+
+
+
+  return `/api/manager/client-cards/${id}`
+}
+
+/**
+ * @summary Get a manager client worksheet
+ */
+export const getManagerClientCard = async (id: number, options?: RequestInit): Promise<ManagerClientCardResponse> => {
+
+  return customFetch<ManagerClientCardResponse>(getGetManagerClientCardUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetManagerClientCardQueryKey = (id: number,) => {
+    return [
+    `/api/manager/client-cards/${id}`
+    ] as const;
+    }
+
+
+export const getGetManagerClientCardQueryOptions = <TData = Awaited<ReturnType<typeof getManagerClientCard>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getManagerClientCard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetManagerClientCardQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getManagerClientCard>>> = ({ signal }) => getManagerClientCard(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getManagerClientCard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetManagerClientCardQueryResult = NonNullable<Awaited<ReturnType<typeof getManagerClientCard>>>
+export type GetManagerClientCardQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a manager client worksheet
+ */
+
+export function useGetManagerClientCard<TData = Awaited<ReturnType<typeof getManagerClientCard>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getManagerClientCard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetManagerClientCardQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListAutoRuCarBrandsUrl = () => {
+
+
+
+
+  return `/api/car-catalog/brands`
+}
+
+/**
+ * @summary List car brands from the server-side Auto.ru catalog proxy
+ */
+export const listAutoRuCarBrands = async ( options?: RequestInit): Promise<AutoRuCatalogBrandsResponse> => {
+
+  return customFetch<AutoRuCatalogBrandsResponse>(getListAutoRuCarBrandsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAutoRuCarBrandsQueryKey = () => {
+    return [
+    `/api/car-catalog/brands`
+    ] as const;
+    }
+
+
+export const getListAutoRuCarBrandsQueryOptions = <TData = Awaited<ReturnType<typeof listAutoRuCarBrands>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAutoRuCarBrands>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAutoRuCarBrandsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAutoRuCarBrands>>> = ({ signal }) => listAutoRuCarBrands({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAutoRuCarBrands>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAutoRuCarBrandsQueryResult = NonNullable<Awaited<ReturnType<typeof listAutoRuCarBrands>>>
+export type ListAutoRuCarBrandsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List car brands from the server-side Auto.ru catalog proxy
+ */
+
+export function useListAutoRuCarBrands<TData = Awaited<ReturnType<typeof listAutoRuCarBrands>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAutoRuCarBrands>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAutoRuCarBrandsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListAutoRuCarModelsUrl = (params: ListAutoRuCarModelsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/car-catalog/models?${stringifiedParams}` : `/api/car-catalog/models`
+}
+
+/**
+ * @summary List Auto.ru models for a selected brand
+ */
+export const listAutoRuCarModels = async (params: ListAutoRuCarModelsParams, options?: RequestInit): Promise<AutoRuCatalogModelsResponse> => {
+
+  return customFetch<AutoRuCatalogModelsResponse>(getListAutoRuCarModelsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAutoRuCarModelsQueryKey = (params?: ListAutoRuCarModelsParams,) => {
+    return [
+    `/api/car-catalog/models`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListAutoRuCarModelsQueryOptions = <TData = Awaited<ReturnType<typeof listAutoRuCarModels>>, TError = ErrorType<void>>(params: ListAutoRuCarModelsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAutoRuCarModels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAutoRuCarModelsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAutoRuCarModels>>> = ({ signal }) => listAutoRuCarModels(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAutoRuCarModels>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAutoRuCarModelsQueryResult = NonNullable<Awaited<ReturnType<typeof listAutoRuCarModels>>>
+export type ListAutoRuCarModelsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List Auto.ru models for a selected brand
+ */
+
+export function useListAutoRuCarModels<TData = Awaited<ReturnType<typeof listAutoRuCarModels>>, TError = ErrorType<void>>(
+ params: ListAutoRuCarModelsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAutoRuCarModels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAutoRuCarModelsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
