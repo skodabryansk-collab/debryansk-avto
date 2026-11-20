@@ -11,6 +11,9 @@ export const brandsTable = pgTable("brands", {
   subName: text("sub_name"),
   isServiceOnly: boolean("is_service_only").default(false),
   carMark: text("car_mark"),
+  cmToBrandId: text("cm_to_brand_id"),
+  onecDepartmentCode: text("onec_department_code"),
+  onecDepartmentCodeConfirmed: boolean("onec_department_code_confirmed").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
 });
 
