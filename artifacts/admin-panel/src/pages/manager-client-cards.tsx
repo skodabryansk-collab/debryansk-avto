@@ -24,8 +24,6 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import type {
-  AutoRuCatalogBrand,
-  AutoRuCatalogModel,
   ManagerClientCard,
   ManagerClientCardInput,
   ManagerClientCardInventoryItem,
@@ -33,8 +31,6 @@ import type {
 import {
   createManagerClientCard,
   exportManagerClientCards,
-  getAutoRuCatalogBrands,
-  getAutoRuCatalogModels,
   getManagerClientCard,
   getManagerClientCardManagers,
   getManagerClientCards,
@@ -68,8 +64,13 @@ type FormState = {
   desiredModel: string;
   desiredVehicleUndecided: boolean;
   budgetRange: "" | typeof budgetOptions[number];
-  currentCar: string;
+  currentCarBrand: string;
+  currentCarModel: string;
   currentCarYear: string;
+  currentCarMileage: string;
+  currentCarGeneration: string;
+  currentCarBodyType: string;
+  currentCarOwnersCount: "" | "1" | "2" | "3" | "4+";
   tradeInPlan: "" | typeof tradeInOptions[number];
   commercialBrand: string;
   commercialModel: string;
@@ -85,8 +86,13 @@ const emptyForm: FormState = {
   desiredModel: "",
   desiredVehicleUndecided: false,
   budgetRange: "",
-  currentCar: "",
+  currentCarBrand: "",
+  currentCarModel: "",
   currentCarYear: "",
+  currentCarMileage: "",
+  currentCarGeneration: "",
+  currentCarBodyType: "",
+  currentCarOwnersCount: "",
   tradeInPlan: "",
   commercialBrand: "",
   commercialModel: "",
@@ -154,15 +160,44 @@ function formatPhoneInput(value: string): string {
   return formatted;
 }
 
+function formatOwnersCount(value: string | null | undefined): string {
+  if (value === "1") return "1 владелец";
+  if (value === "2" || value === "3") return `${value} владельца`;
+  if (value === "4+") return "4 и более";
+  return "";
+}
+
+type CmCatalogItem = { id: string; name: string };
+
+async function fetchCmCatalogItems(path: string): Promise<CmCatalogItem[]> {
+  const response = await fetch(path);
+  if (!response.ok) throw new Error("Не удалось загрузить каталог автомобилей");
+  const payload = await response.json() as { ok?: boolean; data?: unknown };
+  if (!payload.ok || !Array.isArray(payload.data)) throw new Error("Каталог автомобилей недоступен");
+  return payload.data.filter((item): item is CmCatalogItem =>
+    Boolean(item && typeof item === "object" &&
+      typeof (item as Record<string, unknown>)["id"] === "string" &&
+      typeof (item as Record<string, unknown>)["name"] === "string")
+  );
+}
+
+async function fetchCmYears(brand: string, model: string): Promise<number[]> {
+  const params = new URLSearchParams({ brand, model });
+  const response = await fetch(`/api/car-catalog/cm-years?${params}`);
+  if (!response.ok) throw new Error("Не удалось загрузить годы выпуска");
+  const payload = await response.json() as { ok?: boolean; data?: unknown };
+  return payload.ok && Array.isArray(payload.data)
+    ? payload.data.filter((year): year is number => Number.isInteger(year))
+    : [];
+}
+
 function validateStep(
   form: FormState,
   step: number,
-  selectedCurrentCar: ManagerClientCardInventoryItem | null,
-  autoRuBrandId: string,
-  autoRuBrandSearch: string,
-  autoRuModelId: string,
-  autoRuModelSearch: string,
-  currentVinSearch: string,
+  currentCarBrandId: string,
+  currentCarBrandSearch: string,
+  currentCarModelId: string,
+  currentCarModelSearch: string,
   selectedOfferCar: ManagerClientCardInventoryItem | null,
   offerBrandSearch: string,
   offerModelSearch: string,
@@ -197,27 +232,37 @@ function validateStep(
   }
   if (step === 2) {
     const errors: string[] = [];
-    if (form.currentCarYear) {
+    const hasCurrentCarData = Boolean(
+      currentCarBrandSearch.trim() || currentCarModelSearch.trim() ||
+      form.currentCarBrand || form.currentCarModel || form.currentCarYear ||
+      form.currentCarMileage || form.currentCarGeneration || form.currentCarBodyType ||
+      form.currentCarOwnersCount || form.tradeInPlan,
+    );
+    if (!hasCurrentCarData) return errors;
+    if (!currentCarBrandId || !form.currentCarBrand) {
+      errors.push("Выберите марку текущего автомобиля.");
+    }
+    if (!currentCarModelId || !form.currentCarModel) {
+      errors.push("Выберите модель текущего автомобиля.");
+    }
+    if (!form.currentCarYear) {
+      errors.push("Укажите год выпуска текущего автомобиля.");
+    } else {
       const year = Number(form.currentCarYear);
       if (!Number.isInteger(year) || year < 1950 || year > new Date().getFullYear() + 1) {
         errors.push("Проверьте год выпуска текущего автомобиля.");
       }
     }
-    if (autoRuBrandSearch.trim() && !autoRuBrandId) {
-      errors.push("Выберите марку текущего автомобиля из совпадений или очистите поле.");
+    if (!form.currentCarMileage) {
+      errors.push("Укажите пробег текущего автомобиля.");
+    } else {
+      const mileage = Number(form.currentCarMileage);
+      if (!Number.isInteger(mileage) || mileage < 0 || mileage > 2_000_000) {
+        errors.push("Проверьте пробег текущего автомобиля.");
+      }
     }
-    if (autoRuModelSearch.trim() && !autoRuModelId) {
-      errors.push("Выберите модель текущего автомобиля из совпадений или очистите поле.");
-    }
-    if (autoRuBrandId && !autoRuModelId) {
-      errors.push("Выберите модель текущего автомобиля или очистите марку.");
-    }
-    if (currentVinSearch.trim() && currentVinSearch.trim().length < 4) {
-      errors.push("Для поиска по VIN введите минимум 4 символа.");
-    }
-    if (currentVinSearch.trim().length >= 4 && !selectedCurrentCar) {
-      errors.push("Выберите найденный автомобиль по VIN или очистите поле.");
-    }
+    if (currentCarBrandSearch.trim() && !currentCarBrandId) errors.push("Выберите марку из списка.");
+    if (currentCarModelSearch.trim() && !currentCarModelId) errors.push("Выберите модель из списка.");
     return errors;
   }
   if (step === 3) {
@@ -241,6 +286,7 @@ function SelectField({
   onChange,
   children,
   disabled,
+  invalid = false,
 }: {
   id: string;
   label: string;
@@ -248,19 +294,29 @@ function SelectField({
   onChange: (value: string) => void;
   children: ReactNode;
   disabled?: boolean;
+  invalid?: boolean;
 }) {
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
       <select
         id={id}
-        className={fieldClass}
+        className={`${fieldClass} ${invalid ? "border-red-400 focus:border-red-500 focus:ring-red-300" : ""}`}
+        aria-invalid={invalid}
         value={value}
         disabled={disabled}
         onChange={event => onChange(event.target.value)}
       >
         {children}
       </select>
+    </div>
+  );
+}
+
+function CascadeField({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+  return (
+    <div className="manager-form-cascade" style={{ animationDelay: `${delay}ms` }}>
+      {children}
     </div>
   );
 }
@@ -275,6 +331,7 @@ function SearchSuggestionField({
   options,
   loading = false,
   disabled = false,
+  invalid = false,
   onChange,
   onSelect,
 }: {
@@ -285,6 +342,7 @@ function SearchSuggestionField({
   options: SearchSuggestion[];
   loading?: boolean;
   disabled?: boolean;
+  invalid?: boolean;
   onChange: (value: string) => void;
   onSelect: (option: SearchSuggestion) => void;
 }) {
@@ -337,7 +395,8 @@ function SearchSuggestionField({
             setOpen(false);
           }
         }}
-        className="h-11"
+        className={`h-11 ${invalid ? "border-red-400 focus-visible:ring-red-300" : ""}`}
+        aria-invalid={invalid}
       />
       {open && !disabled && (
         <div
@@ -438,15 +497,13 @@ export default function ManagerClientCardsPage() {
   const [page, setPage] = useState(1);
   const [selectedCard, setSelectedCard] = useState<ManagerClientCard | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [selectedCurrentCar, setSelectedCurrentCar] = useState<ManagerClientCardInventoryItem | null>(null);
   const [selectedOfferCar, setSelectedOfferCar] = useState<ManagerClientCardInventoryItem | null>(null);
-  const [autoRuBrandId, setAutoRuBrandId] = useState("");
-  const [autoRuBrandSearch, setAutoRuBrandSearch] = useState("");
-  const [autoRuBrandName, setAutoRuBrandName] = useState("");
-  const [autoRuModelId, setAutoRuModelId] = useState("");
-  const [autoRuModelSearch, setAutoRuModelSearch] = useState("");
-  const [autoRuModelName, setAutoRuModelName] = useState("");
-  const [currentVinSearch, setCurrentVinSearch] = useState("");
+  const [currentCarBrandId, setCurrentCarBrandId] = useState("");
+  const [currentCarModelId, setCurrentCarModelId] = useState("");
+  const [currentCarBrandSearch, setCurrentCarBrandSearch] = useState("");
+  const [currentCarModelSearch, setCurrentCarModelSearch] = useState("");
+  const [currentCarGenerationId, setCurrentCarGenerationId] = useState("");
+  const [currentCarBodyTypeId, setCurrentCarBodyTypeId] = useState("");
   const [offerBrandSearch, setOfferBrandSearch] = useState("");
   const [offerModelSearch, setOfferModelSearch] = useState("");
   const [offerVinSearch, setOfferVinSearch] = useState("");
@@ -479,31 +536,42 @@ export default function ManagerClientCardsPage() {
     queryFn: () => getManagerClientNeedsModels(form.desiredBrand),
     enabled: mode === "form" && Boolean(form.desiredBrand),
   });
-  const autoRuBrandsQuery = useQuery({
-    queryKey: ["manager-client-card-autoru-brands"],
-    queryFn: getAutoRuCatalogBrands,
+  const currentCarBrandsQuery = useQuery({
+    queryKey: ["manager-client-card-current-car-cm-brands"],
+    queryFn: () => fetchCmCatalogItems("/api/car-catalog/cm-brands"),
     enabled: mode === "form" && step === 2,
-    staleTime: 60 * 60 * 1000,
+    staleTime: 24 * 60 * 60 * 1000,
   });
-  const autoRuModelsQuery = useQuery({
-    queryKey: ["manager-client-card-autoru-models", autoRuBrandId],
-    queryFn: () => getAutoRuCatalogModels(autoRuBrandId),
-    enabled: mode === "form" && step === 2 && Boolean(autoRuBrandId),
-    staleTime: 30 * 60 * 1000,
+  const currentCarModelsQuery = useQuery({
+    queryKey: ["manager-client-card-current-car-cm-models", currentCarBrandId],
+    queryFn: () => fetchCmCatalogItems(`/api/car-catalog/cm-models?${new URLSearchParams({ brand: currentCarBrandId })}`),
+    enabled: mode === "form" && step === 2 && Boolean(currentCarBrandId),
+    staleTime: 24 * 60 * 60 * 1000,
   });
-  const currentCarInventoryQuery = useQuery({
-    queryKey: ["manager-client-card-current-vehicle", autoRuBrandName, autoRuModelName, currentVinSearch.trim()],
-    queryFn: () => currentVinSearch.trim().length >= 4
-      ? searchManagerClientCardInventory({ vin: currentVinSearch.trim(), type: "used" })
-      : searchManagerClientCardInventory({
-          brand: autoRuBrandName,
-          model: autoRuModelName,
-          type: "used",
-        }),
-    enabled: mode === "form" && step === 2 && (
-      currentVinSearch.trim().length >= 4 || Boolean(autoRuBrandId && autoRuModelId)
-    ),
-    staleTime: 30_000,
+  const currentCarYearsQuery = useQuery({
+    queryKey: ["manager-client-card-current-car-cm-years", currentCarBrandId, currentCarModelId],
+    queryFn: () => fetchCmYears(currentCarBrandId, currentCarModelId),
+    enabled: mode === "form" && step === 2 && Boolean(currentCarBrandId && currentCarModelId),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+  const currentCarGenerationsQuery = useQuery({
+    queryKey: ["manager-client-card-current-car-cm-generations", currentCarBrandId, currentCarModelId, form.currentCarYear],
+    queryFn: () => {
+      const params = new URLSearchParams({
+        brand: currentCarBrandId,
+        model: currentCarModelId,
+        creationYear: form.currentCarYear,
+      });
+      return fetchCmCatalogItems(`/api/car-catalog/cm-generations?${params}`);
+    },
+    enabled: mode === "form" && step === 2 && Boolean(currentCarBrandId && currentCarModelId && form.currentCarYear),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+  const currentCarBodiesQuery = useQuery({
+    queryKey: ["manager-client-card-current-car-cm-bodies", currentCarBrandId, currentCarModelId],
+    queryFn: () => fetchCmCatalogItems(`/api/car-catalog/cm-bodies?${new URLSearchParams({ brand: currentCarBrandId, model: currentCarModelId })}`),
+    enabled: mode === "form" && step === 2 && Boolean(currentCarBrandId && currentCarModelId),
+    staleTime: 24 * 60 * 60 * 1000,
   });
   const offerInventoryQuery = useQuery({
     queryKey: ["manager-client-card-offer-vehicle", offerBrandSearch.trim(), offerModelSearch.trim(), offerVinSearch.trim()],
@@ -527,16 +595,9 @@ export default function ManagerClientCardsPage() {
     onSuccess: () => {
       toast({ title: "Рабочий лист сохранён" });
       setForm(emptyForm);
-      setSelectedCurrentCar(null);
       setSelectedOfferCar(null);
       setStep(0);
-      setCurrentVinSearch("");
-      setAutoRuBrandSearch("");
-      setAutoRuBrandId("");
-      setAutoRuBrandName("");
-      setAutoRuModelSearch("");
-      setAutoRuModelId("");
-      setAutoRuModelName("");
+      resetCurrentVehicle();
       setOfferBrandSearch("");
       setOfferModelSearch("");
       setOfferVinSearch("");
@@ -552,18 +613,19 @@ export default function ManagerClientCardsPage() {
 
   const brands = brandsQuery.data?.data ?? [];
   const models = modelsQuery.data?.data ?? [];
-  const autoRuBrands = autoRuBrandsQuery.data?.data ?? [];
-  const autoRuModels = autoRuModelsQuery.data?.data ?? [];
-  const autoRuBrandSuggestions = autoRuBrands.map((brand: AutoRuCatalogBrand) => ({
+  const currentCarBrands = currentCarBrandsQuery.data ?? [];
+  const currentCarModels = currentCarModelsQuery.data ?? [];
+  const currentCarGenerations = currentCarGenerationsQuery.data ?? [];
+  const currentCarBodies = currentCarBodiesQuery.data ?? [];
+  const currentCarBrandSuggestions = currentCarBrands.map(brand => ({
     value: brand.id,
-    label: brand.cyrillicName || brand.name,
+    label: brand.name,
   }));
-  const autoRuModelSuggestions = autoRuModels.map((model: AutoRuCatalogModel) => ({
+  const currentCarModelSuggestions = currentCarModels.map(model => ({
     value: model.id,
     label: model.name,
   }));
   const managers = managersQuery.data?.data ?? [];
-  const currentCarInventory = currentCarInventoryQuery.data?.data ?? [];
   const offerInventory = offerInventoryQuery.data?.data ?? [];
   const offerBrandSuggestions = Array.from(new Set(offerInventory.map(car => car.brand).filter((brand): brand is string => Boolean(brand))))
     .map(brand => ({ value: brand, label: brand }));
@@ -578,12 +640,10 @@ export default function ManagerClientCardsPage() {
       ? validateStep(
           form,
           index,
-          selectedCurrentCar,
-          autoRuBrandId,
-          autoRuBrandSearch,
-          autoRuModelId,
-          autoRuModelSearch,
-          currentVinSearch,
+          currentCarBrandId,
+          currentCarBrandSearch,
+          currentCarModelId,
+          currentCarModelSearch,
           selectedOfferCar,
           offerBrandSearch,
           offerModelSearch,
@@ -592,12 +652,10 @@ export default function ManagerClientCardsPage() {
       : []),
     [
       form,
-      selectedCurrentCar,
-      autoRuBrandId,
-      autoRuBrandSearch,
-      autoRuModelId,
-      autoRuModelSearch,
-      currentVinSearch,
+      currentCarBrandId,
+      currentCarBrandSearch,
+      currentCarModelId,
+      currentCarModelSearch,
       selectedOfferCar,
       offerBrandSearch,
       offerModelSearch,
@@ -612,6 +670,26 @@ export default function ManagerClientCardsPage() {
     setFormError("");
   }
 
+  function resetCurrentVehicle() {
+    setCurrentCarBrandId("");
+    setCurrentCarModelId("");
+    setCurrentCarBrandSearch("");
+    setCurrentCarModelSearch("");
+    setCurrentCarGenerationId("");
+    setCurrentCarBodyTypeId("");
+    setForm(previous => ({
+      ...previous,
+      currentCarBrand: "",
+      currentCarModel: "",
+      currentCarYear: "",
+      currentCarMileage: "",
+      currentCarGeneration: "",
+      currentCarBodyType: "",
+      currentCarOwnersCount: "",
+      tradeInPlan: "",
+    }));
+  }
+
   function updateFilters(patch: Partial<ListFilters>) {
     setFilters(previous => ({ ...previous, ...patch }));
     setPage(1);
@@ -623,15 +701,8 @@ export default function ManagerClientCardsPage() {
 
   function startNewCard() {
     setForm(emptyForm);
-    setSelectedCurrentCar(null);
     setSelectedOfferCar(null);
-    setAutoRuBrandSearch("");
-    setAutoRuBrandId("");
-    setAutoRuBrandName("");
-    setAutoRuModelSearch("");
-    setAutoRuModelId("");
-    setAutoRuModelName("");
-    setCurrentVinSearch("");
+    resetCurrentVehicle();
     setOfferBrandSearch("");
     setOfferModelSearch("");
     setOfferVinSearch("");
@@ -648,17 +719,7 @@ export default function ManagerClientCardsPage() {
 
   function skipOptionalStep() {
     if (step === 2) {
-      update("currentCar", "");
-      update("currentCarYear", "");
-      update("tradeInPlan", "");
-      setSelectedCurrentCar(null);
-      setCurrentVinSearch("");
-      setAutoRuBrandSearch("");
-      setAutoRuBrandId("");
-      setAutoRuBrandName("");
-      setAutoRuModelSearch("");
-      setAutoRuModelId("");
-      setAutoRuModelName("");
+      resetCurrentVehicle();
     }
     if (step === 3) {
       setSelectedOfferCar(null);
@@ -678,12 +739,10 @@ export default function ManagerClientCardsPage() {
     const allErrors = steps.map((_, index) => validateStep(
       form,
       index,
-      selectedCurrentCar,
-      autoRuBrandId,
-      autoRuBrandSearch,
-      autoRuModelId,
-      autoRuModelSearch,
-      currentVinSearch,
+      currentCarBrandId,
+      currentCarBrandSearch,
+      currentCarModelId,
+      currentCarModelSearch,
       selectedOfferCar,
       offerBrandSearch,
       offerModelSearch,
@@ -703,9 +762,15 @@ export default function ManagerClientCardsPage() {
       desiredModel: form.desiredModel || null,
       desiredVehicleUndecided: form.desiredVehicleUndecided,
       budgetRange: form.budgetRange || null,
-      currentCar: form.currentCar.trim() || null,
+      currentCar: [form.currentCarBrand, form.currentCarModel].filter(Boolean).join(" ") || null,
+      currentCarBrand: form.currentCarBrand || null,
+      currentCarModel: form.currentCarModel || null,
       currentCarYear: form.currentCarYear ? Number(form.currentCarYear) : null,
-      currentCarInventoryId: selectedCurrentCar?.id ?? null,
+      currentCarMileage: form.currentCarMileage ? Number(form.currentCarMileage) : null,
+      currentCarGeneration: form.currentCarGeneration || null,
+      currentCarBodyType: form.currentCarBodyType || null,
+      currentCarOwnersCount: form.currentCarOwnersCount || null,
+      currentCarInventoryId: null,
       tradeInPlan: form.tradeInPlan || null,
       commercialBrand: form.commercialBrand || null,
       commercialModel: form.commercialModel || null,
@@ -722,12 +787,6 @@ export default function ManagerClientCardsPage() {
     setOfferVinSearch("");
     update("commercialBrand", car.brand ?? "");
     update("commercialModel", car.model ?? "");
-  }
-
-  function selectCurrentCar(car: ManagerClientCardInventoryItem) {
-    setSelectedCurrentCar(car);
-    update("currentCar", [car.brand, car.model].filter(Boolean).join(" "));
-    update("currentCarYear", car.year ? String(car.year) : "");
   }
 
   function downloadCsv(blob: Blob) {
@@ -1008,12 +1067,10 @@ export default function ManagerClientCardsPage() {
                           : validateStep(
                               form,
                               index,
-                              selectedCurrentCar,
-                              autoRuBrandId,
-                              autoRuBrandSearch,
-                              autoRuModelId,
-                              autoRuModelSearch,
-                              currentVinSearch,
+                              currentCarBrandId,
+                              currentCarBrandSearch,
+                              currentCarModelId,
+                              currentCarModelSearch,
                               selectedOfferCar,
                               offerBrandSearch,
                               offerModelSearch,
@@ -1045,12 +1102,10 @@ export default function ManagerClientCardsPage() {
                           : validateStep(
                               form,
                               index,
-                              selectedCurrentCar,
-                              autoRuBrandId,
-                              autoRuBrandSearch,
-                              autoRuModelId,
-                              autoRuModelSearch,
-                              currentVinSearch,
+                              currentCarBrandId,
+                              currentCarBrandSearch,
+                              currentCarModelId,
+                              currentCarModelSearch,
                               selectedOfferCar,
                               offerBrandSearch,
                               offerModelSearch,
@@ -1073,7 +1128,7 @@ export default function ManagerClientCardsPage() {
                 <p className="mt-1 text-sm text-slate-500">
                   {step === 0 && "Укажите контактные данные клиента. Пол можно не заполнять."}
                   {step === 1 && "Выберите модель из доступного склада или отметьте, что клиент пока не определился."}
-                  {step === 2 && "Выберите марку и модель текущего автомобиля в каталоге Auto.ru или найдите его по VIN."}
+                  {step === 2 && "Укажите автомобиль клиента. Марка, модель, год и пробег обязательны; остальные поля можно пропустить."}
                   {step === 3 && "Выберите конкретный новый автомобиль из активного склада."}
                   {step === 4 && "Добавьте важные детали разговора, которые помогут продолжить общение."}
                 </p>
@@ -1227,176 +1282,226 @@ export default function ManagerClientCardsPage() {
               {step === 2 && (
                 <div className="space-y-5">
                   <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                    <CascadeField>
                       <SearchSuggestionField
-                        id="current-autoru-brand"
-                        label="Марка · Auto.ru"
-                        value={autoRuBrandSearch}
-                        placeholder="Начните вводить марку"
-                        options={autoRuBrandSuggestions}
-                        loading={autoRuBrandsQuery.isLoading}
+                        id="current-cm-brand"
+                        label="Марка *"
+                        value={currentCarBrandSearch}
+                        placeholder="Выберите марку"
+                        options={currentCarBrandSuggestions}
+                        loading={currentCarBrandsQuery.isLoading}
+                        invalid={saveAttempted && stepErrors[2].some(error => error.includes("марку"))}
                         onChange={value => {
-                          setAutoRuBrandSearch(value);
-                          setAutoRuBrandId("");
-                          setAutoRuBrandName("");
-                          setCurrentVinSearch("");
-                          setAutoRuModelSearch("");
-                          setAutoRuModelId("");
-                          setAutoRuModelName("");
-                          setSelectedCurrentCar(null);
-                          update("currentCar", "");
-                          update("currentCarYear", "");
+                          setCurrentCarBrandSearch(value);
+                          setCurrentCarBrandId("");
+                          setCurrentCarModelSearch("");
+                          setCurrentCarModelId("");
+                          setCurrentCarGenerationId("");
+                          setCurrentCarBodyTypeId("");
+                          setForm(previous => ({
+                            ...previous,
+                            currentCarBrand: "",
+                            currentCarModel: "",
+                            currentCarYear: "",
+                            currentCarMileage: "",
+                            currentCarGeneration: "",
+                            currentCarBodyType: "",
+                            currentCarOwnersCount: "",
+                          }));
+                          setFormError("");
                         }}
                         onSelect={option => {
-                          const brand = autoRuBrands.find(item => item.id === option.value);
-                          const brandName = brand?.cyrillicName || brand?.name || option.label;
-                          setAutoRuBrandId(option.value);
-                          setAutoRuBrandSearch(brandName);
-                          setAutoRuBrandName(brandName);
-                          setCurrentVinSearch("");
-                          setAutoRuModelSearch("");
-                          setAutoRuModelId("");
-                          setAutoRuModelName("");
-                          setSelectedCurrentCar(null);
-                          update("currentCar", "");
-                          update("currentCarYear", "");
+                          setCurrentCarBrandId(option.value);
+                          setCurrentCarBrandSearch(option.label);
+                          setCurrentCarModelId("");
+                          setCurrentCarModelSearch("");
+                          setCurrentCarGenerationId("");
+                          setCurrentCarBodyTypeId("");
+                          setForm(previous => ({
+                            ...previous,
+                            currentCarBrand: option.label,
+                            currentCarModel: "",
+                            currentCarYear: "",
+                            currentCarMileage: "",
+                            currentCarGeneration: "",
+                            currentCarBodyType: "",
+                            currentCarOwnersCount: "",
+                          }));
+                          setFormError("");
                         }}
                       />
-                      <SearchSuggestionField
-                        id="current-autoru-model"
-                        label="Модель"
-                        value={autoRuModelSearch}
-                        placeholder={autoRuBrandId ? "Начните вводить модель" : "Сначала выберите марку"}
-                        options={autoRuModelSuggestions}
-                        disabled={!autoRuBrandId}
-                        loading={autoRuModelsQuery.isLoading}
-                        onChange={value => {
-                          setAutoRuModelSearch(value);
-                          setAutoRuModelId("");
-                          setAutoRuModelName("");
-                          setSelectedCurrentCar(null);
-                          setCurrentVinSearch("");
-                          update("currentCar", autoRuBrandName);
-                          update("currentCarYear", "");
-                        }}
-                        onSelect={option => {
-                          setAutoRuModelId(option.value);
-                          setAutoRuModelSearch(option.label);
-                          setAutoRuModelName(option.label);
-                          setSelectedCurrentCar(null);
-                          setCurrentVinSearch("");
-                          update("currentCar", [autoRuBrandName, option.label].filter(Boolean).join(" "));
-                          update("currentCarYear", "");
-                        }}
-                      />
-                      {autoRuBrandsQuery.isError && (
-                        <p role="alert" className="text-sm text-red-600 sm:col-span-2">Не удалось загрузить марки из Auto.ru.</p>
-                      )}
-                      {autoRuModelsQuery.isError && (
-                        <p role="alert" className="text-sm text-red-600 sm:col-span-2">Не удалось загрузить модели из Auto.ru.</p>
-                      )}
-                      <div className="space-y-2 sm:col-span-2">
-                        <Label htmlFor="current-vin">Или поиск по VIN / его части</Label>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    </CascadeField>
+                    {currentCarBrandId && (
+                      <CascadeField delay={50}>
+                        <SearchSuggestionField
+                          id="current-cm-model"
+                          label="Модель *"
+                          value={currentCarModelSearch}
+                          placeholder="Начните вводить модель"
+                          options={currentCarModelSuggestions}
+                          loading={currentCarModelsQuery.isLoading}
+                          invalid={saveAttempted && stepErrors[2].some(error => error.includes("модель"))}
+                          onChange={value => {
+                            setCurrentCarModelSearch(value);
+                            setCurrentCarModelId("");
+                            setCurrentCarGenerationId("");
+                            setCurrentCarBodyTypeId("");
+                            setForm(previous => ({
+                              ...previous,
+                              currentCarModel: "",
+                              currentCarYear: "",
+                              currentCarMileage: "",
+                              currentCarGeneration: "",
+                              currentCarBodyType: "",
+                              currentCarOwnersCount: "",
+                            }));
+                            setFormError("");
+                          }}
+                          onSelect={option => {
+                            setCurrentCarModelId(option.value);
+                            setCurrentCarModelSearch(option.label);
+                            setCurrentCarGenerationId("");
+                            setCurrentCarBodyTypeId("");
+                            setForm(previous => ({
+                              ...previous,
+                              currentCarModel: option.label,
+                              currentCarYear: "",
+                              currentCarMileage: "",
+                              currentCarGeneration: "",
+                              currentCarBodyType: "",
+                              currentCarOwnersCount: "",
+                            }));
+                            setFormError("");
+                          }}
+                        />
+                      </CascadeField>
+                    )}
+                    {currentCarBrandsQuery.isError && (
+                      <p role="alert" className="text-sm text-red-600 sm:col-span-2">Не удалось загрузить каталог марок.</p>
+                    )}
+                    {currentCarModelsQuery.isError && (
+                      <p role="alert" className="text-sm text-red-600 sm:col-span-2">Не удалось загрузить модели для выбранной марки.</p>
+                    )}
+                  </div>
+
+                  {currentCarModelId && (
+                    <div className="grid min-w-0 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2">
+                      <CascadeField>
+                        <SelectField
+                          id="current-car-year"
+                          label="Год *"
+                          value={form.currentCarYear}
+                          invalid={saveAttempted && stepErrors[2].some(error => error.includes("год"))}
+                          onChange={value => {
+                            update("currentCarYear", value);
+                            setCurrentCarGenerationId("");
+                            update("currentCarGeneration", "");
+                          }}
+                          disabled={currentCarYearsQuery.isLoading}
+                        >
+                          <option value="">
+                            {currentCarYearsQuery.isLoading ? "Загружаем годы…" : "Выберите год"}
+                          </option>
+                          {(currentCarYearsQuery.data ?? []).map(year => (
+                            <option key={year} value={year}>{year}</option>
+                          ))}
+                        </SelectField>
+                      </CascadeField>
+                      <CascadeField delay={50}>
+                        <div className="space-y-2">
+                          <Label htmlFor="current-car-mileage">Пробег, км *</Label>
                           <Input
-                            id="current-vin"
-                            value={currentVinSearch}
-                            onChange={event => {
-                              setCurrentVinSearch(event.target.value.toUpperCase().replace(/[^A-ZА-Я0-9]/g, "").slice(0, 32));
-                              setAutoRuBrandSearch("");
-                              setAutoRuBrandId("");
-                              setAutoRuBrandName("");
-                              setAutoRuModelSearch("");
-                              setAutoRuModelId("");
-                              setAutoRuModelName("");
-                              setSelectedCurrentCar(null);
-                              update("currentCar", "");
-                              update("currentCarYear", "");
-                            }}
-                            placeholder="Введите минимум 4 символа"
-                            autoCapitalize="characters"
-                            className="h-11 pl-9 uppercase"
+                            id="current-car-mileage"
+                            type="number"
+                            min={0}
+                            max={2_000_000}
+                            step={1}
+                            inputMode="numeric"
+                            value={form.currentCarMileage}
+                            onChange={event => update("currentCarMileage", event.target.value)}
+                            placeholder="Например, 75 000"
+                            className={`h-11 ${saveAttempted && stepErrors[2].some(error => error.includes("пробег")) ? "border-red-400 focus-visible:ring-red-300" : ""}`}
+                            aria-invalid={saveAttempted && stepErrors[2].some(error => error.includes("пробег"))}
                           />
                         </div>
-                      </div>
-                  </div>
-
-                  {selectedCurrentCar ? (
-                    <div className="space-y-3">
-                      <p className="text-sm font-medium text-slate-700">Текущий автомобиль из базы с пробегом</p>
-                      <InventoryResult car={selectedCurrentCar} selected onSelect={() => setSelectedCurrentCar(null)} />
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedCurrentCar(null);
-                          if (currentVinSearch.trim()) {
-                            update("currentCar", "");
-                            update("currentCarYear", "");
-                          }
-                        }}
-                      >
-                        Снять выбор автомобиля из базы
-                      </Button>
+                      </CascadeField>
                     </div>
-                  ) : currentVinSearch.trim() && currentVinSearch.trim().length < 4 ? (
-                    <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
-                      Поиск по VIN работает по базе автомобилей с пробегом и доступен от 4 символов.
-                    </p>
-                  ) : !autoRuBrandId || !autoRuModelId ? (
-                    <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
-                      Введите марку и модель или VIN. Выберите совпадение из подсказок; похожую машину из нашей базы с пробегом можно привязать к листу.
-                    </p>
-                  ) : currentCarInventoryQuery.isLoading ? (
-                    <div className="flex items-center gap-2 py-5 text-sm text-slate-500">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Ищем в базе автомобилей с пробегом…
-                    </div>
-                  ) : currentCarInventoryQuery.isError ? (
-                    <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                      Не удалось выполнить поиск. Измените запрос и попробуйте снова.
-                    </p>
-                  ) : currentCarInventory.length ? (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-slate-700">
-                        Совпадения в базе с пробегом: {currentCarInventory.length}. Выбор конкретной машины необязателен.
-                      </p>
-                      {currentCarInventory.map(car => (
-                        <InventoryResult key={car.id} car={car} selected={false} onSelect={selectCurrentCar} />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
-                      {currentVinSearch.trim()
-                        ? "Автомобиль с таким VIN в базе не найден. Проверьте VIN или выполните поиск по марке и модели."
-                        : "Совпадений в базе с пробегом нет. Марка и модель из Auto.ru всё равно сохранятся."}
-                    </p>
                   )}
 
-                  <div className="grid gap-4 border-t border-slate-100 pt-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="current-car-year">Год выпуска</Label>
-                      <Input
-                        id="current-car-year"
-                        type="number"
-                        min={1950}
-                        max={new Date().getFullYear() + 1}
-                        value={form.currentCarYear}
-                        onChange={event => update("currentCarYear", event.target.value)}
-                        placeholder="Например, 2019"
-                        className="h-11"
-                      />
+                  {currentCarModelId && (
+                    <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                      {form.currentCarYear && (
+                        <CascadeField>
+                          <SelectField
+                            id="current-car-generation"
+                            label="Поколение · необязательно"
+                            value={currentCarGenerationId}
+                            onChange={value => {
+                              setCurrentCarGenerationId(value);
+                              update("currentCarGeneration", currentCarGenerations.find(item => item.id === value)?.name ?? "");
+                            }}
+                            disabled={currentCarGenerationsQuery.isLoading}
+                          >
+                            <option value="">
+                              {currentCarGenerationsQuery.isLoading ? "Загружаем поколения…" : "Не указано"}
+                            </option>
+                            {currentCarGenerations.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                          </SelectField>
+                        </CascadeField>
+                      )}
+                      <CascadeField delay={50}>
+                        <SelectField
+                          id="current-car-body-type"
+                          label="Тип кузова · необязательно"
+                          value={currentCarBodyTypeId}
+                          onChange={value => {
+                            setCurrentCarBodyTypeId(value);
+                            update("currentCarBodyType", currentCarBodies.find(item => item.id === value)?.name ?? "");
+                          }}
+                          disabled={currentCarBodiesQuery.isLoading}
+                        >
+                          <option value="">
+                            {currentCarBodiesQuery.isLoading ? "Загружаем типы кузова…" : "Не указано"}
+                          </option>
+                          {currentCarBodies.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                        </SelectField>
+                      </CascadeField>
+                      <CascadeField delay={100}>
+                        <SelectField
+                          id="current-car-owners"
+                          label="Кол-во владельцев · необязательно"
+                          value={form.currentCarOwnersCount}
+                          onChange={value => update("currentCarOwnersCount", value as FormState["currentCarOwnersCount"])}
+                        >
+                          <option value="">Не указано</option>
+                          <option value="1">1 владелец</option>
+                          <option value="2">2 владельца</option>
+                          <option value="3">3 владельца</option>
+                          <option value="4+">4 и более</option>
+                        </SelectField>
+                      </CascadeField>
+                      <CascadeField delay={150}>
+                        <SelectField
+                          id="trade-in-plan"
+                          label="Планирует сдать в трейд-ин? · необязательно"
+                          value={form.tradeInPlan}
+                          onChange={value => update("tradeInPlan", value as FormState["tradeInPlan"])}
+                        >
+                          <option value="">Не указано</option>
+                          {tradeInOptions.map(value => <option key={value} value={value}>{value}</option>)}
+                        </SelectField>
+                      </CascadeField>
                     </div>
-                    <SelectField
-                      id="trade-in-plan"
-                      label="Планирует сдать в трейд-ин?"
-                      value={form.tradeInPlan}
-                      onChange={value => update("tradeInPlan", value as FormState["tradeInPlan"])}
-                    >
-                      <option value="">Не указано</option>
-                      {tradeInOptions.map(value => <option key={value} value={value}>{value}</option>)}
-                    </SelectField>
-                  </div>
+                  )}
+
+                  {currentCarBodiesQuery.isError && currentCarModelId && (
+                    <p role="alert" className="text-sm text-red-600">Не удалось загрузить типы кузова.</p>
+                  )}
+                  {currentCarYearsQuery.isError && currentCarModelId && (
+                    <p role="alert" className="text-sm text-red-600">Не удалось загрузить годы выпуска.</p>
+                  )}
                   {saveAttempted && stepErrors[2].length > 0 && (
-                    <p className="text-sm text-red-600">{stepErrors[2].join(" ")}</p>
+                    <p role="alert" className="text-sm text-red-600">{stepErrors[2].join(" ")}</p>
                   )}
                 </div>
               )}
@@ -1561,11 +1666,20 @@ export default function ManagerClientCardsPage() {
                       {form.clientGender && <div><dt className="text-xs text-slate-500">Пол</dt><dd className="font-medium">{form.clientGender === "male" ? "Мужской" : "Женский"}</dd></div>}
                       <div><dt className="text-xs text-slate-500">Интересующая модель</dt><dd className="break-words font-medium">{[form.desiredBrand, form.desiredModel].filter(Boolean).join(" ") || (form.desiredVehicleUndecided ? "Пока не определился" : "Не указана")}</dd></div>
                       <div><dt className="text-xs text-slate-500">Бюджет</dt><dd className="font-medium">{form.budgetRange || "Не указан"}</dd></div>
-                      {form.currentCar && (
+                      {(form.currentCarBrand || form.currentCarModel) && (
                         <div>
                           <dt className="text-xs text-slate-500">Текущий автомобиль</dt>
-                          <dd className="break-words font-medium">{[form.currentCar, form.currentCarYear].filter(Boolean).join(", ")}</dd>
-                          {selectedCurrentCar?.vin && <dd className="mt-1 break-all font-mono text-xs text-slate-500">VIN {selectedCurrentCar.vin}</dd>}
+                          <dd className="break-words font-medium">
+                            {[form.currentCarBrand, form.currentCarModel, form.currentCarYear].filter(Boolean).join(" ")}
+                          </dd>
+                          <dd className="mt-1 text-xs text-slate-500">
+                            {[
+                              form.currentCarMileage ? `${Number(form.currentCarMileage).toLocaleString("ru-RU")} км` : "",
+                              form.currentCarGeneration,
+                              form.currentCarBodyType,
+                              formatOwnersCount(form.currentCarOwnersCount),
+                            ].filter(Boolean).join(" · ")}
+                          </dd>
                         </div>
                       )}
                       {(form.commercialBrand || form.commercialModel) && (
@@ -1665,9 +1779,25 @@ export default function ManagerClientCardsPage() {
                     <div>
                       <dt className="text-xs text-slate-500">Автомобиль</dt>
                       <dd className="break-words font-medium">
-                        {[detailCard.currentCar, detailCard.currentCarYear].filter(Boolean).join(", ") || "Не указан"}
+                        {[
+                          detailCard.currentCarBrand || detailCard.currentCar,
+                          detailCard.currentCarModel,
+                          detailCard.currentCarYear,
+                        ].filter(Boolean).join(" ") || "Не указан"}
                       </dd>
                     </div>
+                    {detailCard.currentCarMileage != null && (
+                      <div><dt className="text-xs text-slate-500">Пробег</dt><dd className="font-medium">{detailCard.currentCarMileage.toLocaleString("ru-RU")} км</dd></div>
+                    )}
+                    {detailCard.currentCarGeneration && (
+                      <div><dt className="text-xs text-slate-500">Поколение</dt><dd className="font-medium">{detailCard.currentCarGeneration}</dd></div>
+                    )}
+                    {detailCard.currentCarBodyType && (
+                      <div><dt className="text-xs text-slate-500">Тип кузова</dt><dd className="font-medium">{detailCard.currentCarBodyType}</dd></div>
+                    )}
+                    {detailCard.currentCarOwnersCount && (
+                      <div><dt className="text-xs text-slate-500">Количество владельцев</dt><dd className="font-medium">{formatOwnersCount(detailCard.currentCarOwnersCount)}</dd></div>
+                    )}
                     {detailCard.currentCarSnapshot?.vin && (
                       <div>
                         <dt className="text-xs text-slate-500">VIN из базы</dt>
