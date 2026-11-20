@@ -675,6 +675,121 @@ export interface ManagerClientCardInventoryResponse {
   data: ManagerClientCardInventoryItem[];
 }
 
+export interface OneCClientCarSummary {
+  /** @nullable */
+  id: number | null;
+  /** @nullable */
+  external_id: string | null;
+  /** @nullable */
+  brand: string | null;
+  /** @nullable */
+  model: string | null;
+  /** @nullable */
+  year: number | null;
+  /** @nullable */
+  modification: string | null;
+  /** @nullable */
+  complectation: string | null;
+  /** @nullable */
+  color: string | null;
+  /** @nullable */
+  price: number | null;
+}
+
+/**
+ * @nullable
+ */
+export type OneCClientCardFeedItemClientGender = typeof OneCClientCardFeedItemClientGender[keyof typeof OneCClientCardFeedItemClientGender] | null;
+
+
+export const OneCClientCardFeedItemClientGender = {
+  male: 'male',
+  female: 'female',
+} as const;
+
+export interface OneCClientCardFeedItem {
+  id: number;
+  created_at: string;
+  manager_id: number;
+  /** @nullable */
+  manager_name: string | null;
+  organization_code: string;
+  organization_name: string;
+  department_code: string;
+  department_name: string;
+  client_name: string;
+  client_phone: string;
+  /** @nullable */
+  client_gender: OneCClientCardFeedItemClientGender;
+  /** @nullable */
+  desired_brand: string | null;
+  /** @nullable */
+  desired_model: string | null;
+  desired_vehicle_undecided: boolean;
+  /** @nullable */
+  budget_range: string | null;
+  /** @nullable */
+  current_car: string | null;
+  /** @nullable */
+  current_car_brand: string | null;
+  /** @nullable */
+  current_car_model: string | null;
+  /** @nullable */
+  current_car_year: number | null;
+  /** @nullable */
+  current_car_mileage: number | null;
+  /** @nullable */
+  current_car_generation: string | null;
+  /** @nullable */
+  current_car_body_type: string | null;
+  /** @nullable */
+  current_car_owners_count: string | null;
+  /** @nullable */
+  current_car_inventory_id: number | null;
+  /** @nullable */
+  trade_in_plan: string | null;
+  /** @nullable */
+  commercial_brand: string | null;
+  /** @nullable */
+  commercial_model: string | null;
+  /** @nullable */
+  commercial_car_id: number | null;
+  commercial_car: OneCClientCarSummary | null;
+  /** @nullable */
+  payment_method: string | null;
+  /** @nullable */
+  comment: string | null;
+}
+
+export interface OneCClientCardsPage {
+  items: OneCClientCardFeedItem[];
+  next_cursor: number;
+  has_more: boolean;
+}
+
+export interface OneCClientCardsResponse {
+  ok: boolean;
+  data: OneCClientCardsPage;
+}
+
+export type OneCClientCardsInitialCursorResponseData = {
+  after_id: number;
+  as_of: string;
+};
+
+export interface OneCClientCardsInitialCursorResponse {
+  ok: boolean;
+  data: OneCClientCardsInitialCursorResponseData;
+}
+
+export interface OneCClientCardsErrorResponse {
+  ok: boolean;
+  error: string;
+  /** @nullable */
+  card_id?: number | null;
+  missing_fields?: string[];
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -732,6 +847,19 @@ page?: number;
  * @maximum 100
  */
 pageSize?: number;
+};
+
+export type GetOneCClientCardsParams = {
+/**
+ * Last source ID successfully imported by 1C
+ * @minimum 0
+ */
+after_id: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };
 
 export type ListManagerClientNeedsModelsParams = {
