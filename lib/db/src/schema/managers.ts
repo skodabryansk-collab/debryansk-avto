@@ -61,6 +61,12 @@ export type ManagerClientCurrentCar = {
   tradeInPlan: string | null;
 };
 
+export type ManagerClientCardFieldChange = {
+  field: string;
+  oldValue: unknown;
+  newValue: unknown;
+};
+
 export const managerClientCardsTable = pgTable("manager_client_cards", {
   id: serial("id").primaryKey(),
   managerId: integer("manager_id").notNull().references(() => managersTable.id, { onDelete: "restrict" }),
@@ -91,6 +97,19 @@ export const managerClientCardsTable = pgTable("manager_client_cards", {
   paymentMethod: text("payment_method"),
   comment: text("comment"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const managerClientCardHistoryTable = pgTable("manager_client_card_history", {
+  id: serial("id").primaryKey(),
+  cardId: integer("card_id").notNull().references(() => managerClientCardsTable.id, { onDelete: "cascade" }),
+  editorManagerId: integer("editor_manager_id").references(() => managersTable.id, { onDelete: "set null" }),
+  editorName: text("editor_name").notNull(),
+  editorRole: text("editor_role").notNull(),
+  changes: jsonb("changes").$type<ManagerClientCardFieldChange[]>().notNull(),
+  previousBrands: jsonb("previous_brands").$type<string[]>().notNull().default([]),
+  currentBrands: jsonb("current_brands").$type<string[]>().notNull().default([]),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const salesHeadManagersTable = pgTable("sales_head_managers", {
@@ -108,4 +127,5 @@ export const salesHeadManagersTable = pgTable("sales_head_managers", {
 export type Manager = typeof managersTable.$inferSelect;
 export type Quote = typeof quotesTable.$inferSelect;
 export type ManagerClientCard = typeof managerClientCardsTable.$inferSelect;
+export type ManagerClientCardHistory = typeof managerClientCardHistoryTable.$inferSelect;
 export type SalesHeadManager = typeof salesHeadManagersTable.$inferSelect;
