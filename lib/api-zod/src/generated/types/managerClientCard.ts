@@ -27,7 +27,19 @@ export interface ManagerClientCard {
   /** @nullable */
   currentCar: string | null;
   /** @nullable */
+  currentCarBrand: string | null;
+  /** @nullable */
+  currentCarModel: string | null;
+  /** @nullable */
   currentCarYear: number | null;
+  /** @nullable */
+  currentCarMileage: number | null;
+  /** @nullable */
+  currentCarGeneration: string | null;
+  /** @nullable */
+  currentCarBodyType: string | null;
+  /** @nullable */
+  currentCarOwnersCount: string | null;
   /** @nullable */
   currentCarInventoryId: number | null;
   currentCarSnapshot: ManagerClientCarSnapshot | null;
