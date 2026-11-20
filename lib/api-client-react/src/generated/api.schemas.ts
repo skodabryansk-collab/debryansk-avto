@@ -413,6 +413,11 @@ export interface ManagerClientNeed {
   undecided: boolean;
   /** @nullable */
   budgetRange: ManagerClientNeedBudgetRange;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  plannedPurchaseDate?: string | null;
 }
 
 /**
@@ -467,11 +472,6 @@ export interface ManagerClientCurrentCar {
   bodyType: string | null;
   /** @nullable */
   ownersCount: ManagerClientCurrentCarOwnersCount;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  inventoryId: number | null;
   snapshot: ManagerClientCarSnapshot | null;
   /** @nullable */
   tradeInPlan: ManagerClientCurrentCarTradeInPlan;
@@ -520,8 +520,6 @@ export interface ManagerClientCard {
   currentCarBodyType: string | null;
   /** @nullable */
   currentCarOwnersCount: string | null;
-  /** @nullable */
-  currentCarInventoryId: number | null;
   currentCarSnapshot: ManagerClientCarSnapshot | null;
   /** @nullable */
   tradeInPlan: string | null;
@@ -668,11 +666,6 @@ export interface ManagerClientCardInput {
   currentCarBodyType: string | null;
   /** @nullable */
   currentCarOwnersCount: ManagerClientCardInputCurrentCarOwnersCount;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  currentCarInventoryId: number | null;
   /** @nullable */
   tradeInPlan: ManagerClientCardInputTradeInPlan;
   /** @minItems 1 */
@@ -774,9 +767,7 @@ export interface ManagerClientCardInventoryResponse {
 
 export interface OneCClientCarSummary {
   /** @nullable */
-  id: number | null;
-  /** @nullable */
-  external_id: string | null;
+  vin: string | null;
   /** @nullable */
   brand: string | null;
   /** @nullable */
@@ -817,6 +808,11 @@ export interface OneCClientNeed {
   undecided: boolean;
   /** @nullable */
   budget_range: OneCClientNeedBudgetRange;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  planned_purchase_date: string | null;
   /** @nullable */
   organization_code: string | null;
   /** @nullable */
@@ -851,8 +847,6 @@ export interface OneCClientCurrentCar {
   /** @nullable */
   owners_count: string | null;
   /** @nullable */
-  inventory_id: number | null;
-  /** @nullable */
   trade_in_plan: OneCClientCurrentCarTradeInPlan;
 }
 
@@ -864,7 +858,7 @@ export interface OneCClientCommercialOffer {
   /** @nullable */
   model: string | null;
   /** @nullable */
-  car_id: number | null;
+  car_vin: string | null;
   car: OneCClientCarSummary | null;
   /** @nullable */
   organization_code: string | null;
@@ -949,15 +943,13 @@ export interface OneCClientCardFeedItem {
   /** @nullable */
   current_car_owners_count: string | null;
   /** @nullable */
-  current_car_inventory_id: number | null;
-  /** @nullable */
   trade_in_plan: string | null;
   /** @nullable */
   commercial_brand: string | null;
   /** @nullable */
   commercial_model: string | null;
   /** @nullable */
-  commercial_car_id: number | null;
+  commercial_car_vin: string | null;
   commercial_car: OneCClientCarSummary | null;
   /** @nullable */
   payment_method: OneCClientCardFeedItemPaymentMethod;
