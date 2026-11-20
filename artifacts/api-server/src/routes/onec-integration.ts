@@ -85,6 +85,15 @@ function asNumber(value: unknown): number | null {
   return null;
 }
 
+function brandKeyForSource(value: string): string {
+  return value
+    .normalize("NFKC")
+    .trim()
+    .toLocaleLowerCase("ru-RU")
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-|-$/g, "") || "brand";
+}
+
 function getCommercialCarSummary(snapshotValue: unknown) {
   const snapshot = asRecord(snapshotValue);
   if (Object.keys(snapshot).length === 0) return null;
@@ -334,16 +343,13 @@ router.get("/client-cards", async (req, res): Promise<void> => {
         const brand = asString(need["brand"]);
         const mapping = findMapping(brand);
         return {
-          brand_id: mapping?.brandId ?? null,
           brand,
           model: asString(need["model"]),
           undecided: need["undecided"] === true,
           budget_range: asString(need["budgetRange"]),
           planned_purchase_date: asString(need["plannedPurchaseDate"]),
           organization_code: mapping?.organizationCode ?? null,
-          organization_name: mapping?.locationTitle ?? null,
           department_code: mapping?.departmentCode ?? null,
-          department_name: mapping?.brandName ?? null,
         };
       });
       const offerMapping = findMapping(card.commercialBrand);
@@ -351,25 +357,19 @@ router.get("/client-cards", async (req, res): Promise<void> => {
       const commercialCarVin = asString(card.commercialCarVin) ?? asString(commercialCarSnapshot["vin"]);
       const commercialOffer = card.commercialBrand || card.commercialModel || card.commercialCarId
         ? {
-            brand_id: offerMapping?.brandId ?? null,
             brand: card.commercialBrand,
             model: card.commercialModel,
             car_vin: commercialCarVin,
             car: getCommercialCarSummary(card.commercialCarSnapshot),
             organization_code: offerMapping?.organizationCode ?? null,
-            organization_name: offerMapping?.locationTitle ?? null,
             department_code: offerMapping?.departmentCode ?? null,
-            department_name: offerMapping?.brandName ?? null,
           }
         : null;
       const recordsByBrand = new Map<number, {
         source_key: string;
-        brand_id: number;
         brand_name: string;
         organization_code: string;
-        organization_name: string;
         department_code: string;
-        department_name: string;
         needs: typeof mappedNeeds;
         commercial_offer: typeof commercialOffer;
       }>();
@@ -377,13 +377,10 @@ router.get("/client-cards", async (req, res): Promise<void> => {
         if (!mapping?.locationId || !mapping.organizationCode || !mapping.locationTitle || !mapping.departmentCode) return;
         if (!recordsByBrand.has(mapping.brandId)) {
           recordsByBrand.set(mapping.brandId, {
-            source_key: `${card.id}:${mapping.brandId}`,
-            brand_id: mapping.brandId,
+            source_key: `${card.id}:${brandKeyForSource(mapping.brandName)}`,
             brand_name: mapping.brandName,
             organization_code: mapping.organizationCode,
-            organization_name: mapping.locationTitle,
             department_code: mapping.departmentCode,
-            department_name: mapping.brandName,
             needs: [],
             commercial_offer: null,
           });
@@ -391,11 +388,10 @@ router.get("/client-cards", async (req, res): Promise<void> => {
         return recordsByBrand.get(mapping.brandId)!;
       };
       for (const need of mappedNeeds) {
-        if (!need.brand_id) continue;
         const group = addBrandRecord(findMapping(need.brand));
         if (group) group.needs.push(need);
       }
-      if (commercialOffer?.brand_id) {
+      if (commercialOffer && offerMapping) {
         const group = addBrandRecord(offerMapping);
         if (group) group.commercial_offer = commercialOffer;
       }
@@ -411,9 +407,7 @@ router.get("/client-cards", async (req, res): Promise<void> => {
         manager_id: card.managerId,
         manager_name: card.managerName,
         organization_code: primaryRecord?.organization_code ?? "",
-        organization_name: primaryRecord?.organization_name ?? "",
         department_code: primaryRecord?.department_code ?? "",
-        department_name: primaryRecord?.department_name ?? "",
         client_name: card.clientName,
         client_phone: card.clientPhone,
         client_gender: card.clientGender,
