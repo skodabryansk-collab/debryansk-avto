@@ -38,7 +38,13 @@ type CreateClientCardInput = {
   desiredVehicleUndecided: boolean;
   budgetRange: typeof budgetRanges[number] | null;
   currentCar: string | null;
+  currentCarBrand: string | null;
+  currentCarModel: string | null;
   currentCarYear: number | null;
+  currentCarMileage: number | null;
+  currentCarGeneration: string | null;
+  currentCarBodyType: string | null;
+  currentCarOwnersCount: "1" | "2" | "3" | "4+" | null;
   currentCarInventoryId: number | null;
   tradeInPlan: typeof tradeInPlans[number] | null;
   commercialBrand: string | null;
@@ -97,6 +103,13 @@ function parseCreateClientCardInput(body: unknown): { data?: CreateClientCardInp
       throw new Error("Для предложения укажите и марку, и модель");
     }
 
+    const currentCarBrand = text(value["currentCarBrand"], "марку текущего автомобиля", 120);
+    const currentCarModel = text(value["currentCarModel"], "модель текущего автомобиля", 120);
+    const currentCarGeneration = text(value["currentCarGeneration"], "поколение", 120);
+    const currentCarBodyType = text(value["currentCarBodyType"], "тип кузова", 120);
+    const currentCarOwnersCount = enumValue(value["currentCarOwnersCount"], ["1", "2", "3", "4+"] as const, "количество владельцев");
+    const tradeInPlan = enumValue(value["tradeInPlan"], tradeInPlans, "трейд-ин");
+
     let currentCarYear: number | null = null;
     if (value["currentCarYear"] != null && value["currentCarYear"] !== "") {
       const parsedYear = Number(value["currentCarYear"]);
@@ -106,6 +119,15 @@ function parseCreateClientCardInput(body: unknown): { data?: CreateClientCardInp
       currentCarYear = parsedYear;
     }
 
+    let currentCarMileage: number | null = null;
+    if (value["currentCarMileage"] != null && value["currentCarMileage"] !== "") {
+      const parsedMileage = Number(value["currentCarMileage"]);
+      if (!Number.isInteger(parsedMileage) || parsedMileage < 0 || parsedMileage > 2_000_000) {
+        throw new Error("Проверьте пробег текущего автомобиля");
+      }
+      currentCarMileage = parsedMileage;
+    }
+
     let currentCarInventoryId: number | null = null;
     if (value["currentCarInventoryId"] != null && value["currentCarInventoryId"] !== "") {
       const parsedId = Number(value["currentCarInventoryId"]);
@@ -113,6 +135,18 @@ function parseCreateClientCardInput(body: unknown): { data?: CreateClientCardInp
         throw new Error("Некорректно выбран текущий автомобиль");
       }
       currentCarInventoryId = parsedId;
+    }
+
+    const currentCarText = text(value["currentCar"], "текущий автомобиль", 180);
+    const hasEnteredCurrentCarData = Boolean(
+      currentCarText || currentCarBrand || currentCarModel || currentCarYear != null ||
+      currentCarMileage != null || currentCarGeneration || currentCarBodyType ||
+      currentCarOwnersCount || tradeInPlan,
+    );
+    if (hasEnteredCurrentCarData && (
+      !currentCarBrand || !currentCarModel || currentCarYear == null || currentCarMileage == null
+    )) {
+      throw new Error("Для текущего автомобиля заполните марку, модель, год и пробег");
     }
 
     let commercialCarId: number | null = null;
@@ -138,10 +172,16 @@ function parseCreateClientCardInput(body: unknown): { data?: CreateClientCardInp
         desiredModel,
         desiredVehicleUndecided,
         budgetRange: enumValue(value["budgetRange"], budgetRanges, "бюджет"),
-        currentCar: text(value["currentCar"], "текущий автомобиль", 180),
+        currentCar: currentCarText,
+        currentCarBrand,
+        currentCarModel,
         currentCarYear,
+        currentCarMileage,
+        currentCarGeneration,
+        currentCarBodyType,
+        currentCarOwnersCount,
         currentCarInventoryId,
-        tradeInPlan: enumValue(value["tradeInPlan"], tradeInPlans, "трейд-ин"),
+        tradeInPlan,
         commercialBrand,
         commercialModel,
         commercialCarId,
@@ -269,7 +309,13 @@ const cardProjection = {
   desiredVehicleUndecided: managerClientCardsTable.desiredVehicleUndecided,
   budgetRange: managerClientCardsTable.budgetRange,
   currentCar: managerClientCardsTable.currentCar,
+  currentCarBrand: managerClientCardsTable.currentCarBrand,
+  currentCarModel: managerClientCardsTable.currentCarModel,
   currentCarYear: managerClientCardsTable.currentCarYear,
+  currentCarMileage: managerClientCardsTable.currentCarMileage,
+  currentCarGeneration: managerClientCardsTable.currentCarGeneration,
+  currentCarBodyType: managerClientCardsTable.currentCarBodyType,
+  currentCarOwnersCount: managerClientCardsTable.currentCarOwnersCount,
   currentCarInventoryId: managerClientCardsTable.currentCarInventoryId,
   currentCarSnapshot: managerClientCardsTable.currentCarSnapshot,
   tradeInPlan: managerClientCardsTable.tradeInPlan,
@@ -589,7 +635,9 @@ router.get("/client-cards/export.csv", async (req, res): Promise<void> => {
     const header = [
       "Дата", "Менеджер", "ФИО клиента", "Телефон", "Пол", "Марка интереса",
       "Модель интереса", "Не определился", "Бюджет", "Текущий автомобиль",
-      "Год текущего автомобиля", "VIN текущего автомобиля", "Трейд-ин", "Марка предложения", "Модель предложения",
+      "Марка текущего автомобиля", "Модель текущего автомобиля", "Год текущего автомобиля",
+      "Пробег, км", "Поколение", "Тип кузова", "Количество владельцев", "VIN текущего автомобиля",
+      "Трейд-ин", "Марка предложения", "Модель предложения",
       "Автомобиль из базы", "Способ оплаты", "Комментарий",
     ];
     const lines = rows.map(card => [
@@ -603,7 +651,13 @@ router.get("/client-cards/export.csv", async (req, res): Promise<void> => {
       card.desiredVehicleUndecided ? "Да" : "Нет",
       card.budgetRange,
       card.currentCar,
+      card.currentCarBrand,
+      card.currentCarModel,
       card.currentCarYear,
+      card.currentCarMileage,
+      card.currentCarGeneration,
+      card.currentCarBodyType,
+      card.currentCarOwnersCount,
       card.currentCarSnapshot && typeof card.currentCarSnapshot === "object"
         ? (card.currentCarSnapshot as Record<string, unknown>)["vin"]
         : "",
@@ -712,6 +766,8 @@ router.post("/client-cards", async (req, res): Promise<void> => {
 
     let currentCarSnapshot: Record<string, unknown> | null = null;
     let currentCar = input.currentCar;
+    let currentCarBrand = input.currentCarBrand;
+    let currentCarModel = input.currentCarModel;
     let currentCarYear = input.currentCarYear;
     if (input.currentCarInventoryId) {
       const car = await getInventoryCar(input.currentCarInventoryId);
@@ -724,7 +780,9 @@ router.post("/client-cards", async (req, res): Promise<void> => {
         return;
       }
       currentCarSnapshot = { ...car };
-      currentCar = [car.brand, car.model].filter(Boolean).join(" ") || currentCar;
+      currentCarBrand = currentCarBrand || car.brand;
+      currentCarModel = currentCarModel || car.model;
+      currentCar = currentCar || [car.brand, car.model].filter(Boolean).join(" ");
       currentCarYear = currentCarYear || car.year;
     }
 
@@ -761,8 +819,14 @@ router.post("/client-cards", async (req, res): Promise<void> => {
       desiredModel: input.desiredModel || null,
       desiredVehicleUndecided: input.desiredVehicleUndecided,
       budgetRange: input.budgetRange || null,
-      currentCar: currentCar || null,
+      currentCar: currentCar || [currentCarBrand, currentCarModel].filter(Boolean).join(" ") || null,
+      currentCarBrand: currentCarBrand || null,
+      currentCarModel: currentCarModel || null,
       currentCarYear: currentCarYear || null,
+      currentCarMileage: input.currentCarMileage,
+      currentCarGeneration: input.currentCarGeneration || null,
+      currentCarBodyType: input.currentCarBodyType || null,
+      currentCarOwnersCount: input.currentCarOwnersCount || null,
       currentCarInventoryId: input.currentCarInventoryId || null,
       currentCarSnapshot,
       tradeInPlan: input.tradeInPlan || null,
