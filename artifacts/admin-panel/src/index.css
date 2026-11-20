@@ -2,6 +2,27 @@
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
+@keyframes manager-form-cascade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.manager-form-cascade {
+  animation: manager-form-cascade 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .manager-form-cascade {
+    animation: none;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -357,10 +378,44 @@
 
   /* If there's a 1px border, adjust the inset so that it covers that parent's border */
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after,
-  .border.active-elevate:not(.no-active-interaction-elevate)::after,
+  .border.active-elevate:not(.no-default-active-elevate)::after,
   .border.hover-elevate-2:not(.no-hover-interaction-elevate)::after,
   .border.active-elevate-2:not(.no-active-interaction-elevate)::after,
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+}
+
+/* Dashboard card mount animation */
+@keyframes dash-card-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.dash-card-enter {
+  animation: dash-card-in 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* Tab content fade-up on switch */
+@keyframes tab-content-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tab-content-enter {
+  animation: tab-content-in 160ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* Mobile sidebar drawer — slides in from left */
+@keyframes sidebar-slide-in {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes sidebar-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.sidebar-drawer {
+  animation: sidebar-slide-in 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.sidebar-overlay {
+  animation: sidebar-overlay-in 180ms ease-out both;
 }
