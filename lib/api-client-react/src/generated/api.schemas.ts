@@ -388,6 +388,98 @@ export interface ManagerClientCarSnapshot {
 /**
  * @nullable
  */
+export type ManagerClientNeedBudgetRange = typeof ManagerClientNeedBudgetRange[keyof typeof ManagerClientNeedBudgetRange] | null;
+
+
+export const ManagerClientNeedBudgetRange = {
+  Не_указан: 'Не указан',
+  до_2_млн: 'до 2 млн',
+  '2–3_млн': '2–3 млн',
+  '3–5_млн': '3–5 млн',
+  '5+_млн': '5+ млн',
+} as const;
+
+export interface ManagerClientNeed {
+  /**
+     * @maxLength 180
+     * @nullable
+     */
+  brand: string | null;
+  /**
+     * @maxLength 180
+     * @nullable
+     */
+  model: string | null;
+  undecided: boolean;
+  /** @nullable */
+  budgetRange: ManagerClientNeedBudgetRange;
+}
+
+/**
+ * @nullable
+ */
+export type ManagerClientCurrentCarOwnersCount = typeof ManagerClientCurrentCarOwnersCount[keyof typeof ManagerClientCurrentCarOwnersCount] | null;
+
+
+export const ManagerClientCurrentCarOwnersCount = {
+  NUMBER_1: '1',
+  NUMBER_2: '2',
+  NUMBER_3: '3',
+  '4+': '4+',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ManagerClientCurrentCarTradeInPlan = typeof ManagerClientCurrentCarTradeInPlan[keyof typeof ManagerClientCurrentCarTradeInPlan] | null;
+
+
+export const ManagerClientCurrentCarTradeInPlan = {
+  Да: 'Да',
+  Нет: 'Нет',
+  Пока_не_решил: 'Пока не решил',
+} as const;
+
+export interface ManagerClientCurrentCar {
+  /** @maxLength 120 */
+  brand: string;
+  /** @maxLength 120 */
+  model: string;
+  /**
+     * @minimum 1950
+     * @maximum 2100
+     */
+  year: number;
+  /**
+     * @minimum 0
+     * @maximum 2000000
+     */
+  mileage: number;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  generation: string | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  bodyType: string | null;
+  /** @nullable */
+  ownersCount: ManagerClientCurrentCarOwnersCount;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  inventoryId: number | null;
+  snapshot: ManagerClientCarSnapshot | null;
+  /** @nullable */
+  tradeInPlan: ManagerClientCurrentCarTradeInPlan;
+}
+
+/**
+ * @nullable
+ */
 export type ManagerClientCardClientGender = typeof ManagerClientCardClientGender[keyof typeof ManagerClientCardClientGender] | null;
 
 
@@ -433,6 +525,8 @@ export interface ManagerClientCard {
   currentCarSnapshot: ManagerClientCarSnapshot | null;
   /** @nullable */
   tradeInPlan: string | null;
+  needs: ManagerClientNeed[];
+  currentCars: ManagerClientCurrentCar[];
   /** @nullable */
   commercialBrand: string | null;
   /** @nullable */
@@ -581,6 +675,9 @@ export interface ManagerClientCardInput {
   currentCarInventoryId: number | null;
   /** @nullable */
   tradeInPlan: ManagerClientCardInputTradeInPlan;
+  /** @minItems 1 */
+  needs?: ManagerClientNeed[];
+  currentCars?: ManagerClientCurrentCar[];
   /**
      * @maxLength 180
      * @nullable
@@ -699,12 +796,119 @@ export interface OneCClientCarSummary {
 /**
  * @nullable
  */
+export type OneCClientNeedBudgetRange = typeof OneCClientNeedBudgetRange[keyof typeof OneCClientNeedBudgetRange] | null;
+
+
+export const OneCClientNeedBudgetRange = {
+  Не_указан: 'Не указан',
+  до_2_млн: 'до 2 млн',
+  '2–3_млн': '2–3 млн',
+  '3–5_млн': '3–5 млн',
+  '5+_млн': '5+ млн',
+} as const;
+
+export interface OneCClientNeed {
+  /** @nullable */
+  brand_id: number | null;
+  /** @nullable */
+  brand: string | null;
+  /** @nullable */
+  model: string | null;
+  undecided: boolean;
+  /** @nullable */
+  budget_range: OneCClientNeedBudgetRange;
+  /** @nullable */
+  organization_code: string | null;
+  /** @nullable */
+  organization_name: string | null;
+  /** @nullable */
+  department_code: string | null;
+  /** @nullable */
+  department_name: string | null;
+}
+
+/**
+ * @nullable
+ */
+export type OneCClientCurrentCarTradeInPlan = typeof OneCClientCurrentCarTradeInPlan[keyof typeof OneCClientCurrentCarTradeInPlan] | null;
+
+
+export const OneCClientCurrentCarTradeInPlan = {
+  Да: 'Да',
+  Нет: 'Нет',
+  Пока_не_решил: 'Пока не решил',
+} as const;
+
+export interface OneCClientCurrentCar {
+  brand: string;
+  model: string;
+  year: number;
+  mileage: number;
+  /** @nullable */
+  generation: string | null;
+  /** @nullable */
+  body_type: string | null;
+  /** @nullable */
+  owners_count: string | null;
+  /** @nullable */
+  inventory_id: number | null;
+  /** @nullable */
+  trade_in_plan: OneCClientCurrentCarTradeInPlan;
+}
+
+export interface OneCClientCommercialOffer {
+  /** @nullable */
+  brand_id: number | null;
+  /** @nullable */
+  brand: string | null;
+  /** @nullable */
+  model: string | null;
+  /** @nullable */
+  car_id: number | null;
+  car: OneCClientCarSummary | null;
+  /** @nullable */
+  organization_code: string | null;
+  /** @nullable */
+  organization_name: string | null;
+  /** @nullable */
+  department_code: string | null;
+  /** @nullable */
+  department_name: string | null;
+}
+
+export interface OneCClientBrandRecord {
+  source_key: string;
+  brand_id: number;
+  brand_name: string;
+  organization_code: string;
+  organization_name: string;
+  department_code: string;
+  department_name: string;
+  needs: OneCClientNeed[];
+  commercial_offer: OneCClientCommercialOffer | null;
+}
+
+/**
+ * @nullable
+ */
 export type OneCClientCardFeedItemClientGender = typeof OneCClientCardFeedItemClientGender[keyof typeof OneCClientCardFeedItemClientGender] | null;
 
 
 export const OneCClientCardFeedItemClientGender = {
   male: 'male',
   female: 'female',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OneCClientCardFeedItemPaymentMethod = typeof OneCClientCardFeedItemPaymentMethod[keyof typeof OneCClientCardFeedItemPaymentMethod] | null;
+
+
+export const OneCClientCardFeedItemPaymentMethod = {
+  Кредит: 'Кредит',
+  Лизинг: 'Лизинг',
+  'Наличные_/_Безнал': 'Наличные / Безнал',
 } as const;
 
 export interface OneCClientCardFeedItem {
@@ -756,9 +960,13 @@ export interface OneCClientCardFeedItem {
   commercial_car_id: number | null;
   commercial_car: OneCClientCarSummary | null;
   /** @nullable */
-  payment_method: string | null;
+  payment_method: OneCClientCardFeedItemPaymentMethod;
   /** @nullable */
   comment: string | null;
+  needs: OneCClientNeed[];
+  current_cars: OneCClientCurrentCar[];
+  commercial_offer: OneCClientCommercialOffer | null;
+  brand_records: OneCClientBrandRecord[];
 }
 
 export interface OneCClientCardsPage {
