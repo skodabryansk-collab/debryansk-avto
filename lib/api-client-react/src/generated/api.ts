@@ -35,6 +35,7 @@ import type {
   GetCarImageThumbnailParams,
   GetCustomerSurveyStatsParams,
   GetOneCAdminLogsParams,
+  GetOneCClientCardChangesParams,
   GetOneCClientCardsParams,
   HealthStatus,
   ListAutoRuCarModelsParams,
@@ -47,10 +48,13 @@ import type {
   ManagerClientCardManagersResponse,
   ManagerClientCardResponse,
   ManagerClientCardStringListResponse,
+  ManagerClientCardUpdatedResponse,
   ManagerClientCardsPageResponse,
   OneCAdminLogsPage,
   OneCAdminMappings,
   OneCAdminStatus,
+  OneCClientCardChangesInitialCursorResponse,
+  OneCClientCardChangesResponse,
   OneCClientCardsErrorResponse,
   OneCClientCardsInitialCursorResponse,
   OneCClientCardsResponse,
@@ -1316,6 +1320,170 @@ export function useGetOneCClientCardsInitialCursor<TData = Awaited<ReturnType<ty
 
 
 
+export const getGetOneCClientCardChangesUrl = (params: GetOneCClientCardChangesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/integrations/1c/v1/client-cards/changes?${stringifiedParams}` : `/api/integrations/1c/v1/client-cards/changes`
+}
+
+/**
+ * Returns edits with IDs greater than after_change_id in ascending order. The caller must persist next_cursor only after applying every event. Each event contains the latest full worksheet, stable brand source keys, and source keys for brand records that must be removed.
+
+ * @summary Poll edits to manager client worksheets for 1C
+ */
+export const getOneCClientCardChanges = async (params: GetOneCClientCardChangesParams, options?: RequestInit): Promise<OneCClientCardChangesResponse> => {
+
+  return customFetch<OneCClientCardChangesResponse>(getGetOneCClientCardChangesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOneCClientCardChangesQueryKey = (params?: GetOneCClientCardChangesParams,) => {
+    return [
+    `/api/integrations/1c/v1/client-cards/changes`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetOneCClientCardChangesQueryOptions = <TData = Awaited<ReturnType<typeof getOneCClientCardChanges>>, TError = ErrorType<OneCClientCardsErrorResponse>>(params: GetOneCClientCardChangesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCClientCardChanges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOneCClientCardChangesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOneCClientCardChanges>>> = ({ signal }) => getOneCClientCardChanges(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOneCClientCardChanges>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOneCClientCardChangesQueryResult = NonNullable<Awaited<ReturnType<typeof getOneCClientCardChanges>>>
+export type GetOneCClientCardChangesQueryError = ErrorType<OneCClientCardsErrorResponse>
+
+
+/**
+ * @summary Poll edits to manager client worksheets for 1C
+ */
+
+export function useGetOneCClientCardChanges<TData = Awaited<ReturnType<typeof getOneCClientCardChanges>>, TError = ErrorType<OneCClientCardsErrorResponse>>(
+ params: GetOneCClientCardChangesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCClientCardChanges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOneCClientCardChangesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetOneCClientCardChangesInitialCursorUrl = () => {
+
+
+
+
+  return `/api/integrations/1c/v1/client-cards/changes/initial-cursor`
+}
+
+/**
+ * Call once during 1C change-feed setup, then poll the changes endpoint.
+ * @summary Get the starting edit cursor without exporting historical edits
+ */
+export const getOneCClientCardChangesInitialCursor = async ( options?: RequestInit): Promise<OneCClientCardChangesInitialCursorResponse> => {
+
+  return customFetch<OneCClientCardChangesInitialCursorResponse>(getGetOneCClientCardChangesInitialCursorUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOneCClientCardChangesInitialCursorQueryKey = () => {
+    return [
+    `/api/integrations/1c/v1/client-cards/changes/initial-cursor`
+    ] as const;
+    }
+
+
+export const getGetOneCClientCardChangesInitialCursorQueryOptions = <TData = Awaited<ReturnType<typeof getOneCClientCardChangesInitialCursor>>, TError = ErrorType<OneCClientCardsErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCClientCardChangesInitialCursor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOneCClientCardChangesInitialCursorQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOneCClientCardChangesInitialCursor>>> = ({ signal }) => getOneCClientCardChangesInitialCursor({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOneCClientCardChangesInitialCursor>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOneCClientCardChangesInitialCursorQueryResult = NonNullable<Awaited<ReturnType<typeof getOneCClientCardChangesInitialCursor>>>
+export type GetOneCClientCardChangesInitialCursorQueryError = ErrorType<OneCClientCardsErrorResponse>
+
+
+/**
+ * @summary Get the starting edit cursor without exporting historical edits
+ */
+
+export function useGetOneCClientCardChangesInitialCursor<TData = Awaited<ReturnType<typeof getOneCClientCardChangesInitialCursor>>, TError = ErrorType<OneCClientCardsErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCClientCardChangesInitialCursor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOneCClientCardChangesInitialCursorQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetOneCAdminStatusUrl = () => {
 
 
@@ -2180,6 +2348,78 @@ export function useGetManagerClientCard<TData = Awaited<ReturnType<typeof getMan
 
 
 
+
+export const getUpdateManagerClientCardUrl = (id: number,) => {
+
+
+
+
+  return `/api/manager/client-cards/${id}`
+}
+
+/**
+ * @summary Update a manager client worksheet
+ */
+export const updateManagerClientCard = async (id: number,
+    managerClientCardInput: ManagerClientCardInput, options?: RequestInit): Promise<ManagerClientCardUpdatedResponse> => {
+
+  return customFetch<ManagerClientCardUpdatedResponse>(getUpdateManagerClientCardUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      managerClientCardInput,)
+  }
+);}
+
+
+
+
+export const getUpdateManagerClientCardMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateManagerClientCard>>, TError,{id: number;data: BodyType<ManagerClientCardInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateManagerClientCard>>, TError,{id: number;data: BodyType<ManagerClientCardInput>}, TContext> => {
+
+const mutationKey = ['updateManagerClientCard'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateManagerClientCard>>, {id: number;data: BodyType<ManagerClientCardInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateManagerClientCard(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateManagerClientCardMutationResult = NonNullable<Awaited<ReturnType<typeof updateManagerClientCard>>>
+    export type UpdateManagerClientCardMutationBody = BodyType<ManagerClientCardInput>
+    export type UpdateManagerClientCardMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a manager client worksheet
+ */
+export const useUpdateManagerClientCard = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateManagerClientCard>>, TError,{id: number;data: BodyType<ManagerClientCardInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateManagerClientCard>>,
+        TError,
+        {id: number;data: BodyType<ManagerClientCardInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateManagerClientCardMutationOptions(options));
+    }
 
 export const getListAutoRuCarBrandsUrl = () => {
 
