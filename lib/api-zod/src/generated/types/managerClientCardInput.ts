@@ -7,6 +7,7 @@
  */
 import type { ManagerClientCardInputBudgetRange } from './managerClientCardInputBudgetRange';
 import type { ManagerClientCardInputClientGender } from './managerClientCardInputClientGender';
+import type { ManagerClientCardInputCurrentCarOwnersCount } from './managerClientCardInputCurrentCarOwnersCount';
 import type { ManagerClientCardInputPaymentMethod } from './managerClientCardInputPaymentMethod';
 import type { ManagerClientCardInputTradeInPlan } from './managerClientCardInputTradeInPlan';
 
@@ -42,11 +43,39 @@ export interface ManagerClientCardInput {
      */
   currentCar: string | null;
   /**
+     * @maxLength 120
+     * @nullable
+     */
+  currentCarBrand: string | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  currentCarModel: string | null;
+  /**
      * @minimum 1950
      * @maximum 2100
      * @nullable
      */
   currentCarYear: number | null;
+  /**
+     * @minimum 0
+     * @maximum 2000000
+     * @nullable
+     */
+  currentCarMileage: number | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  currentCarGeneration: string | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  currentCarBodyType: string | null;
+  /** @nullable */
+  currentCarOwnersCount: ManagerClientCardInputCurrentCarOwnersCount;
   /**
      * @minimum 1
      * @nullable
