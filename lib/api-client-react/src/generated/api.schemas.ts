@@ -415,7 +415,19 @@ export interface ManagerClientCard {
   /** @nullable */
   currentCar: string | null;
   /** @nullable */
+  currentCarBrand: string | null;
+  /** @nullable */
+  currentCarModel: string | null;
+  /** @nullable */
   currentCarYear: number | null;
+  /** @nullable */
+  currentCarMileage: number | null;
+  /** @nullable */
+  currentCarGeneration: string | null;
+  /** @nullable */
+  currentCarBodyType: string | null;
+  /** @nullable */
+  currentCarOwnersCount: string | null;
   /** @nullable */
   currentCarInventoryId: number | null;
   currentCarSnapshot: ManagerClientCarSnapshot | null;
@@ -458,6 +470,19 @@ export const ManagerClientCardInputBudgetRange = {
   '2–3_млн': '2–3 млн',
   '3–5_млн': '3–5 млн',
   '5+_млн': '5+ млн',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ManagerClientCardInputCurrentCarOwnersCount = typeof ManagerClientCardInputCurrentCarOwnersCount[keyof typeof ManagerClientCardInputCurrentCarOwnersCount] | null;
+
+
+export const ManagerClientCardInputCurrentCarOwnersCount = {
+  NUMBER_1: '1',
+  NUMBER_2: '2',
+  NUMBER_3: '3',
+  '4+': '4+',
 } as const;
 
 /**
@@ -516,11 +541,39 @@ export interface ManagerClientCardInput {
      */
   currentCar: string | null;
   /**
+     * @maxLength 120
+     * @nullable
+     */
+  currentCarBrand: string | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  currentCarModel: string | null;
+  /**
      * @minimum 1950
      * @maximum 2100
      * @nullable
      */
   currentCarYear: number | null;
+  /**
+     * @minimum 0
+     * @maximum 2000000
+     * @nullable
+     */
+  currentCarMileage: number | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  currentCarGeneration: string | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  currentCarBodyType: string | null;
+  /** @nullable */
+  currentCarOwnersCount: ManagerClientCardInputCurrentCarOwnersCount;
   /**
      * @minimum 1
      * @nullable
