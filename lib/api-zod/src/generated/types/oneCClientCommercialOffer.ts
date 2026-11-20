@@ -9,8 +9,6 @@ import type { OneCClientCarSummary } from './oneCClientCarSummary';
 
 export interface OneCClientCommercialOffer {
   /** @nullable */
-  brand_id: number | null;
-  /** @nullable */
   brand: string | null;
   /** @nullable */
   model: string | null;
@@ -20,9 +18,5 @@ export interface OneCClientCommercialOffer {
   /** @nullable */
   organization_code: string | null;
   /** @nullable */
-  organization_name: string | null;
-  /** @nullable */
   department_code: string | null;
-  /** @nullable */
-  department_name: string | null;
 }
