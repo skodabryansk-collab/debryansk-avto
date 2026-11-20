@@ -36,11 +36,6 @@ export interface ManagerClientCurrentCar {
   bodyType: string | null;
   /** @nullable */
   ownersCount: ManagerClientCurrentCarOwnersCount;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  inventoryId: number | null;
   snapshot: ManagerClientCarSnapshot | null;
   /** @nullable */
   tradeInPlan: ManagerClientCurrentCarTradeInPlan;
