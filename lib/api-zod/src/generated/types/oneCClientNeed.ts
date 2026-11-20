@@ -17,6 +17,11 @@ export interface OneCClientNeed {
   undecided: boolean;
   /** @nullable */
   budget_range: OneCClientNeedBudgetRange;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  planned_purchase_date: string | null;
   /** @nullable */
   organization_code: string | null;
   /** @nullable */
