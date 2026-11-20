@@ -7,6 +7,8 @@
  */
 import type { ManagerClientCardClientGender } from './managerClientCardClientGender';
 import type { ManagerClientCarSnapshot } from './managerClientCarSnapshot';
+import type { ManagerClientCurrentCar } from './managerClientCurrentCar';
+import type { ManagerClientNeed } from './managerClientNeed';
 
 export interface ManagerClientCard {
   id: number;
@@ -45,6 +47,8 @@ export interface ManagerClientCard {
   currentCarSnapshot: ManagerClientCarSnapshot | null;
   /** @nullable */
   tradeInPlan: string | null;
+  needs: ManagerClientNeed[];
+  currentCars: ManagerClientCurrentCar[];
   /** @nullable */
   commercialBrand: string | null;
   /** @nullable */
