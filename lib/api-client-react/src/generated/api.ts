@@ -34,6 +34,7 @@ import type {
   ExportManagerClientCardsParams,
   GetCarImageThumbnailParams,
   GetCustomerSurveyStatsParams,
+  GetOneCAdminLogsParams,
   GetOneCClientCardsParams,
   HealthStatus,
   ListAutoRuCarModelsParams,
@@ -47,9 +48,14 @@ import type {
   ManagerClientCardResponse,
   ManagerClientCardStringListResponse,
   ManagerClientCardsPageResponse,
+  OneCAdminLogsPage,
+  OneCAdminMappings,
+  OneCAdminStatus,
   OneCClientCardsErrorResponse,
   OneCClientCardsInitialCursorResponse,
   OneCClientCardsResponse,
+  OneCMappingUpdateInput,
+  OneCMappingUpdateResponse,
   SearchManagerClientCardInventoryParams,
   ShowroomSurveyModelsResponse,
   ShowroomSurveySubmissionInput,
@@ -1309,6 +1315,388 @@ export function useGetOneCClientCardsInitialCursor<TData = Awaited<ReturnType<ty
 
 
 
+
+export const getGetOneCAdminStatusUrl = () => {
+
+
+
+
+  return `/api/admin/onec/status`
+}
+
+/**
+ * @summary Get safe 1C integration configuration status
+ */
+export const getOneCAdminStatus = async ( options?: RequestInit): Promise<OneCAdminStatus> => {
+
+  return customFetch<OneCAdminStatus>(getGetOneCAdminStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOneCAdminStatusQueryKey = () => {
+    return [
+    `/api/admin/onec/status`
+    ] as const;
+    }
+
+
+export const getGetOneCAdminStatusQueryOptions = <TData = Awaited<ReturnType<typeof getOneCAdminStatus>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCAdminStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOneCAdminStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOneCAdminStatus>>> = ({ signal }) => getOneCAdminStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOneCAdminStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOneCAdminStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getOneCAdminStatus>>>
+export type GetOneCAdminStatusQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get safe 1C integration configuration status
+ */
+
+export function useGetOneCAdminStatus<TData = Awaited<ReturnType<typeof getOneCAdminStatus>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCAdminStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOneCAdminStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetOneCAdminLogsUrl = (params?: GetOneCAdminLogsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/onec/logs?${stringifiedParams}` : `/api/admin/onec/logs`
+}
+
+/**
+ * @summary List 1C exchange and settings events
+ */
+export const getOneCAdminLogs = async (params?: GetOneCAdminLogsParams, options?: RequestInit): Promise<OneCAdminLogsPage> => {
+
+  return customFetch<OneCAdminLogsPage>(getGetOneCAdminLogsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOneCAdminLogsQueryKey = (params?: GetOneCAdminLogsParams,) => {
+    return [
+    `/api/admin/onec/logs`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetOneCAdminLogsQueryOptions = <TData = Awaited<ReturnType<typeof getOneCAdminLogs>>, TError = ErrorType<void>>(params?: GetOneCAdminLogsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCAdminLogs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOneCAdminLogsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOneCAdminLogs>>> = ({ signal }) => getOneCAdminLogs(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOneCAdminLogs>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOneCAdminLogsQueryResult = NonNullable<Awaited<ReturnType<typeof getOneCAdminLogs>>>
+export type GetOneCAdminLogsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List 1C exchange and settings events
+ */
+
+export function useGetOneCAdminLogs<TData = Awaited<ReturnType<typeof getOneCAdminLogs>>, TError = ErrorType<void>>(
+ params?: GetOneCAdminLogsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCAdminLogs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOneCAdminLogsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetOneCAdminMappingsUrl = () => {
+
+
+
+
+  return `/api/admin/onec/mappings`
+}
+
+/**
+ * @summary List organization and department code mappings
+ */
+export const getOneCAdminMappings = async ( options?: RequestInit): Promise<OneCAdminMappings> => {
+
+  return customFetch<OneCAdminMappings>(getGetOneCAdminMappingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOneCAdminMappingsQueryKey = () => {
+    return [
+    `/api/admin/onec/mappings`
+    ] as const;
+    }
+
+
+export const getGetOneCAdminMappingsQueryOptions = <TData = Awaited<ReturnType<typeof getOneCAdminMappings>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCAdminMappings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOneCAdminMappingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOneCAdminMappings>>> = ({ signal }) => getOneCAdminMappings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOneCAdminMappings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOneCAdminMappingsQueryResult = NonNullable<Awaited<ReturnType<typeof getOneCAdminMappings>>>
+export type GetOneCAdminMappingsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List organization and department code mappings
+ */
+
+export function useGetOneCAdminMappings<TData = Awaited<ReturnType<typeof getOneCAdminMappings>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCAdminMappings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOneCAdminMappingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateOneCOrganizationMappingUrl = (locationId: number,) => {
+
+
+
+
+  return `/api/admin/onec/mappings/organizations/${locationId}`
+}
+
+/**
+ * @summary Update the 1C organization code for a location
+ */
+export const updateOneCOrganizationMapping = async (locationId: number,
+    oneCMappingUpdateInput: OneCMappingUpdateInput, options?: RequestInit): Promise<OneCMappingUpdateResponse> => {
+
+  return customFetch<OneCMappingUpdateResponse>(getUpdateOneCOrganizationMappingUrl(locationId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      oneCMappingUpdateInput,)
+  }
+);}
+
+
+
+
+export const getUpdateOneCOrganizationMappingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOneCOrganizationMapping>>, TError,{locationId: number;data: BodyType<OneCMappingUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateOneCOrganizationMapping>>, TError,{locationId: number;data: BodyType<OneCMappingUpdateInput>}, TContext> => {
+
+const mutationKey = ['updateOneCOrganizationMapping'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOneCOrganizationMapping>>, {locationId: number;data: BodyType<OneCMappingUpdateInput>}> = (props) => {
+          const {locationId,data} = props ?? {};
+
+          return  updateOneCOrganizationMapping(locationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateOneCOrganizationMappingMutationResult = NonNullable<Awaited<ReturnType<typeof updateOneCOrganizationMapping>>>
+    export type UpdateOneCOrganizationMappingMutationBody = BodyType<OneCMappingUpdateInput>
+    export type UpdateOneCOrganizationMappingMutationError = ErrorType<void>
+
+    /**
+ * @summary Update the 1C organization code for a location
+ */
+export const useUpdateOneCOrganizationMapping = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOneCOrganizationMapping>>, TError,{locationId: number;data: BodyType<OneCMappingUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateOneCOrganizationMapping>>,
+        TError,
+        {locationId: number;data: BodyType<OneCMappingUpdateInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateOneCOrganizationMappingMutationOptions(options));
+    }
+
+export const getUpdateOneCDepartmentMappingUrl = (brandId: number,) => {
+
+
+
+
+  return `/api/admin/onec/mappings/departments/${brandId}`
+}
+
+/**
+ * @summary Update the 1C department code for a brand
+ */
+export const updateOneCDepartmentMapping = async (brandId: number,
+    oneCMappingUpdateInput: OneCMappingUpdateInput, options?: RequestInit): Promise<OneCMappingUpdateResponse> => {
+
+  return customFetch<OneCMappingUpdateResponse>(getUpdateOneCDepartmentMappingUrl(brandId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      oneCMappingUpdateInput,)
+  }
+);}
+
+
+
+
+export const getUpdateOneCDepartmentMappingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOneCDepartmentMapping>>, TError,{brandId: number;data: BodyType<OneCMappingUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateOneCDepartmentMapping>>, TError,{brandId: number;data: BodyType<OneCMappingUpdateInput>}, TContext> => {
+
+const mutationKey = ['updateOneCDepartmentMapping'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOneCDepartmentMapping>>, {brandId: number;data: BodyType<OneCMappingUpdateInput>}> = (props) => {
+          const {brandId,data} = props ?? {};
+
+          return  updateOneCDepartmentMapping(brandId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateOneCDepartmentMappingMutationResult = NonNullable<Awaited<ReturnType<typeof updateOneCDepartmentMapping>>>
+    export type UpdateOneCDepartmentMappingMutationBody = BodyType<OneCMappingUpdateInput>
+    export type UpdateOneCDepartmentMappingMutationError = ErrorType<void>
+
+    /**
+ * @summary Update the 1C department code for a brand
+ */
+export const useUpdateOneCDepartmentMapping = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOneCDepartmentMapping>>, TError,{brandId: number;data: BodyType<OneCMappingUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateOneCDepartmentMapping>>,
+        TError,
+        {brandId: number;data: BodyType<OneCMappingUpdateInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateOneCDepartmentMappingMutationOptions(options));
+    }
 
 export const getListManagerClientCardManagersUrl = () => {
 
