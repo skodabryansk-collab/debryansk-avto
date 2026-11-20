@@ -8,9 +8,7 @@
 
 export interface OneCClientCarSummary {
   /** @nullable */
-  id: number | null;
-  /** @nullable */
-  external_id: string | null;
+  vin: string | null;
   /** @nullable */
   brand: string | null;
   /** @nullable */
