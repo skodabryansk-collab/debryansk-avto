@@ -49,6 +49,7 @@ import adminCalltouchRouter from "./admin-calltouch";
 import managerAuthRouter from "./manager-auth";
 import managerRegisterRouter from "./manager-register";
 import managerQuotesRouter from "./manager-quotes";
+import managerClientCardsRouter from "./manager-client-cards";
 import quoteShareRouter from "./quote-share";
 import managerProfileRouter from "./manager-profile";
 import adminManagersRouter from "./admin-managers";
@@ -64,6 +65,9 @@ import onlineRouter from "./online";
 import landingPagesRouter from "./landing-pages";
 import publicSalesRouter from "./public-sales";
 import carImageThumbnailRouter from "./car-image-thumbnail";
+import showroomSurveyRouter from "./showroom-survey";
+import customerSurveysRouter from "./customer-surveys";
+import adminSurveysRouter from "./admin-surveys";
 
 const router: IRouter = Router();
 
@@ -75,6 +79,8 @@ router.use(publicSalesRouter);
 router.use(chatRouter);
 router.use(carsRouter);
 router.use(carImageThumbnailRouter);
+router.use("/showroom-survey", showroomSurveyRouter);
+router.use("/surveys", customerSurveysRouter);
 router.use(feedYmlRouter);
 router.use(newCarsRouter);
 router.use(featuredRouter);
@@ -99,6 +105,7 @@ router.use("/car-catalog", carCatalogRouter);
 router.use("/admin/login", adminAuthRouter);
 router.use("/admin/news", adminNewsRouter);
 router.use("/admin/leads", adminLeadsRouter);
+router.use("/admin", adminSurveysRouter);
 router.use("/admin/dashboard", adminDashboardRouter);
 router.use("/admin/stats", adminStatsRouter);
 router.use("/admin/brands", adminBrandsRouter);
@@ -144,6 +151,7 @@ router.use("/manager/register", managerRegisterRouter);
 router.use("/quote-share", quoteShareRouter);
 router.use("/manager", managerProfileRouter);
 router.use("/manager", managerQuotesRouter);
+router.use("/manager", managerClientCardsRouter);
 
 // AI Image Studio
 router.use("/admin/ai-images", adminAiImagesRouter);
