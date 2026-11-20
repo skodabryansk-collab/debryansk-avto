@@ -73,7 +73,7 @@
 - [Karpathy evaluator schedule](karpathy-evaluator-schedule.md) — оценка должна иметь ежедневный catch-up, а не зависеть только от воскресного снапшота позиций.
 - [GAP pending stability](gap-pending-stability.md) — pending-гипотезы принадлежат менеджеру: GAP не создаёт и не перезаписывает их до решения.
 - [Visitor conversion calls](visitor-conversion-calls.md) — completed >30 сек; звонки и заявки уникальны в rolling-окне 24 часа с учётом границы периода.
-- [Non-interactive post-merge schema sync](post-merge-drizzle.md) — post-merge запускается без TTY; Drizzle push должен использовать non-interactive entry point.
+- [Safe post-merge schema updates](post-merge-drizzle.md) — unfiltered Drizzle force-push can delete live schema data; use additive, idempotent development migrations and Replit Publish for production.
 - [GEO active hypothesis ownership](geo-active-hypothesis.md) — legacy applied rows without an evaluation schedule must not block new GEO recommendations forever.
 - [GEO measurement refresh](geo-citation-refresh.md) — the admin GEO button starts a fresh weekly measurement, not just a reread of the saved report; account for AI-provider request costs.
 - [Yandex Webmaster indexing samples](webmaster-indexing-samples.md) — v4 uses /indexing/samples, not /crawling/samples; read the tail because offset=0 can be historical.
@@ -90,3 +90,4 @@
 - [Price-tag data enrichment](vehicle-tag-enrichment-source.md) — active car records are authoritative; specification data fills only fields missing from a printable tag.
 - [Debryansk Auto logo descriptor](debryansk-auto-logo-descriptor.md) — preserve the approved uppercase tagline and derive employee-card styling from the main site.
 - [Printed employee business cards](printed-business-cards.md) — show contact details as static print text, without clickable controls or link arrows.
+- [Showroom survey handoff and consent](showroom-survey-handoff-consent.md) — gifts are handed over onsite; lead processing consent is required and contact permission is separate and optional.
