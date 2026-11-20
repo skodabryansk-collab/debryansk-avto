@@ -46,6 +46,7 @@ export type ManagerClientNeed = {
   model: string | null;
   undecided: boolean;
   budgetRange: string | null;
+  plannedPurchaseDate: string | null;
 };
 
 export type ManagerClientCurrentCar = {
@@ -56,7 +57,6 @@ export type ManagerClientCurrentCar = {
   generation: string | null;
   bodyType: string | null;
   ownersCount: string | null;
-  inventoryId: number | null;
   snapshot: Record<string, unknown> | null;
   tradeInPlan: string | null;
 };
