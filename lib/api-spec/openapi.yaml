@@ -1016,7 +1016,7 @@ components:
         vin: { type: ["string", "null"] }
     ManagerClientCard:
       type: object
-      required: [id, managerId, managerName, clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarYear, currentCarInventoryId, currentCarSnapshot, tradeInPlan, commercialBrand, commercialModel, commercialCarId, commercialCarSnapshot, paymentMethod, comment, createdAt]
+      required: [id, managerId, managerName, clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarBrand, currentCarModel, currentCarYear, currentCarMileage, currentCarGeneration, currentCarBodyType, currentCarOwnersCount, currentCarInventoryId, currentCarSnapshot, tradeInPlan, commercialBrand, commercialModel, commercialCarId, commercialCarSnapshot, paymentMethod, comment, createdAt]
       properties:
         id: { type: integer }
         managerId: { type: integer }
@@ -1029,7 +1029,13 @@ components:
         desiredVehicleUndecided: { type: boolean }
         budgetRange: { type: ["string", "null"] }
         currentCar: { type: ["string", "null"] }
+        currentCarBrand: { type: ["string", "null"] }
+        currentCarModel: { type: ["string", "null"] }
         currentCarYear: { type: ["integer", "null"] }
+        currentCarMileage: { type: ["integer", "null"] }
+        currentCarGeneration: { type: ["string", "null"] }
+        currentCarBodyType: { type: ["string", "null"] }
+        currentCarOwnersCount: { type: ["string", "null"] }
         currentCarInventoryId: { type: ["integer", "null"] }
         currentCarSnapshot:
           oneOf:
@@ -1048,7 +1054,7 @@ components:
         createdAt: { type: string, format: date-time }
     ManagerClientCardInput:
       type: object
-      required: [clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarYear, currentCarInventoryId, tradeInPlan, commercialBrand, commercialModel, commercialCarId, paymentMethod, comment]
+      required: [clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarBrand, currentCarModel, currentCarYear, currentCarMileage, currentCarGeneration, currentCarBodyType, currentCarOwnersCount, currentCarInventoryId, tradeInPlan, commercialBrand, commercialModel, commercialCarId, paymentMethod, comment]
       properties:
         clientName: { type: string, minLength: 2, maxLength: 120 }
         clientPhone: { type: string, minLength: 10, maxLength: 40 }
@@ -1058,7 +1064,13 @@ components:
         desiredVehicleUndecided: { type: boolean }
         budgetRange: { type: ["string", "null"], enum: ["Не указан", "до 2 млн", "2–3 млн", "3–5 млн", "5+ млн", null] }
         currentCar: { type: ["string", "null"], maxLength: 180 }
+        currentCarBrand: { type: ["string", "null"], maxLength: 120 }
+        currentCarModel: { type: ["string", "null"], maxLength: 120 }
         currentCarYear: { type: ["integer", "null"], minimum: 1950, maximum: 2100 }
+        currentCarMileage: { type: ["integer", "null"], minimum: 0, maximum: 2000000 }
+        currentCarGeneration: { type: ["string", "null"], maxLength: 120 }
+        currentCarBodyType: { type: ["string", "null"], maxLength: 120 }
+        currentCarOwnersCount: { type: ["string", "null"], enum: ["1", "2", "3", "4+", null] }
         currentCarInventoryId: { type: ["integer", "null"], minimum: 1 }
         tradeInPlan: { type: ["string", "null"], enum: ["Да", "Нет", "Пока не решил", null] }
         commercialBrand: { type: ["string", "null"], maxLength: 180 }
