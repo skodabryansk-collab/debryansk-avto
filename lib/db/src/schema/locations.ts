@@ -9,7 +9,10 @@ export const locationsTable = pgTable("locations", {
   mapY: real("map_y"),
   phone: text("phone"),
   hours: text("hours"),
+  email: text("email"),
   sortOrder: integer("sort_order").default(0),
+  onecOrganizationCode: text("onec_organization_code"),
+  onecOrganizationCodeConfirmed: boolean("onec_organization_code_confirmed").notNull().default(false),
 });
 
 export const locationBrandsTable = pgTable("location_brands", {
