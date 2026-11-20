@@ -791,6 +791,88 @@ export const CreateManagerClientCardBody = zod.object({
 
 
 /**
+ * Returns client worksheets with IDs greater than after_id in ascending order. The caller must persist next_cursor only after successfully importing every returned item. Records are not returned while organization or department codes are provisional.
+
+ * @summary Poll new manager client worksheets for 1C
+ */
+export const getOneCClientCardsQueryAfterIdMin = 0;
+
+export const getOneCClientCardsQueryLimitDefault = 100;
+export const getOneCClientCardsQueryLimitMax = 100;
+
+
+
+export const GetOneCClientCardsQueryParams = zod.object({
+  "after_id": zod.coerce.number().min(getOneCClientCardsQueryAfterIdMin).describe('Last source ID successfully imported by 1C'),
+  "limit": zod.coerce.number().min(1).max(getOneCClientCardsQueryLimitMax).default(getOneCClientCardsQueryLimitDefault)
+})
+
+export const GetOneCClientCardsResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "created_at": zod.coerce.date(),
+  "manager_id": zod.number(),
+  "manager_name": zod.string().nullable(),
+  "organization_code": zod.string(),
+  "organization_name": zod.string(),
+  "department_code": zod.string(),
+  "department_name": zod.string(),
+  "client_name": zod.string(),
+  "client_phone": zod.string(),
+  "client_gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullable(),
+  "desired_brand": zod.string().nullable(),
+  "desired_model": zod.string().nullable(),
+  "desired_vehicle_undecided": zod.boolean(),
+  "budget_range": zod.string().nullable(),
+  "current_car": zod.string().nullable(),
+  "current_car_brand": zod.string().nullable(),
+  "current_car_model": zod.string().nullable(),
+  "current_car_year": zod.number().nullable(),
+  "current_car_mileage": zod.number().nullable(),
+  "current_car_generation": zod.string().nullable(),
+  "current_car_body_type": zod.string().nullable(),
+  "current_car_owners_count": zod.string().nullable(),
+  "current_car_inventory_id": zod.number().nullable(),
+  "trade_in_plan": zod.string().nullable(),
+  "commercial_brand": zod.string().nullable(),
+  "commercial_model": zod.string().nullable(),
+  "commercial_car_id": zod.number().nullable(),
+  "commercial_car": zod.union([zod.object({
+  "id": zod.number().nullable(),
+  "external_id": zod.string().nullable(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "year": zod.number().nullable(),
+  "modification": zod.string().nullable(),
+  "complectation": zod.string().nullable(),
+  "color": zod.string().nullable(),
+  "price": zod.number().nullable()
+}),zod.null()]),
+  "payment_method": zod.string().nullable(),
+  "comment": zod.string().nullable()
+})),
+  "next_cursor": zod.number(),
+  "has_more": zod.boolean()
+})
+})
+
+
+/**
+ * Call once during initial setup, store after_id in 1C, then poll the feed endpoint.
+ * @summary Get the starting cursor without exporting historical client data
+ */
+export const GetOneCClientCardsInitialCursorResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.object({
+  "after_id": zod.number(),
+  "as_of": zod.coerce.date()
+})
+})
+
+
+/**
  * @summary List managers available in the worksheet filter
  */
 export const ListManagerClientCardManagersResponse = zod.object({
