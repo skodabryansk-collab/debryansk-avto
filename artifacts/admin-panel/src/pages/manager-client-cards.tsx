@@ -158,12 +158,15 @@ function validateStep(
   form: FormState,
   step: number,
   selectedCurrentCar: ManagerClientCardInventoryItem | null,
-  currentVehicleMode: "model" | "vin",
   autoRuBrandId: string,
+  autoRuBrandSearch: string,
   autoRuModelId: string,
+  autoRuModelSearch: string,
   currentVinSearch: string,
   selectedOfferCar: ManagerClientCardInventoryItem | null,
-  offerSearch: string,
+  offerBrandSearch: string,
+  offerModelSearch: string,
+  offerVinSearch: string,
 ): string[] {
   if (step === 0) {
     const errors: string[] = [];
@@ -200,10 +203,19 @@ function validateStep(
         errors.push("Проверьте год выпуска текущего автомобиля.");
       }
     }
-    if (currentVehicleMode === "model" && autoRuBrandId && !autoRuModelId) {
+    if (autoRuBrandSearch.trim() && !autoRuBrandId) {
+      errors.push("Выберите марку текущего автомобиля из совпадений или очистите поле.");
+    }
+    if (autoRuModelSearch.trim() && !autoRuModelId) {
+      errors.push("Выберите модель текущего автомобиля из совпадений или очистите поле.");
+    }
+    if (autoRuBrandId && !autoRuModelId) {
       errors.push("Выберите модель текущего автомобиля или очистите марку.");
     }
-    if (currentVehicleMode === "vin" && currentVinSearch.trim() && !selectedCurrentCar) {
+    if (currentVinSearch.trim() && currentVinSearch.trim().length < 4) {
+      errors.push("Для поиска по VIN введите минимум 4 символа.");
+    }
+    if (currentVinSearch.trim().length >= 4 && !selectedCurrentCar) {
       errors.push("Выберите найденный автомобиль по VIN или очистите поле.");
     }
     return errors;
@@ -213,7 +225,9 @@ function validateStep(
     if (Boolean(form.commercialBrand) !== Boolean(form.commercialModel)) {
       return ["Выберите и марку, и модель предложения."];
     }
-    if (offerSearch.trim() && !selectedOfferCar) return ["Выберите новый автомобиль из базы или очистите поиск."];
+    if ((offerBrandSearch.trim() || offerModelSearch.trim() || offerVinSearch.trim()) && !selectedOfferCar) {
+      return ["Выберите новый автомобиль из базы или очистите поля поиска."];
+    }
     if (selectedOfferCar || hasCatalogSelection) return [];
     return [];
   }
@@ -247,6 +261,117 @@ function SelectField({
       >
         {children}
       </select>
+    </div>
+  );
+}
+
+type SearchSuggestion = { value: string; label: string };
+
+function SearchSuggestionField({
+  id,
+  label,
+  value,
+  placeholder,
+  options,
+  loading = false,
+  disabled = false,
+  onChange,
+  onSelect,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  placeholder: string;
+  options: SearchSuggestion[];
+  loading?: boolean;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+  onSelect: (option: SearchSuggestion) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const matchingOptions = options
+    .filter(option => option.label.toLocaleLowerCase("ru").includes(value.trim().toLocaleLowerCase("ru")))
+    .slice(0, 20);
+  const listId = `${id}-suggestions`;
+  const active = activeIndex >= 0 ? matchingOptions[activeIndex] : undefined;
+
+  function choose(option: SearchSuggestion) {
+    onSelect(option);
+    setOpen(false);
+  }
+
+  return (
+    <div className="relative min-w-0 space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        value={value}
+        disabled={disabled}
+        placeholder={placeholder}
+        autoComplete="off"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={open && !disabled}
+        aria-controls={listId}
+        aria-activedescendant={open && active ? `${listId}-${activeIndex}` : undefined}
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 140)}
+        onChange={event => {
+          onChange(event.target.value);
+          setActiveIndex(-1);
+          setOpen(true);
+        }}
+        onKeyDown={event => {
+          if (event.key === "ArrowDown" && matchingOptions.length) {
+            event.preventDefault();
+            setOpen(true);
+            setActiveIndex(index => index < 0 ? 0 : Math.min(index + 1, matchingOptions.length - 1));
+          } else if (event.key === "ArrowUp" && matchingOptions.length) {
+            event.preventDefault();
+            setActiveIndex(index => index < 0 ? matchingOptions.length - 1 : Math.max(index - 1, 0));
+          } else if (event.key === "Enter" && open && (active || matchingOptions[0])) {
+            event.preventDefault();
+            choose(active ?? matchingOptions[0]!);
+          } else if (event.key === "Escape") {
+            setOpen(false);
+          }
+        }}
+        className="h-11"
+      />
+      {open && !disabled && (
+        <div
+          id={listId}
+          role="listbox"
+          className="absolute left-0 right-0 top-full z-40 mt-1 max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+        >
+          {loading ? (
+            <p className="px-3 py-2 text-sm text-slate-500">Загружаем варианты…</p>
+          ) : matchingOptions.length ? (
+            matchingOptions.map((option, index) => (
+              <button
+                key={`${option.value}-${index}`}
+                id={`${listId}-${index}`}
+                type="button"
+                role="option"
+                aria-selected={index === activeIndex}
+                onPointerDown={event => event.preventDefault()}
+                onMouseMove={() => setActiveIndex(index)}
+                onClick={() => choose(option)}
+                className={`block w-full rounded-md px-3 py-2 text-left text-sm ${
+                  index === activeIndex ? "bg-sky-50 text-[#005a94]" : "text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))
+          ) : value.trim().length >= 1 ? (
+            <p className="px-3 py-2 text-sm text-slate-500">Совпадений не найдено</p>
+          ) : (
+            <p className="px-3 py-2 text-sm text-slate-500">Начните вводить текст для поиска</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -315,13 +440,16 @@ export default function ManagerClientCardsPage() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [selectedCurrentCar, setSelectedCurrentCar] = useState<ManagerClientCardInventoryItem | null>(null);
   const [selectedOfferCar, setSelectedOfferCar] = useState<ManagerClientCardInventoryItem | null>(null);
-  const [currentVehicleMode, setCurrentVehicleMode] = useState<"model" | "vin">("model");
   const [autoRuBrandId, setAutoRuBrandId] = useState("");
+  const [autoRuBrandSearch, setAutoRuBrandSearch] = useState("");
   const [autoRuBrandName, setAutoRuBrandName] = useState("");
   const [autoRuModelId, setAutoRuModelId] = useState("");
+  const [autoRuModelSearch, setAutoRuModelSearch] = useState("");
   const [autoRuModelName, setAutoRuModelName] = useState("");
   const [currentVinSearch, setCurrentVinSearch] = useState("");
-  const [offerSearch, setOfferSearch] = useState("");
+  const [offerBrandSearch, setOfferBrandSearch] = useState("");
+  const [offerModelSearch, setOfferModelSearch] = useState("");
+  const [offerVinSearch, setOfferVinSearch] = useState("");
   const [formError, setFormError] = useState("");
   const [saveAttempted, setSaveAttempted] = useState(false);
 
@@ -354,18 +482,18 @@ export default function ManagerClientCardsPage() {
   const autoRuBrandsQuery = useQuery({
     queryKey: ["manager-client-card-autoru-brands"],
     queryFn: getAutoRuCatalogBrands,
-    enabled: mode === "form" && step === 2 && currentVehicleMode === "model",
+    enabled: mode === "form" && step === 2,
     staleTime: 60 * 60 * 1000,
   });
   const autoRuModelsQuery = useQuery({
     queryKey: ["manager-client-card-autoru-models", autoRuBrandId],
     queryFn: () => getAutoRuCatalogModels(autoRuBrandId),
-    enabled: mode === "form" && step === 2 && currentVehicleMode === "model" && Boolean(autoRuBrandId),
+    enabled: mode === "form" && step === 2 && Boolean(autoRuBrandId),
     staleTime: 30 * 60 * 1000,
   });
   const currentCarInventoryQuery = useQuery({
-    queryKey: ["manager-client-card-current-vehicle", currentVehicleMode, autoRuBrandName, autoRuModelName, currentVinSearch.trim()],
-    queryFn: () => currentVehicleMode === "vin"
+    queryKey: ["manager-client-card-current-vehicle", autoRuBrandName, autoRuModelName, currentVinSearch.trim()],
+    queryFn: () => currentVinSearch.trim().length >= 4
       ? searchManagerClientCardInventory({ vin: currentVinSearch.trim(), type: "used" })
       : searchManagerClientCardInventory({
           brand: autoRuBrandName,
@@ -373,16 +501,24 @@ export default function ManagerClientCardsPage() {
           type: "used",
         }),
     enabled: mode === "form" && step === 2 && (
-      currentVehicleMode === "vin"
-        ? currentVinSearch.trim().length >= 4
-        : Boolean(autoRuBrandName && autoRuModelName)
+      currentVinSearch.trim().length >= 4 || Boolean(autoRuBrandId && autoRuModelId)
     ),
     staleTime: 30_000,
   });
   const offerInventoryQuery = useQuery({
-    queryKey: ["manager-client-card-offer-vehicle", offerSearch.trim()],
-    queryFn: () => searchManagerClientCardInventory({ q: offerSearch.trim(), type: "new" }),
-    enabled: mode === "form" && step === 3 && offerSearch.trim().length >= 2,
+    queryKey: ["manager-client-card-offer-vehicle", offerBrandSearch.trim(), offerModelSearch.trim(), offerVinSearch.trim()],
+    queryFn: () => offerVinSearch.trim().length >= 4
+      ? searchManagerClientCardInventory({ vin: offerVinSearch.trim(), type: "new" })
+      : searchManagerClientCardInventory({
+          brand: offerBrandSearch.trim().length >= 2 ? offerBrandSearch.trim() : undefined,
+          model: offerModelSearch.trim().length >= 2 ? offerModelSearch.trim() : undefined,
+          type: "new",
+        }),
+    enabled: mode === "form" && step === 3 && (
+      offerVinSearch.trim().length >= 4 ||
+      offerBrandSearch.trim().length >= 2 ||
+      offerModelSearch.trim().length >= 2
+    ),
     staleTime: 30_000,
   });
 
@@ -395,12 +531,15 @@ export default function ManagerClientCardsPage() {
       setSelectedOfferCar(null);
       setStep(0);
       setCurrentVinSearch("");
-      setOfferSearch("");
+      setAutoRuBrandSearch("");
       setAutoRuBrandId("");
       setAutoRuBrandName("");
+      setAutoRuModelSearch("");
       setAutoRuModelId("");
       setAutoRuModelName("");
-      setCurrentVehicleMode("model");
+      setOfferBrandSearch("");
+      setOfferModelSearch("");
+      setOfferVinSearch("");
       setFormError("");
       setSaveAttempted(false);
       setMode("list");
@@ -415,9 +554,21 @@ export default function ManagerClientCardsPage() {
   const models = modelsQuery.data?.data ?? [];
   const autoRuBrands = autoRuBrandsQuery.data?.data ?? [];
   const autoRuModels = autoRuModelsQuery.data?.data ?? [];
+  const autoRuBrandSuggestions = autoRuBrands.map((brand: AutoRuCatalogBrand) => ({
+    value: brand.id,
+    label: brand.cyrillicName || brand.name,
+  }));
+  const autoRuModelSuggestions = autoRuModels.map((model: AutoRuCatalogModel) => ({
+    value: model.id,
+    label: model.name,
+  }));
   const managers = managersQuery.data?.data ?? [];
   const currentCarInventory = currentCarInventoryQuery.data?.data ?? [];
   const offerInventory = offerInventoryQuery.data?.data ?? [];
+  const offerBrandSuggestions = Array.from(new Set(offerInventory.map(car => car.brand).filter((brand): brand is string => Boolean(brand))))
+    .map(brand => ({ value: brand, label: brand }));
+  const offerModelSuggestions = Array.from(new Set(offerInventory.map(car => car.model).filter((model): model is string => Boolean(model))))
+    .map(model => ({ value: model, label: model }));
   const cardsPage = cardsQuery.data?.data;
   const cards = cardsPage?.items ?? [];
   const detailCard = detailQuery.data?.data ?? selectedCard;
@@ -428,23 +579,29 @@ export default function ManagerClientCardsPage() {
           form,
           index,
           selectedCurrentCar,
-          currentVehicleMode,
           autoRuBrandId,
+          autoRuBrandSearch,
           autoRuModelId,
+          autoRuModelSearch,
           currentVinSearch,
           selectedOfferCar,
-          offerSearch,
+          offerBrandSearch,
+          offerModelSearch,
+          offerVinSearch,
         )
       : []),
     [
       form,
       selectedCurrentCar,
-      currentVehicleMode,
       autoRuBrandId,
+      autoRuBrandSearch,
       autoRuModelId,
+      autoRuModelSearch,
       currentVinSearch,
       selectedOfferCar,
-      offerSearch,
+      offerBrandSearch,
+      offerModelSearch,
+      offerVinSearch,
       saveAttempted,
     ],
   );
@@ -468,13 +625,16 @@ export default function ManagerClientCardsPage() {
     setForm(emptyForm);
     setSelectedCurrentCar(null);
     setSelectedOfferCar(null);
-    setCurrentVehicleMode("model");
-    setOfferSearch("");
+    setAutoRuBrandSearch("");
     setAutoRuBrandId("");
     setAutoRuBrandName("");
+    setAutoRuModelSearch("");
     setAutoRuModelId("");
     setAutoRuModelName("");
     setCurrentVinSearch("");
+    setOfferBrandSearch("");
+    setOfferModelSearch("");
+    setOfferVinSearch("");
     setStep(0);
     setFormError("");
     setSaveAttempted(false);
@@ -493,14 +653,18 @@ export default function ManagerClientCardsPage() {
       update("tradeInPlan", "");
       setSelectedCurrentCar(null);
       setCurrentVinSearch("");
+      setAutoRuBrandSearch("");
       setAutoRuBrandId("");
       setAutoRuBrandName("");
+      setAutoRuModelSearch("");
       setAutoRuModelId("");
       setAutoRuModelName("");
     }
     if (step === 3) {
       setSelectedOfferCar(null);
-      setOfferSearch("");
+      setOfferBrandSearch("");
+      setOfferModelSearch("");
+      setOfferVinSearch("");
       update("commercialBrand", "");
       update("commercialModel", "");
       update("paymentMethod", "");
@@ -515,12 +679,15 @@ export default function ManagerClientCardsPage() {
       form,
       index,
       selectedCurrentCar,
-      currentVehicleMode,
       autoRuBrandId,
+      autoRuBrandSearch,
       autoRuModelId,
+      autoRuModelSearch,
       currentVinSearch,
       selectedOfferCar,
-      offerSearch,
+      offerBrandSearch,
+      offerModelSearch,
+      offerVinSearch,
     ));
     const firstInvalid = allErrors.findIndex(errors => errors.length > 0);
     if (firstInvalid >= 0) {
@@ -550,6 +717,9 @@ export default function ManagerClientCardsPage() {
 
   function selectOfferCar(car: ManagerClientCardInventoryItem) {
     setSelectedOfferCar(car);
+    setOfferBrandSearch(car.brand ?? "");
+    setOfferModelSearch(car.model ?? "");
+    setOfferVinSearch("");
     update("commercialBrand", car.brand ?? "");
     update("commercialModel", car.model ?? "");
   }
@@ -839,12 +1009,15 @@ export default function ManagerClientCardsPage() {
                               form,
                               index,
                               selectedCurrentCar,
-                              currentVehicleMode,
                               autoRuBrandId,
+                              autoRuBrandSearch,
                               autoRuModelId,
+                              autoRuModelSearch,
                               currentVinSearch,
                               selectedOfferCar,
-                              offerSearch,
+                              offerBrandSearch,
+                              offerModelSearch,
+                              offerVinSearch,
                             ).length === 0
                             ? "bg-emerald-500"
                             : "bg-slate-200"
@@ -873,12 +1046,15 @@ export default function ManagerClientCardsPage() {
                               form,
                               index,
                               selectedCurrentCar,
-                              currentVehicleMode,
                               autoRuBrandId,
+                              autoRuBrandSearch,
                               autoRuModelId,
+                              autoRuModelSearch,
                               currentVinSearch,
                               selectedOfferCar,
-                              offerSearch,
+                              offerBrandSearch,
+                              offerModelSearch,
+                              offerVinSearch,
                             ).length === 0
                             ? "border-emerald-100 bg-emerald-50/60 text-emerald-800"
                             : "border-transparent text-slate-500 hover:bg-slate-50"
@@ -1050,119 +1226,100 @@ export default function ManagerClientCardsPage() {
 
               {step === 2 && (
                 <div className="space-y-5">
-                  <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Способ поиска текущего автомобиля">
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={currentVehicleMode === "model"}
-                      onClick={() => {
-                        setCurrentVehicleMode("model");
-                        setCurrentVinSearch("");
-                        setSelectedCurrentCar(null);
-                        update("currentCar", "");
-                        update("currentCarYear", "");
-                      }}
-                      className={`min-h-11 rounded-lg border px-3 text-sm font-medium transition ${
-                        currentVehicleMode === "model" ? "border-[#0070b8] bg-sky-50 text-[#005a94]" : "border-slate-200 text-slate-600"
-                      }`}
-                    >
-                      По марке и модели
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={currentVehicleMode === "vin"}
-                      onClick={() => {
-                        setCurrentVehicleMode("vin");
-                        setAutoRuBrandId("");
-                        setAutoRuBrandName("");
-                        setAutoRuModelId("");
-                        setAutoRuModelName("");
-                        setSelectedCurrentCar(null);
-                        setCurrentVinSearch("");
-                        update("currentCar", "");
-                        update("currentCarYear", "");
-                      }}
-                      className={`min-h-11 rounded-lg border px-3 text-sm font-medium transition ${
-                        currentVehicleMode === "vin" ? "border-[#0070b8] bg-sky-50 text-[#005a94]" : "border-slate-200 text-slate-600"
-                      }`}
-                    >
-                      По VIN
-                    </button>
-                  </div>
-
-                  {currentVehicleMode === "model" ? (
-                    <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-                      <SelectField
+                  <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                      <SearchSuggestionField
                         id="current-autoru-brand"
                         label="Марка · Auto.ru"
-                        value={autoRuBrandId}
-                        disabled={autoRuBrandsQuery.isLoading}
-                        onChange={id => {
-                          const brand = autoRuBrands.find(item => item.id === id);
-                          const brandName = brand?.cyrillicName || brand?.name || "";
-                          setAutoRuBrandId(id);
-                          setAutoRuBrandName(brandName);
+                        value={autoRuBrandSearch}
+                        placeholder="Начните вводить марку"
+                        options={autoRuBrandSuggestions}
+                        loading={autoRuBrandsQuery.isLoading}
+                        onChange={value => {
+                          setAutoRuBrandSearch(value);
+                          setAutoRuBrandId("");
+                          setAutoRuBrandName("");
+                          setCurrentVinSearch("");
+                          setAutoRuModelSearch("");
                           setAutoRuModelId("");
                           setAutoRuModelName("");
                           setSelectedCurrentCar(null);
-                          update("currentCar", brandName);
+                          update("currentCar", "");
                           update("currentCarYear", "");
                         }}
-                      >
-                        <option value="">{autoRuBrandsQuery.isLoading ? "Загружаем марки…" : "Выберите марку"}</option>
-                        {autoRuBrands.map(brand => (
-                          <option key={brand.id} value={brand.id}>{brand.cyrillicName || brand.name}</option>
-                        ))}
-                      </SelectField>
-                      <SelectField
+                        onSelect={option => {
+                          const brand = autoRuBrands.find(item => item.id === option.value);
+                          const brandName = brand?.cyrillicName || brand?.name || option.label;
+                          setAutoRuBrandId(option.value);
+                          setAutoRuBrandSearch(brandName);
+                          setAutoRuBrandName(brandName);
+                          setCurrentVinSearch("");
+                          setAutoRuModelSearch("");
+                          setAutoRuModelId("");
+                          setAutoRuModelName("");
+                          setSelectedCurrentCar(null);
+                          update("currentCar", "");
+                          update("currentCarYear", "");
+                        }}
+                      />
+                      <SearchSuggestionField
                         id="current-autoru-model"
                         label="Модель"
-                        value={autoRuModelId}
-                        disabled={!autoRuBrandId || autoRuModelsQuery.isLoading}
-                        onChange={id => {
-                          const model = autoRuModels.find(item => item.id === id);
-                          const modelName = model?.name || "";
-                          setAutoRuModelId(id);
-                          setAutoRuModelName(modelName);
+                        value={autoRuModelSearch}
+                        placeholder={autoRuBrandId ? "Начните вводить модель" : "Сначала выберите марку"}
+                        options={autoRuModelSuggestions}
+                        disabled={!autoRuBrandId}
+                        loading={autoRuModelsQuery.isLoading}
+                        onChange={value => {
+                          setAutoRuModelSearch(value);
+                          setAutoRuModelId("");
+                          setAutoRuModelName("");
                           setSelectedCurrentCar(null);
-                          update("currentCar", [autoRuBrandName, modelName].filter(Boolean).join(" "));
+                          setCurrentVinSearch("");
+                          update("currentCar", autoRuBrandName);
                           update("currentCarYear", "");
                         }}
-                      >
-                        <option value="">
-                          {autoRuModelsQuery.isLoading ? "Загружаем модели…" : autoRuBrandId ? "Выберите модель" : "Сначала выберите марку"}
-                        </option>
-                        {autoRuModels.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}
-                      </SelectField>
+                        onSelect={option => {
+                          setAutoRuModelId(option.value);
+                          setAutoRuModelSearch(option.label);
+                          setAutoRuModelName(option.label);
+                          setSelectedCurrentCar(null);
+                          setCurrentVinSearch("");
+                          update("currentCar", [autoRuBrandName, option.label].filter(Boolean).join(" "));
+                          update("currentCarYear", "");
+                        }}
+                      />
                       {autoRuBrandsQuery.isError && (
                         <p role="alert" className="text-sm text-red-600 sm:col-span-2">Не удалось загрузить марки из Auto.ru.</p>
                       )}
                       {autoRuModelsQuery.isError && (
                         <p role="alert" className="text-sm text-red-600 sm:col-span-2">Не удалось загрузить модели из Auto.ru.</p>
                       )}
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Label htmlFor="current-vin">VIN или его часть</Label>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                        <Input
-                          id="current-vin"
-                          value={currentVinSearch}
-                          onChange={event => {
-                            setCurrentVinSearch(event.target.value.toUpperCase().replace(/[^A-ZА-Я0-9]/g, "").slice(0, 32));
-                            setSelectedCurrentCar(null);
-                            update("currentCar", "");
-                            update("currentCarYear", "");
-                          }}
-                          placeholder="Введите минимум 4 символа"
-                          autoCapitalize="characters"
-                          className="h-11 pl-9 uppercase"
-                        />
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label htmlFor="current-vin">Или поиск по VIN / его части</Label>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          <Input
+                            id="current-vin"
+                            value={currentVinSearch}
+                            onChange={event => {
+                              setCurrentVinSearch(event.target.value.toUpperCase().replace(/[^A-ZА-Я0-9]/g, "").slice(0, 32));
+                              setAutoRuBrandSearch("");
+                              setAutoRuBrandId("");
+                              setAutoRuBrandName("");
+                              setAutoRuModelSearch("");
+                              setAutoRuModelId("");
+                              setAutoRuModelName("");
+                              setSelectedCurrentCar(null);
+                              update("currentCar", "");
+                              update("currentCarYear", "");
+                            }}
+                            placeholder="Введите минимум 4 символа"
+                            autoCapitalize="characters"
+                            className="h-11 pl-9 uppercase"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  )}
+                  </div>
 
                   {selectedCurrentCar ? (
                     <div className="space-y-3">
@@ -1172,7 +1329,7 @@ export default function ManagerClientCardsPage() {
                         variant="outline"
                         onClick={() => {
                           setSelectedCurrentCar(null);
-                          if (currentVehicleMode === "vin") {
+                          if (currentVinSearch.trim()) {
                             update("currentCar", "");
                             update("currentCarYear", "");
                           }
@@ -1181,13 +1338,13 @@ export default function ManagerClientCardsPage() {
                         Снять выбор автомобиля из базы
                       </Button>
                     </div>
-                  ) : currentVehicleMode === "vin" && currentVinSearch.trim().length < 4 ? (
+                  ) : currentVinSearch.trim() && currentVinSearch.trim().length < 4 ? (
                     <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
                       Поиск по VIN работает по базе автомобилей с пробегом и доступен от 4 символов.
                     </p>
-                  ) : currentVehicleMode === "model" && (!autoRuBrandName || !autoRuModelName) ? (
+                  ) : !autoRuBrandId || !autoRuModelId ? (
                     <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
-                      Выберите марку и модель в Auto.ru. Если похожий автомобиль есть в нашей базе с пробегом, его можно привязать к листу.
+                      Введите марку и модель или VIN. Выберите совпадение из подсказок; похожую машину из нашей базы с пробегом можно привязать к листу.
                     </p>
                   ) : currentCarInventoryQuery.isLoading ? (
                     <div className="flex items-center gap-2 py-5 text-sm text-slate-500">
@@ -1208,9 +1365,9 @@ export default function ManagerClientCardsPage() {
                     </div>
                   ) : (
                     <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
-                      {currentVehicleMode === "model"
-                        ? "Совпадений в базе с пробегом нет. Марка и модель из Auto.ru всё равно сохранятся."
-                        : "Автомобиль с таким VIN в базе не найден. Проверьте VIN или выполните поиск по марке и модели."}
+                      {currentVinSearch.trim()
+                        ? "Автомобиль с таким VIN в базе не найден. Проверьте VIN или выполните поиск по марке и модели."
+                        : "Совпадений в базе с пробегом нет. Марка и модель из Auto.ru всё равно сохранятся."}
                     </p>
                   )}
 
@@ -1246,24 +1403,73 @@ export default function ManagerClientCardsPage() {
 
               {step === 3 && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="offer-car-search">Поиск нового автомобиля по марке, модели, комплектации или VIN</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        id="offer-car-search"
-                        value={offerSearch}
-                        onChange={event => {
-                          setOfferSearch(event.target.value);
-                          setSelectedOfferCar(null);
-                          update("commercialBrand", "");
-                          update("commercialModel", "");
-                        }}
-                        placeholder="Например, HAVAL DARGO"
-                        className="h-11 pl-9"
-                      />
+                  <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                    <SearchSuggestionField
+                      id="offer-brand-search"
+                      label="Марка нового автомобиля"
+                      value={offerBrandSearch}
+                      placeholder="Начните вводить марку"
+                      options={offerBrandSuggestions}
+                      loading={offerInventoryQuery.isLoading && offerBrandSearch.trim().length >= 2}
+                      onChange={value => {
+                        setOfferBrandSearch(value);
+                        setOfferVinSearch("");
+                        setSelectedOfferCar(null);
+                        update("commercialBrand", "");
+                        update("commercialModel", "");
+                      }}
+                      onSelect={option => {
+                        setOfferBrandSearch(option.label);
+                        setOfferVinSearch("");
+                        setSelectedOfferCar(null);
+                        update("commercialBrand", "");
+                        update("commercialModel", "");
+                      }}
+                    />
+                    <SearchSuggestionField
+                      id="offer-model-search"
+                      label="Модель"
+                      value={offerModelSearch}
+                      placeholder="Начните вводить модель"
+                      options={offerModelSuggestions}
+                      loading={offerInventoryQuery.isLoading && offerModelSearch.trim().length >= 2}
+                      onChange={value => {
+                        setOfferModelSearch(value);
+                        setOfferVinSearch("");
+                        setSelectedOfferCar(null);
+                        update("commercialBrand", "");
+                        update("commercialModel", "");
+                      }}
+                      onSelect={option => {
+                        setOfferModelSearch(option.label);
+                        setOfferVinSearch("");
+                        setSelectedOfferCar(null);
+                        update("commercialBrand", "");
+                        update("commercialModel", "");
+                      }}
+                    />
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="offer-vin-search">Или поиск по VIN</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Input
+                          id="offer-vin-search"
+                          value={offerVinSearch}
+                          onChange={event => {
+                            setOfferVinSearch(event.target.value.toUpperCase().replace(/[^A-ZА-Я0-9]/g, "").slice(0, 32));
+                            setOfferBrandSearch("");
+                            setOfferModelSearch("");
+                            setSelectedOfferCar(null);
+                            update("commercialBrand", "");
+                            update("commercialModel", "");
+                          }}
+                          placeholder="Введите минимум 4 символа"
+                          autoCapitalize="characters"
+                          className="h-11 pl-9 uppercase"
+                        />
+                      </div>
                     </div>
-                    <p className="text-xs text-slate-500">Поиск выполняется только по новым автомобилям из доступного склада.</p>
+                    <p className="text-xs text-slate-500 sm:col-span-2">Совпадения и выбранный автомобиль берутся только из новых машин нашего склада.</p>
                   </div>
 
                   {selectedOfferCar ? (
@@ -1289,9 +1495,13 @@ export default function ManagerClientCardsPage() {
                         Снять выбор автомобиля
                       </Button>
                     </div>
-                  ) : offerSearch.trim().length < 2 ? (
+                  ) : offerVinSearch.trim().length > 0 && offerVinSearch.trim().length < 4 ? (
                     <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
-                      Введите не менее двух символов. Здесь отображаются только новые автомобили из базы.
+                      Для поиска по VIN введите минимум четыре символа.
+                    </p>
+                  ) : offerBrandSearch.trim().length < 2 && offerModelSearch.trim().length < 2 && offerVinSearch.trim().length < 4 ? (
+                    <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
+                      Введите минимум два символа марки или модели либо четыре символа VIN.
                     </p>
                   ) : offerInventoryQuery.isLoading ? (
                     <div className="flex items-center gap-2 py-5 text-sm text-slate-500">
