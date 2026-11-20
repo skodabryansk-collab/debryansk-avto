@@ -239,6 +239,8 @@ router.get("/client-cards", async (req, res): Promise<void> => {
         currentCarOwnersCount: managerClientCardsTable.currentCarOwnersCount,
         currentCarInventoryId: managerClientCardsTable.currentCarInventoryId,
         tradeInPlan: managerClientCardsTable.tradeInPlan,
+        needs: managerClientCardsTable.needs,
+        currentCars: managerClientCardsTable.currentCars,
         commercialBrand: managerClientCardsTable.commercialBrand,
         commercialModel: managerClientCardsTable.commercialModel,
         commercialCarId: managerClientCardsTable.commercialCarId,
@@ -257,58 +259,192 @@ router.get("/client-cards", async (req, res): Promise<void> => {
     const cards = pageRows.slice(0, limit);
     const mappings = cards.length ? await getBrandLocationMappings() : [];
 
+    const needsForCard = (card: (typeof cards)[number]) => {
+      if (Array.isArray(card.needs) && card.needs.length > 0) return card.needs.map(asRecord);
+      return [{
+        brand: card.desiredBrand,
+        model: card.desiredModel,
+        undecided: card.desiredVehicleUndecided,
+        budgetRange: card.budgetRange,
+      }];
+    };
+    const currentCarsForCard = (card: (typeof cards)[number]) => {
+      if (Array.isArray(card.currentCars) && card.currentCars.length > 0) return card.currentCars.map(asRecord);
+      if (!card.currentCarBrand && !card.currentCarModel && card.currentCarYear == null && card.currentCarMileage == null) return [];
+      return [{
+        brand: card.currentCarBrand,
+        model: card.currentCarModel,
+        year: card.currentCarYear,
+        mileage: card.currentCarMileage,
+        generation: card.currentCarGeneration,
+        bodyType: card.currentCarBodyType,
+        ownersCount: card.currentCarOwnersCount,
+        inventoryId: card.currentCarInventoryId,
+        tradeInPlan: card.tradeInPlan,
+      }];
+    };
+    const findMapping = (brandName: string | null) => {
+      if (!brandName) return null;
+      const matching = mappings.filter(
+        mapping => normalizeManagerQuoteBrand(mapping.brandName) === normalizeManagerQuoteBrand(brandName),
+      );
+      const locationIds = new Set(matching.flatMap(mapping => mapping.locationId === null ? [] : [mapping.locationId]));
+      return matching.find(item => item.locationId !== null && locationIds.size === 1) ?? null;
+    };
+
     for (const card of cards) {
-      const resolvedBrand = card.commercialBrand?.trim() || card.desiredBrand?.trim() || null;
-      const problem = getMappingProblem(card.id, resolvedBrand, mappings);
-      if (problem) {
+      const needs = needsForCard(card);
+      const targetBrands = new Map<string, string>();
+      for (const need of needs) {
+        const brand = asString(need["brand"]);
+        if (brand) targetBrands.set(normalizeManagerQuoteBrand(brand), brand);
+      }
+      if (card.commercialBrand?.trim()) {
+        const brand = card.commercialBrand.trim();
+        targetBrands.set(normalizeManagerQuoteBrand(brand), brand);
+      }
+      if (targetBrands.size === 0) {
         res.status(409).json({
           ok: false,
           error: "mapping_not_ready",
-          card_id: problem.cardId,
-          missing_fields: problem.missingFields,
+          card_id: card.id,
+          missing_fields: ["department_code", "organization_code"],
         } satisfies FeedError);
         return;
+      }
+      for (const brand of targetBrands.values()) {
+        const problem = getMappingProblem(card.id, brand, mappings);
+        if (problem) {
+          res.status(409).json({
+            ok: false,
+            error: "mapping_not_ready",
+            card_id: problem.cardId,
+            missing_fields: problem.missingFields,
+          } satisfies FeedError);
+          return;
+        }
       }
     }
 
     const items = cards.map(card => {
-      const resolvedBrand = card.commercialBrand?.trim() || card.desiredBrand?.trim() || "";
-      const matching = mappings.filter(
-        mapping => normalizeManagerQuoteBrand(mapping.brandName) === normalizeManagerQuoteBrand(resolvedBrand),
-      );
-      const locationIds = new Set(matching.flatMap(mapping => mapping.locationId === null ? [] : [mapping.locationId]));
-      const mapping = matching.find(item => item.locationId !== null && locationIds.size === 1)!;
+      const needs = needsForCard(card);
+      const currentCars = currentCarsForCard(card);
+      const mappedNeeds = needs.map(need => {
+        const brand = asString(need["brand"]);
+        const mapping = findMapping(brand);
+        return {
+          brand_id: mapping?.brandId ?? null,
+          brand,
+          model: asString(need["model"]),
+          undecided: need["undecided"] === true,
+          budget_range: asString(need["budgetRange"]),
+          organization_code: mapping?.organizationCode ?? null,
+          organization_name: mapping?.locationTitle ?? null,
+          department_code: mapping?.departmentCode ?? null,
+          department_name: mapping?.brandName ?? null,
+        };
+      });
+      const offerMapping = findMapping(card.commercialBrand);
+      const commercialOffer = card.commercialBrand || card.commercialModel || card.commercialCarId
+        ? {
+            brand_id: offerMapping?.brandId ?? null,
+            brand: card.commercialBrand,
+            model: card.commercialModel,
+            car_id: card.commercialCarId,
+            car: getCommercialCarSummary(card.commercialCarSnapshot, card.commercialCarId),
+            organization_code: offerMapping?.organizationCode ?? null,
+            organization_name: offerMapping?.locationTitle ?? null,
+            department_code: offerMapping?.departmentCode ?? null,
+            department_name: offerMapping?.brandName ?? null,
+          }
+        : null;
+      const recordsByBrand = new Map<number, {
+        source_key: string;
+        brand_id: number;
+        brand_name: string;
+        organization_code: string;
+        organization_name: string;
+        department_code: string;
+        department_name: string;
+        needs: typeof mappedNeeds;
+        commercial_offer: typeof commercialOffer;
+      }>();
+      const addBrandRecord = (mapping: MappingRow | null) => {
+        if (!mapping?.locationId || !mapping.organizationCode || !mapping.locationTitle || !mapping.departmentCode) return;
+        if (!recordsByBrand.has(mapping.brandId)) {
+          recordsByBrand.set(mapping.brandId, {
+            source_key: `${card.id}:${mapping.brandId}`,
+            brand_id: mapping.brandId,
+            brand_name: mapping.brandName,
+            organization_code: mapping.organizationCode,
+            organization_name: mapping.locationTitle,
+            department_code: mapping.departmentCode,
+            department_name: mapping.brandName,
+            needs: [],
+            commercial_offer: null,
+          });
+        }
+        return recordsByBrand.get(mapping.brandId)!;
+      };
+      for (const need of mappedNeeds) {
+        if (!need.brand_id) continue;
+        const group = addBrandRecord(findMapping(need.brand));
+        if (group) group.needs.push(need);
+      }
+      if (commercialOffer?.brand_id) {
+        const group = addBrandRecord(offerMapping);
+        if (group) group.commercial_offer = commercialOffer;
+      }
+      const brandRecords = [...recordsByBrand.values()];
+      const primaryRecord = brandRecords[0];
+      const firstNeed = mappedNeeds[0];
+      const firstCar = currentCars[0] ?? {};
+      const currentCarName = [asString(firstCar["brand"]), asString(firstCar["model"])].filter(Boolean).join(" ") || null;
 
       return {
         id: card.id,
         created_at: card.createdAt.toISOString(),
         manager_id: card.managerId,
         manager_name: card.managerName,
-        organization_code: mapping.organizationCode!,
-        organization_name: mapping.locationTitle!,
-        department_code: mapping.departmentCode!,
-        department_name: mapping.brandName,
+        organization_code: primaryRecord?.organization_code ?? "",
+        organization_name: primaryRecord?.organization_name ?? "",
+        department_code: primaryRecord?.department_code ?? "",
+        department_name: primaryRecord?.department_name ?? "",
         client_name: card.clientName,
         client_phone: card.clientPhone,
         client_gender: card.clientGender,
-        desired_brand: card.desiredBrand,
-        desired_model: card.desiredModel,
-        desired_vehicle_undecided: card.desiredVehicleUndecided,
-        budget_range: card.budgetRange,
-        current_car: card.currentCar,
-        current_car_brand: card.currentCarBrand,
-        current_car_model: card.currentCarModel,
-        current_car_year: card.currentCarYear,
-        current_car_mileage: card.currentCarMileage,
-        current_car_generation: card.currentCarGeneration,
-        current_car_body_type: card.currentCarBodyType,
-        current_car_owners_count: card.currentCarOwnersCount,
-        current_car_inventory_id: card.currentCarInventoryId,
-        trade_in_plan: card.tradeInPlan,
+        desired_brand: firstNeed?.brand ?? null,
+        desired_model: firstNeed?.model ?? null,
+        desired_vehicle_undecided: firstNeed?.undecided ?? false,
+        budget_range: firstNeed?.budget_range ?? null,
+        current_car: currentCarName,
+        current_car_brand: asString(firstCar["brand"]),
+        current_car_model: asString(firstCar["model"]),
+        current_car_year: asNumber(firstCar["year"]),
+        current_car_mileage: asNumber(firstCar["mileage"]),
+        current_car_generation: asString(firstCar["generation"]),
+        current_car_body_type: asString(firstCar["bodyType"]),
+        current_car_owners_count: asString(firstCar["ownersCount"]),
+        current_car_inventory_id: asNumber(firstCar["inventoryId"]),
+        trade_in_plan: asString(firstCar["tradeInPlan"]),
         commercial_brand: card.commercialBrand,
         commercial_model: card.commercialModel,
         commercial_car_id: card.commercialCarId,
         commercial_car: getCommercialCarSummary(card.commercialCarSnapshot, card.commercialCarId),
+        needs: mappedNeeds,
+        current_cars: currentCars.map(car => ({
+          brand: asString(car["brand"]) ?? "",
+          model: asString(car["model"]) ?? "",
+          year: asNumber(car["year"]) ?? 0,
+          mileage: asNumber(car["mileage"]) ?? 0,
+          generation: asString(car["generation"]),
+          body_type: asString(car["bodyType"]),
+          owners_count: asString(car["ownersCount"]),
+          inventory_id: asNumber(car["inventoryId"]),
+          trade_in_plan: asString(car["tradeInPlan"]),
+        })),
+        commercial_offer: commercialOffer,
+        brand_records: brandRecords,
         payment_method: card.paymentMethod,
         comment: card.comment,
       };
