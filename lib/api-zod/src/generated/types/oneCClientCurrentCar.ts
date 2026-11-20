@@ -19,7 +19,5 @@ export interface OneCClientCurrentCar {
   /** @nullable */
   owners_count: string | null;
   /** @nullable */
-  inventory_id: number | null;
-  /** @nullable */
   trade_in_plan: OneCClientCurrentCarTradeInPlan;
 }
