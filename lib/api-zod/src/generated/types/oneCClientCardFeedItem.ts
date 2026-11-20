@@ -51,15 +51,13 @@ export interface OneCClientCardFeedItem {
   /** @nullable */
   current_car_owners_count: string | null;
   /** @nullable */
-  current_car_inventory_id: number | null;
-  /** @nullable */
   trade_in_plan: string | null;
   /** @nullable */
   commercial_brand: string | null;
   /** @nullable */
   commercial_model: string | null;
   /** @nullable */
-  commercial_car_id: number | null;
+  commercial_car_vin: string | null;
   commercial_car: OneCClientCarSummary | null;
   /** @nullable */
   payment_method: OneCClientCardFeedItemPaymentMethod;
