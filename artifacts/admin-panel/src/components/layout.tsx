@@ -8,7 +8,7 @@ import {
   HelpCircle, FileText, Gift, Wrench, TrendingUp, PhoneCall,
   UserCog, FileSpreadsheet, Plus, Zap, Activity, Wand2,
   Palette, MapPin, Users, UserCircle, Inbox, Briefcase, ClipboardList,
-  Boxes,
+  Boxes, ArrowLeftRight,
 } from "lucide-react";
 import { rebuildCache, getRebuildStatus, runPrerender, getPrerenderStatus } from "@/lib/api";
 
@@ -69,6 +69,12 @@ const navGroups = [
       { path: "/sales-managers", label: "Рук. отдела продаж",  icon: TrendingUp    },
       { path: "/quotes",         label: "КП менеджеров",       icon: FileSpreadsheet},
       { path: "/manager/quotes", label: "Создать КП",          icon: Plus          },
+    ],
+  },
+  {
+    label: "Интеграции",
+    items: [
+      { path: "/onec-integration", label: "Интеграция с 1С", icon: ArrowLeftRight },
     ],
   },
 ] as const;
