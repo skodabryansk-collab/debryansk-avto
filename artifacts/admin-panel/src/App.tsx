@@ -26,6 +26,7 @@ import CorporateAdminPage from "@/pages/corporate";
 import ToCatalogPage from "@/pages/to-catalog";
 import SeoHubPage from "@/pages/seo-hub";
 import CalltouchPage from "@/pages/calltouch";
+import OneCIntegrationPage from "@/pages/onec-integration";
 import AdminManagersPage from "@/pages/admin-managers";
 import AdminQuotesPage from "@/pages/admin-quotes";
 import AdminSalesManagersPage from "@/pages/admin-sales-managers";
@@ -75,6 +76,7 @@ function AppRouter() {
       <Route path="/seo-positions" component={() => <RequireAuth><AdminLayout><SeoHubPage /></AdminLayout></RequireAuth>} />
       <Route path="/seo-autopilot" component={() => <RequireAuth><AdminLayout><SeoHubPage /></AdminLayout></RequireAuth>} />
       <Route path="/calltouch" component={() => <RequireAuth><AdminLayout><CalltouchPage /></AdminLayout></RequireAuth>} />
+      <Route path="/onec-integration" component={() => <RequireAuth><AdminLayout><OneCIntegrationPage /></AdminLayout></RequireAuth>} />
       <Route path="/managers" component={() => <RequireAuth><AdminLayout><AdminManagersPage /></AdminLayout></RequireAuth>} />
       <Route path="/quotes" component={() => <RequireAuth><AdminLayout><AdminQuotesPage /></AdminLayout></RequireAuth>} />
       <Route path="/sales-managers" component={() => <RequireAuth><AdminLayout><AdminSalesManagersPage /></AdminLayout></RequireAuth>} />
