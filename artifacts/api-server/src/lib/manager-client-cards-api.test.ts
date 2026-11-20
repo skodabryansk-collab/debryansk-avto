@@ -184,6 +184,28 @@ test("manager client cards are saved and isolated by manager", async () => {
     const currentVinResults = await currentVinResponse.json() as ApiEnvelope<Array<{ vin: string }>>;
     assert.equal(currentVinResponse.status, 200);
     assert.equal(currentVinResults.data?.[0]?.vin, "XW8ZZZ61ZHG000456");
+
+    const partialBrandResponse = await fetch(`${started.baseUrl}/api/manager/client-cards/inventory?brand=Hav&type=new`, {
+      headers: { authorization: `Bearer ${managerToken(managerIds[0]!)}` },
+    });
+    const partialBrand = await partialBrandResponse.json() as ApiEnvelope<Array<{ brand: string }>>;
+    assert.equal(partialBrandResponse.status, 200);
+    assert.equal(partialBrand.data?.some(car => car.brand === "Haval City"), true);
+
+    const partialModelResponse = await fetch(`${started.baseUrl}/api/manager/client-cards/inventory?model=Jol&type=new`, {
+      headers: { authorization: `Bearer ${managerToken(managerIds[0]!)}` },
+    });
+    const partialModel = await partialModelResponse.json() as ApiEnvelope<Array<{ model: string }>>;
+    assert.equal(partialModelResponse.status, 200);
+    assert.equal(partialModel.data?.some(car => car.model === "Jolion"), true);
+
+    const combinedOfferResponse = await fetch(`${started.baseUrl}/api/manager/client-cards/inventory?brand=Hav&model=Jol&type=new`, {
+      headers: { authorization: `Bearer ${managerToken(managerIds[0]!)}` },
+    });
+    const combinedOffer = await combinedOfferResponse.json() as ApiEnvelope<Array<{ brand: string; model: string }>>;
+    assert.equal(combinedOfferResponse.status, 200);
+    assert.equal(combinedOffer.data?.some(car => car.brand === "Haval City" && car.model === "Jolion"), true);
+
     const hiddenCurrentVinResponse = await fetch(`${started.baseUrl}/api/manager/client-cards/inventory?vin=0004&type=used`, {
       headers: { authorization: `Bearer ${managerToken(managerIds[1]!)}` },
     });
