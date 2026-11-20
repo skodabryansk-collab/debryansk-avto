@@ -7,7 +7,8 @@ import {
   Menu, X, Tag, Settings, Bot, Star, Megaphone, RefreshCw,
   HelpCircle, FileText, Gift, Wrench, TrendingUp, PhoneCall,
   UserCog, FileSpreadsheet, Plus, Zap, Activity, Wand2,
-  Palette, MapPin, Users, UserCircle, Inbox, Briefcase,
+  Palette, MapPin, Users, UserCircle, Inbox, Briefcase, ClipboardList,
+  Boxes,
 } from "lucide-react";
 import { rebuildCache, getRebuildStatus, runPrerender, getPrerenderStatus } from "@/lib/api";
 
@@ -35,6 +36,7 @@ const navGroups = [
     label: "Аналитика",
     items: [
       { path: "/leads",    label: "Заявки",      icon: Inbox     },
+      { path: "/surveys",  label: "Опросы клиентов", icon: ClipboardList },
       { path: "/calltouch",label: "Звонки",      icon: PhoneCall },
       { path: "/visitors", label: "Посетители",  icon: Users     },
       { path: "/reviews",  label: "Отзывы",      icon: Star      },
@@ -54,6 +56,7 @@ const navGroups = [
     label: "Сайт",
     items: [
       { path: "/locations", label: "Локации",       icon: MapPin     },
+      { path: "/cm-stock",  label: "Склад CM",      icon: Boxes      },
       { path: "/brands",    label: "Бренды",        icon: Tag        },
       { path: "/users",     label: "Пользователи",  icon: UserCircle },
       { path: "/settings",  label: "Настройки",     icon: Settings   },
@@ -298,8 +301,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       )}
 
       {/* ── Main content ────────────────────────────── */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden md:pt-0 pt-14">
-        <div className="p-4 sm:p-6 max-w-6xl mx-auto min-w-0">
+      <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden pt-14 md:pt-0">
+        <div className="box-border w-full min-w-0 max-w-6xl mx-auto p-4 sm:p-6">
           {children}
         </div>
       </main>
