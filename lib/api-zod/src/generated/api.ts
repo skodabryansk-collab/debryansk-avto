@@ -920,9 +920,7 @@ export const GetOneCClientCardsResponse = zod.object({
   "manager_id": zod.number(),
   "manager_name": zod.string().nullable(),
   "organization_code": zod.string(),
-  "organization_name": zod.string(),
   "department_code": zod.string(),
-  "department_name": zod.string(),
   "client_name": zod.string(),
   "client_phone": zod.string(),
   "client_gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullable(),
@@ -955,16 +953,13 @@ export const GetOneCClientCardsResponse = zod.object({
   "payment_method": zod.union([zod.literal('Кредит'),zod.literal('Лизинг'),zod.literal('Наличные / Безнал'),zod.literal(null)]).nullable(),
   "comment": zod.string().nullable(),
   "needs": zod.array(zod.object({
-  "brand_id": zod.number().nullable(),
   "brand": zod.string().nullable(),
   "model": zod.string().nullable(),
   "undecided": zod.boolean(),
   "budget_range": zod.union([zod.literal('Не указан'),zod.literal('до 2 млн'),zod.literal('2–3 млн'),zod.literal('3–5 млн'),zod.literal('5+ млн'),zod.literal(null)]).nullable(),
   "planned_purchase_date": zod.string().regex(getOneCClientCardsResponseDataItemsItemNeedsItemPlannedPurchaseDateRegExp).nullable(),
   "organization_code": zod.string().nullable(),
-  "organization_name": zod.string().nullable(),
-  "department_code": zod.string().nullable(),
-  "department_name": zod.string().nullable()
+  "department_code": zod.string().nullable()
 })),
   "current_cars": zod.array(zod.object({
   "brand": zod.string(),
@@ -977,7 +972,6 @@ export const GetOneCClientCardsResponse = zod.object({
   "trade_in_plan": zod.union([zod.literal('Да'),zod.literal('Нет'),zod.literal('Пока не решил'),zod.literal(null)]).nullable()
 })),
   "commercial_offer": zod.union([zod.object({
-  "brand_id": zod.number().nullable(),
   "brand": zod.string().nullable(),
   "model": zod.string().nullable(),
   "car_vin": zod.string().nullable(),
@@ -992,32 +986,23 @@ export const GetOneCClientCardsResponse = zod.object({
   "price": zod.number().nullable()
 }),zod.null()]),
   "organization_code": zod.string().nullable(),
-  "organization_name": zod.string().nullable(),
-  "department_code": zod.string().nullable(),
-  "department_name": zod.string().nullable()
+  "department_code": zod.string().nullable()
 }),zod.null()]),
   "brand_records": zod.array(zod.object({
   "source_key": zod.string(),
-  "brand_id": zod.number(),
   "brand_name": zod.string(),
   "organization_code": zod.string(),
-  "organization_name": zod.string(),
   "department_code": zod.string(),
-  "department_name": zod.string(),
   "needs": zod.array(zod.object({
-  "brand_id": zod.number().nullable(),
   "brand": zod.string().nullable(),
   "model": zod.string().nullable(),
   "undecided": zod.boolean(),
   "budget_range": zod.union([zod.literal('Не указан'),zod.literal('до 2 млн'),zod.literal('2–3 млн'),zod.literal('3–5 млн'),zod.literal('5+ млн'),zod.literal(null)]).nullable(),
   "planned_purchase_date": zod.string().regex(getOneCClientCardsResponseDataItemsItemBrandRecordsItemNeedsItemPlannedPurchaseDateRegExp).nullable(),
   "organization_code": zod.string().nullable(),
-  "organization_name": zod.string().nullable(),
-  "department_code": zod.string().nullable(),
-  "department_name": zod.string().nullable()
+  "department_code": zod.string().nullable()
 })),
   "commercial_offer": zod.union([zod.object({
-  "brand_id": zod.number().nullable(),
   "brand": zod.string().nullable(),
   "model": zod.string().nullable(),
   "car_vin": zod.string().nullable(),
@@ -1032,9 +1017,7 @@ export const GetOneCClientCardsResponse = zod.object({
   "price": zod.number().nullable()
 }),zod.null()]),
   "organization_code": zod.string().nullable(),
-  "organization_name": zod.string().nullable(),
-  "department_code": zod.string().nullable(),
-  "department_name": zod.string().nullable()
+  "department_code": zod.string().nullable()
 }),zod.null()])
 }))
 })),
