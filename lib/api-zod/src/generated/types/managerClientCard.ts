@@ -42,8 +42,6 @@ export interface ManagerClientCard {
   currentCarBodyType: string | null;
   /** @nullable */
   currentCarOwnersCount: string | null;
-  /** @nullable */
-  currentCarInventoryId: number | null;
   currentCarSnapshot: ManagerClientCarSnapshot | null;
   /** @nullable */
   tradeInPlan: string | null;
