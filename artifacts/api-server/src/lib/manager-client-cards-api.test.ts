@@ -60,6 +60,12 @@ test("manager client cards are saved and isolated by manager", async () => {
         passwordHash: "test-only",
         brands: ["Jetour"],
       },
+      {
+        name: "Client card manager C",
+        login: `client-card-c-${suffix}`,
+        passwordHash: "test-only",
+        brands: [],
+      },
     ]).returning({ id: managersTable.id });
     managerIds = managers.map(manager => manager.id);
 
@@ -259,6 +265,74 @@ test("manager client cards are saved and isolated by manager", async () => {
     const needsBrands = await needsBrandsResponse.json() as ApiEnvelope<string[]>;
     assert.equal(needsBrandsResponse.status, 200);
     assert.deepEqual(needsBrands.data, ["Haval City"]);
+
+    const unrestrictedToken = managerToken(managerIds[2]!);
+    const unrestrictedBrandsResponse = await fetch(`${started.baseUrl}/api/manager/client-cards/needs/brands`, {
+      headers: { authorization: `Bearer ${unrestrictedToken}` },
+    });
+    const unrestrictedBrands = await unrestrictedBrandsResponse.json() as ApiEnvelope<string[]>;
+    assert.equal(unrestrictedBrandsResponse.status, 200);
+    assert.equal(unrestrictedBrands.data?.includes("Haval City"), true);
+
+    const unrestrictedModelsResponse = await fetch(
+      `${started.baseUrl}/api/manager/client-cards/needs/models?brand=${encodeURIComponent("Haval City")}`,
+      { headers: { authorization: `Bearer ${unrestrictedToken}` } },
+    );
+    const unrestrictedModels = await unrestrictedModelsResponse.json() as ApiEnvelope<string[]>;
+    assert.equal(unrestrictedModelsResponse.status, 200);
+    assert.equal(unrestrictedModels.data?.includes("Jolion"), true);
+
+    const unrestrictedOfferResponse = await fetch(
+      `${started.baseUrl}/api/manager/client-cards/inventory?brand=Hav&model=Jol&type=new`,
+      { headers: { authorization: `Bearer ${unrestrictedToken}` } },
+    );
+    const unrestrictedOffers = await unrestrictedOfferResponse.json() as ApiEnvelope<Array<{ brand: string; model: string }>>;
+    assert.equal(unrestrictedOfferResponse.status, 200);
+    assert.equal(unrestrictedOffers.data?.some(car => car.brand === "Haval City" && car.model === "Jolion"), true);
+
+    const unrestrictedVinResponse = await fetch(
+      `${started.baseUrl}/api/manager/client-cards/inventory?vin=0001&type=new`,
+      { headers: { authorization: `Bearer ${unrestrictedToken}` } },
+    );
+    const unrestrictedVin = await unrestrictedVinResponse.json() as ApiEnvelope<Array<{ vin: string }>>;
+    assert.equal(unrestrictedVinResponse.status, 200);
+    assert.equal(unrestrictedVin.data?.[0]?.vin, "XW8ZZZ61ZHG000123");
+
+    const unrestrictedCreateResponse = await fetch(`${started.baseUrl}/api/manager/client-cards`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${unrestrictedToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        clientName: "Клиент менеджера без ограничений",
+        clientPhone: "+7 (920) 607-28-58",
+        clientGender: null,
+        needs: [
+          { brand: "Haval City", model: "Jolion", undecided: false, budgetRange: "2–3 млн", plannedPurchaseDate: null },
+        ],
+        currentCars: [],
+        desiredBrand: "Haval City",
+        desiredModel: "Jolion",
+        desiredVehicleUndecided: false,
+        budgetRange: "2–3 млн",
+        currentCar: null,
+        currentCarBrand: null,
+        currentCarModel: null,
+        currentCarYear: null,
+        currentCarMileage: null,
+        currentCarGeneration: null,
+        currentCarBodyType: null,
+        currentCarOwnersCount: null,
+        tradeInPlan: null,
+        commercialBrand: null,
+        commercialModel: null,
+        commercialCarId: null,
+        paymentMethod: null,
+        comment: "",
+      }),
+    });
+    assert.equal(unrestrictedCreateResponse.status, 201);
 
     const vinResponse = await fetch(`${started.baseUrl}/api/manager/client-cards/inventory?vin=0001&type=new`, {
       headers: { authorization: `Bearer ${managerToken(managerIds[0]!)}` },
