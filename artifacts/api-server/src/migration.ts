@@ -14,6 +14,9 @@ export async function runMigration() {
           ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_campaign TEXT;
           ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_term TEXT;
           ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_content TEXT;
+          ALTER TABLE leads ADD COLUMN IF NOT EXISTS submission_id TEXT;
+          CREATE UNIQUE INDEX IF NOT EXISTS leads_submission_id_unique
+            ON leads (submission_id);
         END IF;
       END $$;
     `);
@@ -109,6 +112,7 @@ export async function runMigration() {
           utm_term TEXT,
           utm_content TEXT,
           extra_json JSONB,
+          submission_id TEXT UNIQUE,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         )
       `);
@@ -1150,6 +1154,41 @@ export async function runMigration() {
     // ── News image gallery — images text[] column ─────────────────────────────
     await db.execute(sql`ALTER TABLE news ADD COLUMN IF NOT EXISTS images text[] NOT NULL DEFAULT '{}'`);
     logger.info("news.images column ready (idempotent)");
+
+    // Safe 1C exchange journal; only operational metadata is stored, never tokens or client payloads.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS onec_exchange_logs (
+        id SERIAL PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        endpoint TEXT,
+        method TEXT NOT NULL,
+        http_status INTEGER,
+        outcome TEXT NOT NULL,
+        after_id INTEGER,
+        next_cursor INTEGER,
+        item_count INTEGER NOT NULL DEFAULT 0,
+        has_more BOOLEAN,
+        duration_ms INTEGER,
+        error_code TEXT,
+        request_id TEXT,
+        entity_type TEXT,
+        entity_id INTEGER,
+        entity_name TEXT,
+        previous_code TEXT,
+        new_code TEXT,
+        actor_login TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS onec_exchange_logs_created_at_idx
+      ON onec_exchange_logs (created_at)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS onec_exchange_logs_event_created_at_idx
+      ON onec_exchange_logs (event_type, created_at)
+    `);
+    logger.info("onec_exchange_logs schema ready (idempotent)");
 
   } catch (err) {
     logger.error({ err }, "Migration error");
