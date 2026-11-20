@@ -1109,9 +1109,34 @@ components:
         price: { type: ["number", "null"] }
         imageUrl: { type: ["string", "null"] }
         vin: { type: ["string", "null"] }
+    ManagerClientNeed:
+      type: object
+      required: [brand, model, undecided, budgetRange]
+      properties:
+        brand: { type: ["string", "null"], maxLength: 180 }
+        model: { type: ["string", "null"], maxLength: 180 }
+        undecided: { type: boolean }
+        budgetRange: { type: ["string", "null"], enum: ["Не указан", "до 2 млн", "2–3 млн", "3–5 млн", "5+ млн", null] }
+    ManagerClientCurrentCar:
+      type: object
+      required: [brand, model, year, mileage, generation, bodyType, ownersCount, inventoryId, snapshot, tradeInPlan]
+      properties:
+        brand: { type: string, maxLength: 120 }
+        model: { type: string, maxLength: 120 }
+        year: { type: integer, minimum: 1950, maximum: 2100 }
+        mileage: { type: integer, minimum: 0, maximum: 2000000 }
+        generation: { type: ["string", "null"], maxLength: 120 }
+        bodyType: { type: ["string", "null"], maxLength: 120 }
+        ownersCount: { type: ["string", "null"], enum: ["1", "2", "3", "4+", null] }
+        inventoryId: { type: ["integer", "null"], minimum: 1 }
+        snapshot:
+          oneOf:
+            - $ref: "#/components/schemas/ManagerClientCarSnapshot"
+            - type: "null"
+        tradeInPlan: { type: ["string", "null"], enum: ["Да", "Нет", "Пока не решил", null] }
     ManagerClientCard:
       type: object
-      required: [id, managerId, managerName, clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarBrand, currentCarModel, currentCarYear, currentCarMileage, currentCarGeneration, currentCarBodyType, currentCarOwnersCount, currentCarInventoryId, currentCarSnapshot, tradeInPlan, commercialBrand, commercialModel, commercialCarId, commercialCarSnapshot, paymentMethod, comment, createdAt]
+      required: [id, managerId, managerName, clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarBrand, currentCarModel, currentCarYear, currentCarMileage, currentCarGeneration, currentCarBodyType, currentCarOwnersCount, currentCarInventoryId, currentCarSnapshot, tradeInPlan, needs, currentCars, commercialBrand, commercialModel, commercialCarId, commercialCarSnapshot, paymentMethod, comment, createdAt]
       properties:
         id: { type: integer }
         managerId: { type: integer }
@@ -1137,6 +1162,12 @@ components:
             - $ref: "#/components/schemas/ManagerClientCarSnapshot"
             - type: "null"
         tradeInPlan: { type: ["string", "null"] }
+        needs:
+          type: array
+          items: { $ref: "#/components/schemas/ManagerClientNeed" }
+        currentCars:
+          type: array
+          items: { $ref: "#/components/schemas/ManagerClientCurrentCar" }
         commercialBrand: { type: ["string", "null"] }
         commercialModel: { type: ["string", "null"] }
         commercialCarId: { type: ["integer", "null"] }
@@ -1168,6 +1199,13 @@ components:
         currentCarOwnersCount: { type: ["string", "null"], enum: ["1", "2", "3", "4+", null] }
         currentCarInventoryId: { type: ["integer", "null"], minimum: 1 }
         tradeInPlan: { type: ["string", "null"], enum: ["Да", "Нет", "Пока не решил", null] }
+        needs:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/ManagerClientNeed" }
+        currentCars:
+          type: array
+          items: { $ref: "#/components/schemas/ManagerClientCurrentCar" }
         commercialBrand: { type: ["string", "null"], maxLength: 180 }
         commercialModel: { type: ["string", "null"], maxLength: 180 }
         commercialCarId: { type: ["integer", "null"], minimum: 1 }
@@ -1266,9 +1304,69 @@ components:
         complectation: { type: ["string", "null"] }
         color: { type: ["string", "null"] }
         price: { type: ["number", "null"] }
+    OneCClientNeed:
+      type: object
+      required: [brand_id, brand, model, undecided, budget_range, organization_code, organization_name, department_code, department_name]
+      properties:
+        brand_id: { type: ["integer", "null"] }
+        brand: { type: ["string", "null"] }
+        model: { type: ["string", "null"] }
+        undecided: { type: boolean }
+        budget_range: { type: ["string", "null"], enum: ["Не указан", "до 2 млн", "2–3 млн", "3–5 млн", "5+ млн", null] }
+        organization_code: { type: ["string", "null"] }
+        organization_name: { type: ["string", "null"] }
+        department_code: { type: ["string", "null"] }
+        department_name: { type: ["string", "null"] }
+    OneCClientCurrentCar:
+      type: object
+      required: [brand, model, year, mileage, generation, body_type, owners_count, inventory_id, trade_in_plan]
+      properties:
+        brand: { type: string }
+        model: { type: string }
+        year: { type: integer }
+        mileage: { type: integer }
+        generation: { type: ["string", "null"] }
+        body_type: { type: ["string", "null"] }
+        owners_count: { type: ["string", "null"] }
+        inventory_id: { type: ["integer", "null"] }
+        trade_in_plan: { type: ["string", "null"], enum: ["Да", "Нет", "Пока не решил", null] }
+    OneCClientCommercialOffer:
+      type: object
+      required: [brand_id, brand, model, car_id, car, organization_code, organization_name, department_code, department_name]
+      properties:
+        brand_id: { type: ["integer", "null"] }
+        brand: { type: ["string", "null"] }
+        model: { type: ["string", "null"] }
+        car_id: { type: ["integer", "null"] }
+        car:
+          oneOf:
+            - $ref: "#/components/schemas/OneCClientCarSummary"
+            - type: "null"
+        organization_code: { type: ["string", "null"] }
+        organization_name: { type: ["string", "null"] }
+        department_code: { type: ["string", "null"] }
+        department_name: { type: ["string", "null"] }
+    OneCClientBrandRecord:
+      type: object
+      required: [source_key, brand_id, brand_name, organization_code, organization_name, department_code, department_name, needs, commercial_offer]
+      properties:
+        source_key: { type: string }
+        brand_id: { type: integer }
+        brand_name: { type: string }
+        organization_code: { type: string }
+        organization_name: { type: string }
+        department_code: { type: string }
+        department_name: { type: string }
+        needs:
+          type: array
+          items: { $ref: "#/components/schemas/OneCClientNeed" }
+        commercial_offer:
+          oneOf:
+            - $ref: "#/components/schemas/OneCClientCommercialOffer"
+            - type: "null"
     OneCClientCardFeedItem:
       type: object
-      required: [id, created_at, manager_id, manager_name, organization_code, organization_name, department_code, department_name, client_name, client_phone, client_gender, desired_brand, desired_model, desired_vehicle_undecided, budget_range, current_car, current_car_brand, current_car_model, current_car_year, current_car_mileage, current_car_generation, current_car_body_type, current_car_owners_count, current_car_inventory_id, trade_in_plan, commercial_brand, commercial_model, commercial_car_id, commercial_car, payment_method, comment]
+      required: [id, created_at, manager_id, manager_name, organization_code, organization_name, department_code, department_name, client_name, client_phone, client_gender, desired_brand, desired_model, desired_vehicle_undecided, budget_range, current_car, current_car_brand, current_car_model, current_car_year, current_car_mileage, current_car_generation, current_car_body_type, current_car_owners_count, current_car_inventory_id, trade_in_plan, commercial_brand, commercial_model, commercial_car_id, commercial_car, needs, current_cars, commercial_offer, brand_records, payment_method, comment]
       properties:
         id: { type: integer }
         created_at: { type: string, format: date-time }
@@ -1302,8 +1400,21 @@ components:
           oneOf:
             - $ref: "#/components/schemas/OneCClientCarSummary"
             - type: "null"
-        payment_method: { type: ["string", "null"] }
+        payment_method: { type: ["string", "null"], enum: ["Кредит", "Лизинг", "Наличные / Безнал", null] }
         comment: { type: ["string", "null"] }
+        needs:
+          type: array
+          items: { $ref: "#/components/schemas/OneCClientNeed" }
+        current_cars:
+          type: array
+          items: { $ref: "#/components/schemas/OneCClientCurrentCar" }
+        commercial_offer:
+          oneOf:
+            - $ref: "#/components/schemas/OneCClientCommercialOffer"
+            - type: "null"
+        brand_records:
+          type: array
+          items: { $ref: "#/components/schemas/OneCClientBrandRecord" }
     OneCClientCardsPage:
       type: object
       required: [items, next_cursor, has_more]
