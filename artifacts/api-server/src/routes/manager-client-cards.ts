@@ -33,6 +33,24 @@ type CreateClientCardInput = {
   clientName: string;
   clientPhone: string;
   clientGender: typeof genders[number] | null;
+  needs: Array<{
+    brand: string | null;
+    model: string | null;
+    undecided: boolean;
+    budgetRange: typeof budgetRanges[number] | null;
+  }>;
+  currentCars: Array<{
+    brand: string;
+    model: string;
+    year: number;
+    mileage: number;
+    generation: string | null;
+    bodyType: string | null;
+    ownersCount: "1" | "2" | "3" | "4+" | null;
+    inventoryId: number | null;
+    snapshot: Record<string, unknown> | null;
+    tradeInPlan: typeof tradeInPlans[number] | null;
+  }>;
   desiredBrand: string | null;
   desiredModel: string | null;
   desiredVehicleUndecided: boolean;
@@ -85,69 +103,112 @@ function parseCreateClientCardInput(body: unknown): { data?: CreateClientCardInp
     const clientPhone = normalizeRussianPhone(rawPhone);
     if (!clientPhone) throw new Error("Проверьте номер телефона: нужен действующий номер +7");
 
-    const desiredBrand = text(value["desiredBrand"], "марку автомобиля", 180);
-    const desiredModel = text(value["desiredModel"], "модель автомобиля", 180);
-    if (Boolean(desiredBrand) !== Boolean(desiredModel)) {
-      throw new Error("Выберите и марку, и модель автомобиля");
+    const legacyBrand = text(value["desiredBrand"], "марку автомобиля", 180);
+    const legacyModel = text(value["desiredModel"], "модель автомобиля", 180);
+    const needsRaw = value["needs"];
+    const rawNeeds = needsRaw === undefined
+      ? [{
+          brand: legacyBrand,
+          model: legacyModel,
+          undecided: value["desiredVehicleUndecided"] === true,
+          budgetRange: value["budgetRange"],
+        }]
+      : needsRaw;
+    if (!Array.isArray(rawNeeds) || rawNeeds.length === 0 || rawNeeds.length > 20) {
+      throw new Error("Добавьте от одной до 20 потребностей клиента");
     }
-    if (value["desiredVehicleUndecided"] != null && typeof value["desiredVehicleUndecided"] !== "boolean") {
-      throw new Error("Проверьте выбор автомобиля клиента");
-    }
-    const desiredVehicleUndecided = value["desiredVehicleUndecided"] === true;
-    if (desiredVehicleUndecided === Boolean(desiredBrand)) {
-      throw new Error("Выберите модель автомобиля или отметьте «Пока не определился»");
-    }
+    const needs = rawNeeds.map((rawNeed, index) => {
+      const need = rawNeed && typeof rawNeed === "object" && !Array.isArray(rawNeed)
+        ? rawNeed as Record<string, unknown>
+        : {};
+      const brand = text(need["brand"], `марку в потребности ${index + 1}`, 180);
+      const model = text(need["model"], `модель в потребности ${index + 1}`, 180);
+      if (Boolean(brand) !== Boolean(model)) {
+        throw new Error(`В потребности ${index + 1} укажите и марку, и модель`);
+      }
+      if (need["undecided"] != null && typeof need["undecided"] !== "boolean") {
+        throw new Error(`Проверьте выбор автомобиля в потребности ${index + 1}`);
+      }
+      const undecided = need["undecided"] === true;
+      if (undecided === Boolean(brand)) {
+        throw new Error(`Выберите модель в потребности ${index + 1} или отметьте «Пока не определился»`);
+      }
+      const budgetRange = enumValue(need["budgetRange"], budgetRanges, `бюджет в потребности ${index + 1}`);
+      if (!budgetRange) throw new Error(`Укажите бюджет в потребности ${index + 1}`);
+      return {
+        brand,
+        model,
+        undecided,
+        budgetRange,
+      };
+    });
     const commercialBrand = text(value["commercialBrand"], "марку предложения", 180);
     const commercialModel = text(value["commercialModel"], "модель предложения", 180);
     if (Boolean(commercialBrand) !== Boolean(commercialModel)) {
       throw new Error("Для предложения укажите и марку, и модель");
     }
 
-    const currentCarBrand = text(value["currentCarBrand"], "марку текущего автомобиля", 120);
-    const currentCarModel = text(value["currentCarModel"], "модель текущего автомобиля", 120);
-    const currentCarGeneration = text(value["currentCarGeneration"], "поколение", 120);
-    const currentCarBodyType = text(value["currentCarBodyType"], "тип кузова", 120);
-    const currentCarOwnersCount = enumValue(value["currentCarOwnersCount"], ["1", "2", "3", "4+"] as const, "количество владельцев");
-    const tradeInPlan = enumValue(value["tradeInPlan"], tradeInPlans, "трейд-ин");
-
-    let currentCarYear: number | null = null;
-    if (value["currentCarYear"] != null && value["currentCarYear"] !== "") {
-      const parsedYear = Number(value["currentCarYear"]);
-      if (!Number.isInteger(parsedYear) || parsedYear < 1950 || parsedYear > 2100) {
-        throw new Error("Проверьте год выпуска текущего автомобиля");
-      }
-      currentCarYear = parsedYear;
-    }
-
-    let currentCarMileage: number | null = null;
-    if (value["currentCarMileage"] != null && value["currentCarMileage"] !== "") {
-      const parsedMileage = Number(value["currentCarMileage"]);
-      if (!Number.isInteger(parsedMileage) || parsedMileage < 0 || parsedMileage > 2_000_000) {
-        throw new Error("Проверьте пробег текущего автомобиля");
-      }
-      currentCarMileage = parsedMileage;
-    }
-
-    let currentCarInventoryId: number | null = null;
-    if (value["currentCarInventoryId"] != null && value["currentCarInventoryId"] !== "") {
-      const parsedId = Number(value["currentCarInventoryId"]);
-      if (!Number.isSafeInteger(parsedId) || parsedId <= 0) {
-        throw new Error("Некорректно выбран текущий автомобиль");
-      }
-      currentCarInventoryId = parsedId;
-    }
-
     const currentCarText = text(value["currentCar"], "текущий автомобиль", 180);
-    const hasEnteredCurrentCarData = Boolean(
-      currentCarText || currentCarBrand || currentCarModel || currentCarYear != null ||
-      currentCarMileage != null || currentCarGeneration || currentCarBodyType ||
-      currentCarOwnersCount || tradeInPlan,
-    );
-    if (hasEnteredCurrentCarData && (
-      !currentCarBrand || !currentCarModel || currentCarYear == null || currentCarMileage == null
-    )) {
-      throw new Error("Для текущего автомобиля заполните марку, модель, год и пробег");
+    const legacyCurrentCar = {
+      brand: value["currentCarBrand"],
+      model: value["currentCarModel"],
+      year: value["currentCarYear"],
+      mileage: value["currentCarMileage"],
+      generation: value["currentCarGeneration"],
+      bodyType: value["currentCarBodyType"],
+      ownersCount: value["currentCarOwnersCount"],
+      inventoryId: value["currentCarInventoryId"],
+      snapshot: value["currentCarSnapshot"],
+      tradeInPlan: value["tradeInPlan"],
+    };
+    const hasLegacyCurrentCar = Object.values(legacyCurrentCar)
+      .some(item => item != null && item !== "") || Boolean(currentCarText);
+    const currentCarsRaw = value["currentCars"] === undefined
+      ? (hasLegacyCurrentCar ? [legacyCurrentCar] : [])
+      : value["currentCars"];
+    if (!Array.isArray(currentCarsRaw) || currentCarsRaw.length > 10) {
+      throw new Error("Можно добавить не более 10 текущих автомобилей");
     }
+    const currentCars = currentCarsRaw.map((rawCar, index) => {
+      const car = rawCar && typeof rawCar === "object" && !Array.isArray(rawCar)
+        ? rawCar as Record<string, unknown>
+        : {};
+      const label = `текущего автомобиля ${index + 1}`;
+      const brand = text(car["brand"], `марку ${label}`, 120);
+      const model = text(car["model"], `модель ${label}`, 120);
+      const year = Number(car["year"]);
+      const mileage = Number(car["mileage"]);
+      if (
+        !brand || !model ||
+        car["year"] == null || car["year"] === "" || !Number.isInteger(year) || year < 1950 || year > 2100 ||
+        car["mileage"] == null || car["mileage"] === "" || !Number.isInteger(mileage) || mileage < 0 || mileage > 2_000_000
+      ) {
+        throw new Error("Для каждого текущего автомобиля заполните марку, модель, год и пробег");
+      }
+      let inventoryId: number | null = null;
+      if (car["inventoryId"] != null && car["inventoryId"] !== "") {
+        const parsedId = Number(car["inventoryId"]);
+        if (!Number.isSafeInteger(parsedId) || parsedId <= 0) {
+          throw new Error(`Некорректно выбран ${label}`);
+        }
+        inventoryId = parsedId;
+      }
+      const snapshot = car["snapshot"] && typeof car["snapshot"] === "object" && !Array.isArray(car["snapshot"])
+        ? car["snapshot"] as Record<string, unknown>
+        : null;
+      return {
+        brand,
+        model,
+        year,
+        mileage,
+        generation: text(car["generation"], `поколение ${label}`, 120),
+        bodyType: text(car["bodyType"], `тип кузова ${label}`, 120),
+        ownersCount: enumValue(car["ownersCount"], ["1", "2", "3", "4+"] as const, `количество владельцев ${label}`),
+        inventoryId,
+        snapshot,
+        tradeInPlan: enumValue(car["tradeInPlan"], tradeInPlans, `трейд-ин ${label}`),
+      };
+    });
 
     let commercialCarId: number | null = null;
     if (value["commercialCarId"] != null && value["commercialCarId"] !== "") {
@@ -168,20 +229,24 @@ function parseCreateClientCardInput(body: unknown): { data?: CreateClientCardInp
         clientName,
         clientPhone,
         clientGender: enumValue(value["clientGender"], genders, "пол"),
-        desiredBrand,
-        desiredModel,
-        desiredVehicleUndecided,
-        budgetRange: enumValue(value["budgetRange"], budgetRanges, "бюджет"),
-        currentCar: currentCarText,
-        currentCarBrand,
-        currentCarModel,
-        currentCarYear,
-        currentCarMileage,
-        currentCarGeneration,
-        currentCarBodyType,
-        currentCarOwnersCount,
-        currentCarInventoryId,
-        tradeInPlan,
+        needs,
+        currentCars,
+        desiredBrand: needs[0]?.brand ?? null,
+        desiredModel: needs[0]?.model ?? null,
+        desiredVehicleUndecided: needs[0]?.undecided ?? false,
+        budgetRange: needs[0]?.budgetRange ?? null,
+        currentCar: currentCarText || (
+          currentCars[0] ? [currentCars[0].brand, currentCars[0].model].join(" ") : null
+        ),
+        currentCarBrand: currentCars[0]?.brand ?? null,
+        currentCarModel: currentCars[0]?.model ?? null,
+        currentCarYear: currentCars[0]?.year ?? null,
+        currentCarMileage: currentCars[0]?.mileage ?? null,
+        currentCarGeneration: currentCars[0]?.generation ?? null,
+        currentCarBodyType: currentCars[0]?.bodyType ?? null,
+        currentCarOwnersCount: currentCars[0]?.ownersCount ?? null,
+        currentCarInventoryId: currentCars[0]?.inventoryId ?? null,
+        tradeInPlan: currentCars[0]?.tradeInPlan ?? null,
         commercialBrand,
         commercialModel,
         commercialCarId,
@@ -319,6 +384,8 @@ const cardProjection = {
   currentCarInventoryId: managerClientCardsTable.currentCarInventoryId,
   currentCarSnapshot: managerClientCardsTable.currentCarSnapshot,
   tradeInPlan: managerClientCardsTable.tradeInPlan,
+  needs: managerClientCardsTable.needs,
+  currentCars: managerClientCardsTable.currentCars,
   commercialBrand: managerClientCardsTable.commercialBrand,
   commercialModel: managerClientCardsTable.commercialModel,
   commercialCarId: managerClientCardsTable.commercialCarId,
@@ -638,7 +705,7 @@ router.get("/client-cards/export.csv", async (req, res): Promise<void> => {
       "Марка текущего автомобиля", "Модель текущего автомобиля", "Год текущего автомобиля",
       "Пробег, км", "Поколение", "Тип кузова", "Количество владельцев", "VIN текущего автомобиля",
       "Трейд-ин", "Марка предложения", "Модель предложения",
-      "Автомобиль из базы", "Способ оплаты", "Комментарий",
+      "Автомобиль из базы", "Способ оплаты", "Комментарий", "Все потребности", "Все текущие автомобили",
     ];
     const lines = rows.map(card => [
       card.createdAt,
@@ -673,6 +740,23 @@ router.get("/client-cards/export.csv", async (req, res): Promise<void> => {
         : "",
       card.paymentMethod,
       card.comment,
+      (Array.isArray(card.needs) ? card.needs : []).map(needValue => {
+        const need = needValue as Record<string, unknown>;
+        const vehicle = [need["brand"], need["model"]].filter(Boolean).join(" ") ||
+          (need["undecided"] ? "Пока не определился" : "Не указано");
+        return `${vehicle}; бюджет: ${String(need["budgetRange"] ?? "Не указан")}`;
+      }).join(" | "),
+      (Array.isArray(card.currentCars) ? card.currentCars : []).map(carValue => {
+        const car = carValue as Record<string, unknown>;
+        return [
+          [car["brand"], car["model"], car["year"]].filter(Boolean).join(" "),
+          car["mileage"] != null ? `${car["mileage"]} км` : "",
+          car["generation"],
+          car["bodyType"],
+          car["ownersCount"],
+          car["tradeInPlan"] ? `Трейд-ин: ${car["tradeInPlan"]}` : "",
+        ].filter(Boolean).join(", ");
+      }).join(" | "),
     ].map(csvCell).join(","));
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -739,7 +823,8 @@ router.post("/client-cards", async (req, res): Promise<void> => {
       assignedBrands = Array.isArray(manager?.brands) ? manager.brands : [];
     }
 
-    if (input.desiredBrand && input.desiredModel) {
+    for (const need of input.needs) {
+      if (!need.brand || !need.model) continue;
       const [matchingModel] = await db.select({
         id: carsTable.id,
         brand: carsTable.brand,
@@ -747,15 +832,18 @@ router.post("/client-cards", async (req, res): Promise<void> => {
       })
         .from(carsTable)
         .where(and(
-          eq(carsTable.brand, input.desiredBrand),
-          eq(carsTable.model, input.desiredModel),
+          eq(carsTable.brand, need.brand),
+          eq(carsTable.model, need.model),
           eq(carsTable.type, "new"),
           eq(carsTable.catalogSource, "cm_business"),
           eq(carsTable.cmStockState, "in"),
         ))
         .limit(1);
       if (!matchingModel) {
-        res.status(400).json({ ok: false, error: "Выберите марку и модель из актуального склада CM Expert" });
+        res.status(400).json({
+          ok: false,
+          error: `Выберите марку и модель «${need.brand} ${need.model}» из актуального склада CM Expert`,
+        });
         return;
       }
       if (!scope.isAdmin && !isCarVisibleToManager(matchingModel, assignedBrands)) {
@@ -764,27 +852,28 @@ router.post("/client-cards", async (req, res): Promise<void> => {
       }
     }
 
-    let currentCarSnapshot: Record<string, unknown> | null = null;
-    let currentCar = input.currentCar;
-    let currentCarBrand = input.currentCarBrand;
-    let currentCarModel = input.currentCarModel;
-    let currentCarYear = input.currentCarYear;
-    if (input.currentCarInventoryId) {
-      const car = await getInventoryCar(input.currentCarInventoryId);
-      if (!car || car.type !== "used" || !isCurrentInventoryCar(car)) {
-        res.status(400).json({ ok: false, error: "Выбранный текущий автомобиль больше не найден в базе" });
-        return;
+    const currentCars: CreateClientCardInput["currentCars"] = [];
+    for (const currentCarInput of input.currentCars) {
+      let snapshot = currentCarInput.snapshot;
+      if (currentCarInput.inventoryId) {
+        const car = await getInventoryCar(currentCarInput.inventoryId);
+        if (!car || car.type !== "used" || !isCurrentInventoryCar(car)) {
+          res.status(400).json({ ok: false, error: "Выбранный текущий автомобиль больше не найден в базе" });
+          return;
+        }
+        if (!scope.isAdmin && !isCarVisibleToManager(car, assignedBrands)) {
+          res.status(403).json({ ok: false, error: "У вас нет доступа к выбранному текущему автомобилю" });
+          return;
+        }
+        snapshot = { ...car };
       }
-      if (!scope.isAdmin && !isCarVisibleToManager(car, assignedBrands)) {
-        res.status(403).json({ ok: false, error: "У вас нет доступа к выбранному текущему автомобилю" });
-        return;
-      }
-      currentCarSnapshot = { ...car };
-      currentCarBrand = currentCarBrand || car.brand;
-      currentCarModel = currentCarModel || car.model;
-      currentCar = currentCar || [car.brand, car.model].filter(Boolean).join(" ");
-      currentCarYear = currentCarYear || car.year;
+      currentCars.push({ ...currentCarInput, snapshot });
     }
+    const firstCurrentCar = currentCars[0] ?? null;
+    const currentCarSnapshot = firstCurrentCar?.snapshot ?? null;
+    const currentCar = input.currentCar || (
+      firstCurrentCar ? [firstCurrentCar.brand, firstCurrentCar.model].join(" ") : null
+    );
 
     let commercialCarSnapshot: Record<string, unknown> | null = null;
     if (input.commercialCarId) {
@@ -815,21 +904,23 @@ router.post("/client-cards", async (req, res): Promise<void> => {
       clientName: input.clientName,
       clientPhone: input.clientPhone,
       clientGender: input.clientGender,
-      desiredBrand: input.desiredBrand || null,
-      desiredModel: input.desiredModel || null,
+      desiredBrand: input.desiredBrand,
+      desiredModel: input.desiredModel,
       desiredVehicleUndecided: input.desiredVehicleUndecided,
-      budgetRange: input.budgetRange || null,
-      currentCar: currentCar || [currentCarBrand, currentCarModel].filter(Boolean).join(" ") || null,
-      currentCarBrand: currentCarBrand || null,
-      currentCarModel: currentCarModel || null,
-      currentCarYear: currentCarYear || null,
-      currentCarMileage: input.currentCarMileage,
-      currentCarGeneration: input.currentCarGeneration || null,
-      currentCarBodyType: input.currentCarBodyType || null,
-      currentCarOwnersCount: input.currentCarOwnersCount || null,
-      currentCarInventoryId: input.currentCarInventoryId || null,
+      budgetRange: input.budgetRange,
+      needs: input.needs,
+      currentCar: currentCar || null,
+      currentCarBrand: firstCurrentCar?.brand ?? null,
+      currentCarModel: firstCurrentCar?.model ?? null,
+      currentCarYear: firstCurrentCar?.year ?? null,
+      currentCarMileage: firstCurrentCar?.mileage ?? null,
+      currentCarGeneration: firstCurrentCar?.generation ?? null,
+      currentCarBodyType: firstCurrentCar?.bodyType ?? null,
+      currentCarOwnersCount: firstCurrentCar?.ownersCount ?? null,
+      currentCarInventoryId: firstCurrentCar?.inventoryId ?? null,
       currentCarSnapshot,
-      tradeInPlan: input.tradeInPlan || null,
+      currentCars,
+      tradeInPlan: firstCurrentCar?.tradeInPlan ?? null,
       commercialBrand,
       commercialModel,
       commercialCarId: input.commercialCarId || null,
