@@ -116,6 +116,53 @@ export interface QuoteHistoryItem {
   updatedAt: string | null;
 }
 
+export interface ManagerClientCarSnapshot {
+  id: number;
+  externalId: string;
+  type: string;
+  brand: string | null;
+  model: string | null;
+  year: number | null;
+  modification: string | null;
+  complectation: string | null;
+  color: string | null;
+  price: number | null;
+  imageUrl: string | null;
+}
+
+export interface ManagerClientCard {
+  id: number;
+  managerId: number;
+  managerName: string | null;
+  clientName: string;
+  clientPhone: string;
+  desiredBrand: string | null;
+  desiredModel: string | null;
+  budgetRange: string | null;
+  currentCar: string | null;
+  currentCarYear: number | null;
+  tradeInPlan: string | null;
+  commercialCarId: number | null;
+  commercialCarSnapshot: ManagerClientCarSnapshot | null;
+  paymentMethod: string | null;
+  comment: string | null;
+  createdAt: string;
+}
+
+export interface NewManagerClientCard {
+  clientName: string;
+  clientPhone: string;
+  desiredBrand: string | null;
+  desiredModel: string | null;
+  budgetRange: string | null;
+  currentCar: string | null;
+  currentCarYear: number | null;
+  tradeInPlan: string | null;
+  commercialCarId: number | null;
+  paymentMethod: string | null;
+  comment: string;
+}
+
 export function searchCars(opts: {
   q?: string; brand?: string; model?: string; type?: string;
 }): Promise<{ ok: boolean; data: CarSearchResult[] }> {
@@ -125,6 +172,19 @@ export function searchCars(opts: {
   if (opts.model) params.set("model", opts.model);
   if (opts.type) params.set("type", opts.type);
   return managerApi("GET", `/cars/search?${params}`);
+}
+
+export function getManagerClientCards(q?: string): Promise<{ ok: boolean; data: ManagerClientCard[] }> {
+  const params = new URLSearchParams();
+  if (q?.trim()) params.set("q", q.trim());
+  return managerApi("GET", `/client-cards${params.size ? `?${params}` : ""}`);
+}
+
+export function createManagerClientCard(data: NewManagerClientCard): Promise<{
+  ok: boolean;
+  data: { id: number; createdAt: string };
+}> {
+  return managerApi("POST", "/client-cards", data);
 }
 
 export function refreshManagerCarFromCm(id: number): Promise<{
