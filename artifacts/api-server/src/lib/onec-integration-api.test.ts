@@ -35,10 +35,16 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
   let cardId: number | undefined;
   let brandId: number | undefined;
   let locationId: number | undefined;
+  let jetourBrandId: number | undefined;
+  let jetourLocationId: number | undefined;
   let originalDepartmentCode: string | null | undefined;
   let originalDepartmentCodeConfirmed: boolean | undefined;
   let originalOrganizationCode: string | null | undefined;
   let originalOrganizationCodeConfirmed: boolean | undefined;
+  let originalJetourDepartmentCode: string | null | undefined;
+  let originalJetourDepartmentCodeConfirmed: boolean | undefined;
+  let originalJetourOrganizationCode: string | null | undefined;
+  let originalJetourOrganizationCodeConfirmed: boolean | undefined;
   let server: Server | undefined;
 
   try {
@@ -84,6 +90,25 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
       clientName: "Тестовый клиент интеграции",
       clientPhone: "+7 999 000-00-00",
       desiredBrand: "Haval City",
+      desiredModel: "Jolion",
+      needs: [
+        { brand: "Haval City", model: "Jolion", undecided: false, budgetRange: "2–3 млн" },
+        { brand: "Jetour", model: "DASHING", undecided: false, budgetRange: "3–5 млн" },
+      ],
+      currentCars: [
+        {
+          brand: "Toyota",
+          model: "Camry",
+          year: 2019,
+          mileage: 75000,
+          generation: null,
+          bodyType: "Седан",
+          ownersCount: "2",
+          inventoryId: null,
+          snapshot: null,
+          tradeInPlan: "Да",
+        },
+      ],
     }).returning({ id: managerClientCardsTable.id });
     cardId = cards[0]?.id;
     assert.ok(cardId);
@@ -125,6 +150,32 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
     originalOrganizationCode = location.code;
     originalOrganizationCodeConfirmed = location.confirmed;
 
+    const [jetour] = await db.select({
+      id: brandsTable.id,
+      code: brandsTable.onecDepartmentCode,
+      confirmed: brandsTable.onecDepartmentCodeConfirmed,
+    }).from(brandsTable).where(eq(brandsTable.name, "Jetour")).limit(1);
+    assert.ok(jetour);
+    jetourBrandId = jetour.id;
+    originalJetourDepartmentCode = jetour.code;
+    originalJetourDepartmentCodeConfirmed = jetour.confirmed;
+    const [jetourLocation] = await db.select({
+      id: locationsTable.id,
+      code: locationsTable.onecOrganizationCode,
+      confirmed: locationsTable.onecOrganizationCodeConfirmed,
+    })
+      .from(locationBrandsTable)
+      .innerJoin(locationsTable, eq(locationsTable.id, locationBrandsTable.locationId))
+      .where(and(
+        eq(locationBrandsTable.brandId, jetour.id),
+        eq(locationBrandsTable.isService, false),
+      ))
+      .limit(1);
+    assert.ok(jetourLocation);
+    jetourLocationId = jetourLocation.id;
+    originalJetourOrganizationCode = jetourLocation.code;
+    originalJetourOrganizationCodeConfirmed = jetourLocation.confirmed;
+
     await db.update(brandsTable).set({
       onecDepartmentCodeConfirmed: true,
     }).where(eq(brandsTable.id, brand.id));
@@ -145,6 +196,14 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
       onecOrganizationCode: "TEST-ORG-LITEYNAYA",
       onecOrganizationCodeConfirmed: true,
     }).where(eq(locationsTable.id, location.id));
+    await db.update(brandsTable).set({
+      onecDepartmentCode: "TEST-DEPT-JETOUR",
+      onecDepartmentCodeConfirmed: true,
+    }).where(eq(brandsTable.id, jetour.id));
+    await db.update(locationsTable).set({
+      onecOrganizationCode: "TEST-ORG-MOSKOVSKIY",
+      onecOrganizationCodeConfirmed: true,
+    }).where(eq(locationsTable.id, jetourLocation.id));
 
     const exported = await fetch(
       `${started.baseUrl}/api/integrations/1c/v1/client-cards?after_id=${initialCursor}&limit=10`,
@@ -153,13 +212,27 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
     assert.equal(exported.status, 200);
     const exportedBody = await exported.json() as {
       ok: boolean;
-      data: { items: Array<{ id: number; organization_code: string; department_code: string; client_phone: string }> };
+      data: { items: Array<{
+        id: number;
+        organization_code: string;
+        department_code: string;
+        client_phone: string;
+        needs: Array<{ brand: string; model: string }>;
+        current_cars: Array<{ brand: string; mileage: number }>;
+        brand_records: Array<{ source_key: string; brand_name: string; department_code: string }>;
+      }> };
     };
     assert.equal(exportedBody.ok, true);
     assert.equal(exportedBody.data.items[0]?.id, cardId);
     assert.equal(exportedBody.data.items[0]?.organization_code, "TEST-ORG-LITEYNAYA");
     assert.equal(exportedBody.data.items[0]?.department_code, "TEST-DEPT-HAVAL-CITY");
     assert.equal(exportedBody.data.items[0]?.client_phone, "+7 999 000-00-00");
+    assert.equal(exportedBody.data.items[0]?.needs.length, 2);
+    assert.equal(exportedBody.data.items[0]?.current_cars[0]?.brand, "Toyota");
+    assert.equal(exportedBody.data.items[0]?.current_cars[0]?.mileage, 75000);
+    assert.equal(exportedBody.data.items[0]?.brand_records.length, 2);
+    assert.equal(exportedBody.data.items[0]?.brand_records[0]?.source_key, `${cardId}:${brandId}`);
+    assert.equal(exportedBody.data.items[0]?.brand_records[1]?.department_code, "TEST-DEPT-JETOUR");
   } finally {
     if (server) {
       await new Promise<void>(resolve => server!.close(() => resolve()));
@@ -178,6 +251,18 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
         onecOrganizationCode: originalOrganizationCode ?? null,
         onecOrganizationCodeConfirmed: originalOrganizationCodeConfirmed ?? false,
       }).where(eq(locationsTable.id, locationId));
+    }
+    if (jetourBrandId !== undefined) {
+      await db.update(brandsTable).set({
+        onecDepartmentCode: originalJetourDepartmentCode ?? null,
+        onecDepartmentCodeConfirmed: originalJetourDepartmentCodeConfirmed ?? false,
+      }).where(eq(brandsTable.id, jetourBrandId));
+    }
+    if (jetourLocationId !== undefined) {
+      await db.update(locationsTable).set({
+        onecOrganizationCode: originalJetourOrganizationCode ?? null,
+        onecOrganizationCodeConfirmed: originalJetourOrganizationCodeConfirmed ?? false,
+      }).where(eq(locationsTable.id, jetourLocationId));
     }
     if (managerId) {
       await db.delete(managersTable).where(eq(managersTable.id, managerId));
