@@ -488,6 +488,28 @@ export const ManagerClientCardClientGender = {
   female: 'female',
 } as const;
 
+export type ManagerClientCardEditHistoryEntryEditorRole = typeof ManagerClientCardEditHistoryEntryEditorRole[keyof typeof ManagerClientCardEditHistoryEntryEditorRole];
+
+
+export const ManagerClientCardEditHistoryEntryEditorRole = {
+  manager: 'manager',
+  admin: 'admin',
+} as const;
+
+export interface ManagerClientCardFieldChange {
+  field: string;
+  oldValue: unknown;
+  newValue: unknown;
+}
+
+export interface ManagerClientCardEditHistoryEntry {
+  id: number;
+  editorName: string;
+  editorRole: ManagerClientCardEditHistoryEntryEditorRole;
+  createdAt: string;
+  changes: ManagerClientCardFieldChange[];
+}
+
 export interface ManagerClientCard {
   id: number;
   managerId: number;
@@ -537,6 +559,8 @@ export interface ManagerClientCard {
   /** @nullable */
   comment: string | null;
   createdAt: string;
+  updatedAt: string;
+  editHistory?: ManagerClientCardEditHistoryEntry[];
 }
 
 /**
@@ -717,6 +741,17 @@ export type ManagerClientCardCreatedResponseData = {
 export interface ManagerClientCardCreatedResponse {
   ok: boolean;
   data: ManagerClientCardCreatedResponseData;
+}
+
+export type ManagerClientCardUpdatedResponseData = {
+  id: number;
+  changed: boolean;
+  updatedAt: string;
+};
+
+export interface ManagerClientCardUpdatedResponse {
+  ok: boolean;
+  data: ManagerClientCardUpdatedResponseData;
 }
 
 export interface ManagerClientCardManager {
@@ -1072,6 +1107,35 @@ export interface OneCClientCardsInitialCursorResponse {
   data: OneCClientCardsInitialCursorResponseData;
 }
 
+export interface OneCClientCardChangeEvent {
+  change_id: number;
+  worksheet_id: number;
+  changed_at: string;
+  deleted_source_keys: string[];
+  item: OneCClientCardFeedItem;
+}
+
+export interface OneCClientCardChangesPage {
+  events: OneCClientCardChangeEvent[];
+  next_cursor: number;
+  has_more: boolean;
+}
+
+export interface OneCClientCardChangesResponse {
+  ok: boolean;
+  data: OneCClientCardChangesPage;
+}
+
+export type OneCClientCardChangesInitialCursorResponseData = {
+  after_change_id: number;
+  as_of: string;
+};
+
+export interface OneCClientCardChangesInitialCursorResponse {
+  ok: boolean;
+  data: OneCClientCardChangesInitialCursorResponseData;
+}
+
 export interface OneCClientCardsErrorResponse {
   ok: boolean;
   error: string;
@@ -1145,6 +1209,19 @@ export type GetOneCClientCardsParams = {
  * @minimum 0
  */
 after_id: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type GetOneCClientCardChangesParams = {
+/**
+ * Last edit event successfully applied by 1C
+ * @minimum 0
+ */
+after_change_id: number;
 /**
  * @minimum 1
  * @maximum 100
