@@ -5,6 +5,7 @@ import express from "express";
 import { and, eq } from "drizzle-orm";
 import {
   brandsTable,
+  carsTable,
   db,
   locationsTable,
   locationBrandsTable,
@@ -33,6 +34,7 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
   const managerLogin = `onec-feed-test-${suffix}`;
   let managerId: number | undefined;
   let cardId: number | undefined;
+  let commercialCarId: number | undefined;
   let brandId: number | undefined;
   let locationId: number | undefined;
   let jetourBrandId: number | undefined;
@@ -85,15 +87,26 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
     managerId = managers[0]?.id;
     assert.ok(managerId);
 
-    const cards = await db.insert(managerClientCardsTable).values({
+    const [commercialCar] = await db.insert(carsTable).values({
+      externalId: `onec-feed-car-${suffix}`,
+      type: "new",
+      brand: "Haval City",
+      model: "Jolion",
+      year: 2026,
+      vin: "XW8ZZZ61ZHG000456",
+    }).returning({ id: carsTable.id });
+    commercialCarId = commercialCar?.id;
+    assert.ok(commercialCarId);
+
+    const cardInsert: typeof managerClientCardsTable.$inferInsert = {
       managerId,
       clientName: "Тестовый клиент интеграции",
       clientPhone: "+7 999 000-00-00",
       desiredBrand: "Haval City",
       desiredModel: "Jolion",
       needs: [
-        { brand: "Haval City", model: "Jolion", undecided: false, budgetRange: "2–3 млн" },
-        { brand: "Jetour", model: "DASHING", undecided: false, budgetRange: "3–5 млн" },
+        { brand: "Haval City", model: "Jolion", undecided: false, budgetRange: "2–3 млн", plannedPurchaseDate: "2027-05-21" },
+        { brand: "Jetour", model: "DASHING", undecided: false, budgetRange: "3–5 млн", plannedPurchaseDate: null },
       ],
       currentCars: [
         {
@@ -104,12 +117,21 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
           generation: null,
           bodyType: "Седан",
           ownersCount: "2",
-          inventoryId: null,
           snapshot: null,
           tradeInPlan: "Да",
         },
       ],
-    }).returning({ id: managerClientCardsTable.id });
+      commercialBrand: "Haval City",
+      commercialModel: "Jolion",
+      commercialCarId,
+      commercialCarSnapshot: {
+        vin: "XW8ZZZ61ZHG000456",
+        brand: "Haval City",
+        model: "Jolion",
+        year: 2026,
+      },
+    };
+    const cards = await db.insert(managerClientCardsTable).values(cardInsert).returning({ id: managerClientCardsTable.id });
     cardId = cards[0]?.id;
     assert.ok(cardId);
 
@@ -217,8 +239,13 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
         organization_code: string;
         department_code: string;
         client_phone: string;
-        needs: Array<{ brand: string; model: string }>;
+        needs: Array<{ brand: string; model: string; planned_purchase_date: string | null }>;
         current_cars: Array<{ brand: string; mileage: number }>;
+        commercial_car_vin: string | null;
+        commercial_car_id?: number;
+        current_car_inventory_id?: number | null;
+        commercial_car: { vin: string | null } | null;
+        commercial_offer: { car_vin: string | null } | null;
         brand_records: Array<{ source_key: string; brand_name: string; department_code: string }>;
       }> };
     };
@@ -228,8 +255,15 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
     assert.equal(exportedBody.data.items[0]?.department_code, "TEST-DEPT-HAVAL-CITY");
     assert.equal(exportedBody.data.items[0]?.client_phone, "+7 999 000-00-00");
     assert.equal(exportedBody.data.items[0]?.needs.length, 2);
+    assert.equal(exportedBody.data.items[0]?.needs[0]?.planned_purchase_date, "2027-05-21");
     assert.equal(exportedBody.data.items[0]?.current_cars[0]?.brand, "Toyota");
     assert.equal(exportedBody.data.items[0]?.current_cars[0]?.mileage, 75000);
+    assert.equal(exportedBody.data.items[0]?.commercial_car_vin, "XW8ZZZ61ZHG000456");
+    assert.equal(exportedBody.data.items[0]?.commercial_car?.vin, "XW8ZZZ61ZHG000456");
+    assert.equal(exportedBody.data.items[0]?.commercial_offer?.car_vin, "XW8ZZZ61ZHG000456");
+    assert.equal("commercial_car_id" in (exportedBody.data.items[0] ?? {}), false);
+    assert.equal("current_car_inventory_id" in (exportedBody.data.items[0] ?? {}), false);
+    assert.equal("inventory_id" in ((exportedBody.data.items[0]?.current_cars[0] ?? {}) as object), false);
     assert.equal(exportedBody.data.items[0]?.brand_records.length, 2);
     assert.equal(exportedBody.data.items[0]?.brand_records[0]?.source_key, `${cardId}:${brandId}`);
     assert.equal(exportedBody.data.items[0]?.brand_records[1]?.department_code, "TEST-DEPT-JETOUR");
@@ -239,6 +273,9 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
     }
     if (cardId) {
       await db.delete(managerClientCardsTable).where(eq(managerClientCardsTable.id, cardId));
+    }
+    if (commercialCarId) {
+      await db.delete(carsTable).where(eq(carsTable.id, commercialCarId));
     }
     if (brandId !== undefined) {
       await db.update(brandsTable).set({
