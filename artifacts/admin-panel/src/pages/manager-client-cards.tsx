@@ -14,6 +14,7 @@ import {
   LogOut,
   Plus,
   Search,
+  Trash2,
   UserRound,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +47,7 @@ import {
 const steps = [
   { title: "Клиент", short: "Клиент" },
   { title: "Потребности", short: "Потребности" },
-  { title: "Текущий автомобиль", short: "Текущий авто" },
+  { title: "Текущие автомобили", short: "Текущие авто" },
   { title: "Предложение", short: "Предложение" },
   { title: "Комментарий", short: "Комментарий" },
 ];
@@ -60,18 +61,30 @@ type FormState = {
   clientName: string;
   clientPhone: string;
   clientGender: "" | "male" | "female";
-  desiredBrand: string;
-  desiredModel: string;
-  desiredVehicleUndecided: boolean;
-  budgetRange: "" | typeof budgetOptions[number];
-  currentCarBrand: string;
-  currentCarModel: string;
-  currentCarYear: string;
-  currentCarMileage: string;
-  currentCarGeneration: string;
-  currentCarBodyType: string;
-  currentCarOwnersCount: "" | "1" | "2" | "3" | "4+";
-  tradeInPlan: "" | typeof tradeInOptions[number];
+  needs: Array<{
+    localId: string;
+    brand: string;
+    model: string;
+    undecided: boolean;
+    budgetRange: "" | typeof budgetOptions[number];
+  }>;
+  currentCars: Array<{
+    localId: string;
+    brandId: string;
+    modelId: string;
+    brandSearch: string;
+    modelSearch: string;
+    brand: string;
+    model: string;
+    year: string;
+    mileage: string;
+    generationId: string;
+    bodyTypeId: string;
+    generation: string;
+    bodyType: string;
+    ownersCount: "" | "1" | "2" | "3" | "4+";
+    tradeInPlan: "" | typeof tradeInOptions[number];
+  }>;
   commercialBrand: string;
   commercialModel: string;
   paymentMethod: "" | typeof paymentOptions[number];
@@ -82,23 +95,37 @@ const emptyForm: FormState = {
   clientName: "",
   clientPhone: "+7",
   clientGender: "",
-  desiredBrand: "",
-  desiredModel: "",
-  desiredVehicleUndecided: false,
-  budgetRange: "",
-  currentCarBrand: "",
-  currentCarModel: "",
-  currentCarYear: "",
-  currentCarMileage: "",
-  currentCarGeneration: "",
-  currentCarBodyType: "",
-  currentCarOwnersCount: "",
-  tradeInPlan: "",
+  needs: [{ localId: "need-initial", brand: "", model: "", undecided: false, budgetRange: "" }],
+  currentCars: [],
   commercialBrand: "",
   commercialModel: "",
   paymentMethod: "",
   comment: "",
 };
+
+function newLocalId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function emptyCurrentCar(localId = newLocalId("car")): FormState["currentCars"][number] {
+  return {
+    localId,
+    brandId: "",
+    modelId: "",
+    brandSearch: "",
+    modelSearch: "",
+    brand: "",
+    model: "",
+    year: "",
+    mileage: "",
+    generationId: "",
+    bodyTypeId: "",
+    generation: "",
+    bodyType: "",
+    ownersCount: "",
+    tradeInPlan: "",
+  };
+}
 
 type ListFilters = {
   client: string;
@@ -194,10 +221,6 @@ async function fetchCmYears(brand: string, model: string): Promise<number[]> {
 function validateStep(
   form: FormState,
   step: number,
-  currentCarBrandId: string,
-  currentCarBrandSearch: string,
-  currentCarModelId: string,
-  currentCarModelSearch: string,
   selectedOfferCar: ManagerClientCardInventoryItem | null,
   offerBrandSearch: string,
   offerModelSearch: string,
@@ -220,49 +243,47 @@ function validateStep(
   }
   if (step === 1) {
     const errors: string[] = [];
-    const hasBrandModel = Boolean(form.desiredBrand && form.desiredModel);
-    if (!form.desiredVehicleUndecided && !hasBrandModel) {
-      errors.push("Выберите марку и модель или отметьте, что клиент пока не определился.");
-    }
-    if (form.desiredVehicleUndecided && (form.desiredBrand || form.desiredModel)) {
-      errors.push("Снимите отметку «Пока не определился» или очистите выбранную модель.");
-    }
-    if (!form.budgetRange) errors.push("Укажите бюджет или выберите «Не указан».");
+    if (form.needs.length === 0) errors.push("Добавьте хотя бы одну потребность клиента.");
+    form.needs.forEach((need, index) => {
+      const hasBrandModel = Boolean(need.brand && need.model);
+      if (!need.undecided && !hasBrandModel) {
+        errors.push(`В потребности ${index + 1} выберите марку и модель или отметьте, что клиент пока не определился.`);
+      }
+      if (need.undecided && (need.brand || need.model)) {
+        errors.push(`В потребности ${index + 1} очистите марку и модель или снимите отметку «Пока не определился».`);
+      }
+      if (!need.budgetRange) errors.push(`Укажите бюджет в потребности ${index + 1}.`);
+    });
     return errors;
   }
   if (step === 2) {
     const errors: string[] = [];
-    const hasCurrentCarData = Boolean(
-      currentCarBrandSearch.trim() || currentCarModelSearch.trim() ||
-      form.currentCarBrand || form.currentCarModel || form.currentCarYear ||
-      form.currentCarMileage || form.currentCarGeneration || form.currentCarBodyType ||
-      form.currentCarOwnersCount || form.tradeInPlan,
-    );
-    if (!hasCurrentCarData) return errors;
-    if (!currentCarBrandId || !form.currentCarBrand) {
-      errors.push("Выберите марку текущего автомобиля.");
-    }
-    if (!currentCarModelId || !form.currentCarModel) {
-      errors.push("Выберите модель текущего автомобиля.");
-    }
-    if (!form.currentCarYear) {
-      errors.push("Укажите год выпуска текущего автомобиля.");
-    } else {
-      const year = Number(form.currentCarYear);
-      if (!Number.isInteger(year) || year < 1950 || year > new Date().getFullYear() + 1) {
-        errors.push("Проверьте год выпуска текущего автомобиля.");
+    form.currentCars.forEach((car, index) => {
+      const hasData = Boolean(
+        car.brandSearch.trim() || car.modelSearch.trim() || car.brand || car.model || car.year ||
+        car.mileage || car.generation || car.bodyType || car.ownersCount || car.tradeInPlan,
+      );
+      if (!hasData) return;
+      const label = `текущем автомобиле ${index + 1}`;
+      if (!car.brandId || !car.brand) errors.push(`Выберите марку в ${label}.`);
+      if (!car.modelId || !car.model) errors.push(`Выберите модель в ${label}.`);
+      if (!car.year) errors.push(`Укажите год в ${label}.`);
+      else {
+        const year = Number(car.year);
+        if (!Number.isInteger(year) || year < 1950 || year > new Date().getFullYear() + 1) {
+          errors.push(`Проверьте год в ${label}.`);
+        }
       }
-    }
-    if (!form.currentCarMileage) {
-      errors.push("Укажите пробег текущего автомобиля.");
-    } else {
-      const mileage = Number(form.currentCarMileage);
-      if (!Number.isInteger(mileage) || mileage < 0 || mileage > 2_000_000) {
-        errors.push("Проверьте пробег текущего автомобиля.");
+      if (car.mileage === "") errors.push(`Укажите пробег в ${label}.`);
+      else {
+        const mileage = Number(car.mileage);
+        if (!Number.isInteger(mileage) || mileage < 0 || mileage > 2_000_000) {
+          errors.push(`Проверьте пробег в ${label}.`);
+        }
       }
-    }
-    if (currentCarBrandSearch.trim() && !currentCarBrandId) errors.push("Выберите марку из списка.");
-    if (currentCarModelSearch.trim() && !currentCarModelId) errors.push("Выберите модель из списка.");
+      if (car.brandSearch.trim() && !car.brandId) errors.push(`Выберите марку из списка в ${label}.`);
+      if (car.modelSearch.trim() && !car.modelId) errors.push(`Выберите модель из списка в ${label}.`);
+    });
     return errors;
   }
   if (step === 3) {
@@ -435,6 +456,341 @@ function SearchSuggestionField({
   );
 }
 
+function NeedEditor({
+  need,
+  index,
+  brands,
+  canRemove,
+  invalid,
+  onChange,
+  onRemove,
+}: {
+  need: FormState["needs"][number];
+  index: number;
+  brands: string[];
+  canRemove: boolean;
+  invalid: boolean;
+  onChange: (patch: Partial<FormState["needs"][number]>) => void;
+  onRemove: () => void;
+}) {
+  const modelsQuery = useQuery({
+    queryKey: ["manager-client-card-models", need.brand],
+    queryFn: () => getManagerClientNeedsModels(need.brand),
+    enabled: Boolean(need.brand && !need.undecided),
+  });
+  const models = modelsQuery.data?.data ?? [];
+  return (
+    <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-semibold text-slate-900">Потребность {index + 1}</h3>
+        <Button variant="ghost" size="sm" onClick={onRemove} disabled={!canRemove} aria-label={`Удалить потребность ${index + 1}`}>
+          <Trash2 className="mr-2 h-4 w-4" />
+          Удалить
+        </Button>
+      </div>
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+        <SelectField
+          id={`need-brand-${need.localId}`}
+          label="Марка"
+          value={need.brand}
+          disabled={need.undecided}
+          invalid={invalid && !need.undecided && !need.brand}
+          onChange={brand => onChange({ brand, model: "" })}
+        >
+          <option value="">Выберите марку</option>
+          {brands.map(brand => <option key={brand} value={brand}>{brand}</option>)}
+        </SelectField>
+        <SelectField
+          id={`need-model-${need.localId}`}
+          label="Модель"
+          value={need.model}
+          disabled={!need.brand || need.undecided || modelsQuery.isLoading}
+          invalid={invalid && !need.undecided && !need.model}
+          onChange={model => onChange({ model })}
+        >
+          <option value="">{need.brand ? "Выберите модель" : "Сначала выберите марку"}</option>
+          {models.map(model => <option key={model} value={model}>{model}</option>)}
+        </SelectField>
+      </div>
+      {modelsQuery.isLoading && <p className="text-xs text-slate-500">Загружаем модели…</p>}
+      {modelsQuery.isError && <p role="alert" className="text-sm text-red-600">Не удалось загрузить модели для выбранной марки.</p>}
+      <div className="space-y-2">
+        <Label>Бюджет клиента</Label>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {budgetOptions.map(option => (
+            <button
+              type="button"
+              key={option}
+              onClick={() => onChange({ budgetRange: option })}
+              className={`min-h-11 rounded-lg border px-4 text-left text-sm font-medium transition ${
+                need.budgetRange === option ? "border-[#0070b8] bg-sky-50 text-[#005a94]" : "border-slate-200 hover:bg-slate-50"
+              }`}
+              aria-pressed={need.budgetRange === option}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+        {invalid && !need.budgetRange && <p className="text-sm text-red-600">Укажите бюджет.</p>}
+      </div>
+      <label className="flex min-h-10 items-center gap-2 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          checked={need.undecided}
+          onChange={event => onChange({
+            undecided: event.target.checked,
+            brand: event.target.checked ? "" : need.brand,
+            model: event.target.checked ? "" : need.model,
+          })}
+          className="h-4 w-4 rounded border-slate-300 text-[#0070b8] focus:ring-[#0070b8]"
+        />
+        Клиент пока не определился с моделью
+      </label>
+    </section>
+  );
+}
+
+function CurrentCarEditor({
+  car,
+  index,
+  invalid,
+  onChange,
+  onRemove,
+}: {
+  car: FormState["currentCars"][number];
+  index: number;
+  invalid: boolean;
+  onChange: (patch: Partial<FormState["currentCars"][number]>) => void;
+  onRemove: () => void;
+}) {
+  const brandsQuery = useQuery({
+    queryKey: ["manager-client-card-current-car-cm-brands"],
+    queryFn: () => fetchCmCatalogItems("/api/car-catalog/cm-brands"),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+  const modelsQuery = useQuery({
+    queryKey: ["manager-client-card-current-car-cm-models", car.brandId],
+    queryFn: () => fetchCmCatalogItems(`/api/car-catalog/cm-models?${new URLSearchParams({ brand: car.brandId })}`),
+    enabled: Boolean(car.brandId),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+  const yearsQuery = useQuery({
+    queryKey: ["manager-client-card-current-car-cm-years", car.brandId, car.modelId],
+    queryFn: () => fetchCmYears(car.brandId, car.modelId),
+    enabled: Boolean(car.brandId && car.modelId),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+  const generationsQuery = useQuery({
+    queryKey: ["manager-client-card-current-car-cm-generations", car.brandId, car.modelId, car.year],
+    queryFn: () => fetchCmCatalogItems(`/api/car-catalog/cm-generations?${new URLSearchParams({
+      brand: car.brandId,
+      model: car.modelId,
+      creationYear: car.year,
+    })}`),
+    enabled: Boolean(car.brandId && car.modelId && car.year),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+  const bodiesQuery = useQuery({
+    queryKey: ["manager-client-card-current-car-cm-bodies", car.brandId, car.modelId],
+    queryFn: () => fetchCmCatalogItems(`/api/car-catalog/cm-bodies?${new URLSearchParams({
+      brand: car.brandId,
+      model: car.modelId,
+    })}`),
+    enabled: Boolean(car.brandId && car.modelId),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+  const brandOptions = (brandsQuery.data ?? []).map(item => ({ value: item.id, label: item.name }));
+  const modelOptions = (modelsQuery.data ?? []).map(item => ({ value: item.id, label: item.name }));
+  const generations = generationsQuery.data ?? [];
+  const bodies = bodiesQuery.data ?? [];
+  const fieldError = (part: string) => invalid && (
+    part === "brand" ? !car.brandId :
+    part === "model" ? !car.modelId :
+    part === "year" ? !car.year :
+    part === "mileage" ? car.mileage === "" : false
+  );
+  const clearAfterBrand = {
+    modelId: "",
+    modelSearch: "",
+    model: "",
+    year: "",
+    mileage: "",
+    generationId: "",
+    bodyTypeId: "",
+    generation: "",
+    bodyType: "",
+    ownersCount: "",
+    tradeInPlan: "",
+  } as const;
+  const clearAfterModel = {
+    year: "",
+    mileage: "",
+    generationId: "",
+    bodyTypeId: "",
+    generation: "",
+    bodyType: "",
+    ownersCount: "",
+    tradeInPlan: "",
+  } as const;
+  return (
+    <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-semibold text-slate-900">Текущий автомобиль {index + 1}</h3>
+        <Button variant="ghost" size="sm" onClick={onRemove} aria-label={`Удалить текущий автомобиль ${index + 1}`}>
+          <Trash2 className="mr-2 h-4 w-4" />
+          Удалить
+        </Button>
+      </div>
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+        <CascadeField>
+          <SearchSuggestionField
+            id={`current-car-brand-${car.localId}`}
+            label="Марка *"
+            value={car.brandSearch}
+            placeholder="Выберите марку"
+            options={brandOptions}
+            loading={brandsQuery.isLoading}
+            invalid={fieldError("brand")}
+            onChange={brandSearch => onChange({
+              brandSearch, brandId: "", brand: "", ...clearAfterBrand,
+            })}
+            onSelect={option => onChange({
+              brandSearch: option.label,
+              brandId: option.value,
+              brand: option.label,
+              ...clearAfterBrand,
+            })}
+          />
+        </CascadeField>
+        {car.brandId && (
+          <CascadeField delay={50}>
+            <SearchSuggestionField
+              id={`current-car-model-${car.localId}`}
+              label="Модель *"
+              value={car.modelSearch}
+              placeholder="Начните вводить модель"
+              options={modelOptions}
+              loading={modelsQuery.isLoading}
+              invalid={fieldError("model")}
+              onChange={modelSearch => onChange({
+                modelSearch, modelId: "", model: "", ...clearAfterModel,
+              })}
+              onSelect={option => onChange({
+                modelSearch: option.label,
+                modelId: option.value,
+                model: option.label,
+                ...clearAfterModel,
+              })}
+            />
+          </CascadeField>
+        )}
+      </div>
+      {(brandsQuery.isError || modelsQuery.isError) && (
+        <p role="alert" className="text-sm text-red-600">Не удалось загрузить каталог марок и моделей.</p>
+      )}
+      {car.modelId && (
+        <>
+          <div className="grid min-w-0 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2">
+            <CascadeField>
+              <SelectField
+                id={`current-car-year-${car.localId}`}
+                label="Год *"
+                value={car.year}
+                invalid={fieldError("year")}
+                onChange={year => onChange({ year, generationId: "", generation: "" })}
+                disabled={yearsQuery.isLoading}
+              >
+                <option value="">{yearsQuery.isLoading ? "Загружаем годы…" : "Выберите год"}</option>
+                {(yearsQuery.data ?? []).map(year => <option key={year} value={year}>{year}</option>)}
+              </SelectField>
+            </CascadeField>
+            <CascadeField delay={50}>
+              <div className="space-y-2">
+                <Label htmlFor={`current-car-mileage-${car.localId}`}>Пробег, км *</Label>
+                <Input
+                  id={`current-car-mileage-${car.localId}`}
+                  type="number"
+                  min={0}
+                  max={2_000_000}
+                  step={1}
+                  inputMode="numeric"
+                  value={car.mileage}
+                  onChange={event => onChange({ mileage: event.target.value })}
+                  placeholder="Например, 75 000"
+                  className={`h-11 ${fieldError("mileage") ? "border-red-400 focus-visible:ring-red-300" : ""}`}
+                  aria-invalid={fieldError("mileage")}
+                />
+              </div>
+            </CascadeField>
+          </div>
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+            {car.year && (
+              <CascadeField>
+                <SelectField
+                  id={`current-car-generation-${car.localId}`}
+                  label="Поколение · необязательно"
+                  value={car.generationId}
+                  onChange={value => onChange({
+                    generationId: value,
+                    generation: generations.find(item => item.id === value)?.name ?? "",
+                  })}
+                  disabled={generationsQuery.isLoading}
+                >
+                  <option value="">{generationsQuery.isLoading ? "Загружаем поколения…" : "Не указано"}</option>
+                  {generations.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </SelectField>
+              </CascadeField>
+            )}
+            <CascadeField delay={50}>
+              <SelectField
+                id={`current-car-body-${car.localId}`}
+                label="Тип кузова · необязательно"
+                value={car.bodyTypeId}
+                onChange={value => onChange({
+                  bodyTypeId: value,
+                  bodyType: bodies.find(item => item.id === value)?.name ?? "",
+                })}
+                disabled={bodiesQuery.isLoading}
+              >
+                <option value="">{bodiesQuery.isLoading ? "Загружаем типы кузова…" : "Не указано"}</option>
+                {bodies.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </SelectField>
+            </CascadeField>
+            <CascadeField delay={100}>
+              <SelectField
+                id={`current-car-owners-${car.localId}`}
+                label="Кол-во владельцев · необязательно"
+                value={car.ownersCount}
+                onChange={value => onChange({ ownersCount: value as FormState["currentCars"][number]["ownersCount"] })}
+              >
+                <option value="">Не указано</option>
+                <option value="1">1 владелец</option>
+                <option value="2">2 владельца</option>
+                <option value="3">3 владельца</option>
+                <option value="4+">4 и более</option>
+              </SelectField>
+            </CascadeField>
+            <CascadeField delay={150}>
+              <SelectField
+                id={`current-car-trade-in-${car.localId}`}
+                label="Планирует сдать в трейд-ин? · необязательно"
+                value={car.tradeInPlan}
+                onChange={value => onChange({ tradeInPlan: value as FormState["currentCars"][number]["tradeInPlan"] })}
+              >
+                <option value="">Не указано</option>
+                {tradeInOptions.map(value => <option key={value} value={value}>{value}</option>)}
+              </SelectField>
+            </CascadeField>
+          </div>
+          {(yearsQuery.isError || generationsQuery.isError || bodiesQuery.isError) && (
+            <p role="alert" className="text-sm text-red-600">Не удалось загрузить данные автомобиля.</p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 function InventoryResult({
   car,
   selected,
@@ -498,12 +854,6 @@ export default function ManagerClientCardsPage() {
   const [selectedCard, setSelectedCard] = useState<ManagerClientCard | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [selectedOfferCar, setSelectedOfferCar] = useState<ManagerClientCardInventoryItem | null>(null);
-  const [currentCarBrandId, setCurrentCarBrandId] = useState("");
-  const [currentCarModelId, setCurrentCarModelId] = useState("");
-  const [currentCarBrandSearch, setCurrentCarBrandSearch] = useState("");
-  const [currentCarModelSearch, setCurrentCarModelSearch] = useState("");
-  const [currentCarGenerationId, setCurrentCarGenerationId] = useState("");
-  const [currentCarBodyTypeId, setCurrentCarBodyTypeId] = useState("");
   const [offerBrandSearch, setOfferBrandSearch] = useState("");
   const [offerModelSearch, setOfferModelSearch] = useState("");
   const [offerVinSearch, setOfferVinSearch] = useState("");
@@ -530,48 +880,6 @@ export default function ManagerClientCardsPage() {
     queryKey: ["manager-client-card-brands"],
     queryFn: getManagerClientNeedsBrands,
     enabled: mode === "form",
-  });
-  const modelsQuery = useQuery({
-    queryKey: ["manager-client-card-models", form.desiredBrand],
-    queryFn: () => getManagerClientNeedsModels(form.desiredBrand),
-    enabled: mode === "form" && Boolean(form.desiredBrand),
-  });
-  const currentCarBrandsQuery = useQuery({
-    queryKey: ["manager-client-card-current-car-cm-brands"],
-    queryFn: () => fetchCmCatalogItems("/api/car-catalog/cm-brands"),
-    enabled: mode === "form" && step === 2,
-    staleTime: 24 * 60 * 60 * 1000,
-  });
-  const currentCarModelsQuery = useQuery({
-    queryKey: ["manager-client-card-current-car-cm-models", currentCarBrandId],
-    queryFn: () => fetchCmCatalogItems(`/api/car-catalog/cm-models?${new URLSearchParams({ brand: currentCarBrandId })}`),
-    enabled: mode === "form" && step === 2 && Boolean(currentCarBrandId),
-    staleTime: 24 * 60 * 60 * 1000,
-  });
-  const currentCarYearsQuery = useQuery({
-    queryKey: ["manager-client-card-current-car-cm-years", currentCarBrandId, currentCarModelId],
-    queryFn: () => fetchCmYears(currentCarBrandId, currentCarModelId),
-    enabled: mode === "form" && step === 2 && Boolean(currentCarBrandId && currentCarModelId),
-    staleTime: 24 * 60 * 60 * 1000,
-  });
-  const currentCarGenerationsQuery = useQuery({
-    queryKey: ["manager-client-card-current-car-cm-generations", currentCarBrandId, currentCarModelId, form.currentCarYear],
-    queryFn: () => {
-      const params = new URLSearchParams({
-        brand: currentCarBrandId,
-        model: currentCarModelId,
-        creationYear: form.currentCarYear,
-      });
-      return fetchCmCatalogItems(`/api/car-catalog/cm-generations?${params}`);
-    },
-    enabled: mode === "form" && step === 2 && Boolean(currentCarBrandId && currentCarModelId && form.currentCarYear),
-    staleTime: 24 * 60 * 60 * 1000,
-  });
-  const currentCarBodiesQuery = useQuery({
-    queryKey: ["manager-client-card-current-car-cm-bodies", currentCarBrandId, currentCarModelId],
-    queryFn: () => fetchCmCatalogItems(`/api/car-catalog/cm-bodies?${new URLSearchParams({ brand: currentCarBrandId, model: currentCarModelId })}`),
-    enabled: mode === "form" && step === 2 && Boolean(currentCarBrandId && currentCarModelId),
-    staleTime: 24 * 60 * 60 * 1000,
   });
   const offerInventoryQuery = useQuery({
     queryKey: ["manager-client-card-offer-vehicle", offerBrandSearch.trim(), offerModelSearch.trim(), offerVinSearch.trim()],
@@ -612,19 +920,6 @@ export default function ManagerClientCardsPage() {
   });
 
   const brands = brandsQuery.data?.data ?? [];
-  const models = modelsQuery.data?.data ?? [];
-  const currentCarBrands = currentCarBrandsQuery.data ?? [];
-  const currentCarModels = currentCarModelsQuery.data ?? [];
-  const currentCarGenerations = currentCarGenerationsQuery.data ?? [];
-  const currentCarBodies = currentCarBodiesQuery.data ?? [];
-  const currentCarBrandSuggestions = currentCarBrands.map(brand => ({
-    value: brand.id,
-    label: brand.name,
-  }));
-  const currentCarModelSuggestions = currentCarModels.map(model => ({
-    value: model.id,
-    label: model.name,
-  }));
   const managers = managersQuery.data?.data ?? [];
   const offerInventory = offerInventoryQuery.data?.data ?? [];
   const offerBrandSuggestions = Array.from(new Set(offerInventory.map(car => car.brand).filter((brand): brand is string => Boolean(brand))))
@@ -634,16 +929,33 @@ export default function ManagerClientCardsPage() {
   const cardsPage = cardsQuery.data?.data;
   const cards = cardsPage?.items ?? [];
   const detailCard = detailQuery.data?.data ?? selectedCard;
+  const detailNeeds = detailCard?.needs?.length ? detailCard.needs : detailCard ? [{
+    brand: detailCard.desiredBrand,
+    model: detailCard.desiredModel,
+    undecided: detailCard.desiredVehicleUndecided,
+    budgetRange: detailCard.budgetRange,
+  }] : [];
+  const detailCurrentCars = detailCard?.currentCars?.length ? detailCard.currentCars : detailCard && (
+    detailCard.currentCarBrand || detailCard.currentCarModel || detailCard.currentCarYear != null ||
+    detailCard.currentCarMileage != null || detailCard.currentCar
+  ) ? [{
+    brand: detailCard.currentCarBrand ?? detailCard.currentCar ?? "",
+    model: detailCard.currentCarModel ?? "",
+    year: detailCard.currentCarYear,
+    mileage: detailCard.currentCarMileage,
+    generation: detailCard.currentCarGeneration,
+    bodyType: detailCard.currentCarBodyType,
+    ownersCount: detailCard.currentCarOwnersCount,
+    inventoryId: detailCard.currentCarInventoryId,
+    snapshot: detailCard.currentCarSnapshot,
+    tradeInPlan: detailCard.tradeInPlan,
+  }] : [];
   const totalPages = Math.max(1, Math.ceil((cardsPage?.total ?? 0) / pageSize));
   const stepErrors = useMemo(
     () => steps.map((_, index) => saveAttempted
       ? validateStep(
           form,
           index,
-          currentCarBrandId,
-          currentCarBrandSearch,
-          currentCarModelId,
-          currentCarModelSearch,
           selectedOfferCar,
           offerBrandSearch,
           offerModelSearch,
@@ -652,10 +964,6 @@ export default function ManagerClientCardsPage() {
       : []),
     [
       form,
-      currentCarBrandId,
-      currentCarBrandSearch,
-      currentCarModelId,
-      currentCarModelSearch,
       selectedOfferCar,
       offerBrandSearch,
       offerModelSearch,
@@ -671,23 +979,7 @@ export default function ManagerClientCardsPage() {
   }
 
   function resetCurrentVehicle() {
-    setCurrentCarBrandId("");
-    setCurrentCarModelId("");
-    setCurrentCarBrandSearch("");
-    setCurrentCarModelSearch("");
-    setCurrentCarGenerationId("");
-    setCurrentCarBodyTypeId("");
-    setForm(previous => ({
-      ...previous,
-      currentCarBrand: "",
-      currentCarModel: "",
-      currentCarYear: "",
-      currentCarMileage: "",
-      currentCarGeneration: "",
-      currentCarBodyType: "",
-      currentCarOwnersCount: "",
-      tradeInPlan: "",
-    }));
+    setForm(previous => ({ ...previous, currentCars: [] }));
   }
 
   function updateFilters(patch: Partial<ListFilters>) {
@@ -739,10 +1031,6 @@ export default function ManagerClientCardsPage() {
     const allErrors = steps.map((_, index) => validateStep(
       form,
       index,
-      currentCarBrandId,
-      currentCarBrandSearch,
-      currentCarModelId,
-      currentCarModelSearch,
       selectedOfferCar,
       offerBrandSearch,
       offerModelSearch,
@@ -754,24 +1042,51 @@ export default function ManagerClientCardsPage() {
       setFormError(allErrors[firstInvalid].join(" "));
       return;
     }
+    const needs = form.needs.map(need => ({
+      brand: need.brand || null,
+      model: need.model || null,
+      undecided: need.undecided,
+      budgetRange: need.budgetRange || null,
+    }));
+    const currentCars = form.currentCars
+      .filter(car => Boolean(
+        car.brandSearch.trim() || car.modelSearch.trim() || car.brand || car.model || car.year ||
+        car.mileage || car.generation || car.bodyType || car.ownersCount || car.tradeInPlan,
+      ))
+      .map(car => ({
+        brand: car.brand,
+        model: car.model,
+        year: Number(car.year),
+        mileage: Number(car.mileage),
+        generation: car.generation || null,
+        bodyType: car.bodyType || null,
+        ownersCount: car.ownersCount || null,
+        inventoryId: null,
+        snapshot: null,
+        tradeInPlan: car.tradeInPlan || null,
+      }));
+    const firstNeed = needs[0]!;
+    const firstCar = currentCars[0] ?? null;
     saveMutation.mutate({
       clientName: form.clientName.trim(),
       clientPhone: form.clientPhone.trim(),
       clientGender: form.clientGender || null,
-      desiredBrand: form.desiredBrand || null,
-      desiredModel: form.desiredModel || null,
-      desiredVehicleUndecided: form.desiredVehicleUndecided,
-      budgetRange: form.budgetRange || null,
-      currentCar: [form.currentCarBrand, form.currentCarModel].filter(Boolean).join(" ") || null,
-      currentCarBrand: form.currentCarBrand || null,
-      currentCarModel: form.currentCarModel || null,
-      currentCarYear: form.currentCarYear ? Number(form.currentCarYear) : null,
-      currentCarMileage: form.currentCarMileage ? Number(form.currentCarMileage) : null,
-      currentCarGeneration: form.currentCarGeneration || null,
-      currentCarBodyType: form.currentCarBodyType || null,
-      currentCarOwnersCount: form.currentCarOwnersCount || null,
-      currentCarInventoryId: null,
-      tradeInPlan: form.tradeInPlan || null,
+      needs,
+      currentCars,
+      desiredBrand: firstNeed.brand,
+      desiredModel: firstNeed.model,
+      desiredVehicleUndecided: firstNeed.undecided,
+      budgetRange: firstNeed.budgetRange,
+      currentCar: firstCar ? [firstCar.brand, firstCar.model].join(" ") : null,
+      currentCarBrand: firstCar?.brand ?? null,
+      currentCarModel: firstCar?.model ?? null,
+      currentCarYear: firstCar?.year ?? null,
+      currentCarMileage: firstCar?.mileage ?? null,
+      currentCarGeneration: firstCar?.generation ?? null,
+      currentCarBodyType: firstCar?.bodyType ?? null,
+      currentCarOwnersCount: firstCar?.ownersCount ?? null,
+      currentCarInventoryId: firstCar?.inventoryId ?? null,
+      tradeInPlan: firstCar?.tradeInPlan ?? null,
       commercialBrand: form.commercialBrand || null,
       commercialModel: form.commercialModel || null,
       commercialCarId: selectedOfferCar?.id ?? null,
@@ -978,7 +1293,16 @@ export default function ManagerClientCardsPage() {
             ) : (
               <div className="space-y-2">
                 {cards.map(card => {
-                  const desired = [card.desiredBrand, card.desiredModel].filter(Boolean).join(" ");
+                  const cardNeeds = card.needs?.length ? card.needs : [{
+                    brand: card.desiredBrand,
+                    model: card.desiredModel,
+                    undecided: card.desiredVehicleUndecided,
+                    budgetRange: card.budgetRange,
+                  }];
+                  const desired = cardNeeds.map(need =>
+                    [need.brand, need.model].filter(Boolean).join(" ") || (need.undecided ? "Пока не определился" : "Не указано"),
+                  ).join(" · ");
+                  const budgets = [...new Set(cardNeeds.map(need => need.budgetRange).filter((value): value is string => Boolean(value)))];
                   const offer = card.commercialCarSnapshot;
                   const offerTitle = [
                     card.commercialBrand || offer?.brand,
@@ -999,11 +1323,14 @@ export default function ManagerClientCardsPage() {
                       <span className="min-w-0">
                         <span className="block text-[11px] font-medium uppercase tracking-wide text-slate-400">Интерес</span>
                         <span className="mt-0.5 block break-words text-sm text-slate-700">
-                          {desired || (card.desiredVehicleUndecided ? "Пока не определился" : "Не указан")}
+                          {desired || "Не указан"}
                         </span>
                       </span>
                       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                        {card.budgetRange && <Badge variant="secondary">{card.budgetRange}</Badge>}
+                        {budgets.map(budget => <Badge key={budget} variant="secondary">{budget}</Badge>)}
+                        {card.currentCars?.length > 0 && (
+                          <Badge variant="outline">Текущих авто: {card.currentCars.length}</Badge>
+                        )}
                         <span className="text-xs text-slate-500">{formatDate(card.createdAt)}</span>
                         {adminPortal && card.managerName && (
                           <span className="w-full truncate text-xs text-slate-500">{card.managerName}</span>
@@ -1067,10 +1394,6 @@ export default function ManagerClientCardsPage() {
                           : validateStep(
                               form,
                               index,
-                              currentCarBrandId,
-                              currentCarBrandSearch,
-                              currentCarModelId,
-                              currentCarModelSearch,
                               selectedOfferCar,
                               offerBrandSearch,
                               offerModelSearch,
@@ -1102,10 +1425,6 @@ export default function ManagerClientCardsPage() {
                           : validateStep(
                               form,
                               index,
-                              currentCarBrandId,
-                              currentCarBrandSearch,
-                              currentCarModelId,
-                              currentCarModelSearch,
                               selectedOfferCar,
                               offerBrandSearch,
                               offerModelSearch,
@@ -1127,8 +1446,8 @@ export default function ManagerClientCardsPage() {
                 <h2 className="text-lg font-semibold text-slate-900">{steps[step]?.title}</h2>
                 <p className="mt-1 text-sm text-slate-500">
                   {step === 0 && "Укажите контактные данные клиента. Пол можно не заполнять."}
-                  {step === 1 && "Выберите модель из доступного склада или отметьте, что клиент пока не определился."}
-                  {step === 2 && "Укажите автомобиль клиента. Марка, модель, год и пробег обязательны; остальные поля можно пропустить."}
+                  {step === 1 && "Добавьте все интересующие модели клиента. Для разных марок 1С получит отдельные записи."}
+                  {step === 2 && "Добавьте один или несколько автомобилей клиента. Для каждого указанные марка, модель, год и пробег обязательны."}
                   {step === 3 && "Выберите конкретный новый автомобиль из активного склада."}
                   {step === 4 && "Добавьте важные детали разговора, которые помогут продолжить общение."}
                 </p>
@@ -1190,316 +1509,104 @@ export default function ManagerClientCardsPage() {
               )}
 
               {step === 1 && (
-                <div className="space-y-5">
-                  <div className="space-y-3">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <Label htmlFor="desired-brand">Марка и модель нового автомобиля</Label>
-                      <button
-                        type="button"
-                        aria-pressed={form.desiredVehicleUndecided}
-                        onClick={() => {
-                          update("desiredVehicleUndecided", !form.desiredVehicleUndecided);
-                          if (!form.desiredVehicleUndecided) {
-                            update("desiredBrand", "");
-                            update("desiredModel", "");
-                          }
-                        }}
-                        className={`min-h-9 rounded-lg border px-3 text-sm transition ${
-                          form.desiredVehicleUndecided
-                            ? "border-[#0070b8] bg-sky-50 font-medium text-[#005a94]"
-                            : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                        }`}
-                      >
-                        Пока не определился
-                      </button>
-                    </div>
-                    <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-                      <div className="min-w-0 space-y-1.5">
-                        <Label htmlFor="desired-brand">Марка</Label>
-                        <select
-                          id="desired-brand"
-                          className={fieldClass}
-                          value={form.desiredBrand}
-                          disabled={form.desiredVehicleUndecided || brandsQuery.isLoading}
-                          onChange={event => {
-                            update("desiredVehicleUndecided", false);
-                            update("desiredBrand", event.target.value);
-                            update("desiredModel", "");
-                          }}
-                        >
-                          <option value="">Выберите марку</option>
-                          {brands.map(brand => <option key={brand} value={brand}>{brand}</option>)}
-                        </select>
-                      </div>
-                      <div className="min-w-0 space-y-1.5">
-                        <Label htmlFor="desired-model">Модель</Label>
-                        <select
-                          id="desired-model"
-                          className={fieldClass}
-                          value={form.desiredModel}
-                          disabled={!form.desiredBrand || form.desiredVehicleUndecided || modelsQuery.isLoading}
-                          onChange={event => update("desiredModel", event.target.value)}
-                        >
-                          <option value="">{form.desiredBrand ? "Выберите модель" : "Сначала выберите марку"}</option>
-                          {models.map(model => <option key={model} value={model}>{model}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    {brandsQuery.isLoading && <p className="text-xs text-slate-500">Загружаем марки из активного склада…</p>}
-                    {modelsQuery.isLoading && <p className="text-xs text-slate-500">Загружаем модели…</p>}
-                    {brandsQuery.isError && <p role="alert" className="text-sm text-red-600">Не удалось загрузить марки из склада CM Expert.</p>}
-                    {brands.length === 0 && !brandsQuery.isLoading && !brandsQuery.isError && (
-                      <p className="text-sm text-slate-500">Для этого аккаунта нет доступных новых автомобилей из CM Expert.</p>
-                    )}
-                    {saveAttempted && stepErrors[1].some(error => error.includes("марку")) && (
-                      <p className="text-sm text-red-600">{stepErrors[1].find(error => error.includes("марку"))}</p>
-                    )}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-slate-900">Потребности клиента</h3>
+                    <p className="mt-1 text-sm text-slate-500">Добавляйте разные модели и марки — каждая потребность попадёт в отдельную запись 1С по своей марке.</p>
                   </div>
-                  <div className="space-y-2 border-t border-slate-100 pt-4">
-                    <Label>Бюджет клиента</Label>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {budgetOptions.map(option => (
-                        <button
-                          type="button"
-                          key={option}
-                          onClick={() => update("budgetRange", option)}
-                          className={`min-h-11 rounded-lg border px-4 text-left text-sm font-medium transition ${
-                            form.budgetRange === option ? "border-[#0070b8] bg-sky-50 text-[#005a94]" : "border-slate-200 hover:bg-slate-50"
-                          }`}
-                          aria-pressed={form.budgetRange === option}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                    {saveAttempted && stepErrors[1].some(error => error.includes("бюджет")) && (
-                      <p className="text-sm text-red-600">{stepErrors[1].find(error => error.includes("бюджет"))}</p>
-                    )}
-                  </div>
+                  {form.needs.map((need, index) => (
+                    <NeedEditor
+                      key={need.localId}
+                      need={need}
+                      index={index}
+                      brands={brands}
+                      canRemove={form.needs.length > 1}
+                      invalid={saveAttempted && stepErrors[1].length > 0}
+                      onChange={patch => {
+                        setForm(previous => ({
+                          ...previous,
+                          needs: previous.needs.map(item => item.localId === need.localId ? { ...item, ...patch } : item),
+                        }));
+                        setFormError("");
+                      }}
+                      onRemove={() => {
+                        setForm(previous => ({
+                          ...previous,
+                          needs: previous.needs.filter(item => item.localId !== need.localId),
+                        }));
+                        setFormError("");
+                      }}
+                    />
+                  ))}
+                  {brandsQuery.isLoading && <p className="text-xs text-slate-500">Загружаем марки из активного склада…</p>}
+                  {brandsQuery.isError && <p role="alert" className="text-sm text-red-600">Не удалось загрузить марки из склада CM Expert.</p>}
+                  {brands.length === 0 && !brandsQuery.isLoading && !brandsQuery.isError && (
+                    <p className="text-sm text-slate-500">Для этого аккаунта нет доступных новых автомобилей из CM Expert.</p>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setForm(previous => ({
+                        ...previous,
+                        needs: [...previous.needs, { localId: newLocalId("need"), brand: "", model: "", undecided: false, budgetRange: "" }],
+                      }));
+                      setFormError("");
+                    }}
+                    disabled={form.needs.length >= 20}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Добавить потребность
+                  </Button>
+                  {saveAttempted && stepErrors[1].length > 0 && (
+                    <p role="alert" className="text-sm text-red-600">{stepErrors[1].join(" ")}</p>
+                  )}
                 </div>
               )}
 
               {step === 2 && (
-                <div className="space-y-5">
-                  <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-                    <CascadeField>
-                      <SearchSuggestionField
-                        id="current-cm-brand"
-                        label="Марка *"
-                        value={currentCarBrandSearch}
-                        placeholder="Выберите марку"
-                        options={currentCarBrandSuggestions}
-                        loading={currentCarBrandsQuery.isLoading}
-                        invalid={saveAttempted && stepErrors[2].some(error => error.includes("марку"))}
-                        onChange={value => {
-                          setCurrentCarBrandSearch(value);
-                          setCurrentCarBrandId("");
-                          setCurrentCarModelSearch("");
-                          setCurrentCarModelId("");
-                          setCurrentCarGenerationId("");
-                          setCurrentCarBodyTypeId("");
-                          setForm(previous => ({
-                            ...previous,
-                            currentCarBrand: "",
-                            currentCarModel: "",
-                            currentCarYear: "",
-                            currentCarMileage: "",
-                            currentCarGeneration: "",
-                            currentCarBodyType: "",
-                            currentCarOwnersCount: "",
-                          }));
-                          setFormError("");
-                        }}
-                        onSelect={option => {
-                          setCurrentCarBrandId(option.value);
-                          setCurrentCarBrandSearch(option.label);
-                          setCurrentCarModelId("");
-                          setCurrentCarModelSearch("");
-                          setCurrentCarGenerationId("");
-                          setCurrentCarBodyTypeId("");
-                          setForm(previous => ({
-                            ...previous,
-                            currentCarBrand: option.label,
-                            currentCarModel: "",
-                            currentCarYear: "",
-                            currentCarMileage: "",
-                            currentCarGeneration: "",
-                            currentCarBodyType: "",
-                            currentCarOwnersCount: "",
-                          }));
-                          setFormError("");
-                        }}
-                      />
-                    </CascadeField>
-                    {currentCarBrandId && (
-                      <CascadeField delay={50}>
-                        <SearchSuggestionField
-                          id="current-cm-model"
-                          label="Модель *"
-                          value={currentCarModelSearch}
-                          placeholder="Начните вводить модель"
-                          options={currentCarModelSuggestions}
-                          loading={currentCarModelsQuery.isLoading}
-                          invalid={saveAttempted && stepErrors[2].some(error => error.includes("модель"))}
-                          onChange={value => {
-                            setCurrentCarModelSearch(value);
-                            setCurrentCarModelId("");
-                            setCurrentCarGenerationId("");
-                            setCurrentCarBodyTypeId("");
-                            setForm(previous => ({
-                              ...previous,
-                              currentCarModel: "",
-                              currentCarYear: "",
-                              currentCarMileage: "",
-                              currentCarGeneration: "",
-                              currentCarBodyType: "",
-                              currentCarOwnersCount: "",
-                            }));
-                            setFormError("");
-                          }}
-                          onSelect={option => {
-                            setCurrentCarModelId(option.value);
-                            setCurrentCarModelSearch(option.label);
-                            setCurrentCarGenerationId("");
-                            setCurrentCarBodyTypeId("");
-                            setForm(previous => ({
-                              ...previous,
-                              currentCarModel: option.label,
-                              currentCarYear: "",
-                              currentCarMileage: "",
-                              currentCarGeneration: "",
-                              currentCarBodyType: "",
-                              currentCarOwnersCount: "",
-                            }));
-                            setFormError("");
-                          }}
-                        />
-                      </CascadeField>
-                    )}
-                    {currentCarBrandsQuery.isError && (
-                      <p role="alert" className="text-sm text-red-600 sm:col-span-2">Не удалось загрузить каталог марок.</p>
-                    )}
-                    {currentCarModelsQuery.isError && (
-                      <p role="alert" className="text-sm text-red-600 sm:col-span-2">Не удалось загрузить модели для выбранной марки.</p>
-                    )}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-slate-900">Текущие автомобили клиента</h3>
+                    <p className="mt-1 text-sm text-slate-500">Раздел необязательный. Если добавили автомобиль, заполните марку, модель, год и пробег.</p>
                   </div>
-
-                  {currentCarModelId && (
-                    <div className="grid min-w-0 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2">
-                      <CascadeField>
-                        <SelectField
-                          id="current-car-year"
-                          label="Год *"
-                          value={form.currentCarYear}
-                          invalid={saveAttempted && stepErrors[2].some(error => error.includes("год"))}
-                          onChange={value => {
-                            update("currentCarYear", value);
-                            setCurrentCarGenerationId("");
-                            update("currentCarGeneration", "");
-                          }}
-                          disabled={currentCarYearsQuery.isLoading}
-                        >
-                          <option value="">
-                            {currentCarYearsQuery.isLoading ? "Загружаем годы…" : "Выберите год"}
-                          </option>
-                          {(currentCarYearsQuery.data ?? []).map(year => (
-                            <option key={year} value={year}>{year}</option>
-                          ))}
-                        </SelectField>
-                      </CascadeField>
-                      <CascadeField delay={50}>
-                        <div className="space-y-2">
-                          <Label htmlFor="current-car-mileage">Пробег, км *</Label>
-                          <Input
-                            id="current-car-mileage"
-                            type="number"
-                            min={0}
-                            max={2_000_000}
-                            step={1}
-                            inputMode="numeric"
-                            value={form.currentCarMileage}
-                            onChange={event => update("currentCarMileage", event.target.value)}
-                            placeholder="Например, 75 000"
-                            className={`h-11 ${saveAttempted && stepErrors[2].some(error => error.includes("пробег")) ? "border-red-400 focus-visible:ring-red-300" : ""}`}
-                            aria-invalid={saveAttempted && stepErrors[2].some(error => error.includes("пробег"))}
-                          />
-                        </div>
-                      </CascadeField>
-                    </div>
-                  )}
-
-                  {currentCarModelId && (
-                    <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-                      {form.currentCarYear && (
-                        <CascadeField>
-                          <SelectField
-                            id="current-car-generation"
-                            label="Поколение · необязательно"
-                            value={currentCarGenerationId}
-                            onChange={value => {
-                              setCurrentCarGenerationId(value);
-                              update("currentCarGeneration", currentCarGenerations.find(item => item.id === value)?.name ?? "");
-                            }}
-                            disabled={currentCarGenerationsQuery.isLoading}
-                          >
-                            <option value="">
-                              {currentCarGenerationsQuery.isLoading ? "Загружаем поколения…" : "Не указано"}
-                            </option>
-                            {currentCarGenerations.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-                          </SelectField>
-                        </CascadeField>
-                      )}
-                      <CascadeField delay={50}>
-                        <SelectField
-                          id="current-car-body-type"
-                          label="Тип кузова · необязательно"
-                          value={currentCarBodyTypeId}
-                          onChange={value => {
-                            setCurrentCarBodyTypeId(value);
-                            update("currentCarBodyType", currentCarBodies.find(item => item.id === value)?.name ?? "");
-                          }}
-                          disabled={currentCarBodiesQuery.isLoading}
-                        >
-                          <option value="">
-                            {currentCarBodiesQuery.isLoading ? "Загружаем типы кузова…" : "Не указано"}
-                          </option>
-                          {currentCarBodies.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-                        </SelectField>
-                      </CascadeField>
-                      <CascadeField delay={100}>
-                        <SelectField
-                          id="current-car-owners"
-                          label="Кол-во владельцев · необязательно"
-                          value={form.currentCarOwnersCount}
-                          onChange={value => update("currentCarOwnersCount", value as FormState["currentCarOwnersCount"])}
-                        >
-                          <option value="">Не указано</option>
-                          <option value="1">1 владелец</option>
-                          <option value="2">2 владельца</option>
-                          <option value="3">3 владельца</option>
-                          <option value="4+">4 и более</option>
-                        </SelectField>
-                      </CascadeField>
-                      <CascadeField delay={150}>
-                        <SelectField
-                          id="trade-in-plan"
-                          label="Планирует сдать в трейд-ин? · необязательно"
-                          value={form.tradeInPlan}
-                          onChange={value => update("tradeInPlan", value as FormState["tradeInPlan"])}
-                        >
-                          <option value="">Не указано</option>
-                          {tradeInOptions.map(value => <option key={value} value={value}>{value}</option>)}
-                        </SelectField>
-                      </CascadeField>
-                    </div>
-                  )}
-
-                  {currentCarBodiesQuery.isError && currentCarModelId && (
-                    <p role="alert" className="text-sm text-red-600">Не удалось загрузить типы кузова.</p>
-                  )}
-                  {currentCarYearsQuery.isError && currentCarModelId && (
-                    <p role="alert" className="text-sm text-red-600">Не удалось загрузить годы выпуска.</p>
-                  )}
+                  {form.currentCars.map((car, index) => (
+                    <CurrentCarEditor
+                      key={car.localId}
+                      car={car}
+                      index={index}
+                      invalid={saveAttempted && stepErrors[2].length > 0}
+                      onChange={patch => {
+                        setForm(previous => ({
+                          ...previous,
+                          currentCars: previous.currentCars.map(item => item.localId === car.localId ? { ...item, ...patch } : item),
+                        }));
+                        setFormError("");
+                      }}
+                      onRemove={() => {
+                        setForm(previous => ({
+                          ...previous,
+                          currentCars: previous.currentCars.filter(item => item.localId !== car.localId),
+                        }));
+                        setFormError("");
+                      }}
+                    />
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setForm(previous => ({
+                        ...previous,
+                        currentCars: [...previous.currentCars, emptyCurrentCar()],
+                      }));
+                      setFormError("");
+                    }}
+                    disabled={form.currentCars.length >= 10}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Добавить автомобиль
+                  </Button>
                   {saveAttempted && stepErrors[2].length > 0 && (
                     <p role="alert" className="text-sm text-red-600">{stepErrors[2].join(" ")}</p>
                   )}
@@ -1664,24 +1771,32 @@ export default function ManagerClientCardsPage() {
                       <div><dt className="text-xs text-slate-500">Клиент</dt><dd className="break-words font-medium">{form.clientName}</dd></div>
                       <div><dt className="text-xs text-slate-500">Телефон</dt><dd className="font-medium">{form.clientPhone}</dd></div>
                       {form.clientGender && <div><dt className="text-xs text-slate-500">Пол</dt><dd className="font-medium">{form.clientGender === "male" ? "Мужской" : "Женский"}</dd></div>}
-                      <div><dt className="text-xs text-slate-500">Интересующая модель</dt><dd className="break-words font-medium">{[form.desiredBrand, form.desiredModel].filter(Boolean).join(" ") || (form.desiredVehicleUndecided ? "Пока не определился" : "Не указана")}</dd></div>
-                      <div><dt className="text-xs text-slate-500">Бюджет</dt><dd className="font-medium">{form.budgetRange || "Не указан"}</dd></div>
-                      {(form.currentCarBrand || form.currentCarModel) && (
-                        <div>
-                          <dt className="text-xs text-slate-500">Текущий автомобиль</dt>
+                      {form.needs.map((need, index) => (
+                        <div key={need.localId}>
+                          <dt className="text-xs text-slate-500">Потребность {index + 1}</dt>
                           <dd className="break-words font-medium">
-                            {[form.currentCarBrand, form.currentCarModel, form.currentCarYear].filter(Boolean).join(" ")}
+                            {[need.brand, need.model].filter(Boolean).join(" ") || (need.undecided ? "Пока не определился" : "Не указана")}
+                          </dd>
+                          <dd className="mt-1 text-xs text-slate-500">Бюджет: {need.budgetRange || "Не указан"}</dd>
+                        </div>
+                      ))}
+                      {form.currentCars.filter(car => car.brand || car.model || car.year).map((car, index) => (
+                        <div key={car.localId}>
+                          <dt className="text-xs text-slate-500">Текущий автомобиль {index + 1}</dt>
+                          <dd className="break-words font-medium">
+                            {[car.brand, car.model, car.year].filter(Boolean).join(" ")}
                           </dd>
                           <dd className="mt-1 text-xs text-slate-500">
                             {[
-                              form.currentCarMileage ? `${Number(form.currentCarMileage).toLocaleString("ru-RU")} км` : "",
-                              form.currentCarGeneration,
-                              form.currentCarBodyType,
-                              formatOwnersCount(form.currentCarOwnersCount),
+                              car.mileage ? `${Number(car.mileage).toLocaleString("ru-RU")} км` : "",
+                              car.generation,
+                              car.bodyType,
+                              formatOwnersCount(car.ownersCount),
+                              car.tradeInPlan ? `Трейд-ин: ${car.tradeInPlan}` : "",
                             ].filter(Boolean).join(" · ")}
                           </dd>
                         </div>
-                      )}
+                      ))}
                       {(form.commercialBrand || form.commercialModel) && (
                         <div>
                           <dt className="text-xs text-slate-500">Предложение</dt>
@@ -1763,48 +1878,41 @@ export default function ManagerClientCardsPage() {
                 <section className="rounded-xl border border-slate-200 p-4">
                   <h3 className="font-semibold text-slate-900">Потребности</h3>
                   <dl className="mt-3 space-y-3 text-sm">
-                    <div>
-                      <dt className="text-xs text-slate-500">Модель</dt>
-                      <dd className="break-words font-medium">
-                        {[detailCard.desiredBrand, detailCard.desiredModel].filter(Boolean).join(" ") ||
-                          (detailCard.desiredVehicleUndecided ? "Пока не определился" : "Не указана")}
-                      </dd>
-                    </div>
-                    <div><dt className="text-xs text-slate-500">Бюджет</dt><dd className="font-medium">{detailCard.budgetRange || "Не указан"}</dd></div>
+                    {detailNeeds.map((need, index) => (
+                      <div key={`${need.brand ?? "undecided"}-${need.model ?? index}-${index}`}>
+                        <dt className="text-xs text-slate-500">Потребность {index + 1}</dt>
+                        <dd className="break-words font-medium">
+                          {[need.brand, need.model].filter(Boolean).join(" ") ||
+                            (need.undecided ? "Пока не определился" : "Не указана")}
+                        </dd>
+                        <dd className="mt-1 text-xs text-slate-500">Бюджет: {need.budgetRange || "Не указан"}</dd>
+                      </div>
+                    ))}
                   </dl>
                 </section>
                 <section className="rounded-xl border border-slate-200 p-4">
-                  <h3 className="font-semibold text-slate-900">Текущий автомобиль</h3>
+                  <h3 className="font-semibold text-slate-900">Текущие автомобили</h3>
                   <dl className="mt-3 space-y-3 text-sm">
-                    <div>
-                      <dt className="text-xs text-slate-500">Автомобиль</dt>
-                      <dd className="break-words font-medium">
-                        {[
-                          detailCard.currentCarBrand || detailCard.currentCar,
-                          detailCard.currentCarModel,
-                          detailCard.currentCarYear,
-                        ].filter(Boolean).join(" ") || "Не указан"}
-                      </dd>
-                    </div>
-                    {detailCard.currentCarMileage != null && (
-                      <div><dt className="text-xs text-slate-500">Пробег</dt><dd className="font-medium">{detailCard.currentCarMileage.toLocaleString("ru-RU")} км</dd></div>
-                    )}
-                    {detailCard.currentCarGeneration && (
-                      <div><dt className="text-xs text-slate-500">Поколение</dt><dd className="font-medium">{detailCard.currentCarGeneration}</dd></div>
-                    )}
-                    {detailCard.currentCarBodyType && (
-                      <div><dt className="text-xs text-slate-500">Тип кузова</dt><dd className="font-medium">{detailCard.currentCarBodyType}</dd></div>
-                    )}
-                    {detailCard.currentCarOwnersCount && (
-                      <div><dt className="text-xs text-slate-500">Количество владельцев</dt><dd className="font-medium">{formatOwnersCount(detailCard.currentCarOwnersCount)}</dd></div>
-                    )}
-                    {detailCard.currentCarSnapshot?.vin && (
-                      <div>
-                        <dt className="text-xs text-slate-500">VIN из базы</dt>
-                        <dd className="break-all font-mono text-xs">{detailCard.currentCarSnapshot.vin}</dd>
+                    {detailCurrentCars.length === 0 ? (
+                      <p className="text-sm text-slate-500">Не указаны</p>
+                    ) : detailCurrentCars.map((car, index) => (
+                      <div key={`${car.brand}-${car.model}-${index}`} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                        <dt className="text-xs text-slate-500">Автомобиль {index + 1}</dt>
+                        <dd className="break-words font-medium">{[car.brand || detailCard.currentCar, car.model, car.year].filter(Boolean).join(" ")}</dd>
+                        <dd className="mt-1 text-xs text-slate-500">
+                          {[
+                            car.mileage != null ? `${car.mileage.toLocaleString("ru-RU")} км` : "",
+                            car.generation,
+                            car.bodyType,
+                            car.ownersCount ? formatOwnersCount(car.ownersCount) : "",
+                            car.tradeInPlan ? `Трейд-ин: ${car.tradeInPlan}` : "Трейд-ин: не указано",
+                          ].filter(Boolean).join(" · ")}
+                        </dd>
+                        {car.snapshot?.vin && (
+                          <dd className="mt-1 break-all font-mono text-xs text-slate-500">VIN из базы: {car.snapshot.vin}</dd>
+                        )}
                       </div>
-                    )}
-                    <div><dt className="text-xs text-slate-500">Трейд-ин</dt><dd className="font-medium">{detailCard.tradeInPlan || "Не указано"}</dd></div>
+                    ))}
                   </dl>
                 </section>
                 <section className="rounded-xl border border-slate-200 p-4">
