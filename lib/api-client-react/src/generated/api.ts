@@ -1253,9 +1253,9 @@ export const getUpdateOneCClientCardMetadataUrl = (id: number,) => {
 }
 
 /**
- * Stores the latest dealership manager and worksheet status received from 1C. Omitted fields remain unchanged; explicit null or an empty string clears a field.
+ * Stores the latest dealership manager, worksheet status, and archive reason received from 1C. worksheet_status must be one of: Создан, В работе, Проверка перед закрытием, Архив, Завершен. When worksheet_status is Архив, archive_reason is required and must contain the refusal reason. Omitted fields remain unchanged; explicit null or an empty string clears a field.
 
- * @summary Send dealership manager and worksheet status from 1C
+ * @summary Send dealership manager, worksheet status, and archive reason from 1C
  */
 export const updateOneCClientCardMetadata = async (id: number,
     oneCClientCardMetadataUpdate: OneCClientCardMetadataUpdate, options?: RequestInit): Promise<OneCClientCardMetadataUpdateResponse> => {
@@ -1305,7 +1305,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateOneCClientCardMetadataMutationError = ErrorType<OneCClientCardsErrorResponse>
 
     /**
- * @summary Send dealership manager and worksheet status from 1C
+ * @summary Send dealership manager, worksheet status, and archive reason from 1C
  */
 export const useUpdateOneCClientCardMetadata = <TError = ErrorType<OneCClientCardsErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOneCClientCardMetadata>>, TError,{id: number;data: BodyType<OneCClientCardMetadataUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
