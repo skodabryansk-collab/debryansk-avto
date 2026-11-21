@@ -558,6 +558,12 @@ export interface ManagerClientCard {
   paymentMethod: string | null;
   /** @nullable */
   comment: string | null;
+  /** @nullable */
+  onecDealerManager: string | null;
+  /** @nullable */
+  onecWorksheetStatus: string | null;
+  /** @nullable */
+  onecUpdatedAt: string | null;
   createdAt: string;
   updatedAt: string;
   editHistory?: ManagerClientCardEditHistoryEntry[];
@@ -1142,6 +1148,33 @@ export interface OneCClientCardsErrorResponse {
   /** @nullable */
   card_id?: number | null;
   missing_fields?: string[];
+}
+
+export interface OneCClientCardMetadataUpdate {
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  dealer_manager?: string | null;
+  /**
+     * @maxLength 160
+     * @nullable
+     */
+  worksheet_status?: string | null;
+}
+
+export type OneCClientCardMetadataUpdateResponseData = {
+  worksheet_id: number;
+  /** @nullable */
+  dealer_manager: string | null;
+  /** @nullable */
+  worksheet_status: string | null;
+  received_at: string;
+};
+
+export interface OneCClientCardMetadataUpdateResponse {
+  ok: boolean;
+  data: OneCClientCardMetadataUpdateResponseData;
 }
 
 export interface HealthStatus {
