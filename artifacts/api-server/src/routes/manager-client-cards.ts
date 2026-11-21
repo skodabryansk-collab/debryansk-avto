@@ -456,6 +456,9 @@ const cardProjection = {
   commercialCarSnapshot: managerClientCardsTable.commercialCarSnapshot,
   paymentMethod: managerClientCardsTable.paymentMethod,
   comment: managerClientCardsTable.comment,
+  onecDealerManager: managerClientCardsTable.onecDealerManager,
+  onecWorksheetStatus: managerClientCardsTable.onecWorksheetStatus,
+  onecUpdatedAt: managerClientCardsTable.onecUpdatedAt,
   createdAt: managerClientCardsTable.createdAt,
   updatedAt: managerClientCardsTable.updatedAt,
 };
