@@ -55,6 +55,8 @@ import type {
   OneCAdminStatus,
   OneCClientCardChangesInitialCursorResponse,
   OneCClientCardChangesResponse,
+  OneCClientCardMetadataUpdate,
+  OneCClientCardMetadataUpdateResponse,
   OneCClientCardsErrorResponse,
   OneCClientCardsInitialCursorResponse,
   OneCClientCardsResponse,
@@ -1241,6 +1243,80 @@ export function useGetOneCClientCards<TData = Awaited<ReturnType<typeof getOneCC
 
 
 
+
+export const getUpdateOneCClientCardMetadataUrl = (id: number,) => {
+
+
+
+
+  return `/api/integrations/1c/v1/client-cards/${id}/onec-data`
+}
+
+/**
+ * Stores the latest dealership manager and worksheet status received from 1C. Omitted fields remain unchanged; explicit null or an empty string clears a field.
+
+ * @summary Send dealership manager and worksheet status from 1C
+ */
+export const updateOneCClientCardMetadata = async (id: number,
+    oneCClientCardMetadataUpdate: OneCClientCardMetadataUpdate, options?: RequestInit): Promise<OneCClientCardMetadataUpdateResponse> => {
+
+  return customFetch<OneCClientCardMetadataUpdateResponse>(getUpdateOneCClientCardMetadataUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      oneCClientCardMetadataUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateOneCClientCardMetadataMutationOptions = <TError = ErrorType<OneCClientCardsErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOneCClientCardMetadata>>, TError,{id: number;data: BodyType<OneCClientCardMetadataUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateOneCClientCardMetadata>>, TError,{id: number;data: BodyType<OneCClientCardMetadataUpdate>}, TContext> => {
+
+const mutationKey = ['updateOneCClientCardMetadata'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOneCClientCardMetadata>>, {id: number;data: BodyType<OneCClientCardMetadataUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateOneCClientCardMetadata(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateOneCClientCardMetadataMutationResult = NonNullable<Awaited<ReturnType<typeof updateOneCClientCardMetadata>>>
+    export type UpdateOneCClientCardMetadataMutationBody = BodyType<OneCClientCardMetadataUpdate>
+    export type UpdateOneCClientCardMetadataMutationError = ErrorType<OneCClientCardsErrorResponse>
+
+    /**
+ * @summary Send dealership manager and worksheet status from 1C
+ */
+export const useUpdateOneCClientCardMetadata = <TError = ErrorType<OneCClientCardsErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOneCClientCardMetadata>>, TError,{id: number;data: BodyType<OneCClientCardMetadataUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateOneCClientCardMetadata>>,
+        TError,
+        {id: number;data: BodyType<OneCClientCardMetadataUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateOneCClientCardMetadataMutationOptions(options));
+    }
 
 export const getGetOneCClientCardsInitialCursorUrl = () => {
 
