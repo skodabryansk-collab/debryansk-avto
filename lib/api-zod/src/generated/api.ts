@@ -769,6 +769,7 @@ export const ListManagerClientCardsResponse = zod.object({
   "comment": zod.string().nullable(),
   "onecDealerManager": zod.string().nullable(),
   "onecWorksheetStatus": zod.string().nullable(),
+  "onecArchiveReason": zod.string().nullable(),
   "onecUpdatedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -1043,9 +1044,9 @@ export const GetOneCClientCardsResponse = zod.object({
 
 
 /**
- * Stores the latest dealership manager and worksheet status received from 1C. Omitted fields remain unchanged; explicit null or an empty string clears a field.
+ * Stores the latest dealership manager, worksheet status, and archive reason received from 1C. worksheet_status must be one of: Создан, В работе, Проверка перед закрытием, Архив, Завершен. When worksheet_status is Архив, archive_reason is required and must contain the refusal reason. Omitted fields remain unchanged; explicit null or an empty string clears a field.
 
- * @summary Send dealership manager and worksheet status from 1C
+ * @summary Send dealership manager, worksheet status, and archive reason from 1C
  */
 
 
@@ -1056,13 +1057,14 @@ export const UpdateOneCClientCardMetadataParams = zod.object({
 
 export const updateOneCClientCardMetadataBodyDealerManagerMax = 160;
 
-export const updateOneCClientCardMetadataBodyWorksheetStatusMax = 160;
+export const updateOneCClientCardMetadataBodyArchiveReasonMax = 1000;
 
 
 
 export const UpdateOneCClientCardMetadataBody = zod.object({
   "dealer_manager": zod.string().max(updateOneCClientCardMetadataBodyDealerManagerMax).nullish(),
-  "worksheet_status": zod.string().max(updateOneCClientCardMetadataBodyWorksheetStatusMax).nullish()
+  "worksheet_status": zod.union([zod.literal('Создан'),zod.literal('В работе'),zod.literal('Проверка перед закрытием'),zod.literal('Архив'),zod.literal('Завершен'),zod.literal(null)]).nullish(),
+  "archive_reason": zod.string().max(updateOneCClientCardMetadataBodyArchiveReasonMax).nullish()
 })
 
 export const UpdateOneCClientCardMetadataResponse = zod.object({
@@ -1071,6 +1073,7 @@ export const UpdateOneCClientCardMetadataResponse = zod.object({
   "worksheet_id": zod.number(),
   "dealer_manager": zod.string().nullable(),
   "worksheet_status": zod.string().nullable(),
+  "archive_reason": zod.string().nullable(),
   "received_at": zod.coerce.date()
 })
 })
@@ -1602,6 +1605,7 @@ export const GetManagerClientCardResponse = zod.object({
   "comment": zod.string().nullable(),
   "onecDealerManager": zod.string().nullable(),
   "onecWorksheetStatus": zod.string().nullable(),
+  "onecArchiveReason": zod.string().nullable(),
   "onecUpdatedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
