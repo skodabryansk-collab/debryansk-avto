@@ -458,6 +458,7 @@ const cardProjection = {
   comment: managerClientCardsTable.comment,
   onecDealerManager: managerClientCardsTable.onecDealerManager,
   onecWorksheetStatus: managerClientCardsTable.onecWorksheetStatus,
+  onecArchiveReason: managerClientCardsTable.onecArchiveReason,
   onecUpdatedAt: managerClientCardsTable.onecUpdatedAt,
   createdAt: managerClientCardsTable.createdAt,
   updatedAt: managerClientCardsTable.updatedAt,
