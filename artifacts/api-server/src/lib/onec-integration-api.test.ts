@@ -17,6 +17,7 @@ import oneCIntegrationRouter from "../routes/onec-integration";
 
 async function startServer(): Promise<{ server: Server; baseUrl: string }> {
   const app = express();
+  app.use(express.json());
   app.use("/api/integrations/1c/v1", oneCIntegrationRouter);
   const server = app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve, reject) => {
@@ -64,6 +65,15 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
       headers: { Authorization: "Bearer wrong-token" },
     });
     assert.equal(unauthorized.status, 401);
+    const unauthorizedMetadata = await fetch(`${started.baseUrl}/api/integrations/1c/v1/client-cards/1/onec-data`, {
+      method: "PATCH",
+      headers: {
+        Authorization: "Bearer wrong-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ dealer_manager: "Не должно сохраниться" }),
+    });
+    assert.equal(unauthorizedMetadata.status, 401);
 
     const cursorResponse = await fetch(`${started.baseUrl}/api/integrations/1c/v1/client-cards/initial-cursor`, {
       headers: { Authorization: "Bearer test-only-onec-token" },
@@ -147,6 +157,83 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
     const cards = await db.insert(managerClientCardsTable).values(cardInsert).returning({ id: managerClientCardsTable.id });
     cardId = cards[0]?.id;
     assert.ok(cardId);
+
+    const metadataResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v1/client-cards/${cardId}/onec-data`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: "Bearer test-only-onec-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dealer_manager: "  Иванов Иван  ",
+          worksheet_status: "  В работе  ",
+        }),
+      },
+    );
+    assert.equal(metadataResponse.status, 200);
+    const metadataBody = await metadataResponse.json() as {
+      ok: boolean;
+      data: {
+        worksheet_id: number;
+        dealer_manager: string | null;
+        worksheet_status: string | null;
+        received_at: string;
+      };
+    };
+    assert.equal(metadataBody.ok, true);
+    assert.equal(metadataBody.data.worksheet_id, cardId);
+    assert.equal(metadataBody.data.dealer_manager, "Иванов Иван");
+    assert.equal(metadataBody.data.worksheet_status, "В работе");
+    assert.ok(Number.isFinite(Date.parse(metadataBody.data.received_at)));
+
+    const partialMetadataResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v1/client-cards/${cardId}/onec-data`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: "Bearer test-only-onec-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ worksheet_status: "Сделка оформлена" }),
+      },
+    );
+    assert.equal(partialMetadataResponse.status, 200);
+    const [updatedMetadataCard] = await db.select({
+      dealerManager: managerClientCardsTable.onecDealerManager,
+      worksheetStatus: managerClientCardsTable.onecWorksheetStatus,
+      updatedAt: managerClientCardsTable.onecUpdatedAt,
+    }).from(managerClientCardsTable).where(eq(managerClientCardsTable.id, cardId)).limit(1);
+    assert.equal(updatedMetadataCard?.dealerManager, "Иванов Иван");
+    assert.equal(updatedMetadataCard?.worksheetStatus, "Сделка оформлена");
+    assert.ok(updatedMetadataCard?.updatedAt instanceof Date);
+
+    const emptyMetadataResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v1/client-cards/${cardId}/onec-data`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: "Bearer test-only-onec-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+      },
+    );
+    assert.equal(emptyMetadataResponse.status, 400);
+
+    const missingCardMetadataResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v1/client-cards/999999999/onec-data`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: "Bearer test-only-onec-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ worksheet_status: "Не найден" }),
+      },
+    );
+    assert.equal(missingCardMetadataResponse.status, 404);
 
     const blocked = await fetch(
       `${started.baseUrl}/api/integrations/1c/v1/client-cards?after_id=${initialCursor}&limit=10`,
