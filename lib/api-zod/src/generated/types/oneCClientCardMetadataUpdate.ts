@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { OneCClientCardMetadataUpdateWorksheetStatus } from './oneCClientCardMetadataUpdateWorksheetStatus';
 
 export interface OneCClientCardMetadataUpdate {
   /**
@@ -12,9 +13,11 @@ export interface OneCClientCardMetadataUpdate {
      * @nullable
      */
   dealer_manager?: string | null;
+  /** @nullable */
+  worksheet_status?: OneCClientCardMetadataUpdateWorksheetStatus;
   /**
-     * @maxLength 160
+     * @maxLength 1000
      * @nullable
      */
-  worksheet_status?: string | null;
+  archive_reason?: string | null;
 }
