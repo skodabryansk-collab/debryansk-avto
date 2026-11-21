@@ -6,6 +6,7 @@ import {
   ArrowRight,
   CarFront,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -579,7 +580,7 @@ function SearchSuggestionField({
         <div
           id={listId}
           role="listbox"
-          className="relative z-40 mt-1 max-h-40 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg sm:absolute sm:left-0 sm:right-0 sm:top-full sm:mt-1 sm:max-h-60 sm:w-auto"
+          className="relative z-40 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
         >
           {loading ? (
             <p className="px-3 py-2 text-sm text-slate-500">Загружаем варианты…</p>
@@ -594,7 +595,7 @@ function SearchSuggestionField({
                 onPointerDown={event => event.preventDefault()}
                 onMouseMove={() => setActiveIndex(index)}
                 onClick={() => choose(option)}
-                className={`block w-full rounded-md px-3 py-2 text-left text-sm ${
+                className={`block min-h-11 w-full rounded-md px-3 py-2 text-left text-sm ${
                   index === activeIndex ? "bg-sky-50 text-[#005a94]" : "text-slate-700 hover:bg-slate-50"
                 }`}
               >
@@ -645,7 +646,7 @@ function NeedEditor({
     <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-semibold text-slate-900">Потребность {index + 1}</h3>
-        <Button variant="ghost" size="sm" onClick={onRemove} disabled={!canRemove} aria-label={`Удалить потребность ${index + 1}`}>
+        <Button variant="ghost" size="sm" onClick={onRemove} disabled={!canRemove} aria-label={`Удалить потребность ${index + 1}`} className="min-h-11">
           <Trash2 className="mr-2 h-4 w-4" />
           Удалить
         </Button>
@@ -705,7 +706,7 @@ function NeedEditor({
           className="h-11"
         />
       </div>
-      <label className="flex min-h-10 items-center gap-2 text-sm text-slate-700">
+      <label className="flex min-h-11 items-center gap-2 text-sm text-slate-700">
         <input
           type="checkbox"
           checked={need.undecided}
@@ -818,7 +819,7 @@ function CurrentCarEditor({
     <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-semibold text-slate-900">Текущий автомобиль {index + 1}</h3>
-        <Button variant="ghost" size="sm" onClick={onRemove} aria-label={`Удалить текущий автомобиль ${index + 1}`}>
+        <Button variant="ghost" size="sm" onClick={onRemove} aria-label={`Удалить текущий автомобиль ${index + 1}`} className="min-h-11">
           <Trash2 className="mr-2 h-4 w-4" />
           Удалить
         </Button>
@@ -1351,9 +1352,9 @@ export default function ManagerClientCardsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f2f5f8]">
+    <div className="min-h-[100dvh] bg-[#f2f5f8]">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <svg viewBox="0 0 200 33" className="h-6 w-6 shrink-0 text-[#0070b8]" fill="currentColor" aria-hidden="true">
               <path d="M33.7,15.9C33.4,6.8,25.7-.3,16.6,0,7.5.3.3,8.1,0,17.2c.1,2.7.8,5.2,2.1,7.4l2.7-4.2c-.33-1.04-.52-2.14-.56-3.29-.23-6.72,5.04-12.35,11.76-12.58,6.72-.23,12.35,5.04,12.58,11.76.23,6.72-5.04,12.35-11.76,12.58-1.35.05-2.64-.14-3.86-.5l.05-.05,6.41-17.46-.73.02s-11.61,18.14-11.77,18.66c0,0,.63.65,1.23,1.11.62.47,1.43.92,1.43.92,2.23,1.02,4.72,1.55,7.34,1.46,9.02-.3,16.09-7.85,15.79-16.88Z" />
@@ -1379,7 +1380,7 @@ export default function ManagerClientCardsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl space-y-5 px-3 py-5 sm:px-6 sm:py-7">
+      <main className="mx-auto max-w-5xl space-y-5 px-3 py-5 sm:px-6 sm:py-7">
         {mode === "list" ? (
           <>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -1633,7 +1634,7 @@ export default function ManagerClientCardsPage() {
                   />
                 ))}
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
+              <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-3 xl:grid-cols-5">
                 {steps.map((item, index) => (
                   <button
                     key={item.short}
@@ -1644,7 +1645,7 @@ export default function ManagerClientCardsPage() {
                     }}
                     disabled={saveMutation.isPending}
                     aria-current={index === step ? "step" : undefined}
-                    className={`min-h-9 rounded-md border px-2 text-left transition ${
+                    className={`min-h-11 rounded-lg border px-3 text-left transition ${
                       stepErrors[index].length
                         ? "border-red-200 bg-red-50 font-semibold text-red-700"
                         : index === step
@@ -1668,7 +1669,7 @@ export default function ManagerClientCardsPage() {
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-5 p-4 sm:p-6">
+            <CardContent className="space-y-5 p-4 sm:p-6 md:p-7">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">{steps[step]?.title}</h2>
                 <p className="mt-1 text-sm text-slate-500">
@@ -1773,6 +1774,7 @@ export default function ManagerClientCardsPage() {
                   <Button
                     type="button"
                     variant="outline"
+                    className="min-h-11"
                     onClick={() => {
                       setForm(previous => ({
                         ...previous,
@@ -1829,6 +1831,7 @@ export default function ManagerClientCardsPage() {
                   <Button
                     type="button"
                     variant="outline"
+                    className="min-h-11"
                     onClick={() => {
                       setForm(previous => ({
                         ...previous,
@@ -2056,6 +2059,7 @@ export default function ManagerClientCardsPage() {
               <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <Button
                   variant="outline"
+                  className="min-h-11"
                   onClick={() => {
                     setFormError("");
                     setStep(current => Math.max(current - 1, 0));
@@ -2067,17 +2071,17 @@ export default function ManagerClientCardsPage() {
                 </Button>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   {(step === 2 || step === 3) && (
-                    <Button variant="ghost" onClick={skipOptionalStep} disabled={saveMutation.isPending}>
+                    <Button variant="ghost" className="min-h-11" onClick={skipOptionalStep} disabled={saveMutation.isPending}>
                       Пропустить
                     </Button>
                   )}
                   {step < steps.length - 1 ? (
-                    <Button onClick={goNext} className="bg-[#0070b8] hover:bg-[#005a94]">
+                    <Button onClick={goNext} className="min-h-11 bg-[#0070b8] hover:bg-[#005a94]">
                       Далее
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                   ) : (
-                    <Button onClick={saveCard} disabled={saveMutation.isPending} className="bg-[#0070b8] hover:bg-[#005a94]">
+                    <Button onClick={saveCard} disabled={saveMutation.isPending} className="min-h-11 bg-[#0070b8] hover:bg-[#005a94]">
                       {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
                       {editingCardId ? "Сохранить изменения" : "Сохранить рабочий лист"}
                     </Button>
@@ -2089,150 +2093,235 @@ export default function ManagerClientCardsPage() {
         )}
       </main>
       <Dialog open={Boolean(selectedCard)} onOpenChange={open => { if (!open) setSelectedCard(null); }}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogContent
+          className="flex max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:rounded-2xl [&>button:last-child]:right-3 [&>button:last-child]:top-3 [&>button:last-child]:grid [&>button:last-child]:h-11 [&>button:last-child]:w-11 [&>button:last-child]:place-items-center [&>button:last-child]:rounded-lg [&>button:last-child]:bg-slate-50 [&>button:last-child]:opacity-100"
+        >
           {selectedCard && detailCard && (
             <>
-              <div className="flex flex-col gap-3 pr-7 sm:flex-row sm:items-start sm:justify-between sm:pr-8">
-                <DialogHeader className="min-w-0">
-                  <DialogTitle className="break-words">Рабочий лист №{detailCard.id}</DialogTitle>
-                  <DialogDescription>
-                    Создан {formatDate(detailCard.createdAt)}
-                    {detailCard.managerName ? ` · ${detailCard.managerName}` : ""}
-                    {new Date(detailCard.updatedAt).getTime() > new Date(detailCard.createdAt).getTime()
-                      ? ` · Обновлён ${formatDate(detailCard.updatedAt)}`
-                      : ""}
-                  </DialogDescription>
-                </DialogHeader>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="shrink-0"
-                  data-testid={`button-edit-client-card-${detailCard.id}`}
-                  onClick={() => startEditCard(detailCard)}
-                >
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Редактировать
-                </Button>
+              <div className="shrink-0 border-b border-slate-200 px-4 py-4 sm:px-6 md:px-7">
+                <div className="flex flex-col gap-3 pr-11 sm:flex-row sm:items-center sm:justify-between">
+                  <DialogHeader className="min-w-0 flex-1">
+                    <DialogTitle className="break-words text-lg sm:text-xl">
+                      Рабочий лист №{detailCard.id}
+                    </DialogTitle>
+                    <DialogDescription className="flex flex-wrap gap-x-2 gap-y-1">
+                      <span>Создан {formatDate(detailCard.createdAt)}</span>
+                      {detailCard.managerName && <span>{detailCard.managerName}</span>}
+                      {new Date(detailCard.updatedAt).getTime() > new Date(detailCard.createdAt).getTime() && (
+                        <span>Обновлён {formatDate(detailCard.updatedAt)}</span>
+                      )}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-11 w-full shrink-0 sm:w-auto"
+                    data-testid={`button-edit-client-card-${detailCard.id}`}
+                    onClick={() => startEditCard(detailCard)}
+                  >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Редактировать
+                  </Button>
+                </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <section className="rounded-xl border border-slate-200 p-4">
-                  <h3 className="font-semibold text-slate-900">Клиент</h3>
-                  <dl className="mt-3 space-y-3 text-sm">
-                    <div><dt className="text-xs text-slate-500">ФИО</dt><dd className="break-words font-medium">{detailCard.clientName}</dd></div>
-                    <div><dt className="text-xs text-slate-500">Телефон</dt><dd className="font-medium">{detailCard.clientPhone}</dd></div>
-                    {detailCard.clientGender && (
-                      <div><dt className="text-xs text-slate-500">Пол</dt><dd className="font-medium">{detailCard.clientGender === "male" ? "Мужской" : "Женский"}</dd></div>
-                    )}
-                  </dl>
-                </section>
-                <section className="rounded-xl border border-slate-200 p-4">
-                  <h3 className="font-semibold text-slate-900">Потребности</h3>
-                  <dl className="mt-3 space-y-3 text-sm">
-                    {detailNeeds.map((need, index) => (
-                      <div key={`${need.brand ?? "undecided"}-${need.model ?? index}-${index}`}>
-                        <dt className="text-xs text-slate-500">Потребность {index + 1}</dt>
-                        <dd className="break-words font-medium">
-                          {[need.brand, need.model].filter(Boolean).join(" ") ||
-                            (need.undecided ? "Пока не определился" : "Не указана")}
-                        </dd>
-                        <dd className="mt-1 text-xs text-slate-500">Бюджет: {need.budgetRange || "Не указан"}</dd>
-                        <dd className="mt-1 text-xs text-slate-500">Планируемая покупка: {formatDateOnly(need.plannedPurchaseDate)}</dd>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 md:px-7">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                    <h3 className="font-semibold text-slate-900">Клиент</h3>
+                    <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <div className="min-w-0 sm:col-span-2">
+                        <dt className="text-xs font-medium text-slate-500">ФИО</dt>
+                        <dd className="mt-1 break-words text-base font-semibold text-slate-900">{detailCard.clientName}</dd>
                       </div>
-                    ))}
-                  </dl>
-                </section>
-                <section className="rounded-xl border border-slate-200 p-4">
-                  <h3 className="font-semibold text-slate-900">Текущие автомобили</h3>
-                  <dl className="mt-3 space-y-3 text-sm">
-                    {detailCurrentCars.length === 0 ? (
-                      <p className="text-sm text-slate-500">Не указаны</p>
-                    ) : detailCurrentCars.map((car, index) => (
-                      <div key={`${car.brand}-${car.model}-${index}`} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                        <dt className="text-xs text-slate-500">Автомобиль {index + 1}</dt>
-                        <dd className="break-words font-medium">{[car.brand || detailCard.currentCar, car.model, car.year].filter(Boolean).join(" ")}</dd>
-                        <dd className="mt-1 text-xs text-slate-500">
-                          {[
-                            car.mileage != null ? `${car.mileage.toLocaleString("ru-RU")} км` : "",
-                            car.generation,
-                            car.bodyType,
-                            car.ownersCount ? formatOwnersCount(car.ownersCount) : "",
-                            car.tradeInPlan ? `Трейд-ин: ${car.tradeInPlan}` : "Трейд-ин: не указано",
-                          ].filter(Boolean).join(" · ")}
-                        </dd>
-                        {car.snapshot?.vin && (
-                          <dd className="mt-1 break-all font-mono text-xs text-slate-500">VIN из базы: {car.snapshot.vin}</dd>
-                        )}
+                      <div className="min-w-0">
+                        <dt className="text-xs font-medium text-slate-500">Телефон</dt>
+                        <dd className="mt-1 break-words font-medium tabular-nums text-slate-900">{detailCard.clientPhone}</dd>
                       </div>
-                    ))}
-                  </dl>
-                </section>
-                <section className="rounded-xl border border-slate-200 p-4">
-                  <h3 className="font-semibold text-slate-900">Предложение</h3>
-                  <dl className="mt-3 space-y-3 text-sm">
-                    <div>
-                      <dt className="text-xs text-slate-500">Марка и модель</dt>
-                      <dd className="break-words font-medium">
-                        {[detailCard.commercialBrand || detailCard.commercialCarSnapshot?.brand,
-                          detailCard.commercialModel || detailCard.commercialCarSnapshot?.model,
-                          detailCard.commercialCarSnapshot?.year].filter(Boolean).join(" ") || "Не выбрано"}
-                      </dd>
-                    </div>
-                    {detailCard.commercialCarSnapshot?.price != null && (
-                      <div><dt className="text-xs text-slate-500">Цена автомобиля из базы</dt><dd className="font-semibold text-[#0070b8]">{rub(detailCard.commercialCarSnapshot.price)}</dd></div>
-                    )}
-                    {detailCard.commercialCarSnapshot?.vin && (
-                      <div><dt className="text-xs text-slate-500">VIN автомобиля из базы</dt><dd className="break-all font-mono text-xs">{detailCard.commercialCarSnapshot.vin}</dd></div>
-                    )}
-                    <div><dt className="text-xs text-slate-500">Способ оплаты</dt><dd className="font-medium">{detailCard.paymentMethod || "Не указан"}</dd></div>
-                  </dl>
-                </section>
-                {detailCard.comment && (
-                  <section className="rounded-xl border border-slate-200 p-4 sm:col-span-2">
-                    <h3 className="font-semibold text-slate-900">Комментарий менеджера</h3>
-                    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-700">{detailCard.comment}</p>
+                      <div className="min-w-0">
+                        <dt className="text-xs font-medium text-slate-500">Пол</dt>
+                        <dd className="mt-1 font-medium text-slate-900">
+                          {detailCard.clientGender === "male" ? "Мужской" : detailCard.clientGender === "female" ? "Женский" : "Не указан"}
+                        </dd>
+                      </div>
+                    </dl>
                   </section>
-                )}
-                <section className="rounded-xl border border-slate-200 p-4 sm:col-span-2" data-testid={`section-client-card-history-${detailCard.id}`}>
-                  <h3 className="flex items-center gap-2 font-semibold text-slate-900">
-                    <History className="h-4 w-4 text-slate-500" />
-                    История изменений
-                  </h3>
-                  {detailCard.editHistory?.length ? (
-                    <ol className="mt-3 space-y-3">
-                      {detailCard.editHistory.map(entry => (
-                        <li
-                          key={entry.id}
-                          className="rounded-lg bg-slate-50 p-3"
-                          data-testid={`history-entry-${entry.id}`}
-                        >
-                          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                            <span className="text-sm font-medium text-slate-800">
-                              {entry.editorName}{entry.editorRole === "admin" ? " · администратор" : " · менеджер"}
-                            </span>
-                            <time className="text-xs text-slate-500">{formatDate(entry.createdAt)}</time>
-                          </div>
-                          <ul className="mt-2 space-y-2">
-                            {entry.changes.map((change, index) => (
-                              <li key={`${entry.id}-${change.field}-${index}`} className="text-sm">
-                                <span className="font-medium text-slate-700">{auditFieldLabel(change.field)}</span>
-                                <div className="mt-0.5 grid gap-1 text-xs text-slate-600 sm:grid-cols-2">
-                                  <span className="whitespace-pre-wrap break-words rounded bg-white px-2 py-1">
-                                    Было: {formatAuditValue(change.field, change.oldValue)}
-                                  </span>
-                                  <span className="whitespace-pre-wrap break-words rounded bg-white px-2 py-1">
-                                    Стало: {formatAuditValue(change.field, change.newValue)}
-                                  </span>
+
+                  <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="font-semibold text-slate-900">Потребности</h3>
+                      <Badge variant="secondary">{detailNeeds.length}</Badge>
+                    </div>
+                    {detailNeeds.length ? (
+                      <div className="mt-4 space-y-3">
+                        {detailNeeds.map((need, index) => (
+                          <article key={`${need.brand ?? "undecided"}-${need.model ?? index}-${index}`} className="min-w-0 rounded-lg bg-slate-50 p-3">
+                            <div className="flex min-w-0 items-start gap-3">
+                              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-xs font-semibold text-slate-600">
+                                {index + 1}
+                              </span>
+                              <p className="min-w-0 break-words font-semibold text-slate-900">
+                                {[need.brand, need.model].filter(Boolean).join(" ") ||
+                                  (need.undecided ? "Пока не определился" : "Не указана")}
+                              </p>
+                            </div>
+                            <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                              <div>
+                                <dt className="text-xs text-slate-500">Бюджет</dt>
+                                <dd className="mt-1 break-words text-sm font-medium text-slate-800">{need.budgetRange || "Не указан"}</dd>
+                              </div>
+                              <div>
+                                <dt className="text-xs text-slate-500">Планируемая покупка</dt>
+                                <dd className="mt-1 break-words text-sm font-medium text-slate-800">{formatDateOnly(need.plannedPurchaseDate)}</dd>
+                              </div>
+                            </dl>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-500">Потребности не указаны.</p>
+                    )}
+                  </section>
+
+                  <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="font-semibold text-slate-900">Текущие автомобили</h3>
+                      <Badge variant="secondary">{detailCurrentCars.length}</Badge>
+                    </div>
+                    {detailCurrentCars.length ? (
+                      <div className="mt-4 space-y-3">
+                        {detailCurrentCars.map((car, index) => (
+                          <article key={`${car.brand}-${car.model}-${index}`} className="min-w-0 rounded-lg bg-slate-50 p-3">
+                            <p className="break-words font-semibold text-slate-900">
+                              {[car.brand || detailCard.currentCar, car.model, car.year].filter(Boolean).join(" ") || `Автомобиль ${index + 1}`}
+                            </p>
+                            <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                              <div>
+                                <dt className="text-xs text-slate-500">Пробег</dt>
+                                <dd className="mt-1 text-sm font-medium text-slate-800">
+                                  {car.mileage != null ? `${car.mileage.toLocaleString("ru-RU")} км` : "Не указан"}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="text-xs text-slate-500">Трейд-ин</dt>
+                                <dd className="mt-1 text-sm font-medium text-slate-800">{car.tradeInPlan || "Не указано"}</dd>
+                              </div>
+                              {(car.generation || car.bodyType || car.ownersCount) && (
+                                <div className="sm:col-span-2">
+                                  <dt className="text-xs text-slate-500">Дополнительные данные</dt>
+                                  <dd className="mt-1 break-words text-sm text-slate-700">
+                                    {[
+                                      car.generation,
+                                      car.bodyType,
+                                      car.ownersCount ? formatOwnersCount(car.ownersCount) : "",
+                                    ].filter(Boolean).join(" · ")}
+                                  </dd>
                                 </div>
-                              </li>
-                            ))}
-                          </ul>
-                        </li>
-                      ))}
-                    </ol>
-                  ) : (
-                    <p className="mt-2 text-sm text-slate-500">Правок пока нет.</p>
+                              )}
+                              {car.snapshot?.vin && (
+                                <div className="min-w-0 sm:col-span-2">
+                                  <dt className="text-xs text-slate-500">VIN из базы</dt>
+                                  <dd className="mt-1 break-all font-mono text-xs text-slate-700">{car.snapshot.vin}</dd>
+                                </div>
+                              )}
+                            </dl>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-500">Текущие автомобили не указаны.</p>
+                    )}
+                  </section>
+
+                  <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                    <h3 className="font-semibold text-slate-900">Предложение</h3>
+                    <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <div className="min-w-0 sm:col-span-2">
+                        <dt className="text-xs font-medium text-slate-500">Автомобиль</dt>
+                        <dd className="mt-1 break-words font-semibold text-slate-900">
+                          {[detailCard.commercialBrand || detailCard.commercialCarSnapshot?.brand,
+                            detailCard.commercialModel || detailCard.commercialCarSnapshot?.model,
+                            detailCard.commercialCarSnapshot?.year].filter(Boolean).join(" ") || "Не выбран"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium text-slate-500">Цена</dt>
+                        <dd className="mt-1 font-semibold text-[#0070b8]">
+                          {detailCard.commercialCarSnapshot?.price != null ? rub(detailCard.commercialCarSnapshot.price) : "Не указана"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium text-slate-500">Способ оплаты</dt>
+                        <dd className="mt-1 break-words font-medium text-slate-900">{detailCard.paymentMethod || "Не указан"}</dd>
+                      </div>
+                      {detailCard.commercialCarSnapshot?.vin && (
+                        <div className="min-w-0 sm:col-span-2">
+                          <dt className="text-xs font-medium text-slate-500">VIN автомобиля из базы</dt>
+                          <dd className="mt-1 break-all font-mono text-xs text-slate-700">{detailCard.commercialCarSnapshot.vin}</dd>
+                        </div>
+                      )}
+                    </dl>
+                  </section>
+
+                  {detailCard.comment && (
+                    <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:col-span-2 sm:p-5">
+                      <h3 className="font-semibold text-slate-900">Комментарий менеджера</h3>
+                      <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{detailCard.comment}</p>
+                    </section>
                   )}
-                </section>
+
+                  <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:col-span-2 sm:p-5" data-testid={`section-client-card-history-${detailCard.id}`}>
+                    <div className="flex items-center gap-2">
+                      <History className="h-4 w-4 text-slate-500" />
+                      <h3 className="font-semibold text-slate-900">История изменений</h3>
+                      <Badge variant="secondary">{detailCard.editHistory?.length ?? 0}</Badge>
+                    </div>
+                    {detailCard.editHistory?.length ? (
+                      <ol className="mt-4 space-y-2">
+                        {detailCard.editHistory.map((entry, entryIndex) => (
+                          <li key={entry.id} data-testid={`history-entry-${entry.id}`}>
+                            <details open={entryIndex === 0} className="group rounded-lg border border-slate-200">
+                              <summary className="flex min-h-12 cursor-pointer list-none flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2">
+                                <span className="min-w-0 break-words text-sm font-medium text-slate-800">
+                                  {entry.editorName}{entry.editorRole === "admin" ? " · администратор" : " · менеджер"}
+                                </span>
+                                <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                                  <time>{formatDate(entry.createdAt)}</time>
+                                  <span>
+                                    {entry.changes.length} {entry.changes.length === 1 ? "изменение" : entry.changes.length < 5 ? "изменения" : "изменений"}
+                                  </span>
+                                  <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+                                </span>
+                              </summary>
+                              <ul className="space-y-3 border-t border-slate-100 px-3 py-3">
+                                {entry.changes.map((change, index) => (
+                                  <li key={`${entry.id}-${change.field}-${index}`} className="min-w-0 text-sm">
+                                    <p className="font-medium text-slate-700">{auditFieldLabel(change.field)}</p>
+                                    <div className="mt-2 grid gap-2 xl:grid-cols-2">
+                                      <div className="min-w-0 rounded-lg bg-slate-50 px-3 py-2">
+                                        <span className="block text-xs font-medium text-slate-500">Было</span>
+                                        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">
+                                          {formatAuditValue(change.field, change.oldValue)}
+                                        </p>
+                                      </div>
+                                      <div className="min-w-0 rounded-lg bg-sky-50/70 px-3 py-2">
+                                        <span className="block text-xs font-medium text-slate-500">Стало</span>
+                                        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">
+                                          {formatAuditValue(change.field, change.newValue)}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-500">Правок пока нет.</p>
+                    )}
+                  </section>
+                </div>
               </div>
             </>
           )}
