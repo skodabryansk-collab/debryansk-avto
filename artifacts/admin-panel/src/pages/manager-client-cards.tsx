@@ -65,6 +65,33 @@ const paymentOptions = ["Кредит", "Лизинг", "Наличные / Бе
 const tradeInOptions = ["Да", "Нет", "Пока не решил"] as const;
 const pageSize = 25;
 const offerResultsPageSize = 10;
+const onecWorksheetStatuses = {
+  Создан: {
+    description: "Получен из 1С, но ещё не взят менеджером в работу.",
+    className: "border-slate-200 bg-slate-100 text-slate-700",
+  },
+  "В работе": {
+    description: "Находится в работе у менеджера.",
+    className: "border-sky-200 bg-sky-50 text-sky-800",
+  },
+  "Проверка перед закрытием": {
+    description: "Проходит проверку перед архивированием рабочего листа.",
+    className: "border-amber-200 bg-amber-50 text-amber-800",
+  },
+  Архив: {
+    description: "Отказ от покупки.",
+    className: "border-rose-200 bg-rose-50 text-rose-800",
+  },
+  Завершен: {
+    description: "Продажа успешно завершена.",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  },
+} as const;
+
+function getOneCWorksheetStatus(status: string | null | undefined) {
+  if (!status || !Object.hasOwn(onecWorksheetStatuses, status)) return null;
+  return onecWorksheetStatuses[status as keyof typeof onecWorksheetStatuses];
+}
 
 type FormState = {
   clientName: string;
@@ -1674,6 +1701,7 @@ export default function ManagerClientCardsPage() {
                     card.commercialModel || offer?.model,
                     offer?.year,
                   ].filter(Boolean).join(" ");
+                  const onecStatus = getOneCWorksheetStatus(card.onecWorksheetStatus);
                   return (
                     <button
                       key={card.id}
@@ -1688,13 +1716,26 @@ export default function ManagerClientCardsPage() {
                             <span className="mt-0.5 block text-sm text-slate-600">{card.clientPhone}</span>
                           </span>
                           <span
-                            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-500"
-                            title="Статус передачи в 1С пока не отслеживается"
-                            aria-label="Статус передачи в 1С пока не отслеживается"
+                            className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${
+                              onecStatus?.className ?? "bg-slate-100 text-slate-500"
+                            }`}
+                            title={onecStatus
+                              ? `Статус в 1С: ${card.onecWorksheetStatus}. ${onecStatus.description}`
+                              : "Статус из 1С пока не передан"}
+                            aria-label={onecStatus
+                              ? `Статус рабочего листа в 1С: ${card.onecWorksheetStatus}`
+                              : "Статус из 1С пока не передан"}
                           >
                             <ArrowRightLeft className="h-4 w-4" aria-hidden="true" />
                           </span>
                         </span>
+                        {card.onecWorksheetStatus && (
+                          <span className="mt-2 block">
+                            <Badge className={`max-w-full whitespace-normal border text-left ${onecStatus?.className ?? "border-slate-200 bg-slate-100 text-slate-700"}`}>
+                              {card.onecWorksheetStatus}
+                            </Badge>
+                          </span>
+                        )}
                       </span>
                       <span className="min-w-0">
                         <span className="block text-[11px] font-medium uppercase tracking-wide text-slate-400">Интерес</span>
@@ -2474,10 +2515,27 @@ export default function ManagerClientCardsPage() {
                       </div>
                       <div className="min-w-0">
                         <dt className="text-xs font-medium text-slate-500">Статус рабочего листа в 1С</dt>
-                        <dd className="mt-1 break-words font-medium text-slate-900">
-                          {detailCard.onecWorksheetStatus || "Пока не передан"}
+                        <dd className="mt-1">
+                          {detailCard.onecWorksheetStatus ? (
+                            <>
+                              <Badge className={`border ${getOneCWorksheetStatus(detailCard.onecWorksheetStatus)?.className ?? "border-slate-200 bg-slate-100 text-slate-700"}`}>
+                                {detailCard.onecWorksheetStatus}
+                              </Badge>
+                              <p className="mt-1 break-words text-sm text-slate-600">
+                                {getOneCWorksheetStatus(detailCard.onecWorksheetStatus)?.description}
+                              </p>
+                            </>
+                          ) : (
+                            <span className="break-words font-medium text-slate-900">Пока не передан</span>
+                          )}
                         </dd>
                       </div>
+                      {detailCard.onecWorksheetStatus === "Архив" && detailCard.onecArchiveReason && (
+                        <div className="min-w-0 sm:col-span-2">
+                          <dt className="text-xs font-medium text-slate-500">Причина отказа из 1С</dt>
+                          <dd className="mt-1 break-words font-medium text-slate-900">{detailCard.onecArchiveReason}</dd>
+                        </div>
+                      )}
                     </dl>
                     <p className="mt-3 text-xs text-slate-500">
                       {detailCard.onecUpdatedAt
