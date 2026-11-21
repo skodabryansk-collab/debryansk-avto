@@ -56,3 +56,9 @@ The exact status values sent by 1C are `Создан`, `В работе`, `Пр�
 **Why:** the user confirmed this exact assignment after production showed four locations but the supplied organization list had three codes.
 
 **How to apply:** the same organization code may correctly serve more than one production location; preserve leading zeros and the Cyrillic prefix exactly.
+
+The production brand `С пробегом` is assigned to the `Супонево` location (location id 3) in the shared public `location_brands` directory. Its department code is `ЦБ000008`, and the location's organization code is `ЦБ000005`.
+
+**Why:** the user explicitly chose to make the used-car brand-to-location relationship visible on the public site as well as available to 1C routing.
+
+**How to apply:** keep this assignment in sync when reviewing public location listings and 1C organization routing; the brand must resolve to exactly one location.
