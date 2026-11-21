@@ -436,6 +436,64 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+  /integrations/1c/v1/client-cards/{id}/onec-data:
+    patch:
+      operationId: updateOneCClientCardMetadata
+      summary: Send dealership manager and worksheet status from 1C
+      description: >
+        Stores the latest dealership manager and worksheet status received from 1C.
+        Omitted fields remain unchanged; explicit null or an empty string clears a field.
+      security:
+        - oneCClientCardsToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Source worksheet ID returned by the client-card feed
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OneCClientCardMetadataUpdate"
+      responses:
+        "200":
+          description: 1C data stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardMetadataUpdateResponse"
+        "400":
+          description: Invalid worksheet ID or update payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "401":
+          description: Missing or invalid dedicated 1C token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "404":
+          description: Worksheet not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "503":
+          description: The 1C token is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "500":
+          description: Failed to save data received from 1C
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
   /integrations/1c/v1/client-cards/initial-cursor:
     get:
       operationId: getOneCClientCardsInitialCursor
@@ -1382,7 +1440,7 @@ components:
         tradeInPlan: { type: ["string", "null"], enum: ["Да", "Нет", "Пока не решил", null] }
     ManagerClientCard:
       type: object
-      required: [id, managerId, managerName, clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarBrand, currentCarModel, currentCarYear, currentCarMileage, currentCarGeneration, currentCarBodyType, currentCarOwnersCount, currentCarSnapshot, tradeInPlan, needs, currentCars, commercialBrand, commercialModel, commercialCarId, commercialCarSnapshot, paymentMethod, comment, createdAt, updatedAt]
+      required: [id, managerId, managerName, clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarBrand, currentCarModel, currentCarYear, currentCarMileage, currentCarGeneration, currentCarBodyType, currentCarOwnersCount, currentCarSnapshot, tradeInPlan, needs, currentCars, commercialBrand, commercialModel, commercialCarId, commercialCarSnapshot, paymentMethod, comment, onecDealerManager, onecWorksheetStatus, onecUpdatedAt, createdAt, updatedAt]
       properties:
         id: { type: integer }
         managerId: { type: integer }
@@ -1422,6 +1480,9 @@ components:
             - type: "null"
         paymentMethod: { type: ["string", "null"] }
         comment: { type: ["string", "null"] }
+        onecDealerManager: { type: ["string", "null"] }
+        onecWorksheetStatus: { type: ["string", "null"] }
+        onecUpdatedAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         editHistory:
@@ -1845,6 +1906,25 @@ components:
         missing_fields:
           type: array
           items: { type: string }
+    OneCClientCardMetadataUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        dealer_manager: { type: ["string", "null"], maxLength: 160 }
+        worksheet_status: { type: ["string", "null"], maxLength: 160 }
+    OneCClientCardMetadataUpdateResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data:
+          type: object
+          required: [worksheet_id, dealer_manager, worksheet_status, received_at]
+          properties:
+            worksheet_id: { type: integer }
+            dealer_manager: { type: ["string", "null"] }
+            worksheet_status: { type: ["string", "null"] }
+            received_at: { type: string, format: date-time }
     HealthStatus:
       type: object
       properties:
