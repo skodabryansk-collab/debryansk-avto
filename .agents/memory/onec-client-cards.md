@@ -43,3 +43,16 @@ The exact status values sent by 1C are `Создан`, `В работе`, `Пр�
 **Why:** the user supplied these authoritative codes and asked to use them for production 1C routing.
 
 **How to apply:** preserve the Cyrillic `ЦБ` prefix exactly; never infer codes for other departments or organization-to-location assignments.
+
+## Official organization codes supplied by the user
+
+| Production location | Organization label | Organization code |
+|---|---|---|
+| Литейная | Дебрянск Авто | `00001` |
+| Советская | Дебрянск Авто | `00001` |
+| Супонево | БНМ-1 | `ЦБ000005` |
+| Московский | МБ Брянск | `ЦБ000004` |
+
+**Why:** the user confirmed this exact assignment after production showed four locations but the supplied organization list had three codes.
+
+**How to apply:** the same organization code may correctly serve more than one production location; preserve leading zeros and the Cyrillic prefix exactly.
