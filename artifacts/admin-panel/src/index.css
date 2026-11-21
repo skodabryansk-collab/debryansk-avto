@@ -2,6 +2,15 @@
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
+.manager-client-card-glass {
+  --lg-glass: rgb(9 31 47 / 0.92);
+  --lg-glass-active: rgb(14 43 62 / 0.96);
+  --lg-edge: rgb(255 255 255 / 0.18);
+  --lg-drop: rgb(6 21 33 / 0.16);
+  --lg-rim-shine: 0.24;
+  --lg-blur: 14px;
+}
+
 @keyframes manager-form-cascade {
   from {
     opacity: 0;
