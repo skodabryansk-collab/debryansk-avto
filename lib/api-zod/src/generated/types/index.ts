@@ -96,6 +96,7 @@ export * from './oneCClientCardFeedItemPaymentMethod';
 export * from './oneCClientCardMetadataUpdate';
 export * from './oneCClientCardMetadataUpdateResponse';
 export * from './oneCClientCardMetadataUpdateResponseData';
+export * from './oneCClientCardMetadataUpdateWorksheetStatus';
 export * from './oneCClientCardsErrorResponse';
 export * from './oneCClientCardsInitialCursorResponse';
 export * from './oneCClientCardsInitialCursorResponseData';
