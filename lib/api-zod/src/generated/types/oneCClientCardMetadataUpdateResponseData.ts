@@ -12,5 +12,7 @@ export type OneCClientCardMetadataUpdateResponseData = {
   dealer_manager: string | null;
   /** @nullable */
   worksheet_status: string | null;
+  /** @nullable */
+  archive_reason: string | null;
   received_at: Date;
 };
