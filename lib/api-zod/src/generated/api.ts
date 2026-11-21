@@ -767,6 +767,9 @@ export const ListManagerClientCardsResponse = zod.object({
 }),zod.null()]),
   "paymentMethod": zod.string().nullable(),
   "comment": zod.string().nullable(),
+  "onecDealerManager": zod.string().nullable(),
+  "onecWorksheetStatus": zod.string().nullable(),
+  "onecUpdatedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
   "editHistory": zod.array(zod.object({
@@ -1035,6 +1038,40 @@ export const GetOneCClientCardsResponse = zod.object({
 })),
   "next_cursor": zod.number(),
   "has_more": zod.boolean()
+})
+})
+
+
+/**
+ * Stores the latest dealership manager and worksheet status received from 1C. Omitted fields remain unchanged; explicit null or an empty string clears a field.
+
+ * @summary Send dealership manager and worksheet status from 1C
+ */
+
+
+
+export const UpdateOneCClientCardMetadataParams = zod.object({
+  "id": zod.coerce.number().min(1).describe('Source worksheet ID returned by the client-card feed')
+})
+
+export const updateOneCClientCardMetadataBodyDealerManagerMax = 160;
+
+export const updateOneCClientCardMetadataBodyWorksheetStatusMax = 160;
+
+
+
+export const UpdateOneCClientCardMetadataBody = zod.object({
+  "dealer_manager": zod.string().max(updateOneCClientCardMetadataBodyDealerManagerMax).nullish(),
+  "worksheet_status": zod.string().max(updateOneCClientCardMetadataBodyWorksheetStatusMax).nullish()
+})
+
+export const UpdateOneCClientCardMetadataResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.object({
+  "worksheet_id": zod.number(),
+  "dealer_manager": zod.string().nullable(),
+  "worksheet_status": zod.string().nullable(),
+  "received_at": zod.coerce.date()
 })
 })
 
@@ -1563,6 +1600,9 @@ export const GetManagerClientCardResponse = zod.object({
 }),zod.null()]),
   "paymentMethod": zod.string().nullable(),
   "comment": zod.string().nullable(),
+  "onecDealerManager": zod.string().nullable(),
+  "onecWorksheetStatus": zod.string().nullable(),
+  "onecUpdatedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
   "editHistory": zod.array(zod.object({
