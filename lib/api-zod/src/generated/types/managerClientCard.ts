@@ -64,6 +64,8 @@ export interface ManagerClientCard {
   /** @nullable */
   onecWorksheetStatus: string | null;
   /** @nullable */
+  onecArchiveReason: string | null;
+  /** @nullable */
   onecUpdatedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
