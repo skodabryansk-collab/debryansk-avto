@@ -76,6 +76,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
-    "fabric": "^7.4.0"
+    "fabric": "^7.4.0",
+    "glisse": "0.6.0"
   }
 }
