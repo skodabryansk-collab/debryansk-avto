@@ -98,6 +98,7 @@ export const managerClientCardsTable = pgTable("manager_client_cards", {
   comment: text("comment"),
   onecDealerManager: text("onec_dealer_manager"),
   onecWorksheetStatus: text("onec_worksheet_status"),
+  onecArchiveReason: text("onec_archive_reason"),
   onecUpdatedAt: timestamp("onec_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
