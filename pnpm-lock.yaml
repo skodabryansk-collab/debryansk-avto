@@ -177,6 +177,9 @@ importers:
       fabric:
         specifier: ^7.4.0
         version: 7.4.0
+      glisse:
+        specifier: 0.6.0
+        version: 0.6.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0
@@ -921,6 +924,10 @@ importers:
         version: 7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
 
   artifacts/mockup-sandbox:
+    dependencies:
+      glisse:
+        specifier: 0.6.0
+        version: 0.6.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0
@@ -3313,6 +3320,12 @@ packages:
 
   github-from-package@0.0.0:
     resolution: {integrity: sha512-SyHy3T1v2NUXn29OsWdxmK6RwHD+vkj3v8en8AOBZ1wBQ/hCAQ5bAQTD02kW4W9tUp/3Qh6J8r9EvntiyCmOOw==}
+
+  glisse@0.6.0:
+    resolution: {integrity: sha512-zTfA9s6JMYyftXy4gRBL6+36Rr+6sUeVhlwYv3lc3jZoSNEFSBIKpPPpqgIpBAecMMbhtBcnlVayfM2BYSDOOQ==}
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
 
   glob-parent@5.1.2:
     resolution: {integrity: sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow==}
@@ -6980,6 +6993,11 @@ snapshots:
 
   github-from-package@0.0.0:
     optional: true
+
+  glisse@0.6.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
+    dependencies:
+      react: 19.1.0
+      react-dom: 19.1.0(react@19.1.0)
 
   glob-parent@5.1.2:
     dependencies:
