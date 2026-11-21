@@ -63,6 +63,7 @@ const budgetOptions = ["Не указан", "до 2 млн", "2–3 млн", "3�
 const paymentOptions = ["Кредит", "Лизинг", "Наличные / Безнал"] as const;
 const tradeInOptions = ["Да", "Нет", "Пока не решил"] as const;
 const pageSize = 25;
+const offerResultsPageSize = 10;
 
 type FormState = {
   clientName: string;
@@ -1181,6 +1182,7 @@ export default function ManagerClientCardsPage() {
   const [offerBrandSearch, setOfferBrandSearch] = useState("");
   const [offerModelSearch, setOfferModelSearch] = useState("");
   const [offerVinSearch, setOfferVinSearch] = useState("");
+  const [offerPage, setOfferPage] = useState(1);
   const [formError, setFormError] = useState("");
   const [saveAttempted, setSaveAttempted] = useState(false);
 
@@ -1259,6 +1261,12 @@ export default function ManagerClientCardsPage() {
   const brands = brandsQuery.data?.data ?? [];
   const managers = managersQuery.data?.data ?? [];
   const offerInventory = offerInventoryQuery.data?.data ?? [];
+  const offerPageCount = Math.max(1, Math.ceil(offerInventory.length / offerResultsPageSize));
+  const currentOfferPage = Math.min(offerPage, offerPageCount);
+  const visibleOfferInventory = offerInventory.slice(
+    (currentOfferPage - 1) * offerResultsPageSize,
+    currentOfferPage * offerResultsPageSize,
+  );
   const offerBrandSuggestions = Array.from(new Set(offerInventory.map(car => car.brand).filter((brand): brand is string => Boolean(brand))))
     .map(brand => ({ value: brand, label: brand }));
   const offerModelSuggestions = Array.from(new Set(offerInventory.map(car => car.model).filter((model): model is string => Boolean(model))))
@@ -1996,6 +2004,7 @@ export default function ManagerClientCardsPage() {
                       loading={offerInventoryQuery.isLoading && offerBrandSearch.trim().length >= 2}
                       onChange={value => {
                         setOfferBrandSearch(value);
+                         setOfferPage(1);
                         setOfferVinSearch("");
                         setSelectedOfferCar(null);
                         update("commercialBrand", "");
@@ -2003,6 +2012,7 @@ export default function ManagerClientCardsPage() {
                       }}
                       onSelect={option => {
                         setOfferBrandSearch(option.label);
+                         setOfferPage(1);
                         setOfferVinSearch("");
                         setSelectedOfferCar(null);
                         update("commercialBrand", "");
@@ -2018,6 +2028,7 @@ export default function ManagerClientCardsPage() {
                       loading={offerInventoryQuery.isLoading && offerModelSearch.trim().length >= 2}
                       onChange={value => {
                         setOfferModelSearch(value);
+                         setOfferPage(1);
                         setOfferVinSearch("");
                         setSelectedOfferCar(null);
                         update("commercialBrand", "");
@@ -2025,6 +2036,7 @@ export default function ManagerClientCardsPage() {
                       }}
                       onSelect={option => {
                         setOfferModelSearch(option.label);
+                         setOfferPage(1);
                         setOfferVinSearch("");
                         setSelectedOfferCar(null);
                         update("commercialBrand", "");
@@ -2040,6 +2052,7 @@ export default function ManagerClientCardsPage() {
                           value={offerVinSearch}
                           onChange={event => {
                             setOfferVinSearch(event.target.value.toUpperCase().replace(/[^A-ZА-Я0-9]/g, "").slice(0, 32));
+                            setOfferPage(1);
                             setOfferBrandSearch("");
                             setOfferModelSearch("");
                             setSelectedOfferCar(null);
@@ -2097,9 +2110,44 @@ export default function ManagerClientCardsPage() {
                   ) : offerInventory.length ? (
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-slate-700">Найдено новых автомобилей: {offerInventory.length}.</p>
-                      {offerInventory.map(car => (
+                      {visibleOfferInventory.map(car => (
                         <InventoryResult key={car.id} car={car} selected={false} onSelect={selectOfferCar} />
                       ))}
+                      {offerPageCount > 1 && (
+                        <nav
+                          aria-label="Страницы результатов поиска автомобилей"
+                          className="grid gap-2 border-t border-slate-100 pt-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center"
+                        >
+                          <p className="text-center text-sm text-slate-500 sm:text-left">
+                            Показано {(currentOfferPage - 1) * offerResultsPageSize + 1}–{Math.min(currentOfferPage * offerResultsPageSize, offerInventory.length)} из {offerInventory.length}
+                          </p>
+                          <span aria-live="polite" className="order-first text-center text-sm font-medium text-slate-700 sm:order-none">
+                            Страница {currentOfferPage} из {offerPageCount}
+                          </span>
+                          <div className="grid grid-cols-2 gap-2 sm:justify-self-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="min-h-11"
+                              disabled={currentOfferPage === 1}
+                              onClick={() => setOfferPage(current => Math.max(1, current - 1))}
+                            >
+                              <ChevronLeft className="mr-1 h-4 w-4" />
+                              Назад
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="min-h-11"
+                              disabled={currentOfferPage === offerPageCount}
+                              onClick={() => setOfferPage(current => Math.min(offerPageCount, current + 1))}
+                            >
+                              Далее
+                              <ChevronRight className="ml-1 h-4 w-4" />
+                            </Button>
+                          </div>
+                        </nav>
+                      )}
                     </div>
                   ) : (
                     <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
