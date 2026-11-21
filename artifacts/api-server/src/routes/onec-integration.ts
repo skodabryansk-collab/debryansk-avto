@@ -172,10 +172,24 @@ router.patch("/client-cards/:id/onec-data", async (req, res): Promise<void> => {
     res.status(400).json({ ok: false, error: "invalid_worksheet_id" } satisfies FeedError);
     return;
   }
-  const body = UpdateOneCClientCardMetadataBody.safeParse(req.body);
+  const requestBody = req.body;
+  const normalizedRequestBody = typeof requestBody === "object" && requestBody !== null && !Array.isArray(requestBody)
+    ? {
+        ...requestBody,
+        ...(typeof requestBody.worksheet_status === "string"
+          ? { worksheet_status: requestBody.worksheet_status.trim() }
+          : {}),
+      }
+    : requestBody;
+  const body = UpdateOneCClientCardMetadataBody.safeParse(normalizedRequestBody);
   if (!body.success || Object.keys(body.data ?? {}).length === 0) {
     setOneCRequestAudit(res, { errorCode: "invalid_update" });
     res.status(400).json({ ok: false, error: "invalid_update" } satisfies FeedError);
+    return;
+  }
+  if (body.data.worksheet_status === "Архив" && !body.data.archive_reason?.trim()) {
+    setOneCRequestAudit(res, { errorCode: "archive_reason_required" });
+    res.status(400).json({ ok: false, error: "archive_reason_required" } satisfies FeedError);
     return;
   }
 
@@ -198,6 +212,10 @@ router.patch("/client-cards/:id/onec-data", async (req, res): Promise<void> => {
     const value = body.data.worksheet_status?.trim() ?? "";
     update.onecWorksheetStatus = value || null;
   }
+  if (Object.hasOwn(body.data, "archive_reason")) {
+    const value = body.data.archive_reason?.trim() ?? "";
+    update.onecArchiveReason = value || null;
+  }
 
   try {
     const [card] = await db.update(managerClientCardsTable)
@@ -207,6 +225,7 @@ router.patch("/client-cards/:id/onec-data", async (req, res): Promise<void> => {
         id: managerClientCardsTable.id,
         dealerManager: managerClientCardsTable.onecDealerManager,
         worksheetStatus: managerClientCardsTable.onecWorksheetStatus,
+        archiveReason: managerClientCardsTable.onecArchiveReason,
         receivedAt: managerClientCardsTable.onecUpdatedAt,
       });
 
@@ -222,6 +241,7 @@ router.patch("/client-cards/:id/onec-data", async (req, res): Promise<void> => {
         worksheet_id: card.id,
         dealer_manager: card.dealerManager,
         worksheet_status: card.worksheetStatus,
+        archive_reason: card.archiveReason,
         received_at: card.receivedAt ?? new Date(),
       },
     }));
