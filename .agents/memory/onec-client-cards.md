@@ -18,3 +18,11 @@ The 1C payload should send organization and department codes, not their display 
 **Why:** the user clarified that 1C needs the organization/department codes and brand name, but not display names or the source database's brand ID.
 
 **How to apply:** keep one-time cursor initialization separate from polling, use the dedicated bearer token in the Authorization header, stop the feed on an unresolved brand, location, or official code, keep internal IDs out of external fields, and send codes rather than display names.
+
+## 1C worksheet statuses
+
+The exact status values sent by 1C are `Создан`, `В работе`, `Проверка перед закрытием`, `Архив`, and `Завершен`. They mean, respectively: received but not yet taken by a manager; being handled by a manager; under review before archiving; declined purchase; successful sale. When sending `Архив`, include a non-empty `archive_reason` in the same update.
+
+**Why:** the user defined these as the dealership's workflow states and requires the refusal reason to accompany archived worksheets.
+
+**How to apply:** preserve the exact Russian status values across API validation, integration docs, and admin display; do not substitute free-form 1C status labels.
