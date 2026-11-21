@@ -179,6 +179,7 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
         worksheet_id: number;
         dealer_manager: string | null;
         worksheet_status: string | null;
+        archive_reason: string | null;
         received_at: string;
       };
     };
@@ -186,6 +187,7 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
     assert.equal(metadataBody.data.worksheet_id, cardId);
     assert.equal(metadataBody.data.dealer_manager, "Иванов Иван");
     assert.equal(metadataBody.data.worksheet_status, "В работе");
+    assert.equal(metadataBody.data.archive_reason, null);
     assert.ok(Number.isFinite(Date.parse(metadataBody.data.received_at)));
 
     const partialMetadataResponse = await fetch(
@@ -196,7 +198,7 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
           Authorization: "Bearer test-only-onec-token",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ worksheet_status: "Сделка оформлена" }),
+        body: JSON.stringify({ worksheet_status: "Завершен" }),
       },
     );
     assert.equal(partialMetadataResponse.status, 200);
@@ -206,8 +208,49 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
       updatedAt: managerClientCardsTable.onecUpdatedAt,
     }).from(managerClientCardsTable).where(eq(managerClientCardsTable.id, cardId)).limit(1);
     assert.equal(updatedMetadataCard?.dealerManager, "Иванов Иван");
-    assert.equal(updatedMetadataCard?.worksheetStatus, "Сделка оформлена");
+    assert.equal(updatedMetadataCard?.worksheetStatus, "Завершен");
     assert.ok(updatedMetadataCard?.updatedAt instanceof Date);
+
+    const archiveWithoutReasonResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v1/client-cards/${cardId}/onec-data`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: "Bearer test-only-onec-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ worksheet_status: "Архив" }),
+      },
+    );
+    assert.equal(archiveWithoutReasonResponse.status, 400);
+
+    const archiveResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v1/client-cards/${cardId}/onec-data`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: "Bearer test-only-onec-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ worksheet_status: "Архив", archive_reason: "Клиент отказался от покупки" }),
+      },
+    );
+    assert.equal(archiveResponse.status, 200);
+    const archiveBody = await archiveResponse.json() as { data: { archive_reason: string | null } };
+    assert.equal(archiveBody.data.archive_reason, "Клиент отказался от покупки");
+
+    const invalidStatusResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v1/client-cards/${cardId}/onec-data`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: "Bearer test-only-onec-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ worksheet_status: "Сделка оформлена" }),
+      },
+    );
+    assert.equal(invalidStatusResponse.status, 400);
 
     const emptyMetadataResponse = await fetch(
       `${started.baseUrl}/api/integrations/1c/v1/client-cards/${cardId}/onec-data`,
@@ -230,7 +273,7 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
           Authorization: "Bearer test-only-onec-token",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ worksheet_status: "Не найден" }),
+        body: JSON.stringify({ worksheet_status: "Завершен" }),
       },
     );
     assert.equal(missingCardMetadataResponse.status, 404);
