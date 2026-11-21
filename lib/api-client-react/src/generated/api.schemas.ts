@@ -563,6 +563,8 @@ export interface ManagerClientCard {
   /** @nullable */
   onecWorksheetStatus: string | null;
   /** @nullable */
+  onecArchiveReason: string | null;
+  /** @nullable */
   onecUpdatedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -1150,17 +1152,33 @@ export interface OneCClientCardsErrorResponse {
   missing_fields?: string[];
 }
 
+/**
+ * @nullable
+ */
+export type OneCClientCardMetadataUpdateWorksheetStatus = typeof OneCClientCardMetadataUpdateWorksheetStatus[keyof typeof OneCClientCardMetadataUpdateWorksheetStatus] | null;
+
+
+export const OneCClientCardMetadataUpdateWorksheetStatus = {
+  Создан: 'Создан',
+  В_работе: 'В работе',
+  Проверка_перед_закрытием: 'Проверка перед закрытием',
+  Архив: 'Архив',
+  Завершен: 'Завершен',
+} as const;
+
 export interface OneCClientCardMetadataUpdate {
   /**
      * @maxLength 160
      * @nullable
      */
   dealer_manager?: string | null;
+  /** @nullable */
+  worksheet_status?: OneCClientCardMetadataUpdateWorksheetStatus;
   /**
-     * @maxLength 160
+     * @maxLength 1000
      * @nullable
      */
-  worksheet_status?: string | null;
+  archive_reason?: string | null;
 }
 
 export type OneCClientCardMetadataUpdateResponseData = {
@@ -1169,6 +1187,8 @@ export type OneCClientCardMetadataUpdateResponseData = {
   dealer_manager: string | null;
   /** @nullable */
   worksheet_status: string | null;
+  /** @nullable */
+  archive_reason: string | null;
   received_at: string;
 };
 
