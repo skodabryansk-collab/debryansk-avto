@@ -26,3 +26,20 @@ The exact status values sent by 1C are `Создан`, `В работе`, `Пр�
 **Why:** the user defined these as the dealership's workflow states and requires the refusal reason to accompany archived worksheets.
 
 **How to apply:** preserve the exact Russian status values across API validation, integration docs, and admin display; do not substitute free-form 1C status labels.
+
+## Official department codes supplied by the user
+
+| 1C brand label | Production brand row | Department code |
+|---|---|---|
+| Авто с пробегом | С пробегом | `ЦБ000008` |
+| Омода Брянск | OMODA | `ЦБ000009` |
+| Тенет Брянск | Tenet | `ЦБ000010` |
+| Джетур Брянск | JETOUR | `ЦБ000012` |
+| Джейку Брянск | JAECOO | `ЦБ000013` |
+| Хавейл Про Брянск | Haval Pro | `ЦБ000014` |
+| Хавейл Сити Брянск | Haval City | `ЦБ000015` |
+| Тенет Плюс Брянск | Tenet Plus | `ЦБ000018` |
+
+**Why:** the user supplied these authoritative codes and asked to use them for production 1C routing.
+
+**How to apply:** preserve the Cyrillic `ЦБ` prefix exactly; never infer codes for other departments or organization-to-location assignments.
