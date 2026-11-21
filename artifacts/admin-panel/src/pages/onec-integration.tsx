@@ -330,9 +330,15 @@ export default function OneCIntegrationPage() {
                       <p className="mt-2 break-all text-xs text-slate-500">{entry.endpoint ?? entry.entity_name ?? "—"}</p>
                       {entry.event_type === "api_request" ? (
                         <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2 text-xs text-slate-600">
-                          <span>Листов: <b className="text-slate-800">{entry.item_count}</b></span>
+                          {entry.entity_type === "client_card" ? (
+                            <span className="col-span-2">Рабочий лист: №{entry.entity_id ?? "—"}</span>
+                          ) : (
+                            <>
+                              <span>Листов: <b className="text-slate-800">{entry.item_count}</b></span>
+                              <span className="col-span-2">Курсор: {entry.after_id ?? "—"} → {entry.next_cursor ?? "—"}</span>
+                            </>
+                          )}
                           <span>Время: {entry.duration_ms == null ? "—" : `${entry.duration_ms} мс`}</span>
-                          <span className="col-span-2">Курсор: {entry.after_id ?? "—"} → {entry.next_cursor ?? "—"}</span>
                           {entry.error_code && <span className="col-span-2 break-all font-medium text-red-700">{entry.error_code}</span>}
                         </div>
                       ) : (
@@ -377,8 +383,14 @@ export default function OneCIntegrationPage() {
                           <td className="px-3 py-3 text-xs text-slate-600">
                             {entry.event_type === "api_request" ? (
                               <div className="space-y-1">
-                                <div>Листов: <span className="font-semibold text-slate-800">{entry.item_count}</span></div>
-                                <div>Курсор: {entry.after_id ?? "—"} → {entry.next_cursor ?? "—"}</div>
+                                {entry.entity_type === "client_card" ? (
+                                  <div>Рабочий лист: №{entry.entity_id ?? "—"}</div>
+                                ) : (
+                                  <>
+                                    <div>Листов: <span className="font-semibold text-slate-800">{entry.item_count}</span></div>
+                                    <div>Курсор: {entry.after_id ?? "—"} → {entry.next_cursor ?? "—"}</div>
+                                  </>
+                                )}
                                 <div>Время: {entry.duration_ms == null ? "—" : `${entry.duration_ms} мс`}</div>
                               </div>
                             ) : (
@@ -463,6 +475,7 @@ export default function OneCIntegrationPage() {
                 <InfoBlock label="Авторизация" value={status?.authentication ?? "Bearer"} />
                 <InfoBlock label="Выгрузка рабочих листов" value={status?.feed_path ?? "/api/integrations/1c/v1/client-cards"} />
                 <InfoBlock label="Первичная настройка курсора" value={status?.initial_cursor_path ?? "/api/integrations/1c/v1/client-cards/initial-cursor"} />
+                <InfoBlock label="Обратное обновление из 1С" value="PATCH /api/integrations/1c/v1/client-cards/{id}/onec-data" />
               </div>
               <p className="mt-4 rounded-md bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600">
                 Для смены токена обновите серверный секрет и защищённую конфигурацию VPS, затем передайте новый токен в 1С.
