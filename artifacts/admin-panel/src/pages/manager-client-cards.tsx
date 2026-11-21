@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
@@ -499,6 +499,103 @@ function CascadeField({ children, delay = 0 }: { children: ReactNode; delay?: nu
   );
 }
 
+function useKeyboardAwareForm(enabled: boolean) {
+  const [keyboardSpacer, setKeyboardSpacer] = useState(0);
+  const focusScrollTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      setKeyboardSpacer(0);
+      return;
+    }
+
+    const viewport = window.visualViewport;
+    const isTextEntry = (element: Element | null): element is HTMLElement =>
+      element instanceof HTMLElement &&
+      element.matches('input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]), textarea');
+
+    const getKeyboardMetrics = () => {
+      const viewportHeight = viewport?.height ?? window.innerHeight;
+      const viewportTop = viewport?.offsetTop ?? 0;
+      const inset = Math.max(0, window.innerHeight - viewportHeight - viewportTop);
+      const touchDevice = window.matchMedia("(pointer: coarse)").matches;
+      const keyboardOpen = isTextEntry(document.activeElement) &&
+        touchDevice &&
+        (inset > 80 || viewportHeight < Math.max(window.screen.height, viewportHeight) * 0.78);
+
+      return {
+        keyboardOpen,
+        inset,
+        viewportHeight,
+        viewportTop,
+      };
+    };
+
+    const updateSpacer = () => {
+      const metrics = getKeyboardMetrics();
+      const nextSpacer = metrics.keyboardOpen
+        ? Math.max(160, Math.ceil(Math.max(metrics.inset, metrics.viewportHeight * 0.48)))
+        : 0;
+
+      setKeyboardSpacer(previous => previous === nextSpacer ? previous : nextSpacer);
+      return metrics;
+    };
+
+    const scrollFocusedField = (element: Element | null) => {
+      if (!isTextEntry(element) || document.activeElement !== element || !getKeyboardMetrics().keyboardOpen) return;
+
+      const { viewportHeight, viewportTop } = getKeyboardMetrics();
+      const rect = element.getBoundingClientRect();
+      const viewportBottom = viewportTop + viewportHeight;
+      const preferredTop = viewportTop + Math.min(128, Math.max(56, viewportHeight * 0.18));
+      const safeTop = viewportTop + 12;
+      const safeBottom = viewportBottom - 16;
+      let scrollBy = 0;
+
+      if (rect.bottom > safeBottom) {
+        scrollBy = rect.bottom - safeBottom;
+      } else if (rect.top > preferredTop) {
+        scrollBy = rect.top - preferredTop;
+      } else if (rect.top < safeTop) {
+        scrollBy = rect.top - safeTop;
+      }
+
+      if (Math.abs(scrollBy) > 2) window.scrollBy({ top: scrollBy, behavior: "smooth" });
+    };
+
+    const onFocusIn = (event: FocusEvent) => {
+      updateSpacer();
+      const target = event.target instanceof Element ? event.target : null;
+      if (focusScrollTimer.current !== null) window.clearTimeout(focusScrollTimer.current);
+      focusScrollTimer.current = window.setTimeout(() => scrollFocusedField(target), 280);
+    };
+
+    const onFocusOut = () => {
+      window.setTimeout(updateSpacer, 120);
+    };
+
+    const onViewportResize = () => {
+      updateSpacer();
+      window.requestAnimationFrame(() => scrollFocusedField(document.activeElement));
+    };
+
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    window.addEventListener("resize", onViewportResize);
+    viewport?.addEventListener("resize", onViewportResize);
+
+    return () => {
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+      window.removeEventListener("resize", onViewportResize);
+      viewport?.removeEventListener("resize", onViewportResize);
+      if (focusScrollTimer.current !== null) window.clearTimeout(focusScrollTimer.current);
+    };
+  }, [enabled]);
+
+  return { keyboardSpacer };
+}
+
 type SearchSuggestion = { value: string; label: string };
 
 function SearchSuggestionField({
@@ -526,11 +623,42 @@ function SearchSuggestionField({
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [listMaxHeight, setListMaxHeight] = useState(240);
+  const inputRef = useRef<HTMLInputElement>(null);
   const matchingOptions = options
     .filter(option => option.label.toLocaleLowerCase("ru").includes(value.trim().toLocaleLowerCase("ru")))
     .slice(0, 20);
   const listId = `${id}-suggestions`;
   const active = activeIndex >= 0 ? matchingOptions[activeIndex] : undefined;
+
+  useEffect(() => {
+    if (!open || disabled) return;
+
+    const viewport = window.visualViewport;
+    const measureAvailableHeight = () => {
+      const inputBottom = inputRef.current?.getBoundingClientRect().bottom;
+      if (inputBottom === undefined) return;
+
+      const viewportBottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight);
+      const availableHeight = Math.floor(viewportBottom - inputBottom - 12);
+      const nextHeight = Math.min(240, Math.max(96, availableHeight));
+      setListMaxHeight(previous => previous === nextHeight ? previous : nextHeight);
+    };
+
+    const frame = window.requestAnimationFrame(measureAvailableHeight);
+    window.addEventListener("resize", measureAvailableHeight);
+    window.addEventListener("scroll", measureAvailableHeight, true);
+    viewport?.addEventListener("resize", measureAvailableHeight);
+    viewport?.addEventListener("scroll", measureAvailableHeight);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", measureAvailableHeight);
+      window.removeEventListener("scroll", measureAvailableHeight, true);
+      viewport?.removeEventListener("resize", measureAvailableHeight);
+      viewport?.removeEventListener("scroll", measureAvailableHeight);
+    };
+  }, [open, disabled, matchingOptions.length]);
 
   function choose(option: SearchSuggestion) {
     onSelect(option);
@@ -541,6 +669,7 @@ function SearchSuggestionField({
     <div className="relative min-w-0 space-y-2">
       <Label htmlFor={id}>{label}</Label>
       <Input
+        ref={inputRef}
         id={id}
         value={value}
         disabled={disabled}
@@ -580,7 +709,8 @@ function SearchSuggestionField({
         <div
           id={listId}
           role="listbox"
-          className="relative z-40 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+          className="relative z-40 mt-1 w-full touch-pan-y overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+          style={{ maxHeight: listMaxHeight, WebkitOverflowScrolling: "touch" }}
         >
           {loading ? (
             <p className="px-3 py-2 text-sm text-slate-500">Загружаем варианты…</p>
@@ -1040,6 +1170,7 @@ export default function ManagerClientCardsPage() {
   const adminPortal = isAdminUsingManagerPortal();
 
   const [mode, setMode] = useState<"list" | "form">("list");
+  const { keyboardSpacer } = useKeyboardAwareForm(mode === "form");
   const [editingCardId, setEditingCardId] = useState<number | null>(null);
   const [step, setStep] = useState(0);
   const [filters, setFilters] = useState<ListFilters>(emptyFilters);
@@ -1380,7 +1511,10 @@ export default function ManagerClientCardsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-5 px-3 py-5 sm:px-6 sm:py-7">
+      <main
+        className="mx-auto max-w-5xl space-y-5 px-3 py-5 sm:px-6 sm:py-7"
+        style={keyboardSpacer ? { paddingBottom: keyboardSpacer + 28 } : undefined}
+      >
         {mode === "list" ? (
           <>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
