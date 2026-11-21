@@ -8,6 +8,9 @@ import {
   GetOneCClientCardsInitialCursorResponse,
   GetOneCClientCardsQueryParams,
   GetOneCClientCardsResponse,
+  UpdateOneCClientCardMetadataBody,
+  UpdateOneCClientCardMetadataParams,
+  UpdateOneCClientCardMetadataResponse,
 } from "@workspace/api-zod";
 import {
   brandsTable,
@@ -48,6 +51,9 @@ type OneCRequestAudit = {
   itemCount?: number;
   hasMore?: boolean | null;
   errorCode?: string | null;
+  entityType?: string | null;
+  entityId?: number | null;
+  entityName?: string | null;
 };
 
 type OneCCardFeedRow = {
@@ -105,9 +111,9 @@ router.use((req: Request, res: Response, next) => {
       durationMs: Math.max(0, Date.now() - startedAt),
       errorCode: audit.errorCode ?? null,
       requestId: requestId == null ? null : String(requestId),
-      entityType: null,
-      entityId: null,
-      entityName: null,
+      entityType: audit.entityType ?? null,
+      entityId: audit.entityId ?? null,
+      entityName: audit.entityName ?? null,
       previousCode: null,
       newCode: null,
       actorLogin: null,
@@ -145,6 +151,86 @@ function sendTokenError(
   setOneCRequestAudit(res, { errorCode: error });
   res.status(status).json({ ok: false, error } satisfies FeedError);
 }
+
+router.patch("/client-cards/:id/onec-data", async (req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Vary", "Authorization");
+
+  const tokenStatus = hasValidToken(req.get("authorization"));
+  if (tokenStatus === "not_configured") {
+    sendTokenError(res, 503, "integration_not_configured");
+    return;
+  }
+  if (tokenStatus === "invalid") {
+    sendTokenError(res, 401, "unauthorized");
+    return;
+  }
+
+  const params = UpdateOneCClientCardMetadataParams.safeParse(req.params);
+  if (!params.success) {
+    setOneCRequestAudit(res, { errorCode: "invalid_worksheet_id" });
+    res.status(400).json({ ok: false, error: "invalid_worksheet_id" } satisfies FeedError);
+    return;
+  }
+  const body = UpdateOneCClientCardMetadataBody.safeParse(req.body);
+  if (!body.success || Object.keys(body.data ?? {}).length === 0) {
+    setOneCRequestAudit(res, { errorCode: "invalid_update" });
+    res.status(400).json({ ok: false, error: "invalid_update" } satisfies FeedError);
+    return;
+  }
+
+  const worksheetId = params.data.id;
+  setOneCRequestAudit(res, {
+    itemCount: 1,
+    entityType: "client_card",
+    entityId: worksheetId,
+    entityName: `Рабочий лист №${worksheetId}`,
+  });
+
+  const update: Partial<typeof managerClientCardsTable.$inferInsert> = {
+    onecUpdatedAt: new Date(),
+  };
+  if (Object.hasOwn(body.data, "dealer_manager")) {
+    const value = body.data.dealer_manager?.trim() ?? "";
+    update.onecDealerManager = value || null;
+  }
+  if (Object.hasOwn(body.data, "worksheet_status")) {
+    const value = body.data.worksheet_status?.trim() ?? "";
+    update.onecWorksheetStatus = value || null;
+  }
+
+  try {
+    const [card] = await db.update(managerClientCardsTable)
+      .set(update)
+      .where(eq(managerClientCardsTable.id, worksheetId))
+      .returning({
+        id: managerClientCardsTable.id,
+        dealerManager: managerClientCardsTable.onecDealerManager,
+        worksheetStatus: managerClientCardsTable.onecWorksheetStatus,
+        receivedAt: managerClientCardsTable.onecUpdatedAt,
+      });
+
+    if (!card) {
+      setOneCRequestAudit(res, { errorCode: "worksheet_not_found" });
+      res.status(404).json({ ok: false, error: "worksheet_not_found" } satisfies FeedError);
+      return;
+    }
+
+    res.json(UpdateOneCClientCardMetadataResponse.parse({
+      ok: true,
+      data: {
+        worksheet_id: card.id,
+        dealer_manager: card.dealerManager,
+        worksheet_status: card.worksheetStatus,
+        received_at: card.receivedAt ?? new Date(),
+      },
+    }));
+  } catch (error) {
+    setOneCRequestAudit(res, { errorCode: "internal_error" });
+    req.log.error({ err: error, worksheetId }, "1C client-card metadata update failed");
+    res.status(500).json({ ok: false, error: "internal_error" } satisfies FeedError);
+  }
+});
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
