@@ -21,6 +21,7 @@ import {
   Trash2,
   UserRound,
 } from "lucide-react";
+import { Glass } from "glisse";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -2330,7 +2331,7 @@ export default function ManagerClientCardsPage() {
       </main>
       <Dialog open={Boolean(selectedCard)} onOpenChange={open => { if (!open) setSelectedCard(null); }}>
         <DialogContent
-          className="flex max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:rounded-2xl [&>button:last-child]:right-3 [&>button:last-child]:top-3 [&>button:last-child]:grid [&>button:last-child]:h-11 [&>button:last-child]:w-11 [&>button:last-child]:place-items-center [&>button:last-child]:rounded-lg [&>button:last-child]:bg-slate-50 [&>button:last-child]:opacity-100"
+          className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:rounded-2xl [&>button:last-child]:right-3 [&>button:last-child]:top-3 [&>button:last-child]:grid [&>button:last-child]:h-11 [&>button:last-child]:w-11 [&>button:last-child]:place-items-center [&>button:last-child]:rounded-lg [&>button:last-child]:bg-slate-50 [&>button:last-child]:opacity-100"
         >
           {selectedCard && detailCard && (
             <>
@@ -2361,26 +2362,78 @@ export default function ManagerClientCardsPage() {
                 </div>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 md:px-7">
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-                    <h3 className="font-semibold text-slate-900">Клиент</h3>
-                    <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-                      <div className="min-w-0 sm:col-span-2">
-                        <dt className="text-xs font-medium text-slate-500">ФИО</dt>
-                        <dd className="mt-1 break-words text-base font-semibold text-slate-900">{detailCard.clientName}</dd>
+                <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
+                  <Glass
+                    data-theme="light"
+                    className="manager-client-card-glass grid min-w-0 gap-5 overflow-hidden rounded-2xl p-4 text-white sm:p-5 md:col-span-2 md:grid-cols-[1.1fr_0.9fr]"
+                    data-testid={`summary-client-card-${detailCard.id}`}
+                  >
+                    <section className="min-w-0">
+                      <div className="flex items-center gap-2 text-white/70">
+                        <UserRound className="h-4 w-4" aria-hidden="true" />
+                        <h3 className="text-xs font-semibold uppercase tracking-[0.12em]">Клиент</h3>
                       </div>
-                      <div className="min-w-0">
-                        <dt className="text-xs font-medium text-slate-500">Телефон</dt>
-                        <dd className="mt-1 break-words font-medium tabular-nums text-slate-900">{detailCard.clientPhone}</dd>
+                      <p className="mt-2 break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+                        {detailCard.clientName}
+                      </p>
+                      <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                        <div className="min-w-0">
+                          <dt className="text-xs text-white/65">Телефон</dt>
+                          <dd className="mt-1 break-words font-medium tabular-nums text-white">{detailCard.clientPhone}</dd>
+                        </div>
+                        <div className="min-w-0">
+                          <dt className="text-xs text-white/65">Пол</dt>
+                          <dd className="mt-1 font-medium text-white">
+                            {detailCard.clientGender === "male" ? "Мужской" : detailCard.clientGender === "female" ? "Женский" : "Не указан"}
+                          </dd>
+                        </div>
+                      </dl>
+                    </section>
+
+                    <section
+                      className="min-w-0 border-t border-white/15 pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0"
+                      data-testid={`section-client-card-onec-${detailCard.id}`}
+                    >
+                      <div className="flex items-center gap-2 text-white/70">
+                        <ArrowRightLeft className="h-4 w-4" aria-hidden="true" />
+                        <h3 className="text-xs font-semibold uppercase tracking-[0.12em]">Статус из 1С</h3>
                       </div>
-                      <div className="min-w-0">
-                        <dt className="text-xs font-medium text-slate-500">Пол</dt>
-                        <dd className="mt-1 font-medium text-slate-900">
-                          {detailCard.clientGender === "male" ? "Мужской" : detailCard.clientGender === "female" ? "Женский" : "Не указан"}
-                        </dd>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {detailCard.onecWorksheetStatus ? (
+                          <Badge className={`border ${getOneCWorksheetStatus(detailCard.onecWorksheetStatus)?.className ?? "border-slate-200 bg-slate-100 text-slate-700"}`}>
+                            {detailCard.onecWorksheetStatus}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="border border-white/15 bg-white/10 text-white hover:bg-white/10">
+                            Пока не передан
+                          </Badge>
+                        )}
+                        {detailCard.onecDealerManager && (
+                          <span className="break-words text-sm text-white/85">
+                            {detailCard.onecDealerManager} · менеджер ДЦ
+                          </span>
+                        )}
                       </div>
-                    </dl>
-                  </section>
+                      {detailCard.onecWorksheetStatus ? (
+                        <p className="mt-3 break-words text-sm text-white/75">
+                          {getOneCWorksheetStatus(detailCard.onecWorksheetStatus)?.description}
+                        </p>
+                      ) : (
+                        <p className="mt-3 text-sm text-white/75">Ответ 1С ещё не поступал.</p>
+                      )}
+                      {detailCard.onecWorksheetStatus === "Архив" && detailCard.onecArchiveReason && (
+                        <div className="mt-3 border-l-2 border-rose-300 pl-3">
+                          <p className="text-xs text-white/65">Причина отказа</p>
+                          <p className="mt-1 break-words text-sm text-white">{detailCard.onecArchiveReason}</p>
+                        </div>
+                      )}
+                      <p className="mt-3 text-xs text-white/60">
+                        {detailCard.onecUpdatedAt
+                          ? `Обновлено из 1С: ${formatDate(detailCard.onecUpdatedAt)}`
+                          : "Данные обновятся после ответа 1С."}
+                      </p>
+                    </section>
+                  </Glass>
 
                   <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                     <div className="flex items-center justify-between gap-3">
@@ -2498,60 +2551,14 @@ export default function ManagerClientCardsPage() {
                     </dl>
                   </section>
 
-                  <section
-                    className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:col-span-2 sm:p-5"
-                    data-testid={`section-client-card-onec-${detailCard.id}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <ArrowRightLeft className="h-4 w-4 text-slate-500" aria-hidden="true" />
-                      <h3 className="font-semibold text-slate-900">Данные из 1С</h3>
-                    </div>
-                    <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-                      <div className="min-w-0">
-                        <dt className="text-xs font-medium text-slate-500">Менеджер ДЦ</dt>
-                        <dd className="mt-1 break-words font-medium text-slate-900">
-                          {detailCard.onecDealerManager || "Пока не передан"}
-                        </dd>
-                      </div>
-                      <div className="min-w-0">
-                        <dt className="text-xs font-medium text-slate-500">Статус рабочего листа в 1С</dt>
-                        <dd className="mt-1">
-                          {detailCard.onecWorksheetStatus ? (
-                            <>
-                              <Badge className={`border ${getOneCWorksheetStatus(detailCard.onecWorksheetStatus)?.className ?? "border-slate-200 bg-slate-100 text-slate-700"}`}>
-                                {detailCard.onecWorksheetStatus}
-                              </Badge>
-                              <p className="mt-1 break-words text-sm text-slate-600">
-                                {getOneCWorksheetStatus(detailCard.onecWorksheetStatus)?.description}
-                              </p>
-                            </>
-                          ) : (
-                            <span className="break-words font-medium text-slate-900">Пока не передан</span>
-                          )}
-                        </dd>
-                      </div>
-                      {detailCard.onecWorksheetStatus === "Архив" && detailCard.onecArchiveReason && (
-                        <div className="min-w-0 sm:col-span-2">
-                          <dt className="text-xs font-medium text-slate-500">Причина отказа из 1С</dt>
-                          <dd className="mt-1 break-words font-medium text-slate-900">{detailCard.onecArchiveReason}</dd>
-                        </div>
-                      )}
-                    </dl>
-                    <p className="mt-3 text-xs text-slate-500">
-                      {detailCard.onecUpdatedAt
-                        ? `Обновлено из 1С: ${formatDate(detailCard.onecUpdatedAt)}`
-                        : "Ответ 1С ещё не поступал. Данные обновляются автоматически."}
-                    </p>
-                  </section>
-
                   {detailCard.comment && (
-                    <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:col-span-2 sm:p-5">
+                    <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 md:col-span-2 sm:p-5">
                       <h3 className="font-semibold text-slate-900">Комментарий менеджера</h3>
                       <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{detailCard.comment}</p>
                     </section>
                   )}
 
-                  <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:col-span-2 sm:p-5" data-testid={`section-client-card-history-${detailCard.id}`}>
+                  <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 md:col-span-2 sm:p-5" data-testid={`section-client-card-history-${detailCard.id}`}>
                     <div className="flex items-center gap-2">
                       <History className="h-4 w-4 text-slate-500" />
                       <h3 className="font-semibold text-slate-900">История изменений</h3>
