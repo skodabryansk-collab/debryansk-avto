@@ -1,0 +1,8 @@
+.worksheet-glass {
+  --lg-glass: hsl(var(--secondary) / 0.94);
+  --lg-glass-active: hsl(var(--secondary) / 0.98);
+  --lg-edge: hsl(var(--primary-foreground) / 0.2);
+  --lg-drop: hsl(var(--foreground) / 0.1);
+  --lg-rim-shine: 0.2;
+  --lg-blur: 14px;
+}
