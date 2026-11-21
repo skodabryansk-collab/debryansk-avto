@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowRightLeft,
   CarFront,
   CheckCircle2,
   ChevronDown,
@@ -1196,6 +1197,7 @@ export default function ManagerClientCardsPage() {
     queryFn: () => getManagerClientCard(selectedCard!.id),
     enabled: Boolean(selectedCard),
     staleTime: 15_000,
+    refetchInterval: selectedCard ? 30_000 : false,
   });
   const managersQuery = useQuery({
     queryKey: ["manager-client-card-managers"],
@@ -1680,8 +1682,19 @@ export default function ManagerClientCardsPage() {
                       className="grid w-full min-w-0 gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 hover:shadow-md sm:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)_20px] sm:items-center sm:gap-4 sm:px-4"
                     >
                       <span className="min-w-0">
-                        <span className="block break-words font-semibold text-slate-900">{card.clientName}</span>
-                        <span className="mt-0.5 block text-sm text-slate-600">{card.clientPhone}</span>
+                        <span className="flex min-w-0 items-start justify-between gap-2">
+                          <span className="min-w-0">
+                            <span className="block break-words font-semibold text-slate-900">{card.clientName}</span>
+                            <span className="mt-0.5 block text-sm text-slate-600">{card.clientPhone}</span>
+                          </span>
+                          <span
+                            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-500"
+                            title="Статус передачи в 1С пока не отслеживается"
+                            aria-label="Статус передачи в 1С пока не отслеживается"
+                          >
+                            <ArrowRightLeft className="h-4 w-4" aria-hidden="true" />
+                          </span>
+                        </span>
                       </span>
                       <span className="min-w-0">
                         <span className="block text-[11px] font-medium uppercase tracking-wide text-slate-400">Интерес</span>
@@ -2442,6 +2455,35 @@ export default function ManagerClientCardsPage() {
                         </div>
                       )}
                     </dl>
+                  </section>
+
+                  <section
+                    className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:col-span-2 sm:p-5"
+                    data-testid={`section-client-card-onec-${detailCard.id}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <ArrowRightLeft className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                      <h3 className="font-semibold text-slate-900">Данные из 1С</h3>
+                    </div>
+                    <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <div className="min-w-0">
+                        <dt className="text-xs font-medium text-slate-500">Менеджер ДЦ</dt>
+                        <dd className="mt-1 break-words font-medium text-slate-900">
+                          {detailCard.onecDealerManager || "Пока не передан"}
+                        </dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-xs font-medium text-slate-500">Статус рабочего листа в 1С</dt>
+                        <dd className="mt-1 break-words font-medium text-slate-900">
+                          {detailCard.onecWorksheetStatus || "Пока не передан"}
+                        </dd>
+                      </div>
+                    </dl>
+                    <p className="mt-3 text-xs text-slate-500">
+                      {detailCard.onecUpdatedAt
+                        ? `Обновлено из 1С: ${formatDate(detailCard.onecUpdatedAt)}`
+                        : "Ответ 1С ещё не поступал. Данные обновляются автоматически."}
+                    </p>
                   </section>
 
                   {detailCard.comment && (
