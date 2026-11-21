@@ -59,6 +59,12 @@ export interface ManagerClientCard {
   paymentMethod: string | null;
   /** @nullable */
   comment: string | null;
+  /** @nullable */
+  onecDealerManager: string | null;
+  /** @nullable */
+  onecWorksheetStatus: string | null;
+  /** @nullable */
+  onecUpdatedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   editHistory?: ManagerClientCardEditHistoryEntry[];
