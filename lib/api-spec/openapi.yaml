@@ -439,9 +439,11 @@ paths:
   /integrations/1c/v1/client-cards/{id}/onec-data:
     patch:
       operationId: updateOneCClientCardMetadata
-      summary: Send dealership manager and worksheet status from 1C
+      summary: Send dealership manager, worksheet status, and archive reason from 1C
       description: >
-        Stores the latest dealership manager and worksheet status received from 1C.
+        Stores the latest dealership manager, worksheet status, and archive reason received from 1C.
+        worksheet_status must be one of: Создан, В работе, Проверка перед закрытием, Архив, Завершен.
+        When worksheet_status is Архив, archive_reason is required and must contain the refusal reason.
         Omitted fields remain unchanged; explicit null or an empty string clears a field.
       security:
         - oneCClientCardsToken: []
@@ -1440,7 +1442,7 @@ components:
         tradeInPlan: { type: ["string", "null"], enum: ["Да", "Нет", "Пока не решил", null] }
     ManagerClientCard:
       type: object
-      required: [id, managerId, managerName, clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarBrand, currentCarModel, currentCarYear, currentCarMileage, currentCarGeneration, currentCarBodyType, currentCarOwnersCount, currentCarSnapshot, tradeInPlan, needs, currentCars, commercialBrand, commercialModel, commercialCarId, commercialCarSnapshot, paymentMethod, comment, onecDealerManager, onecWorksheetStatus, onecUpdatedAt, createdAt, updatedAt]
+      required: [id, managerId, managerName, clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarBrand, currentCarModel, currentCarYear, currentCarMileage, currentCarGeneration, currentCarBodyType, currentCarOwnersCount, currentCarSnapshot, tradeInPlan, needs, currentCars, commercialBrand, commercialModel, commercialCarId, commercialCarSnapshot, paymentMethod, comment, onecDealerManager, onecWorksheetStatus, onecArchiveReason, onecUpdatedAt, createdAt, updatedAt]
       properties:
         id: { type: integer }
         managerId: { type: integer }
@@ -1482,6 +1484,7 @@ components:
         comment: { type: ["string", "null"] }
         onecDealerManager: { type: ["string", "null"] }
         onecWorksheetStatus: { type: ["string", "null"] }
+        onecArchiveReason: { type: ["string", "null"] }
         onecUpdatedAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -1911,7 +1914,10 @@ components:
       minProperties: 1
       properties:
         dealer_manager: { type: ["string", "null"], maxLength: 160 }
-        worksheet_status: { type: ["string", "null"], maxLength: 160 }
+        worksheet_status:
+          type: ["string", "null"]
+          enum: [Создан, В работе, Проверка перед закрытием, Архив, Завершен, null]
+        archive_reason: { type: ["string", "null"], maxLength: 1000 }
     OneCClientCardMetadataUpdateResponse:
       type: object
       required: [ok, data]
@@ -1919,11 +1925,12 @@ components:
         ok: { type: boolean }
         data:
           type: object
-          required: [worksheet_id, dealer_manager, worksheet_status, received_at]
+          required: [worksheet_id, dealer_manager, worksheet_status, archive_reason, received_at]
           properties:
             worksheet_id: { type: integer }
             dealer_manager: { type: ["string", "null"] }
             worksheet_status: { type: ["string", "null"] }
+            archive_reason: { type: ["string", "null"] }
             received_at: { type: string, format: date-time }
     HealthStatus:
       type: object
