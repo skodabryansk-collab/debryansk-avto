@@ -46,6 +46,13 @@ interface MetrikaResponse {
   errors?: Array<{ error_type: string; message: string }>;
 }
 
+class MetrikaResponseError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "MetrikaResponseError";
+  }
+}
+
 function getToken(): string {
   return process.env["YANDEX_METRIKA_TOKEN"] || "";
 }
@@ -62,10 +69,21 @@ async function fetchMetrika(params: Record<string, string | number>): Promise<Me
     signal: AbortSignal.timeout(30_000),
   });
 
-  const json = await r.json() as MetrikaResponse;
+  const responseText = await r.text();
+  let json: MetrikaResponse;
+  try {
+    json = JSON.parse(responseText) as MetrikaResponse;
+  } catch {
+    const responseSummary = responseText.trim().replace(/\s+/g, " ").slice(0, 180);
+    throw new MetrikaResponseError(
+      `Яндекс.Метрика вернула не JSON (HTTP ${r.status}): ${responseSummary || "пустой ответ"}`,
+      r.status,
+    );
+  }
+
   if (!r.ok || json.errors?.length) {
     const msg = json.errors?.[0]?.message || `HTTP ${r.status}`;
-    throw new Error(msg);
+    throw new MetrikaResponseError(msg, r.status);
   }
   return json;
 }
@@ -86,9 +104,16 @@ async function fetchWithRetry(
       const msg = err instanceof Error ? err.message : String(err);
       const isQuota = /quota|parallel/i.test(msg);
       const isTimeout = /timeout|aborted/i.test(msg) || (err instanceof Error && err.name === "TimeoutError");
-      const shouldRetry = (isQuota || isTimeout) && attempt < retries;
+      const status = err instanceof MetrikaResponseError ? err.status : undefined;
+      const isTransientStatus = status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+      const isProviderUnavailable = /service unavailable|temporarily unavailable/i.test(msg);
+      const shouldRetry = (isQuota || isTimeout || isTransientStatus || isProviderUnavailable) && attempt < retries;
       if (shouldRetry) {
-        logger.warn({ attempt, retryDelay, reason: isTimeout ? "timeout" : "quota" },
+        const reason = isTimeout ? "timeout"
+          : isQuota ? "quota"
+            : isProviderUnavailable ? "provider_unavailable"
+              : `http_${status}`;
+        logger.warn({ attempt, retryDelay, reason },
           `[metrika] Retrying request ${attempt}/${retries - 1} in ${retryDelay}ms`);
         await sleep(retryDelay);
       } else {
@@ -194,6 +219,13 @@ function goalRow(name: string, reaches: number, reachesW: number, i: number): st
 function buildHtml(report: ReportData): string {
   const yest = formatDate(report.date);
   const weekAgo = formatDate(report.weekDate);
+  const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;",
+  })[char] || char);
 
   let body = `
   <div style="background:linear-gradient(135deg,${DARK} 0%,#253447 100%);padding:20px 24px 16px">
@@ -205,7 +237,7 @@ function buildHtml(report: ReportData): string {
 
   if (report.error) {
     body += `<div style="margin:20px 24px;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:14px;color:#b91c1c;font-family:Arial,sans-serif;font-size:13px">
-      ⚠️ ${report.error}
+      ⚠️ ${escapeHtml(report.error)}
     </div>`;
   } else {
     const m = report.main!;
