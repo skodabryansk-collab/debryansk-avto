@@ -37,6 +37,8 @@ import type {
   GetOneCAdminLogsParams,
   GetOneCClientCardChangesParams,
   GetOneCClientCardsParams,
+  GetOneCDivisionWorksheetChangesParams,
+  GetOneCDivisionWorksheetsParams,
   HealthStatus,
   ListAutoRuCarModelsParams,
   ListCustomerSurveyResponsesParams,
@@ -60,6 +62,10 @@ import type {
   OneCClientCardsErrorResponse,
   OneCClientCardsInitialCursorResponse,
   OneCClientCardsResponse,
+  OneCDivisionMetadataUpdateResponse,
+  OneCDivisionWorksheetChangesErrorResponse,
+  OneCDivisionWorksheetChangesResponse,
+  OneCDivisionWorksheetsResponse,
   OneCMappingUpdateInput,
   OneCMappingUpdateResponse,
   SearchManagerClientCardInventoryParams,
@@ -1243,6 +1249,408 @@ export function useGetOneCClientCards<TData = Awaited<ReturnType<typeof getOneCC
 
 
 
+
+export const getGetOneCDivisionWorksheetsUrl = (params: GetOneCDivisionWorksheetsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/integrations/1c/v2/client-cards?${stringifiedParams}` : `/api/integrations/1c/v2/client-cards`
+}
+
+/**
+ * Each item is a separate 1C integration worksheet linked to one manager worksheet. Needs and the offered vehicle are grouped by the exact organization_code and department_code pair. Different brands with the same pair are combined into one item; a different pair gets its own ID. The caller must persist next_cursor only after importing every returned item.
+
+ * @summary Poll integration worksheets grouped by organization and department
+ */
+export const getOneCDivisionWorksheets = async (params: GetOneCDivisionWorksheetsParams, options?: RequestInit): Promise<OneCDivisionWorksheetsResponse> => {
+
+  return customFetch<OneCDivisionWorksheetsResponse>(getGetOneCDivisionWorksheetsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOneCDivisionWorksheetsQueryKey = (params?: GetOneCDivisionWorksheetsParams,) => {
+    return [
+    `/api/integrations/1c/v2/client-cards`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetOneCDivisionWorksheetsQueryOptions = <TData = Awaited<ReturnType<typeof getOneCDivisionWorksheets>>, TError = ErrorType<OneCClientCardsErrorResponse>>(params: GetOneCDivisionWorksheetsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOneCDivisionWorksheetsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOneCDivisionWorksheets>>> = ({ signal }) => getOneCDivisionWorksheets(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheets>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOneCDivisionWorksheetsQueryResult = NonNullable<Awaited<ReturnType<typeof getOneCDivisionWorksheets>>>
+export type GetOneCDivisionWorksheetsQueryError = ErrorType<OneCClientCardsErrorResponse>
+
+
+/**
+ * @summary Poll integration worksheets grouped by organization and department
+ */
+
+export function useGetOneCDivisionWorksheets<TData = Awaited<ReturnType<typeof getOneCDivisionWorksheets>>, TError = ErrorType<OneCClientCardsErrorResponse>>(
+ params: GetOneCDivisionWorksheetsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOneCDivisionWorksheetsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetOneCDivisionWorksheetsInitialCursorUrl = () => {
+
+
+
+
+  return `/api/integrations/1c/v2/client-cards/initial-cursor`
+}
+
+/**
+ * Call once during initial setup to skip historical rows, then poll the v2 feed.
+ * @summary Get the starting ID cursor for division worksheets
+ */
+export const getOneCDivisionWorksheetsInitialCursor = async ( options?: RequestInit): Promise<OneCClientCardsInitialCursorResponse> => {
+
+  return customFetch<OneCClientCardsInitialCursorResponse>(getGetOneCDivisionWorksheetsInitialCursorUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOneCDivisionWorksheetsInitialCursorQueryKey = () => {
+    return [
+    `/api/integrations/1c/v2/client-cards/initial-cursor`
+    ] as const;
+    }
+
+
+export const getGetOneCDivisionWorksheetsInitialCursorQueryOptions = <TData = Awaited<ReturnType<typeof getOneCDivisionWorksheetsInitialCursor>>, TError = ErrorType<OneCClientCardsErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheetsInitialCursor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOneCDivisionWorksheetsInitialCursorQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOneCDivisionWorksheetsInitialCursor>>> = ({ signal }) => getOneCDivisionWorksheetsInitialCursor({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheetsInitialCursor>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOneCDivisionWorksheetsInitialCursorQueryResult = NonNullable<Awaited<ReturnType<typeof getOneCDivisionWorksheetsInitialCursor>>>
+export type GetOneCDivisionWorksheetsInitialCursorQueryError = ErrorType<OneCClientCardsErrorResponse>
+
+
+/**
+ * @summary Get the starting ID cursor for division worksheets
+ */
+
+export function useGetOneCDivisionWorksheetsInitialCursor<TData = Awaited<ReturnType<typeof getOneCDivisionWorksheetsInitialCursor>>, TError = ErrorType<OneCClientCardsErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheetsInitialCursor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOneCDivisionWorksheetsInitialCursorQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetOneCDivisionWorksheetChangesUrl = (params: GetOneCDivisionWorksheetChangesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/integrations/1c/v2/client-cards/changes?${stringifiedParams}` : `/api/integrations/1c/v2/client-cards/changes`
+}
+
+/**
+ * Returns one event per changed integration worksheet. `upsert` contains the latest worksheet; `delete` removes that source_key in 1C. The manager worksheet remains a single record in the admin panel.
+
+ * @summary Poll changes and deletions for division worksheets
+ */
+export const getOneCDivisionWorksheetChanges = async (params: GetOneCDivisionWorksheetChangesParams, options?: RequestInit): Promise<OneCDivisionWorksheetChangesResponse> => {
+
+  return customFetch<OneCDivisionWorksheetChangesResponse>(getGetOneCDivisionWorksheetChangesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOneCDivisionWorksheetChangesQueryKey = (params?: GetOneCDivisionWorksheetChangesParams,) => {
+    return [
+    `/api/integrations/1c/v2/client-cards/changes`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetOneCDivisionWorksheetChangesQueryOptions = <TData = Awaited<ReturnType<typeof getOneCDivisionWorksheetChanges>>, TError = ErrorType<OneCDivisionWorksheetChangesErrorResponse>>(params: GetOneCDivisionWorksheetChangesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheetChanges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOneCDivisionWorksheetChangesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOneCDivisionWorksheetChanges>>> = ({ signal }) => getOneCDivisionWorksheetChanges(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheetChanges>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOneCDivisionWorksheetChangesQueryResult = NonNullable<Awaited<ReturnType<typeof getOneCDivisionWorksheetChanges>>>
+export type GetOneCDivisionWorksheetChangesQueryError = ErrorType<OneCDivisionWorksheetChangesErrorResponse>
+
+
+/**
+ * @summary Poll changes and deletions for division worksheets
+ */
+
+export function useGetOneCDivisionWorksheetChanges<TData = Awaited<ReturnType<typeof getOneCDivisionWorksheetChanges>>, TError = ErrorType<OneCDivisionWorksheetChangesErrorResponse>>(
+ params: GetOneCDivisionWorksheetChangesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheetChanges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOneCDivisionWorksheetChangesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetOneCDivisionWorksheetChangesInitialCursorUrl = () => {
+
+
+
+
+  return `/api/integrations/1c/v2/client-cards/changes/initial-cursor`
+}
+
+/**
+ * Call once during initial setup if historical edit events should not be replayed.
+ * @summary Get the starting cursor for division worksheet changes
+ */
+export const getOneCDivisionWorksheetChangesInitialCursor = async ( options?: RequestInit): Promise<OneCClientCardChangesInitialCursorResponse> => {
+
+  return customFetch<OneCClientCardChangesInitialCursorResponse>(getGetOneCDivisionWorksheetChangesInitialCursorUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOneCDivisionWorksheetChangesInitialCursorQueryKey = () => {
+    return [
+    `/api/integrations/1c/v2/client-cards/changes/initial-cursor`
+    ] as const;
+    }
+
+
+export const getGetOneCDivisionWorksheetChangesInitialCursorQueryOptions = <TData = Awaited<ReturnType<typeof getOneCDivisionWorksheetChangesInitialCursor>>, TError = ErrorType<OneCClientCardsErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheetChangesInitialCursor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOneCDivisionWorksheetChangesInitialCursorQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOneCDivisionWorksheetChangesInitialCursor>>> = ({ signal }) => getOneCDivisionWorksheetChangesInitialCursor({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheetChangesInitialCursor>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOneCDivisionWorksheetChangesInitialCursorQueryResult = NonNullable<Awaited<ReturnType<typeof getOneCDivisionWorksheetChangesInitialCursor>>>
+export type GetOneCDivisionWorksheetChangesInitialCursorQueryError = ErrorType<OneCClientCardsErrorResponse>
+
+
+/**
+ * @summary Get the starting cursor for division worksheet changes
+ */
+
+export function useGetOneCDivisionWorksheetChangesInitialCursor<TData = Awaited<ReturnType<typeof getOneCDivisionWorksheetChangesInitialCursor>>, TError = ErrorType<OneCClientCardsErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheetChangesInitialCursor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOneCDivisionWorksheetChangesInitialCursorQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateOneCDivisionWorksheetMetadataUrl = (id: number,) => {
+
+
+
+
+  return `/api/integrations/1c/v2/client-cards/${id}/onec-data`
+}
+
+/**
+ * `id` is the division integration worksheet ID, not the manager worksheet ID. Status and archive reason are saved independently for this organization/department pair.
+
+ * @summary Send manager and worksheet status for one division record
+ */
+export const updateOneCDivisionWorksheetMetadata = async (id: number,
+    oneCClientCardMetadataUpdate: OneCClientCardMetadataUpdate, options?: RequestInit): Promise<OneCDivisionMetadataUpdateResponse> => {
+
+  return customFetch<OneCDivisionMetadataUpdateResponse>(getUpdateOneCDivisionWorksheetMetadataUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      oneCClientCardMetadataUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateOneCDivisionWorksheetMetadataMutationOptions = <TError = ErrorType<OneCClientCardsErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOneCDivisionWorksheetMetadata>>, TError,{id: number;data: BodyType<OneCClientCardMetadataUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateOneCDivisionWorksheetMetadata>>, TError,{id: number;data: BodyType<OneCClientCardMetadataUpdate>}, TContext> => {
+
+const mutationKey = ['updateOneCDivisionWorksheetMetadata'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOneCDivisionWorksheetMetadata>>, {id: number;data: BodyType<OneCClientCardMetadataUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateOneCDivisionWorksheetMetadata(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateOneCDivisionWorksheetMetadataMutationResult = NonNullable<Awaited<ReturnType<typeof updateOneCDivisionWorksheetMetadata>>>
+    export type UpdateOneCDivisionWorksheetMetadataMutationBody = BodyType<OneCClientCardMetadataUpdate>
+    export type UpdateOneCDivisionWorksheetMetadataMutationError = ErrorType<OneCClientCardsErrorResponse>
+
+    /**
+ * @summary Send manager and worksheet status for one division record
+ */
+export const useUpdateOneCDivisionWorksheetMetadata = <TError = ErrorType<OneCClientCardsErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOneCDivisionWorksheetMetadata>>, TError,{id: number;data: BodyType<OneCClientCardMetadataUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateOneCDivisionWorksheetMetadata>>,
+        TError,
+        {id: number;data: BodyType<OneCClientCardMetadataUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateOneCDivisionWorksheetMetadataMutationOptions(options));
+    }
 
 export const getUpdateOneCClientCardMetadataUrl = (id: number,) => {
 
