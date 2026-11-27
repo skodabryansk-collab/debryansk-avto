@@ -9,7 +9,7 @@ Generated `TMP1C-` values are placeholders only. Do not send them to 1C, even if
 
 Do not expose `current_car_inventory_id` or `current_cars[].inventory_id` in manager/1C API contracts. The selected commercial car may use an internal numeric database ID inside the admin app, but the 1C contract identifies it by `commercial_car_vin` (nullable when the VIN is unavailable). Each need may also carry an optional planned purchase date as a date-only `YYYY-MM-DD` string.
 
-The 1C payload should send organization and department codes, not their display names, and should not expose an internal `brand_id`. Keep `source_key` as an opaque idempotency key built from the worksheet ID and normalized brand name.
+The 1C payload should send organization and department codes, not their display names, and should not expose an internal `brand_id`. In the legacy v1 contract, `source_key` is based on the parent worksheet and normalized brand. In v2, it identifies the parent worksheet plus the exact organization/department code pair.
 
 **Why:** the user specified that location represents organization, brand represents department, and official 1C codes will be supplied later. Placeholder values must not create incorrectly routed leads.
 
@@ -18,6 +18,14 @@ The 1C payload should send organization and department codes, not their display 
 **Why:** the user clarified that 1C needs the organization/department codes and brand name, but not display names or the source database's brand ID.
 
 **How to apply:** keep one-time cursor initialization separate from polling, use the dedicated bearer token in the Authorization header, stop the feed on an unresolved brand, location, or official code, keep internal IDs out of external fields, and send codes rather than display names.
+
+## Division-level integration records
+
+In the v2 contract, keep one parent manager worksheet in the admin UI but create a separate integration worksheet for every unique organization-code + department-code pair. Brands with the same pair share one integration ID and one 1C status; a different pair gets a different ID and independent status. Group needs and the commercial offer by that pair, and keep source keys opaque.
+
+**Why:** the user confirmed that a single client worksheet can cover multiple 1C departments, while 1C reports status independently for each department; matching organization and department codes must share one record.
+
+**How to apply:** use the child integration worksheet ID for 1C status updates, keep its parent card ID only as a link for the portal, and never split records merely because the brand labels differ when both codes are identical.
 
 ## 1C worksheet statuses
 
