@@ -19,6 +19,7 @@ export * from "./seo-positions";
 export * from "./calltouch-calls";
 export * from "./calltouch-callbacks";
 export * from "./managers";
+export * from "./manager-client-card-onec-worksheets";
 export * from "./corporate-page";
 export * from "./seo-autopilot";
 export * from "./onec-exchange-logs";
