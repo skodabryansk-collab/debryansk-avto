@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import type { Server } from "node:http";
 import test from "node:test";
 import express from "express";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   brandsTable,
   carsTable,
@@ -10,15 +10,19 @@ import {
   locationsTable,
   locationBrandsTable,
   managerClientCardHistoryTable,
+  managerClientCardOnecWorksheetsTable,
   managerClientCardsTable,
   managersTable,
 } from "@workspace/db";
 import oneCIntegrationRouter from "../routes/onec-integration";
+import oneCIntegrationV2Router from "../routes/onec-integration-v2";
+import { syncOneCClientCardWorksheets } from "./onec-client-card-divisions";
 
 async function startServer(): Promise<{ server: Server; baseUrl: string }> {
   const app = express();
   app.use(express.json());
   app.use("/api/integrations/1c/v1", oneCIntegrationRouter);
+  app.use("/api/integrations/1c/v2", oneCIntegrationV2Router);
   const server = app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve, reject) => {
     server.once("listening", resolve);
@@ -504,6 +508,208 @@ test("1C client-card feed uses its own bearer token and blocks provisional codes
     if (managerId) {
       await db.delete(managersTable).where(eq(managersTable.id, managerId));
     }
+    if (previousToken === undefined) delete process.env["ONEC_CLIENT_CARDS_TOKEN"];
+    else process.env["ONEC_CLIENT_CARDS_TOKEN"] = previousToken;
+    if (previousNodeEnv === undefined) delete process.env["NODE_ENV"];
+    else process.env["NODE_ENV"] = previousNodeEnv;
+  }
+});
+
+test("1C v2 creates one integration worksheet per unique organization and department pair", async () => {
+  const previousToken = process.env["ONEC_CLIENT_CARDS_TOKEN"];
+  const previousNodeEnv = process.env["NODE_ENV"];
+  const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const managerLogin = `onec-v2-test-${suffix}`;
+  const locationName = `1С v2 test ${suffix}`;
+  const brandNames = [`V2 Brand A ${suffix}`, `V2 Brand B ${suffix}`, `V2 Brand C ${suffix}`];
+  let managerId: number | undefined;
+  let cardId: number | undefined;
+  let locationId: number | undefined;
+  let createdBrandIds: number[] = [];
+  let server: Server | undefined;
+
+  try {
+    process.env["NODE_ENV"] = "production";
+    process.env["ONEC_CLIENT_CARDS_TOKEN"] = "test-only-onec-v2-token";
+    const started = await startServer();
+    server = started.server;
+    const headers = {
+      Authorization: "Bearer test-only-onec-v2-token",
+      "Content-Type": "application/json",
+    };
+
+    const initialCursorResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v2/client-cards/initial-cursor`,
+      { headers },
+    );
+    assert.equal(initialCursorResponse.status, 200);
+    const initialCursorBody = await initialCursorResponse.json() as { data: { after_id: number } };
+
+    const initialChangeCursorResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v2/client-cards/changes/initial-cursor`,
+      { headers },
+    );
+    assert.equal(initialChangeCursorResponse.status, 200);
+    const initialChangeCursorBody = await initialChangeCursorResponse.json() as {
+      data: { after_change_id: number };
+    };
+
+    const [manager] = await db.insert(managersTable).values({
+      name: "Тест v2",
+      login: managerLogin,
+      passwordHash: "test-only",
+      brands: brandNames,
+    }).returning({ id: managersTable.id });
+    managerId = manager?.id;
+    assert.ok(managerId);
+
+    const [location] = await db.insert(locationsTable).values({
+      title: locationName,
+      address: "Тестовый адрес",
+      onecOrganizationCode: `TEST-ORG-V2-${suffix}`,
+      onecOrganizationCodeConfirmed: true,
+    }).returning({ id: locationsTable.id });
+    locationId = location?.id;
+    assert.ok(locationId);
+
+    const insertedBrands = await db.insert(brandsTable).values(brandNames.map((name, index) => ({
+      name,
+      onecDepartmentCode: index < 2 ? `TEST-DEPT-V2-SHARED-${suffix}` : `TEST-DEPT-V2-OTHER-${suffix}`,
+      onecDepartmentCodeConfirmed: true,
+    }))).returning({ id: brandsTable.id });
+    createdBrandIds = insertedBrands.map(brand => brand.id);
+    assert.equal(createdBrandIds.length, 3);
+    await db.insert(locationBrandsTable).values(createdBrandIds.map(brandId => ({
+      locationId: locationId!,
+      brandId,
+      isService: false,
+    })));
+
+    const [card] = await db.insert(managerClientCardsTable).values({
+      managerId,
+      clientName: "Тестовый клиент v2",
+      clientPhone: "+7 999 111-22-33",
+      desiredBrand: brandNames[0]!,
+      desiredModel: "Модель A",
+      needs: [
+        { brand: brandNames[0]!, model: "Модель A", undecided: false, budgetRange: "Не указан", plannedPurchaseDate: null },
+        { brand: brandNames[1]!, model: "Модель B", undecided: false, budgetRange: "2–3 млн", plannedPurchaseDate: null },
+        { brand: brandNames[2]!, model: "Модель C", undecided: false, budgetRange: "3–5 млн", plannedPurchaseDate: null },
+      ],
+      currentCars: [],
+      commercialBrand: brandNames[2]!,
+      commercialModel: "Модель C",
+      commercialCarSnapshot: { vin: "TESTVIN0000000001", brand: brandNames[2]!, model: "Модель C" },
+      paymentMethod: "Кредит",
+    }).returning({ id: managerClientCardsTable.id });
+    cardId = card?.id;
+    assert.ok(cardId);
+
+    await db.transaction(tx => syncOneCClientCardWorksheets(tx, cardId!));
+
+    const feedResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v2/client-cards?after_id=${initialCursorBody.data.after_id}&limit=100`,
+      { headers },
+    );
+    assert.equal(feedResponse.status, 200);
+    const feedBody = await feedResponse.json() as {
+      data: {
+        items: Array<{
+          id: number;
+          source_key: string;
+          manager_worksheet_id: number;
+          organization_code: string;
+          department_code: string;
+          brand_names: string[];
+          needs: Array<{ brand: string | null }>;
+          commercial_offer: { car_vin: string | null } | null;
+        }>;
+        pending_count: number;
+      };
+    };
+    const cardItems = feedBody.data.items.filter(item => item.manager_worksheet_id === cardId);
+    assert.equal(cardItems.length, 2);
+    assert.equal(new Set(cardItems.map(item => item.id)).size, 2);
+    assert.equal(new Set(cardItems.map(item => item.source_key)).size, 2);
+
+    const sharedDivision = cardItems.find(item => item.department_code === `TEST-DEPT-V2-SHARED-${suffix}`);
+    const separateDivision = cardItems.find(item => item.department_code === `TEST-DEPT-V2-OTHER-${suffix}`);
+    assert.ok(sharedDivision);
+    assert.ok(separateDivision);
+    assert.deepEqual(sharedDivision.brand_names, brandNames.slice(0, 2));
+    assert.deepEqual(sharedDivision.needs.map(need => need.brand), brandNames.slice(0, 2));
+    assert.deepEqual(separateDivision.brand_names, [brandNames[2]]);
+    assert.equal(separateDivision.needs.length, 1);
+    assert.equal(separateDivision.commercial_offer?.car_vin, "TESTVIN0000000001");
+    assert.equal(feedBody.data.pending_count >= 0, true);
+
+    const statusResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v2/client-cards/${sharedDivision.id}/onec-data`,
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ dealer_manager: "Менеджер подразделения", worksheet_status: "В работе" }),
+      },
+    );
+    assert.equal(statusResponse.status, 200);
+    const [savedStatus] = await db.select({
+      dealerManager: managerClientCardOnecWorksheetsTable.dealerManager,
+      worksheetStatus: managerClientCardOnecWorksheetsTable.worksheetStatus,
+    }).from(managerClientCardOnecWorksheetsTable)
+      .where(eq(managerClientCardOnecWorksheetsTable.id, sharedDivision.id))
+      .limit(1);
+    assert.equal(savedStatus?.dealerManager, "Менеджер подразделения");
+    assert.equal(savedStatus?.worksheetStatus, "В работе");
+    const [parentStatus] = await db.select({
+      worksheetStatus: managerClientCardsTable.onecWorksheetStatus,
+    }).from(managerClientCardsTable).where(eq(managerClientCardsTable.id, cardId)).limit(1);
+    assert.equal(parentStatus?.worksheetStatus, null);
+
+    await db.transaction(async tx => {
+      await tx.update(managerClientCardsTable).set({
+        desiredBrand: brandNames[0]!,
+        desiredModel: "Модель A",
+        needs: [
+          { brand: brandNames[0]!, model: "Модель A", undecided: false, budgetRange: "Не указан", plannedPurchaseDate: null },
+          { brand: brandNames[1]!, model: "Модель B", undecided: false, budgetRange: "2–3 млн", plannedPurchaseDate: null },
+        ],
+        commercialBrand: null,
+        commercialModel: null,
+        commercialCarSnapshot: null,
+        updatedAt: new Date(),
+      }).where(eq(managerClientCardsTable.id, cardId!));
+      await syncOneCClientCardWorksheets(tx, cardId!);
+    });
+
+    const changesResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v2/client-cards/changes?after_change_id=${initialChangeCursorBody.data.after_change_id}&limit=100`,
+      { headers },
+    );
+    assert.equal(changesResponse.status, 200);
+    const changesBody = await changesResponse.json() as {
+      data: {
+        events: Array<{
+          action: "upsert" | "delete";
+          worksheet_id: number;
+          manager_worksheet_id: number;
+          source_key: string;
+          item: unknown | null;
+        }>;
+      };
+    };
+    const deletedDivision = changesBody.data.events.find(event =>
+      event.action === "delete" && event.manager_worksheet_id === cardId &&
+      event.source_key === separateDivision.source_key,
+    );
+    assert.ok(deletedDivision);
+    assert.equal(deletedDivision.item, null);
+    assert.equal(deletedDivision.worksheet_id, separateDivision.id);
+  } finally {
+    if (server) await new Promise<void>(resolve => server!.close(() => resolve()));
+    if (cardId) await db.delete(managerClientCardsTable).where(eq(managerClientCardsTable.id, cardId));
+    if (locationId) await db.delete(locationsTable).where(eq(locationsTable.id, locationId));
+    if (createdBrandIds.length) await db.delete(brandsTable).where(inArray(brandsTable.id, createdBrandIds));
+    if (managerId) await db.delete(managersTable).where(eq(managersTable.id, managerId));
     if (previousToken === undefined) delete process.env["ONEC_CLIENT_CARDS_TOKEN"];
     else process.env["ONEC_CLIENT_CARDS_TOKEN"] = previousToken;
     if (previousNodeEnv === undefined) delete process.env["NODE_ENV"];
