@@ -1702,7 +1702,20 @@ export default function ManagerClientCardsPage() {
                     card.commercialModel || offer?.model,
                     offer?.year,
                   ].filter(Boolean).join(" ");
-                  const onecStatus = getOneCWorksheetStatus(card.onecWorksheetStatus);
+                  const onecWorksheets = card.onecWorksheets ?? [];
+                  const hasOneCData = onecWorksheets.length > 0 || Boolean(card.onecWorksheetStatus);
+                  const firstDivisionStatus = onecWorksheets.find(worksheet => worksheet.worksheetStatus)?.worksheetStatus
+                    ?? card.onecWorksheetStatus;
+                  const onecStatus = getOneCWorksheetStatus(firstDivisionStatus);
+                  const onecTooltip = onecWorksheets.length
+                    ? `Передача в 1С: ${onecWorksheets.length} ${onecWorksheets.length === 1 ? "подразделение" : "подразделения"}. ${
+                        onecWorksheets.map(worksheet =>
+                          `${worksheet.brandNames.join(", ")} — ${worksheet.worksheetStatus ?? "ожидает ответа"}`,
+                        ).join("; ")
+                      }`
+                    : onecStatus
+                      ? `Статус в 1С: ${card.onecWorksheetStatus}. ${onecStatus.description}`
+                      : "Статус из 1С пока не передан";
                   return (
                     <button
                       key={card.id}
@@ -1718,25 +1731,38 @@ export default function ManagerClientCardsPage() {
                           </span>
                           <span
                             className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${
-                              onecStatus?.className ?? "bg-slate-100 text-slate-500"
+                              onecStatus?.className ?? (hasOneCData ? "bg-sky-100 text-sky-700" : "bg-slate-100 text-slate-500")
                             }`}
-                            title={onecStatus
-                              ? `Статус в 1С: ${card.onecWorksheetStatus}. ${onecStatus.description}`
-                              : "Статус из 1С пока не передан"}
-                            aria-label={onecStatus
-                              ? `Статус рабочего листа в 1С: ${card.onecWorksheetStatus}`
-                              : "Статус из 1С пока не передан"}
+                            title={onecTooltip}
+                            aria-label={onecTooltip}
                           >
                             <ArrowRightLeft className="h-4 w-4" aria-hidden="true" />
                           </span>
                         </span>
-                        {card.onecWorksheetStatus && (
+                        {onecWorksheets.length > 0 ? (
+                          <span className="mt-2 flex flex-wrap gap-1">
+                            {onecWorksheets.slice(0, 2).map(worksheet => {
+                              const status = getOneCWorksheetStatus(worksheet.worksheetStatus);
+                              return (
+                                <Badge
+                                  key={worksheet.id}
+                                  className={`max-w-full whitespace-normal border text-left ${status?.className ?? "border-slate-200 bg-slate-100 text-slate-700"}`}
+                                >
+                                  {worksheet.brandNames.join(", ") || worksheet.departmentCode}: {worksheet.worksheetStatus ?? "ожидает"}
+                                </Badge>
+                              );
+                            })}
+                            {onecWorksheets.length > 2 && (
+                              <Badge variant="outline">+{onecWorksheets.length - 2} подраздел.</Badge>
+                            )}
+                          </span>
+                        ) : card.onecWorksheetStatus ? (
                           <span className="mt-2 block">
                             <Badge className={`max-w-full whitespace-normal border text-left ${onecStatus?.className ?? "border-slate-200 bg-slate-100 text-slate-700"}`}>
                               {card.onecWorksheetStatus}
                             </Badge>
                           </span>
-                        )}
+                        ) : null}
                       </span>
                       <span className="min-w-0">
                         <span className="block text-[11px] font-medium uppercase tracking-wide text-slate-400">Интерес</span>
@@ -2396,42 +2422,79 @@ export default function ManagerClientCardsPage() {
                     >
                       <div className="flex items-center gap-2 text-white/70">
                         <ArrowRightLeft className="h-4 w-4" aria-hidden="true" />
-                        <h3 className="text-xs font-semibold uppercase tracking-[0.12em]">Статус из 1С</h3>
+                        <h3 className="text-xs font-semibold uppercase tracking-[0.12em]">Статусы по подразделениям</h3>
+                        {detailCard.onecWorksheets.length > 0 && (
+                          <Badge variant="outline" className="border-white/20 text-white/80">
+                            {detailCard.onecWorksheets.length}
+                          </Badge>
+                        )}
                       </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {detailCard.onecWorksheetStatus ? (
+                      {detailCard.onecWorksheets.length > 0 ? (
+                        <div className="mt-3 space-y-3">
+                          {detailCard.onecWorksheets.map(worksheet => {
+                            const status = getOneCWorksheetStatus(worksheet.worksheetStatus);
+                            return (
+                              <article
+                                key={worksheet.id}
+                                className="min-w-0 rounded-xl border border-white/15 bg-white/5 p-3"
+                              >
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <p className="break-words text-sm font-semibold text-white">
+                                      {worksheet.brandNames.join(", ") || "Подразделение"}
+                                    </p>
+                                    <p className="mt-1 text-xs text-white/60">
+                                      Организация {worksheet.organizationCode} · подразделение {worksheet.departmentCode}
+                                    </p>
+                                  </div>
+                                  <Badge className={`shrink-0 border ${status?.className ?? "border-white/20 bg-white/10 text-white/80"}`}>
+                                    {worksheet.worksheetStatus ?? "Ожидает ответа 1С"}
+                                  </Badge>
+                                </div>
+                                {worksheet.dealerManager && (
+                                  <p className="mt-2 break-words text-sm text-white/85">
+                                    {worksheet.dealerManager} · менеджер ДЦ
+                                  </p>
+                                )}
+                                {status && (
+                                  <p className="mt-2 break-words text-sm text-white/70">{status.description}</p>
+                                )}
+                                {worksheet.worksheetStatus === "Архив" && worksheet.archiveReason && (
+                                  <div className="mt-3 border-l-2 border-rose-300 pl-3">
+                                    <p className="text-xs text-white/65">Причина отказа</p>
+                                    <p className="mt-1 break-words text-sm text-white">{worksheet.archiveReason}</p>
+                                  </div>
+                                )}
+                                <p className="mt-2 text-xs text-white/55">
+                                  {worksheet.onecUpdatedAt
+                                    ? `Обновлено из 1С: ${formatDate(worksheet.onecUpdatedAt)}`
+                                    : "Ответ по этому подразделению ещё не поступал."}
+                                </p>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      ) : detailCard.onecWorksheetStatus ? (
+                        <div className="mt-3 space-y-2">
                           <Badge className={`border ${getOneCWorksheetStatus(detailCard.onecWorksheetStatus)?.className ?? "border-slate-200 bg-slate-100 text-slate-700"}`}>
                             {detailCard.onecWorksheetStatus}
                           </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="border border-white/15 bg-white/10 text-white hover:bg-white/10">
-                            Пока не передан
-                          </Badge>
-                        )}
-                        {detailCard.onecDealerManager && (
-                          <span className="break-words text-sm text-white/85">
-                            {detailCard.onecDealerManager} · менеджер ДЦ
-                          </span>
-                        )}
-                      </div>
-                      {detailCard.onecWorksheetStatus ? (
-                        <p className="mt-3 break-words text-sm text-white/75">
-                          {getOneCWorksheetStatus(detailCard.onecWorksheetStatus)?.description}
-                        </p>
-                      ) : (
-                        <p className="mt-3 text-sm text-white/75">Ответ 1С ещё не поступал.</p>
-                      )}
-                      {detailCard.onecWorksheetStatus === "Архив" && detailCard.onecArchiveReason && (
-                        <div className="mt-3 border-l-2 border-rose-300 pl-3">
-                          <p className="text-xs text-white/65">Причина отказа</p>
-                          <p className="mt-1 break-words text-sm text-white">{detailCard.onecArchiveReason}</p>
+                          <p className="break-words text-sm text-white/75">
+                            {detailCard.onecDealerManager ? `${detailCard.onecDealerManager} · менеджер ДЦ. ` : ""}
+                            {getOneCWorksheetStatus(detailCard.onecWorksheetStatus)?.description}
+                          </p>
+                          {detailCard.onecWorksheetStatus === "Архив" && detailCard.onecArchiveReason && (
+                            <p className="break-words text-sm text-white">Причина отказа: {detailCard.onecArchiveReason}</p>
+                          )}
+                          <p className="text-xs text-white/60">
+                            {detailCard.onecUpdatedAt
+                              ? `Обновлено из 1С: ${formatDate(detailCard.onecUpdatedAt)}`
+                              : "Данные обновятся после ответа 1С."}
+                          </p>
                         </div>
+                      ) : (
+                        <p className="mt-3 text-sm text-white/75">Записи по подразделениям и ответы 1С ещё не поступали.</p>
                       )}
-                      <p className="mt-3 text-xs text-white/60">
-                        {detailCard.onecUpdatedAt
-                          ? `Обновлено из 1С: ${formatDate(detailCard.onecUpdatedAt)}`
-                          : "Данные обновятся после ответа 1С."}
-                      </p>
                     </section>
                   </Glass>
 
