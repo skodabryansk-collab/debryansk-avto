@@ -21,6 +21,7 @@ import {
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { pruneOneCExchangeLogsIfDue } from "../lib/onec-exchange-log";
+import { syncAllOneCClientCardWorksheets } from "../lib/onec-client-card-divisions";
 
 const router: IRouter = Router();
 router.use(requireAdmin);
@@ -71,8 +72,8 @@ router.get("/status", async (req, res): Promise<void> => {
       token_active: tokenConfigured && process.env["NODE_ENV"] === "production",
       secret_name: "ONEC_CLIENT_CARDS_TOKEN",
       authentication: "Bearer",
-      feed_path: "/api/integrations/1c/v1/client-cards",
-      initial_cursor_path: "/api/integrations/1c/v1/client-cards/initial-cursor",
+      feed_path: "/api/integrations/1c/v2/client-cards",
+      initial_cursor_path: "/api/integrations/1c/v2/client-cards/initial-cursor",
       last_request_at: lastRequest[0]?.createdAt ?? null,
       last_success_at: lastSuccess[0]?.createdAt ?? null,
       requests_24h: totals[0]?.requests ?? 0,
@@ -258,6 +259,7 @@ router.patch("/mappings/organizations/:locationId", async (req, res): Promise<vo
           newCode: code,
           actorLogin: typeof payload?.["login"] === "string" ? payload["login"] : null,
         });
+        await syncAllOneCClientCardWorksheets(tx);
       }
       return { code, confirmed: body.data.confirmed };
     });
@@ -329,6 +331,7 @@ router.patch("/mappings/departments/:brandId", async (req, res): Promise<void> =
           newCode: code,
           actorLogin: typeof payload?.["login"] === "string" ? payload["login"] : null,
         });
+        await syncAllOneCClientCardWorksheets(tx);
       }
       return { code, confirmed: body.data.confirmed };
     });
