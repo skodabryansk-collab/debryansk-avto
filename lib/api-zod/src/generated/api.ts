@@ -771,6 +771,17 @@ export const ListManagerClientCardsResponse = zod.object({
   "onecWorksheetStatus": zod.string().nullable(),
   "onecArchiveReason": zod.string().nullable(),
   "onecUpdatedAt": zod.coerce.date().nullable(),
+  "onecWorksheets": zod.array(zod.object({
+  "id": zod.number(),
+  "sourceKey": zod.string(),
+  "organizationCode": zod.string(),
+  "departmentCode": zod.string(),
+  "brandNames": zod.array(zod.string()),
+  "dealerManager": zod.string().nullable(),
+  "worksheetStatus": zod.string().nullable(),
+  "archiveReason": zod.string().nullable(),
+  "onecUpdatedAt": zod.coerce.date().nullable()
+})),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
   "editHistory": zod.array(zod.object({
@@ -1039,6 +1050,240 @@ export const GetOneCClientCardsResponse = zod.object({
 })),
   "next_cursor": zod.number(),
   "has_more": zod.boolean()
+})
+})
+
+
+/**
+ * Each item is a separate 1C integration worksheet linked to one manager worksheet. Needs and the offered vehicle are grouped by the exact organization_code and department_code pair. Different brands with the same pair are combined into one item; a different pair gets its own ID. The caller must persist next_cursor only after importing every returned item.
+
+ * @summary Poll integration worksheets grouped by organization and department
+ */
+export const getOneCDivisionWorksheetsQueryAfterIdMin = 0;
+
+export const getOneCDivisionWorksheetsQueryLimitDefault = 100;
+export const getOneCDivisionWorksheetsQueryLimitMax = 100;
+
+
+
+export const GetOneCDivisionWorksheetsQueryParams = zod.object({
+  "after_id": zod.coerce.number().min(getOneCDivisionWorksheetsQueryAfterIdMin).describe('Last integration worksheet ID successfully imported by 1C'),
+  "limit": zod.coerce.number().min(1).max(getOneCDivisionWorksheetsQueryLimitMax).default(getOneCDivisionWorksheetsQueryLimitDefault)
+})
+
+export const getOneCDivisionWorksheetsResponseDataItemsItemNeedsItemPlannedPurchaseDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const GetOneCDivisionWorksheetsResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "source_key": zod.string(),
+  "manager_worksheet_id": zod.number(),
+  "created_at": zod.coerce.date(),
+  "manager_id": zod.number(),
+  "manager_name": zod.string().nullable(),
+  "organization_code": zod.string(),
+  "department_code": zod.string(),
+  "brand_names": zod.array(zod.string()),
+  "client_name": zod.string(),
+  "client_phone": zod.string(),
+  "client_gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullable(),
+  "needs": zod.array(zod.object({
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "undecided": zod.boolean(),
+  "budget_range": zod.union([zod.literal('Не указан'),zod.literal('до 2 млн'),zod.literal('2–3 млн'),zod.literal('3–5 млн'),zod.literal('5+ млн'),zod.literal(null)]).nullable(),
+  "planned_purchase_date": zod.string().regex(getOneCDivisionWorksheetsResponseDataItemsItemNeedsItemPlannedPurchaseDateRegExp).nullable(),
+  "organization_code": zod.string().nullable(),
+  "department_code": zod.string().nullable()
+})),
+  "current_cars": zod.array(zod.object({
+  "brand": zod.string(),
+  "model": zod.string(),
+  "year": zod.number(),
+  "mileage": zod.number(),
+  "generation": zod.string().nullable(),
+  "body_type": zod.string().nullable(),
+  "owners_count": zod.string().nullable(),
+  "trade_in_plan": zod.union([zod.literal('Да'),zod.literal('Нет'),zod.literal('Пока не решил'),zod.literal(null)]).nullable()
+})),
+  "commercial_offer": zod.union([zod.object({
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "car_vin": zod.string().nullable(),
+  "car": zod.union([zod.object({
+  "vin": zod.string().nullable(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "year": zod.number().nullable(),
+  "modification": zod.string().nullable(),
+  "complectation": zod.string().nullable(),
+  "color": zod.string().nullable(),
+  "price": zod.number().nullable()
+}),zod.null()]),
+  "organization_code": zod.string().nullable(),
+  "department_code": zod.string().nullable()
+}),zod.null()]),
+  "payment_method": zod.union([zod.literal('Кредит'),zod.literal('Лизинг'),zod.literal('Наличные / Безнал'),zod.literal(null)]).nullable(),
+  "comment": zod.string().nullable()
+})),
+  "next_cursor": zod.number(),
+  "has_more": zod.boolean(),
+  "pending_count": zod.number().describe('Manager worksheets with brands that still need a confirmed 1C organization or department mapping')
+})
+})
+
+
+/**
+ * Call once during initial setup to skip historical rows, then poll the v2 feed.
+ * @summary Get the starting ID cursor for division worksheets
+ */
+export const GetOneCDivisionWorksheetsInitialCursorResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.object({
+  "after_id": zod.number(),
+  "as_of": zod.coerce.date()
+})
+})
+
+
+/**
+ * Returns one event per changed integration worksheet. `upsert` contains the latest worksheet; `delete` removes that source_key in 1C. The manager worksheet remains a single record in the admin panel.
+
+ * @summary Poll changes and deletions for division worksheets
+ */
+export const getOneCDivisionWorksheetChangesQueryAfterChangeIdMin = 0;
+
+export const getOneCDivisionWorksheetChangesQueryLimitDefault = 100;
+export const getOneCDivisionWorksheetChangesQueryLimitMax = 100;
+
+
+
+export const GetOneCDivisionWorksheetChangesQueryParams = zod.object({
+  "after_change_id": zod.coerce.number().min(getOneCDivisionWorksheetChangesQueryAfterChangeIdMin).describe('Last change ID successfully processed by 1C'),
+  "limit": zod.coerce.number().min(1).max(getOneCDivisionWorksheetChangesQueryLimitMax).default(getOneCDivisionWorksheetChangesQueryLimitDefault)
+})
+
+export const getOneCDivisionWorksheetChangesResponseDataEventsItemItemOneNeedsItemPlannedPurchaseDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const GetOneCDivisionWorksheetChangesResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.object({
+  "events": zod.array(zod.object({
+  "change_id": zod.number(),
+  "action": zod.enum(['upsert', 'delete']),
+  "worksheet_id": zod.number(),
+  "manager_worksheet_id": zod.number(),
+  "source_key": zod.string(),
+  "changed_at": zod.coerce.date(),
+  "item": zod.union([zod.object({
+  "id": zod.number(),
+  "source_key": zod.string(),
+  "manager_worksheet_id": zod.number(),
+  "created_at": zod.coerce.date(),
+  "manager_id": zod.number(),
+  "manager_name": zod.string().nullable(),
+  "organization_code": zod.string(),
+  "department_code": zod.string(),
+  "brand_names": zod.array(zod.string()),
+  "client_name": zod.string(),
+  "client_phone": zod.string(),
+  "client_gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullable(),
+  "needs": zod.array(zod.object({
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "undecided": zod.boolean(),
+  "budget_range": zod.union([zod.literal('Не указан'),zod.literal('до 2 млн'),zod.literal('2–3 млн'),zod.literal('3–5 млн'),zod.literal('5+ млн'),zod.literal(null)]).nullable(),
+  "planned_purchase_date": zod.string().regex(getOneCDivisionWorksheetChangesResponseDataEventsItemItemOneNeedsItemPlannedPurchaseDateRegExp).nullable(),
+  "organization_code": zod.string().nullable(),
+  "department_code": zod.string().nullable()
+})),
+  "current_cars": zod.array(zod.object({
+  "brand": zod.string(),
+  "model": zod.string(),
+  "year": zod.number(),
+  "mileage": zod.number(),
+  "generation": zod.string().nullable(),
+  "body_type": zod.string().nullable(),
+  "owners_count": zod.string().nullable(),
+  "trade_in_plan": zod.union([zod.literal('Да'),zod.literal('Нет'),zod.literal('Пока не решил'),zod.literal(null)]).nullable()
+})),
+  "commercial_offer": zod.union([zod.object({
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "car_vin": zod.string().nullable(),
+  "car": zod.union([zod.object({
+  "vin": zod.string().nullable(),
+  "brand": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "year": zod.number().nullable(),
+  "modification": zod.string().nullable(),
+  "complectation": zod.string().nullable(),
+  "color": zod.string().nullable(),
+  "price": zod.number().nullable()
+}),zod.null()]),
+  "organization_code": zod.string().nullable(),
+  "department_code": zod.string().nullable()
+}),zod.null()]),
+  "payment_method": zod.union([zod.literal('Кредит'),zod.literal('Лизинг'),zod.literal('Наличные / Безнал'),zod.literal(null)]).nullable(),
+  "comment": zod.string().nullable()
+}),zod.null()])
+})),
+  "next_cursor": zod.number(),
+  "has_more": zod.boolean()
+})
+})
+
+
+/**
+ * Call once during initial setup if historical edit events should not be replayed.
+ * @summary Get the starting cursor for division worksheet changes
+ */
+export const GetOneCDivisionWorksheetChangesInitialCursorResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.object({
+  "after_change_id": zod.number(),
+  "as_of": zod.coerce.date()
+})
+})
+
+
+/**
+ * `id` is the division integration worksheet ID, not the manager worksheet ID. Status and archive reason are saved independently for this organization/department pair.
+
+ * @summary Send manager and worksheet status for one division record
+ */
+
+
+
+export const UpdateOneCDivisionWorksheetMetadataParams = zod.object({
+  "id": zod.coerce.number().min(1).describe('Division integration worksheet ID returned by the v2 feed')
+})
+
+export const updateOneCDivisionWorksheetMetadataBodyDealerManagerMax = 160;
+
+export const updateOneCDivisionWorksheetMetadataBodyArchiveReasonMax = 1000;
+
+
+
+export const UpdateOneCDivisionWorksheetMetadataBody = zod.object({
+  "dealer_manager": zod.string().max(updateOneCDivisionWorksheetMetadataBodyDealerManagerMax).nullish(),
+  "worksheet_status": zod.union([zod.literal('Создан'),zod.literal('В работе'),zod.literal('Проверка перед закрытием'),zod.literal('Архив'),zod.literal('Завершен'),zod.literal(null)]).nullish(),
+  "archive_reason": zod.string().max(updateOneCDivisionWorksheetMetadataBodyArchiveReasonMax).nullish()
+})
+
+export const UpdateOneCDivisionWorksheetMetadataResponse = zod.object({
+  "ok": zod.boolean(),
+  "data": zod.object({
+  "worksheet_id": zod.number(),
+  "manager_worksheet_id": zod.number(),
+  "dealer_manager": zod.string().nullable(),
+  "worksheet_status": zod.string().nullable(),
+  "archive_reason": zod.string().nullable(),
+  "received_at": zod.coerce.date()
 })
 })
 
@@ -1607,6 +1852,17 @@ export const GetManagerClientCardResponse = zod.object({
   "onecWorksheetStatus": zod.string().nullable(),
   "onecArchiveReason": zod.string().nullable(),
   "onecUpdatedAt": zod.coerce.date().nullable(),
+  "onecWorksheets": zod.array(zod.object({
+  "id": zod.number(),
+  "sourceKey": zod.string(),
+  "organizationCode": zod.string(),
+  "departmentCode": zod.string(),
+  "brandNames": zod.array(zod.string()),
+  "dealerManager": zod.string().nullable(),
+  "worksheetStatus": zod.string().nullable(),
+  "archiveReason": zod.string().nullable(),
+  "onecUpdatedAt": zod.coerce.date().nullable()
+})),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
   "editHistory": zod.array(zod.object({
