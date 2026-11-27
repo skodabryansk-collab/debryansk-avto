@@ -477,6 +477,22 @@ export interface ManagerClientCurrentCar {
   tradeInPlan: ManagerClientCurrentCarTradeInPlan;
 }
 
+export interface ManagerClientCardOneCWorksheet {
+  id: number;
+  sourceKey: string;
+  organizationCode: string;
+  departmentCode: string;
+  brandNames: string[];
+  /** @nullable */
+  dealerManager: string | null;
+  /** @nullable */
+  worksheetStatus: string | null;
+  /** @nullable */
+  archiveReason: string | null;
+  /** @nullable */
+  onecUpdatedAt: string | null;
+}
+
 /**
  * @nullable
  */
@@ -566,6 +582,7 @@ export interface ManagerClientCard {
   onecArchiveReason: string | null;
   /** @nullable */
   onecUpdatedAt: string | null;
+  onecWorksheets: ManagerClientCardOneCWorksheet[];
   createdAt: string;
   updatedAt: string;
   editHistory?: ManagerClientCardEditHistoryEntry[];
@@ -1197,6 +1214,117 @@ export interface OneCClientCardMetadataUpdateResponse {
   data: OneCClientCardMetadataUpdateResponseData;
 }
 
+/**
+ * @nullable
+ */
+export type OneCDivisionWorksheetItemClientGender = typeof OneCDivisionWorksheetItemClientGender[keyof typeof OneCDivisionWorksheetItemClientGender] | null;
+
+
+export const OneCDivisionWorksheetItemClientGender = {
+  male: 'male',
+  female: 'female',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OneCDivisionWorksheetItemPaymentMethod = typeof OneCDivisionWorksheetItemPaymentMethod[keyof typeof OneCDivisionWorksheetItemPaymentMethod] | null;
+
+
+export const OneCDivisionWorksheetItemPaymentMethod = {
+  Кредит: 'Кредит',
+  Лизинг: 'Лизинг',
+  'Наличные_/_Безнал': 'Наличные / Безнал',
+} as const;
+
+export interface OneCDivisionWorksheetItem {
+  id: number;
+  source_key: string;
+  manager_worksheet_id: number;
+  created_at: string;
+  manager_id: number;
+  /** @nullable */
+  manager_name: string | null;
+  organization_code: string;
+  department_code: string;
+  brand_names: string[];
+  client_name: string;
+  client_phone: string;
+  /** @nullable */
+  client_gender: OneCDivisionWorksheetItemClientGender;
+  needs: OneCClientNeed[];
+  current_cars: OneCClientCurrentCar[];
+  commercial_offer: OneCClientCommercialOffer | null;
+  /** @nullable */
+  payment_method: OneCDivisionWorksheetItemPaymentMethod;
+  /** @nullable */
+  comment: string | null;
+}
+
+export interface OneCDivisionWorksheetsPage {
+  items: OneCDivisionWorksheetItem[];
+  next_cursor: number;
+  has_more: boolean;
+  /** Manager worksheets with brands that still need a confirmed 1C organization or department mapping */
+  pending_count: number;
+}
+
+export interface OneCDivisionWorksheetsResponse {
+  ok: boolean;
+  data: OneCDivisionWorksheetsPage;
+}
+
+export type OneCDivisionWorksheetChangeEventAction = typeof OneCDivisionWorksheetChangeEventAction[keyof typeof OneCDivisionWorksheetChangeEventAction];
+
+
+export const OneCDivisionWorksheetChangeEventAction = {
+  upsert: 'upsert',
+  delete: 'delete',
+} as const;
+
+export interface OneCDivisionWorksheetChangeEvent {
+  change_id: number;
+  action: OneCDivisionWorksheetChangeEventAction;
+  worksheet_id: number;
+  manager_worksheet_id: number;
+  source_key: string;
+  changed_at: string;
+  item: OneCDivisionWorksheetItem | null;
+}
+
+export interface OneCDivisionWorksheetChangesPage {
+  events: OneCDivisionWorksheetChangeEvent[];
+  next_cursor: number;
+  has_more: boolean;
+}
+
+export interface OneCDivisionWorksheetChangesResponse {
+  ok: boolean;
+  data: OneCDivisionWorksheetChangesPage;
+}
+
+export interface OneCDivisionWorksheetChangesErrorResponse {
+  ok: boolean;
+  error: string;
+}
+
+export type OneCDivisionMetadataUpdateResponseData = {
+  worksheet_id: number;
+  manager_worksheet_id: number;
+  /** @nullable */
+  dealer_manager: string | null;
+  /** @nullable */
+  worksheet_status: string | null;
+  /** @nullable */
+  archive_reason: string | null;
+  received_at: string;
+};
+
+export interface OneCDivisionMetadataUpdateResponse {
+  ok: boolean;
+  data: OneCDivisionMetadataUpdateResponseData;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -1262,6 +1390,32 @@ export type GetOneCClientCardsParams = {
  * @minimum 0
  */
 after_id: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type GetOneCDivisionWorksheetsParams = {
+/**
+ * Last integration worksheet ID successfully imported by 1C
+ * @minimum 0
+ */
+after_id: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type GetOneCDivisionWorksheetChangesParams = {
+/**
+ * Last change ID successfully processed by 1C
+ * @minimum 0
+ */
+after_change_id: number;
 /**
  * @minimum 1
  * @maximum 100
