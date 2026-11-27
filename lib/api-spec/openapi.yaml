@@ -436,6 +436,230 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+  /integrations/1c/v2/client-cards:
+    get:
+      operationId: getOneCDivisionWorksheets
+      summary: Poll integration worksheets grouped by organization and department
+      description: >
+        Each item is a separate 1C integration worksheet linked to one manager worksheet.
+        Needs and the offered vehicle are grouped by the exact organization_code and department_code pair.
+        Different brands with the same pair are combined into one item; a different pair gets its own ID.
+        The caller must persist next_cursor only after importing every returned item.
+      security:
+        - oneCClientCardsToken: []
+      parameters:
+        - name: after_id
+          in: query
+          required: true
+          description: Last integration worksheet ID successfully imported by 1C
+          schema: { type: integer, minimum: 0 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 100 }
+      responses:
+        "200":
+          description: Next page of division-level integration worksheets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCDivisionWorksheetsResponse"
+        "400":
+          description: Invalid cursor or page size
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "401":
+          description: Missing or invalid dedicated 1C token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "503":
+          description: The 1C token is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "500":
+          description: Internal error while reading the worksheet feed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+  /integrations/1c/v2/client-cards/initial-cursor:
+    get:
+      operationId: getOneCDivisionWorksheetsInitialCursor
+      summary: Get the starting ID cursor for division worksheets
+      description: Call once during initial setup to skip historical rows, then poll the v2 feed.
+      security:
+        - oneCClientCardsToken: []
+      responses:
+        "200":
+          description: Current end of the division worksheet ID sequence
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsInitialCursorResponse"
+        "401":
+          description: Missing or invalid dedicated 1C token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "503":
+          description: The 1C token is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "500":
+          description: Internal error while reading the cursor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+  /integrations/1c/v2/client-cards/changes:
+    get:
+      operationId: getOneCDivisionWorksheetChanges
+      summary: Poll changes and deletions for division worksheets
+      description: >
+        Returns one event per changed integration worksheet. `upsert` contains the latest worksheet;
+        `delete` removes that source_key in 1C. The manager worksheet remains a single record in the admin panel.
+      security:
+        - oneCClientCardsToken: []
+      parameters:
+        - name: after_change_id
+          in: query
+          required: true
+          description: Last change ID successfully processed by 1C
+          schema: { type: integer, minimum: 0 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 100 }
+      responses:
+        "200":
+          description: Next page of division worksheet changes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCDivisionWorksheetChangesResponse"
+        "400":
+          description: Invalid cursor or page size
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCDivisionWorksheetChangesErrorResponse"
+        "401":
+          description: Missing or invalid dedicated 1C token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCDivisionWorksheetChangesErrorResponse"
+        "503":
+          description: The 1C token is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCDivisionWorksheetChangesErrorResponse"
+        "500":
+          description: Internal error while reading the change feed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCDivisionWorksheetChangesErrorResponse"
+  /integrations/1c/v2/client-cards/changes/initial-cursor:
+    get:
+      operationId: getOneCDivisionWorksheetChangesInitialCursor
+      summary: Get the starting cursor for division worksheet changes
+      description: Call once during initial setup if historical edit events should not be replayed.
+      security:
+        - oneCClientCardsToken: []
+      responses:
+        "200":
+          description: Current end of the change sequence
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardChangesInitialCursorResponse"
+        "401":
+          description: Missing or invalid dedicated 1C token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "503":
+          description: The 1C token is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "500":
+          description: Internal error while reading the change cursor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+  /integrations/1c/v2/client-cards/{id}/onec-data:
+    patch:
+      operationId: updateOneCDivisionWorksheetMetadata
+      summary: Send manager and worksheet status for one division record
+      description: >
+        `id` is the division integration worksheet ID, not the manager worksheet ID.
+        Status and archive reason are saved independently for this organization/department pair.
+      security:
+        - oneCClientCardsToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Division integration worksheet ID returned by the v2 feed
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OneCClientCardMetadataUpdate"
+      responses:
+        "200":
+          description: 1C data stored for the division worksheet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCDivisionMetadataUpdateResponse"
+        "400":
+          description: Invalid worksheet ID or update payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "401":
+          description: Missing or invalid dedicated 1C token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "404":
+          description: Division worksheet not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "503":
+          description: The 1C token is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
+        "500":
+          description: Failed to save data received from 1C
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
   /integrations/1c/v1/client-cards/{id}/onec-data:
     patch:
       operationId: updateOneCClientCardMetadata
@@ -1440,9 +1664,24 @@ components:
             - $ref: "#/components/schemas/ManagerClientCarSnapshot"
             - type: "null"
         tradeInPlan: { type: ["string", "null"], enum: ["Да", "Нет", "Пока не решил", null] }
+    ManagerClientCardOneCWorksheet:
+      type: object
+      required: [id, sourceKey, organizationCode, departmentCode, brandNames, dealerManager, worksheetStatus, archiveReason, onecUpdatedAt]
+      properties:
+        id: { type: integer }
+        sourceKey: { type: string }
+        organizationCode: { type: string }
+        departmentCode: { type: string }
+        brandNames:
+          type: array
+          items: { type: string }
+        dealerManager: { type: ["string", "null"] }
+        worksheetStatus: { type: ["string", "null"] }
+        archiveReason: { type: ["string", "null"] }
+        onecUpdatedAt: { type: ["string", "null"], format: date-time }
     ManagerClientCard:
       type: object
-      required: [id, managerId, managerName, clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarBrand, currentCarModel, currentCarYear, currentCarMileage, currentCarGeneration, currentCarBodyType, currentCarOwnersCount, currentCarSnapshot, tradeInPlan, needs, currentCars, commercialBrand, commercialModel, commercialCarId, commercialCarSnapshot, paymentMethod, comment, onecDealerManager, onecWorksheetStatus, onecArchiveReason, onecUpdatedAt, createdAt, updatedAt]
+      required: [id, managerId, managerName, clientName, clientPhone, clientGender, desiredBrand, desiredModel, desiredVehicleUndecided, budgetRange, currentCar, currentCarBrand, currentCarModel, currentCarYear, currentCarMileage, currentCarGeneration, currentCarBodyType, currentCarOwnersCount, currentCarSnapshot, tradeInPlan, needs, currentCars, commercialBrand, commercialModel, commercialCarId, commercialCarSnapshot, paymentMethod, comment, onecDealerManager, onecWorksheetStatus, onecArchiveReason, onecUpdatedAt, onecWorksheets, createdAt, updatedAt]
       properties:
         id: { type: integer }
         managerId: { type: integer }
@@ -1486,6 +1725,9 @@ components:
         onecWorksheetStatus: { type: ["string", "null"] }
         onecArchiveReason: { type: ["string", "null"] }
         onecUpdatedAt: { type: ["string", "null"], format: date-time }
+        onecWorksheets:
+          type: array
+          items: { $ref: "#/components/schemas/ManagerClientCardOneCWorksheet" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         editHistory:
@@ -1928,6 +2170,104 @@ components:
           required: [worksheet_id, dealer_manager, worksheet_status, archive_reason, received_at]
           properties:
             worksheet_id: { type: integer }
+            dealer_manager: { type: ["string", "null"] }
+            worksheet_status: { type: ["string", "null"] }
+            archive_reason: { type: ["string", "null"] }
+            received_at: { type: string, format: date-time }
+    OneCDivisionWorksheetItem:
+      type: object
+      required: [id, source_key, manager_worksheet_id, created_at, manager_id, manager_name, organization_code, department_code, brand_names, client_name, client_phone, client_gender, needs, current_cars, commercial_offer, payment_method, comment]
+      properties:
+        id: { type: integer }
+        source_key: { type: string }
+        manager_worksheet_id: { type: integer }
+        created_at: { type: string, format: date-time }
+        manager_id: { type: integer }
+        manager_name: { type: ["string", "null"] }
+        organization_code: { type: string }
+        department_code: { type: string }
+        brand_names:
+          type: array
+          items: { type: string }
+        client_name: { type: string }
+        client_phone: { type: string }
+        client_gender: { type: ["string", "null"], enum: [male, female, null] }
+        needs:
+          type: array
+          items: { $ref: "#/components/schemas/OneCClientNeed" }
+        current_cars:
+          type: array
+          items: { $ref: "#/components/schemas/OneCClientCurrentCar" }
+        commercial_offer:
+          oneOf:
+            - $ref: "#/components/schemas/OneCClientCommercialOffer"
+            - type: "null"
+        payment_method: { type: ["string", "null"], enum: ["Кредит", "Лизинг", "Наличные / Безнал", null] }
+        comment: { type: ["string", "null"] }
+    OneCDivisionWorksheetsPage:
+      type: object
+      required: [items, next_cursor, has_more, pending_count]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OneCDivisionWorksheetItem" }
+        next_cursor: { type: integer }
+        has_more: { type: boolean }
+        pending_count:
+          type: integer
+          description: Manager worksheets with brands that still need a confirmed 1C organization or department mapping
+    OneCDivisionWorksheetsResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data: { $ref: "#/components/schemas/OneCDivisionWorksheetsPage" }
+    OneCDivisionWorksheetChangeEvent:
+      type: object
+      required: [change_id, action, worksheet_id, manager_worksheet_id, source_key, changed_at, item]
+      properties:
+        change_id: { type: integer }
+        action: { type: string, enum: [upsert, delete] }
+        worksheet_id: { type: integer }
+        manager_worksheet_id: { type: integer }
+        source_key: { type: string }
+        changed_at: { type: string, format: date-time }
+        item:
+          oneOf:
+            - $ref: "#/components/schemas/OneCDivisionWorksheetItem"
+            - type: "null"
+    OneCDivisionWorksheetChangesPage:
+      type: object
+      required: [events, next_cursor, has_more]
+      properties:
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/OneCDivisionWorksheetChangeEvent" }
+        next_cursor: { type: integer }
+        has_more: { type: boolean }
+    OneCDivisionWorksheetChangesResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data: { $ref: "#/components/schemas/OneCDivisionWorksheetChangesPage" }
+    OneCDivisionWorksheetChangesErrorResponse:
+      type: object
+      required: [ok, error]
+      properties:
+        ok: { type: boolean }
+        error: { type: string }
+    OneCDivisionMetadataUpdateResponse:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean }
+        data:
+          type: object
+          required: [worksheet_id, manager_worksheet_id, dealer_manager, worksheet_status, archive_reason, received_at]
+          properties:
+            worksheet_id: { type: integer }
+            manager_worksheet_id: { type: integer }
             dealer_manager: { type: ["string", "null"] }
             worksheet_status: { type: ["string", "null"] }
             archive_reason: { type: ["string", "null"] }
