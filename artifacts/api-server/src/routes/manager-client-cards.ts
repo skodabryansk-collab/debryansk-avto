@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { and, count, desc, eq, gte, ilike, isNotNull, lt, or } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, isNotNull, lt, or } from "drizzle-orm";
 import {
   carsTable,
   db,
   managerClientCardHistoryTable,
+  managerClientCardOnecWorksheetsTable,
   managerClientCardsTable,
   managersTable,
 } from "@workspace/db";
@@ -20,6 +21,7 @@ import {
 } from "@workspace/api-zod";
 import { normalizeManagerQuoteBrand } from "../lib/manager-quote-brand";
 import { normalizeRussianPhone, validateClientName } from "../lib/manager-client-cards-validation";
+import { syncOneCClientCardWorksheets } from "../lib/onec-client-card-divisions";
 import { getManagerPayload, requireManager } from "../middlewares/requireManager";
 
 const router = Router();
@@ -464,6 +466,37 @@ const cardProjection = {
   updatedAt: managerClientCardsTable.updatedAt,
 };
 
+async function addOneCWorksheets<T extends { id: number }>(cards: T[]) {
+  if (cards.length === 0) return cards.map(card => ({ ...card, onecWorksheets: [] }));
+  const worksheetRows = await db.select({
+    id: managerClientCardOnecWorksheetsTable.id,
+    cardId: managerClientCardOnecWorksheetsTable.cardId,
+    sourceKey: managerClientCardOnecWorksheetsTable.sourceKey,
+    organizationCode: managerClientCardOnecWorksheetsTable.organizationCode,
+    departmentCode: managerClientCardOnecWorksheetsTable.departmentCode,
+    brandNames: managerClientCardOnecWorksheetsTable.brandNames,
+    dealerManager: managerClientCardOnecWorksheetsTable.dealerManager,
+    worksheetStatus: managerClientCardOnecWorksheetsTable.worksheetStatus,
+    archiveReason: managerClientCardOnecWorksheetsTable.archiveReason,
+    onecUpdatedAt: managerClientCardOnecWorksheetsTable.onecUpdatedAt,
+  })
+    .from(managerClientCardOnecWorksheetsTable)
+    .where(and(
+      inArray(managerClientCardOnecWorksheetsTable.cardId, cards.map(card => card.id)),
+      eq(managerClientCardOnecWorksheetsTable.isActive, true),
+    ));
+  const worksheetsByCardId = new Map<number, typeof worksheetRows>();
+  for (const worksheet of worksheetRows) {
+    const group = worksheetsByCardId.get(worksheet.cardId) ?? [];
+    group.push(worksheet);
+    worksheetsByCardId.set(worksheet.cardId, group);
+  }
+  return cards.map(card => ({
+    ...card,
+    onecWorksheets: (worksheetsByCardId.get(card.id) ?? []).map(({ cardId: _cardId, ...worksheet }) => worksheet),
+  }));
+}
+
 function csvCell(value: unknown): string {
   let text = value == null ? "" : value instanceof Date ? value.toISOString() : String(value);
   if (/^[\s]*[=+\-@]/.test(text)) text = `'${text}`;
@@ -544,11 +577,12 @@ router.get("/client-cards", async (req, res): Promise<void> => {
       .orderBy(desc(managerClientCardsTable.createdAt))
       .limit(filters.pageSize)
       .offset((filters.page - 1) * filters.pageSize);
+    const cardsWithOneC = await addOneCWorksheets(cards);
 
     res.json(ListManagerClientCardsResponse.parse({
       ok: true,
       data: {
-        items: cards,
+        items: cardsWithOneC,
         total: totalRow?.total ?? 0,
         page: filters.page,
         pageSize: filters.pageSize,
@@ -864,6 +898,7 @@ router.get("/client-cards/:id", async (req, res): Promise<void> => {
       res.status(404).json({ ok: false, error: "Рабочий лист не найден" });
       return;
     }
+    const [cardWithOneC] = await addOneCWorksheets([card]);
     const editHistory = await db.select({
       id: managerClientCardHistoryTable.id,
       editorName: managerClientCardHistoryTable.editorName,
@@ -876,7 +911,7 @@ router.get("/client-cards/:id", async (req, res): Promise<void> => {
       .orderBy(desc(managerClientCardHistoryTable.id));
     res.json(GetManagerClientCardResponse.parse({
       ok: true,
-      data: { ...card, editHistory },
+      data: { ...cardWithOneC!, editHistory },
     }));
   } catch (error) {
     req.log.error({ err: error, id }, "Manager client card details failed");
@@ -1044,6 +1079,7 @@ router.put("/client-cards/:id", async (req, res): Promise<void> => {
         currentBrands: cardBrands(values),
         createdAt: updatedAt,
       });
+      await syncOneCClientCardWorksheets(tx, id);
       return { status: 200 as const, id, changed: true, updatedAt };
     });
 
@@ -1150,36 +1186,41 @@ router.post("/client-cards", async (req, res): Promise<void> => {
     const commercialBrand = input.commercialBrand || (commercialCarSnapshot?.["brand"] as string | null | undefined) || null;
     const commercialModel = input.commercialModel || (commercialCarSnapshot?.["model"] as string | null | undefined) || null;
 
-    const [created] = await db.insert(managerClientCardsTable).values({
-      managerId: scope.managerId,
-      clientName: input.clientName,
-      clientPhone: input.clientPhone,
-      clientGender: input.clientGender,
-      desiredBrand: input.desiredBrand,
-      desiredModel: input.desiredModel,
-      desiredVehicleUndecided: input.desiredVehicleUndecided,
-      budgetRange: input.budgetRange,
-      needs: input.needs,
-      currentCar: currentCar || null,
-      currentCarBrand: firstCurrentCar?.brand ?? null,
-      currentCarModel: firstCurrentCar?.model ?? null,
-      currentCarYear: firstCurrentCar?.year ?? null,
-      currentCarMileage: firstCurrentCar?.mileage ?? null,
-      currentCarGeneration: firstCurrentCar?.generation ?? null,
-      currentCarBodyType: firstCurrentCar?.bodyType ?? null,
-      currentCarOwnersCount: firstCurrentCar?.ownersCount ?? null,
-      currentCarSnapshot,
-      currentCars,
-      tradeInPlan: firstCurrentCar?.tradeInPlan ?? null,
-      commercialBrand,
-      commercialModel,
-      commercialCarId: input.commercialCarId || null,
-      commercialCarSnapshot,
-      paymentMethod: input.paymentMethod || null,
-      comment: input.comment,
-    }).returning({
-      id: managerClientCardsTable.id,
-      createdAt: managerClientCardsTable.createdAt,
+    const created = await db.transaction(async tx => {
+      const [card] = await tx.insert(managerClientCardsTable).values({
+        managerId: scope.managerId!,
+        clientName: input.clientName,
+        clientPhone: input.clientPhone,
+        clientGender: input.clientGender,
+        desiredBrand: input.desiredBrand,
+        desiredModel: input.desiredModel,
+        desiredVehicleUndecided: input.desiredVehicleUndecided,
+        budgetRange: input.budgetRange,
+        needs: input.needs,
+        currentCar: currentCar || null,
+        currentCarBrand: firstCurrentCar?.brand ?? null,
+        currentCarModel: firstCurrentCar?.model ?? null,
+        currentCarYear: firstCurrentCar?.year ?? null,
+        currentCarMileage: firstCurrentCar?.mileage ?? null,
+        currentCarGeneration: firstCurrentCar?.generation ?? null,
+        currentCarBodyType: firstCurrentCar?.bodyType ?? null,
+        currentCarOwnersCount: firstCurrentCar?.ownersCount ?? null,
+        currentCarSnapshot,
+        currentCars,
+        tradeInPlan: firstCurrentCar?.tradeInPlan ?? null,
+        commercialBrand,
+        commercialModel,
+        commercialCarId: input.commercialCarId || null,
+        commercialCarSnapshot,
+        paymentMethod: input.paymentMethod || null,
+        comment: input.comment,
+      }).returning({
+        id: managerClientCardsTable.id,
+        createdAt: managerClientCardsTable.createdAt,
+      });
+      if (!card) throw new Error("Manager client card insert returned no row");
+      await syncOneCClientCardWorksheets(tx, card.id);
+      return card;
     });
 
     res.status(201).json({ ok: true, data: created });
