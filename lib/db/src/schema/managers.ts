@@ -100,6 +100,7 @@ export const managerClientCardsTable = pgTable("manager_client_cards", {
   onecWorksheetStatus: text("onec_worksheet_status"),
   onecArchiveReason: text("onec_archive_reason"),
   onecUpdatedAt: timestamp("onec_updated_at", { withTimezone: true }),
+  onecSyncPending: boolean("onec_sync_pending").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
