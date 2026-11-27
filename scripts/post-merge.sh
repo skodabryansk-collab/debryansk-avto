@@ -11,3 +11,5 @@ psql "$DATABASE_URL" --set ON_ERROR_STOP=1 --file lib/db/migrations/20261120_man
 psql "$DATABASE_URL" --set ON_ERROR_STOP=1 --file lib/db/migrations/20261120_onec_client_card_codes.sql
 psql "$DATABASE_URL" --set ON_ERROR_STOP=1 --file lib/db/migrations/20261120_onec_exchange_logs.sql
 psql "$DATABASE_URL" --set ON_ERROR_STOP=1 --file lib/db/migrations/20261121_manager_client_card_onec_metadata.sql
+psql "$DATABASE_URL" --set ON_ERROR_STOP=1 --file lib/db/migrations/20261121_manager_client_card_onec_archive_reason.sql
+psql "$DATABASE_URL" --set ON_ERROR_STOP=1 --file lib/db/migrations/20261127_manager_client_card_onec_divisions.sql
