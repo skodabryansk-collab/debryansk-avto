@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
-import { asc, eq, gt, inArray, max } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, max } from "drizzle-orm";
 import {
   GetOneCClientCardChangesInitialCursorResponse,
   GetOneCClientCardChangesQueryParams,
@@ -17,6 +17,7 @@ import {
   carsTable,
   db,
   managerClientCardHistoryTable,
+  managerClientCardOnecWorksheetsTable,
   locationsTable,
   locationBrandsTable,
   managerClientCardsTable,
@@ -34,7 +35,7 @@ type FeedError = {
   missing_fields?: string[];
 };
 
-type MappingRow = {
+export type MappingRow = {
   brandId: number;
   brandName: string;
   departmentCode: string | null;
@@ -56,7 +57,7 @@ type OneCRequestAudit = {
   entityName?: string | null;
 };
 
-type OneCCardFeedRow = {
+export type OneCCardFeedRow = {
   id: number;
   managerId: number;
   managerName: string | null;
@@ -235,6 +236,19 @@ router.patch("/client-cards/:id/onec-data", async (req, res): Promise<void> => {
       return;
     }
 
+    await db.update(managerClientCardOnecWorksheetsTable)
+      .set({
+        dealerManager: card.dealerManager,
+        worksheetStatus: card.worksheetStatus,
+        archiveReason: card.archiveReason,
+        onecUpdatedAt: card.receivedAt,
+        updatedAt: card.receivedAt ?? new Date(),
+      })
+      .where(and(
+        eq(managerClientCardOnecWorksheetsTable.cardId, card.id),
+        eq(managerClientCardOnecWorksheetsTable.isActive, true),
+      ));
+
     res.json(UpdateOneCClientCardMetadataResponse.parse({
       ok: true,
       data: {
@@ -295,7 +309,7 @@ function getCommercialCarSummary(snapshotValue: unknown) {
   };
 }
 
-async function getBrandLocationMappings(): Promise<MappingRow[]> {
+export async function getBrandLocationMappings(): Promise<MappingRow[]> {
   const rows = await db
     .select({
       brandId: brandsTable.id,
@@ -402,7 +416,7 @@ function findMapping(brandName: string | null, mappings: MappingRow[]): MappingR
   return matching.find(item => item.locationId !== null && locationIds.size === 1) ?? null;
 }
 
-function buildOneCClientCardFeedItem(card: OneCCardFeedRow, mappings: MappingRow[]) {
+export function buildOneCClientCardFeedItem(card: OneCCardFeedRow, mappings: MappingRow[]) {
   const needs = needsForCard(card);
   const currentCars = currentCarsForCard(card);
   const mappedNeeds = needs.map(need => {
