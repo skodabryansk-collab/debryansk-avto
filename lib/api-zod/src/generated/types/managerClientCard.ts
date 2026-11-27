@@ -7,6 +7,7 @@
  */
 import type { ManagerClientCardClientGender } from './managerClientCardClientGender';
 import type { ManagerClientCardEditHistoryEntry } from './managerClientCardEditHistoryEntry';
+import type { ManagerClientCardOneCWorksheet } from './managerClientCardOneCWorksheet';
 import type { ManagerClientCarSnapshot } from './managerClientCarSnapshot';
 import type { ManagerClientCurrentCar } from './managerClientCurrentCar';
 import type { ManagerClientNeed } from './managerClientNeed';
@@ -67,6 +68,7 @@ export interface ManagerClientCard {
   onecArchiveReason: string | null;
   /** @nullable */
   onecUpdatedAt: Date | null;
+  onecWorksheets: ManagerClientCardOneCWorksheet[];
   createdAt: Date;
   updatedAt: Date;
   editHistory?: ManagerClientCardEditHistoryEntry[];
