@@ -444,22 +444,25 @@ paths:
         Each item is a separate 1C integration worksheet linked to one manager worksheet.
         Needs and the offered vehicle are grouped by the exact organization_code and department_code pair.
         Different brands with the same pair are combined into one item; a different pair gets its own ID.
-        The caller must persist next_cursor only after importing every returned item.
+        Only active worksheets without a 1C business status are returned. A successful import must be
+        acknowledged with worksheet_status "Создан"; afterward the item no longer appears in this feed.
+        Start each new scan from after_id=0. Use next_cursor only to paginate within that scan, and do not
+        persist it between scans. For edits and deletions, use the separate changes feed and its cursor.
       security:
         - oneCClientCardsToken: []
       parameters:
         - name: after_id
           in: query
-          required: true
-          description: Last integration worksheet ID successfully imported by 1C
-          schema: { type: integer, minimum: 0 }
+          required: false
+          description: Last ID from the current scan page; omit or pass 0 to start a new scan
+          schema: { type: integer, minimum: 0, default: 0 }
         - name: limit
           in: query
           required: false
           schema: { type: integer, minimum: 1, maximum: 100, default: 100 }
       responses:
         "200":
-          description: Next page of division-level integration worksheets
+          description: Page of active worksheets without a 1C business status
           content:
             application/json:
               schema:
@@ -484,38 +487,6 @@ paths:
                 $ref: "#/components/schemas/OneCClientCardsErrorResponse"
         "500":
           description: Internal error while reading the worksheet feed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
-  /integrations/1c/v2/client-cards/initial-cursor:
-    get:
-      operationId: getOneCDivisionWorksheetsInitialCursor
-      summary: Get the starting ID cursor for division worksheets
-      description: Call once during initial setup to skip historical rows, then poll the v2 feed.
-      security:
-        - oneCClientCardsToken: []
-      responses:
-        "200":
-          description: Current end of the division worksheet ID sequence
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/OneCClientCardsInitialCursorResponse"
-        "401":
-          description: Missing or invalid dedicated 1C token
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
-        "503":
-          description: The 1C token is not configured
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/OneCClientCardsErrorResponse"
-        "500":
-          description: Internal error while reading the cursor
           content:
             application/json:
               schema:
@@ -1877,14 +1848,14 @@ components:
           items: { $ref: "#/components/schemas/ManagerClientCardInventoryItem" }
     OneCAdminStatus:
       type: object
-      required: [token_configured, token_active, secret_name, authentication, feed_path, initial_cursor_path, last_request_at, last_success_at, requests_24h, failures_24h]
+      required: [token_configured, token_active, secret_name, authentication, feed_path, changes_initial_cursor_path, last_request_at, last_success_at, requests_24h, failures_24h]
       properties:
         token_configured: { type: boolean }
         token_active: { type: boolean }
         secret_name: { type: string }
         authentication: { type: string }
         feed_path: { type: string }
-        initial_cursor_path: { type: string }
+        changes_initial_cursor_path: { type: string }
         last_request_at: { type: ["string", "null"], format: date-time }
         last_success_at: { type: ["string", "null"], format: date-time }
         requests_24h: { type: integer }
