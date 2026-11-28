@@ -538,13 +538,6 @@ test("1C v2 creates one integration worksheet per unique organization and depart
       "Content-Type": "application/json",
     };
 
-    const initialCursorResponse = await fetch(
-      `${started.baseUrl}/api/integrations/1c/v2/client-cards/initial-cursor`,
-      { headers },
-    );
-    assert.equal(initialCursorResponse.status, 200);
-    const initialCursorBody = await initialCursorResponse.json() as { data: { after_id: number } };
-
     const initialChangeCursorResponse = await fetch(
       `${started.baseUrl}/api/integrations/1c/v2/client-cards/changes/initial-cursor`,
       { headers },
@@ -608,7 +601,7 @@ test("1C v2 creates one integration worksheet per unique organization and depart
     await db.transaction(tx => syncOneCClientCardWorksheets(tx, cardId!));
 
     const feedResponse = await fetch(
-      `${started.baseUrl}/api/integrations/1c/v2/client-cards?after_id=${initialCursorBody.data.after_id}&limit=100`,
+      `${started.baseUrl}/api/integrations/1c/v2/client-cards?limit=100`,
       { headers },
     );
     assert.equal(feedResponse.status, 200);
@@ -643,12 +636,31 @@ test("1C v2 creates one integration worksheet per unique organization and depart
     assert.equal(separateDivision.commercial_offer?.car_vin, "TESTVIN0000000001");
     assert.equal(feedBody.data.pending_count >= 0, true);
 
+    const receivedResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v2/client-cards/${sharedDivision.id}/onec-data`,
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ dealer_manager: "Менеджер подразделения", worksheet_status: "Создан" }),
+      },
+    );
+    assert.equal(receivedResponse.status, 200);
+    const remainingPendingResponse = await fetch(
+      `${started.baseUrl}/api/integrations/1c/v2/client-cards?limit=100`,
+      { headers },
+    );
+    assert.equal(remainingPendingResponse.status, 200);
+    const remainingPendingBody = await remainingPendingResponse.json() as {
+      data: { items: Array<{ id: number }> };
+    };
+    assert.deepEqual(remainingPendingBody.data.items.map(item => item.id), [separateDivision.id]);
+
     const statusResponse = await fetch(
       `${started.baseUrl}/api/integrations/1c/v2/client-cards/${sharedDivision.id}/onec-data`,
       {
         method: "PATCH",
         headers,
-        body: JSON.stringify({ dealer_manager: "Менеджер подразделения", worksheet_status: "В работе" }),
+        body: JSON.stringify({ worksheet_status: "В работе" }),
       },
     );
     assert.equal(statusResponse.status, 200);
