@@ -831,7 +831,7 @@ export interface OneCAdminStatus {
   secret_name: string;
   authentication: string;
   feed_path: string;
-  initial_cursor_path: string;
+  changes_initial_cursor_path: string;
   /** @nullable */
   last_request_at: string | null;
   /** @nullable */
@@ -1399,10 +1399,10 @@ limit?: number;
 
 export type GetOneCDivisionWorksheetsParams = {
 /**
- * Last integration worksheet ID successfully imported by 1C
+ * Last ID from the current scan page; omit or pass 0 to start a new scan
  * @minimum 0
  */
-after_id: number;
+after_id?: number;
 /**
  * @minimum 1
  * @maximum 100
