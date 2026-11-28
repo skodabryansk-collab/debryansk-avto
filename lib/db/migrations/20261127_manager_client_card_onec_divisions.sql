@@ -28,6 +28,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS manager_client_card_onec_worksheets_division_u
   ON public.manager_client_card_onec_worksheets (card_id, organization_code, department_code);
 CREATE INDEX IF NOT EXISTS manager_client_card_onec_worksheets_active_id_idx
   ON public.manager_client_card_onec_worksheets (is_active, id);
+CREATE INDEX IF NOT EXISTS manager_client_card_onec_worksheets_unacknowledged_idx
+  ON public.manager_client_card_onec_worksheets (id)
+  WHERE is_active = true AND onec_worksheet_status IS NULL;
 CREATE INDEX IF NOT EXISTS manager_client_card_onec_worksheets_card_active_idx
   ON public.manager_client_card_onec_worksheets (card_id, is_active);
 
