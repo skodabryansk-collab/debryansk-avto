@@ -1055,7 +1055,7 @@ export const GetOneCClientCardsResponse = zod.object({
 
 
 /**
- * Each item is a separate 1C integration worksheet linked to one manager worksheet. Needs and the offered vehicle are grouped by the exact organization_code and department_code pair. Different brands with the same pair are combined into one item; a different pair gets its own ID. Only active worksheets without a 1C business status are returned. A successful import must be acknowledged with worksheet_status "Создан"; afterward the item no longer appears in this feed. Start each new scan from after_id=0. Use next_cursor only to paginate within that scan, and do not persist it between scans. For edits and deletions, use the separate changes feed and its cursor.
+ * Each item is a separate 1C integration worksheet linked to one manager worksheet. Needs and the offered vehicle are grouped by the exact organization_code and department_code pair. Different brands with the same pair are combined into one item; a different pair gets its own ID. Only active worksheets without a 1C business status are returned. A successful import must be acknowledged with worksheet_status "Создан"; afterward the item no longer appears in this feed. Poll the new-record feed without a stored checkpoint: omit after_id at the start of every polling cycle. When has_more is true, next_cursor is only for requesting the next page in that same cycle. A non-empty 1C business status removes the active worksheet from this feed. For edits and deletions, use the separate changes feed and persist its changes cursor only after successfully processing a page.
 
  * @summary Poll integration worksheets grouped by organization and department
  */
@@ -1068,7 +1068,7 @@ export const getOneCDivisionWorksheetsQueryLimitMax = 100;
 
 
 export const GetOneCDivisionWorksheetsQueryParams = zod.object({
-  "after_id": zod.coerce.number().min(getOneCDivisionWorksheetsQueryAfterIdMin).default(getOneCDivisionWorksheetsQueryAfterIdDefault).describe('Last ID from the current scan page; omit or pass 0 to start a new scan'),
+  "after_id": zod.coerce.number().min(getOneCDivisionWorksheetsQueryAfterIdMin).default(getOneCDivisionWorksheetsQueryAfterIdDefault).describe('Last ID from the current page; omit when starting a new polling cycle'),
   "limit": zod.coerce.number().min(1).max(getOneCDivisionWorksheetsQueryLimitMax).default(getOneCDivisionWorksheetsQueryLimitDefault)
 })
 
