@@ -5,7 +5,7 @@ description: Mapping and safety rules for sending manager client worksheets to 1
 
 For the 1C lead feed, the dealership location is the organization and the selected vehicle brand is the department. Resolve that relationship from the project's existing brand-to-location assignments. A brand must resolve to exactly one location before export.
 
-Generated `TMP1C-` values are placeholders only. Do not send them to 1C, even if someone accidentally marks them confirmed. Export is blocked until the official organization and department codes replace them. The initial cursor is for skipping historical worksheets during first-time setup; after that, 1C must persist each returned cursor only after successful import.
+Generated `TMP1C-` values are placeholders only. Do not send them to 1C, even if someone accidentally marks them confirmed. Export is blocked until the official organization and department codes replace them. In v1, the initial cursor can skip historical worksheets. In v2, the new-record feed restarts at `after_id=0` on each polling cycle; `after_id` is only for page traversal. Persist the separate changes-feed cursor only after successfully processing the whole page.
 
 Do not expose `current_car_inventory_id` or `current_cars[].inventory_id` in manager/1C API contracts. The selected commercial car may use an internal numeric database ID inside the admin app, but the 1C contract identifies it by `commercial_car_vin` (nullable when the VIN is unavailable). Each need may also carry an optional planned purchase date as a date-only `YYYY-MM-DD` string.
 
@@ -26,6 +26,12 @@ In the v2 contract, keep one parent manager worksheet in the admin UI but create
 **Why:** the user confirmed that a single client worksheet can cover multiple 1C departments, while 1C reports status independently for each department; matching organization and department codes must share one record.
 
 **How to apply:** use the child integration worksheet ID for 1C status updates, keep its parent card ID only as a link for the portal, and never split records merely because the brand labels differ when both codes are identical.
+
+For v2 new-record polling, return only active division records with no 1C business status. Start each scan at `after_id=0`, using the next ID only to traverse pages. After 1C imports a record, it should send `Создан`; that status removes it from the new-record queue. Use the persistent `after_change_id` only for the separate edits/deletions feed. The same record may appear in both feeds, so 1C must upsert by opaque `source_key`.
+
+**Why:** the user chose status as the acknowledgment for received worksheets, while edits and deletions must still be delivered incrementally.
+
+**How to apply:** do not persist the new-feed page position between polls; persist `after_change_id` after processing a complete changes page; update an existing 1C document by `source_key` rather than creating duplicates.
 
 ## 1C worksheet statuses
 
