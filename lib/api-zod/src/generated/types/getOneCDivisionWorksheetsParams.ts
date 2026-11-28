@@ -8,7 +8,7 @@
 
 export type GetOneCDivisionWorksheetsParams = {
 /**
- * Last ID from the current scan page; omit or pass 0 to start a new scan
+ * Last ID from the current page; omit when starting a new polling cycle
  * @minimum 0
  */
 after_id?: number;
