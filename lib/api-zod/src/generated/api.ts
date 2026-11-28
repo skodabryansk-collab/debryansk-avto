@@ -1055,10 +1055,11 @@ export const GetOneCClientCardsResponse = zod.object({
 
 
 /**
- * Each item is a separate 1C integration worksheet linked to one manager worksheet. Needs and the offered vehicle are grouped by the exact organization_code and department_code pair. Different brands with the same pair are combined into one item; a different pair gets its own ID. The caller must persist next_cursor only after importing every returned item.
+ * Each item is a separate 1C integration worksheet linked to one manager worksheet. Needs and the offered vehicle are grouped by the exact organization_code and department_code pair. Different brands with the same pair are combined into one item; a different pair gets its own ID. Only active worksheets without a 1C business status are returned. A successful import must be acknowledged with worksheet_status "Создан"; afterward the item no longer appears in this feed. Start each new scan from after_id=0. Use next_cursor only to paginate within that scan, and do not persist it between scans. For edits and deletions, use the separate changes feed and its cursor.
 
  * @summary Poll integration worksheets grouped by organization and department
  */
+export const getOneCDivisionWorksheetsQueryAfterIdDefault = 0;
 export const getOneCDivisionWorksheetsQueryAfterIdMin = 0;
 
 export const getOneCDivisionWorksheetsQueryLimitDefault = 100;
@@ -1067,7 +1068,7 @@ export const getOneCDivisionWorksheetsQueryLimitMax = 100;
 
 
 export const GetOneCDivisionWorksheetsQueryParams = zod.object({
-  "after_id": zod.coerce.number().min(getOneCDivisionWorksheetsQueryAfterIdMin).describe('Last integration worksheet ID successfully imported by 1C'),
+  "after_id": zod.coerce.number().min(getOneCDivisionWorksheetsQueryAfterIdMin).default(getOneCDivisionWorksheetsQueryAfterIdDefault).describe('Last ID from the current scan page; omit or pass 0 to start a new scan'),
   "limit": zod.coerce.number().min(1).max(getOneCDivisionWorksheetsQueryLimitMax).default(getOneCDivisionWorksheetsQueryLimitDefault)
 })
 
@@ -1132,19 +1133,6 @@ export const GetOneCDivisionWorksheetsResponse = zod.object({
   "next_cursor": zod.number(),
   "has_more": zod.boolean(),
   "pending_count": zod.number().describe('Manager worksheets with brands that still need a confirmed 1C organization or department mapping')
-})
-})
-
-
-/**
- * Call once during initial setup to skip historical rows, then poll the v2 feed.
- * @summary Get the starting ID cursor for division worksheets
- */
-export const GetOneCDivisionWorksheetsInitialCursorResponse = zod.object({
-  "ok": zod.boolean(),
-  "data": zod.object({
-  "after_id": zod.number(),
-  "as_of": zod.coerce.date()
 })
 })
 
@@ -1502,7 +1490,7 @@ export const GetOneCAdminStatusResponse = zod.object({
   "secret_name": zod.string(),
   "authentication": zod.string(),
   "feed_path": zod.string(),
-  "initial_cursor_path": zod.string(),
+  "changes_initial_cursor_path": zod.string(),
   "last_request_at": zod.coerce.date().nullable(),
   "last_success_at": zod.coerce.date().nullable(),
   "requests_24h": zod.number(),
