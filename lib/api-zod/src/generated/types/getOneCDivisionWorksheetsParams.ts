@@ -8,10 +8,10 @@
 
 export type GetOneCDivisionWorksheetsParams = {
 /**
- * Last integration worksheet ID successfully imported by 1C
+ * Last ID from the current scan page; omit or pass 0 to start a new scan
  * @minimum 0
  */
-after_id: number;
+after_id?: number;
 /**
  * @minimum 1
  * @maximum 100
