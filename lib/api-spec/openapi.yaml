@@ -446,15 +446,17 @@ paths:
         Different brands with the same pair are combined into one item; a different pair gets its own ID.
         Only active worksheets without a 1C business status are returned. A successful import must be
         acknowledged with worksheet_status "Создан"; afterward the item no longer appears in this feed.
-        Start each new scan from after_id=0. Use next_cursor only to paginate within that scan, and do not
-        persist it between scans. For edits and deletions, use the separate changes feed and its cursor.
+        Poll the new-record feed without a stored checkpoint: omit after_id at the start of every polling cycle.
+        When has_more is true, next_cursor is only for requesting the next page in that same cycle. A non-empty
+        1C business status removes the active worksheet from this feed. For edits and deletions, use the separate
+        changes feed and persist its changes cursor only after successfully processing a page.
       security:
         - oneCClientCardsToken: []
       parameters:
         - name: after_id
           in: query
           required: false
-          description: Last ID from the current scan page; omit or pass 0 to start a new scan
+          description: Last ID from the current page; omit when starting a new polling cycle
           schema: { type: integer, minimum: 0, default: 0 }
         - name: limit
           in: query
