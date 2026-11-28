@@ -12,7 +12,7 @@ export interface OneCAdminStatus {
   secret_name: string;
   authentication: string;
   feed_path: string;
-  initial_cursor_path: string;
+  changes_initial_cursor_path: string;
   /** @nullable */
   last_request_at: Date | null;
   /** @nullable */
