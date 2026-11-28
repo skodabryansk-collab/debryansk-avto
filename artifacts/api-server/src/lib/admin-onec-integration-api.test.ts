@@ -61,6 +61,11 @@ test("1C admin journal and settings are admin-only and do not expose the token",
     assert.equal(status["token_configured"], true);
     assert.equal(status["token_active"], true);
     assert.equal(status["secret_name"], "ONEC_CLIENT_CARDS_TOKEN");
+    assert.equal(status["feed_path"], "/api/integrations/1c/v2/client-cards");
+    assert.equal(
+      status["changes_initial_cursor_path"],
+      "/api/integrations/1c/v2/client-cards/changes/initial-cursor",
+    );
     assert.equal("token" in status, false);
     assert.equal("token_value" in status, false);
 
