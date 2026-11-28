@@ -473,9 +473,9 @@ export default function OneCIntegrationPage() {
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <InfoBlock label="Секрет сервера" value={status?.secret_name ?? "ONEC_CLIENT_CARDS_TOKEN"} />
                 <InfoBlock label="Авторизация" value={status?.authentication ?? "Bearer"} />
-                <InfoBlock label="Выгрузка рабочих листов" value={status?.feed_path ?? "/api/integrations/1c/v1/client-cards"} />
-                <InfoBlock label="Первичная настройка курсора" value={status?.initial_cursor_path ?? "/api/integrations/1c/v1/client-cards/initial-cursor"} />
-                <InfoBlock label="Обратное обновление из 1С" value="PATCH /api/integrations/1c/v1/client-cards/{id}/onec-data" />
+                <InfoBlock label="Новые рабочие листы без статуса" value={status?.feed_path ?? "/api/integrations/1c/v2/client-cards"} />
+                <InfoBlock label="Начальный курсор изменений" value={status?.changes_initial_cursor_path ?? "/api/integrations/1c/v2/client-cards/changes/initial-cursor"} />
+                <InfoBlock label="Обратное обновление из 1С" value="PATCH /api/integrations/1c/v2/client-cards/{id}/onec-data" />
               </div>
               <p className="mt-4 rounded-md bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600">
                 Для смены токена обновите серверный секрет и защищённую конфигурацию VPS, затем передайте новый токен в 1С.
