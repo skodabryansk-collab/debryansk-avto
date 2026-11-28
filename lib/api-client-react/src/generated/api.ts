@@ -1250,7 +1250,7 @@ export function useGetOneCClientCards<TData = Awaited<ReturnType<typeof getOneCC
 
 
 
-export const getGetOneCDivisionWorksheetsUrl = (params: GetOneCDivisionWorksheetsParams,) => {
+export const getGetOneCDivisionWorksheetsUrl = (params?: GetOneCDivisionWorksheetsParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -1266,11 +1266,11 @@ export const getGetOneCDivisionWorksheetsUrl = (params: GetOneCDivisionWorksheet
 }
 
 /**
- * Each item is a separate 1C integration worksheet linked to one manager worksheet. Needs and the offered vehicle are grouped by the exact organization_code and department_code pair. Different brands with the same pair are combined into one item; a different pair gets its own ID. The caller must persist next_cursor only after importing every returned item.
+ * Each item is a separate 1C integration worksheet linked to one manager worksheet. Needs and the offered vehicle are grouped by the exact organization_code and department_code pair. Different brands with the same pair are combined into one item; a different pair gets its own ID. Only active worksheets without a 1C business status are returned. A successful import must be acknowledged with worksheet_status "Создан"; afterward the item no longer appears in this feed. Start each new scan from after_id=0. Use next_cursor only to paginate within that scan, and do not persist it between scans. For edits and deletions, use the separate changes feed and its cursor.
 
  * @summary Poll integration worksheets grouped by organization and department
  */
-export const getOneCDivisionWorksheets = async (params: GetOneCDivisionWorksheetsParams, options?: RequestInit): Promise<OneCDivisionWorksheetsResponse> => {
+export const getOneCDivisionWorksheets = async (params?: GetOneCDivisionWorksheetsParams, options?: RequestInit): Promise<OneCDivisionWorksheetsResponse> => {
 
   return customFetch<OneCDivisionWorksheetsResponse>(getGetOneCDivisionWorksheetsUrl(params),
   {
@@ -1292,7 +1292,7 @@ export const getGetOneCDivisionWorksheetsQueryKey = (params?: GetOneCDivisionWor
     }
 
 
-export const getGetOneCDivisionWorksheetsQueryOptions = <TData = Awaited<ReturnType<typeof getOneCDivisionWorksheets>>, TError = ErrorType<OneCClientCardsErrorResponse>>(params: GetOneCDivisionWorksheetsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetOneCDivisionWorksheetsQueryOptions = <TData = Awaited<ReturnType<typeof getOneCDivisionWorksheets>>, TError = ErrorType<OneCClientCardsErrorResponse>>(params?: GetOneCDivisionWorksheetsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -1319,89 +1319,11 @@ export type GetOneCDivisionWorksheetsQueryError = ErrorType<OneCClientCardsError
  */
 
 export function useGetOneCDivisionWorksheets<TData = Awaited<ReturnType<typeof getOneCDivisionWorksheets>>, TError = ErrorType<OneCClientCardsErrorResponse>>(
- params: GetOneCDivisionWorksheetsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetOneCDivisionWorksheetsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetOneCDivisionWorksheetsQueryOptions(params,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-export const getGetOneCDivisionWorksheetsInitialCursorUrl = () => {
-
-
-
-
-  return `/api/integrations/1c/v2/client-cards/initial-cursor`
-}
-
-/**
- * Call once during initial setup to skip historical rows, then poll the v2 feed.
- * @summary Get the starting ID cursor for division worksheets
- */
-export const getOneCDivisionWorksheetsInitialCursor = async ( options?: RequestInit): Promise<OneCClientCardsInitialCursorResponse> => {
-
-  return customFetch<OneCClientCardsInitialCursorResponse>(getGetOneCDivisionWorksheetsInitialCursorUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetOneCDivisionWorksheetsInitialCursorQueryKey = () => {
-    return [
-    `/api/integrations/1c/v2/client-cards/initial-cursor`
-    ] as const;
-    }
-
-
-export const getGetOneCDivisionWorksheetsInitialCursorQueryOptions = <TData = Awaited<ReturnType<typeof getOneCDivisionWorksheetsInitialCursor>>, TError = ErrorType<OneCClientCardsErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheetsInitialCursor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetOneCDivisionWorksheetsInitialCursorQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOneCDivisionWorksheetsInitialCursor>>> = ({ signal }) => getOneCDivisionWorksheetsInitialCursor({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheetsInitialCursor>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetOneCDivisionWorksheetsInitialCursorQueryResult = NonNullable<Awaited<ReturnType<typeof getOneCDivisionWorksheetsInitialCursor>>>
-export type GetOneCDivisionWorksheetsInitialCursorQueryError = ErrorType<OneCClientCardsErrorResponse>
-
-
-/**
- * @summary Get the starting ID cursor for division worksheets
- */
-
-export function useGetOneCDivisionWorksheetsInitialCursor<TData = Awaited<ReturnType<typeof getOneCDivisionWorksheetsInitialCursor>>, TError = ErrorType<OneCClientCardsErrorResponse>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOneCDivisionWorksheetsInitialCursor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetOneCDivisionWorksheetsInitialCursorQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
