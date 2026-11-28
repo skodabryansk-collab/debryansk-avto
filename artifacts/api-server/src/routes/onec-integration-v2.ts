@@ -1,11 +1,10 @@
 import { timingSafeEqual } from "node:crypto";
 import { Router, type Request, type Response } from "express";
-import { and, asc, count, eq, gt, inArray, max } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, isNull, max } from "drizzle-orm";
 import {
   GetOneCDivisionWorksheetChangesInitialCursorResponse,
   GetOneCDivisionWorksheetChangesQueryParams,
   GetOneCDivisionWorksheetChangesResponse,
-  GetOneCDivisionWorksheetsInitialCursorResponse,
   GetOneCDivisionWorksheetsQueryParams,
   GetOneCDivisionWorksheetsResponse,
   UpdateOneCDivisionWorksheetMetadataBody,
@@ -190,24 +189,6 @@ function buildDivisionItem(
   };
 }
 
-router.get("/client-cards/initial-cursor", async (req, res): Promise<void> => {
-  if (!authorize(req, res)) return;
-  try {
-    const [row] = await db.select({ afterId: max(managerClientCardOnecWorksheetsTable.id) })
-      .from(managerClientCardOnecWorksheetsTable);
-    const afterId = Number(row?.afterId ?? 0);
-    setRequestAudit(res, { nextCursor: afterId, hasMore: false });
-    res.json(GetOneCDivisionWorksheetsInitialCursorResponse.parse({
-      ok: true,
-      data: { after_id: afterId, as_of: new Date().toISOString() },
-    }));
-  } catch (error) {
-    setRequestAudit(res, { errorCode: "internal_error" });
-    req.log.error({ err: error }, "1C v2 division worksheet cursor failed");
-    res.status(500).json({ ok: false, error: "internal_error" } satisfies FeedError);
-  }
-});
-
 router.get("/client-cards", async (req, res): Promise<void> => {
   if (!authorize(req, res)) return;
   const parsed = GetOneCDivisionWorksheetsQueryParams.safeParse(req.query);
@@ -217,7 +198,8 @@ router.get("/client-cards", async (req, res): Promise<void> => {
     return;
   }
 
-  const { after_id: afterId, limit } = parsed.data;
+  const { after_id: requestedAfterId, limit } = parsed.data;
+  const afterId = requestedAfterId ?? 0;
   setRequestAudit(res, { afterId });
   try {
     const [pageRows, pendingRows] = await Promise.all([
@@ -233,6 +215,7 @@ router.get("/client-cards", async (req, res): Promise<void> => {
         .where(and(
           gt(managerClientCardOnecWorksheetsTable.id, afterId),
           eq(managerClientCardOnecWorksheetsTable.isActive, true),
+          isNull(managerClientCardOnecWorksheetsTable.worksheetStatus),
         ))
         .orderBy(asc(managerClientCardOnecWorksheetsTable.id))
         .limit(limit + 1),
