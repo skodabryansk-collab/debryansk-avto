@@ -73,7 +73,7 @@ router.get("/status", async (req, res): Promise<void> => {
       secret_name: "ONEC_CLIENT_CARDS_TOKEN",
       authentication: "Bearer",
       feed_path: "/api/integrations/1c/v2/client-cards",
-      initial_cursor_path: "/api/integrations/1c/v2/client-cards/initial-cursor",
+      changes_initial_cursor_path: "/api/integrations/1c/v2/client-cards/changes/initial-cursor",
       last_request_at: lastRequest[0]?.createdAt ?? null,
       last_success_at: lastSuccess[0]?.createdAt ?? null,
       requests_24h: totals[0]?.requests ?? 0,
